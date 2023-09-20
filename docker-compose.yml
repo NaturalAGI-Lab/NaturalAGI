@@ -1,0 +1,32 @@
+version: '3.8'
+services:
+
+  # Nuclio Deployment
+  nuclio-dashboard:
+    image: quay.io/nuclio/dashboard:stable-amd64
+    ports:
+      - "8070:8070"
+    environment:
+      NUCLIO_DASHBOARD_NAMESPACE: nuclio
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      - nuclio-nuctl
+
+  nuclio-nuctl:
+    image: nuclio/nuctl:1.6.10-amd64
+    entrypoint: ["sh", "-c", "tail -f /dev/null"]
+
+  # Neo4j Deployment
+  neo4j:
+    image: neo4j:latest
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      NEO4J_AUTH: neo4j/s3cr3t
+
+networks:
+  default:
+    external:
+      name: nuclio
