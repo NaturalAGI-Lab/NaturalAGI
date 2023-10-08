@@ -34,3 +34,28 @@ services:
     # This status can be checked using the "docker ps" command.
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider localhost:7474 || exit 1"]
+
+  nuclio-dasboard:
+    
+    image: quay.io/nuclio/dashboard:stable-amd64
+
+    hostname: nuclio-dashboard
+    container_name: nuclio-dashboard
+
+    networks:
+      neo4j-internal:
+        aliases:
+          - neo4j-network
+    
+    deploy:
+      mode: replicated
+      replicas: 1
+
+    ports:
+      - "8070:8070"
+    
+    expose:
+      - '8070'
+    
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
