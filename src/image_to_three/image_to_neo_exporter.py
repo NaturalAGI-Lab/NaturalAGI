@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from neo4j import GraphDatabase
+import numpy as np
 import cv2
 
 @dataclass
@@ -48,7 +49,8 @@ class ImageNeoExporter:
 
 if __name__ == "__main__":
     
+    image = np.tril(np.triu(np.ones((5,5),int),1),1)
     
     exporter = ImageNeoExporter("bolt://localhost:7687", "neo4j", "password")
-    exporter.export_image("hello, world")
+    exporter.export_image(image)
     exporter.close()
