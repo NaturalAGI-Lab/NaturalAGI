@@ -1,2 +1,3 @@
 # NaturalAGI
+
 AGI research artifacts
