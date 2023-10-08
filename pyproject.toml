@@ -9,6 +9,8 @@ readme = "README.md"
 python = "^3.11"
 neo4j = "^5.13.0"
 opencv-python = "^4.8.1.78"
+pydantic = "^2.4.2"
+requests = "^2.31.0"
 
 
 [tool.poetry.group.dev.dependencies]
