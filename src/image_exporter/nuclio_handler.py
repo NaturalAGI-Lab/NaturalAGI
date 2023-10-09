@@ -4,6 +4,7 @@ import os
 import base64
 import io
 import traceback
+from PIL import Image
 
 import requests
 import cv2
@@ -12,6 +13,7 @@ import numpy as np
 from pydantic_settings import BaseSettings
 
 from image_to_neo_exporter import ImageNeoExporter
+from nuclio_sdk import Event
 
 
 HANDLER_NAME = "Image Exporter"
@@ -23,7 +25,6 @@ class Settings(BaseSettings):
     neo4j_dsn: str
     neo4j_user: str
     neo4j_pass: str
-    handler_name = HANDLER_NAME
 
 
 def init_context(context):
@@ -33,38 +34,49 @@ def init_context(context):
         context ([type]): Nuclio context
     """
     
+    context.logger.debug_with(
+        f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
+    )
 
     exporter = ImageNeoExporter(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
     setattr(context.user_data, "exporter", exporter)
 
-    context.logger.debug_with(
-        f"Exporter initialized with:\n{Settings().model_dump()}", handler=HANDLER_NAME
-    )
+    
 
 
 def http_handler(context, event):
     """Handles HTTP requests"""
+    try: 
     
-    data = event.body
+        data = event.body
+        
+        # context.logger.debug_with(
+        #     f"Received data:\n{data}", handler=HANDLER_NAME
+        # )
+        
+        
+        buf = io.BytesIO(base64.b64decode(data))
+        # npimg = np.frombuffer(buf, np.uint8)
+        # img = cv2.imdecode(npimg, cv2.IMREAD_UNCHANGED)
+        
+        image = Image.open(buf)
+        
+        context.logger.debug_with(
+            f"Received image:\n{image.size}", handler=HANDLER_NAME
+        )
+        
+        context.Response(
+            body="Received a http request - nothing to do",
+            headers={},
+            content_type="text/plain",
+            status_code=requests.codes.ok,  # pylint: disable=no-member
+        )
     
-    context.logger.debug_with(
-        f"Received data:\n{data}", handler=HANDLER_NAME
-    )
-    
-    buf = io.BytesIO(base64.b64decode(data["image"]))
-    npimg = np.frombuffer(buf, np.uint8)
-    img = cv2.imdecode(npimg, cv2.IMREAD_UNCHANGED)
-    
-    context.logger.debug_with(
-        f"Received image:\n{img.shape}", handler=HANDLER_NAME
-    )
-    
-    context.Response(
-        body="Received a http request - nothing to do",
-        headers={},
-        content_type="text/plain",
-        status_code=requests.codes.ok,  # pylint: disable=no-member
-    )
+    except Exception as e:
+        context.logger.error_with(
+            f"Error:\n {e}", handler=HANDLER_NAME
+        )
+        traceback.print_exc()
 
 
 

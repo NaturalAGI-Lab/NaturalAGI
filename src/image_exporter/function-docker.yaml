@@ -16,15 +16,8 @@ spec:
       maxWorkers: 1
       attributes:
         serviceType: ClusterIP
-  version: 0.1.0
-  build:
-    baseImage: "python:3.9"
-    commands:
-      - 'apt-get update -y --fix-missing'
-      - 'apt-get install -y libgl1-mesa-glx'
-      - 'pip install numpy requests opencv-python pydantic neo4j'
+  version: -1
   loggerSinks:
     - level: debug
-  platform: {}
   securityContext: {}
   eventTimeout: ""
