@@ -35,7 +35,7 @@ services:
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider localhost:7474 || exit 1"]
 
-  nuclio-dasboard:
+  nuclio-dashboard:
     
     image: quay.io/nuclio/dashboard:stable-amd64
 
@@ -59,3 +59,29 @@ services:
     
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+  
+
+  image-exporter:
+
+    image: image-exporter
+    hostname: image-exporter
+    container_name: image-exporter
+    depends_on:
+      - nuclio-dashboard
+    networks:
+      neo4j-internal:
+        aliases:
+          - neo4j-network
+    
+    command: [ "processor", "-config",  "/opt/nuclio/function.yaml"] 
+    environment:
+      - NEO4J_DSN=bolt://localhost:7687
+      - NEO4J_USER
+      - NEO4J_PASS
+    
+    expose:
+      - '8081'
+      - '8080'
+    ports:
+      - '8081:8081'
+      - '8080:8080'
