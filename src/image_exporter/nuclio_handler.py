@@ -48,25 +48,22 @@ def http_handler(context, event):
     """Handles HTTP requests"""
     try: 
     
-        data = event.body
+        data = event.body       
         
-        # context.logger.debug_with(
-        #     f"Received data:\n{data}", handler=HANDLER_NAME
-        # )
-        
-        
-        buf = io.BytesIO(base64.b64decode(data))
-        # npimg = np.frombuffer(buf, np.uint8)
-        # img = cv2.imdecode(npimg, cv2.IMREAD_UNCHANGED)
-        
-        image = Image.open(buf)
+        decoded_data = base64.b64decode(data['image'])
+        np_data = np.fromstring(decoded_data,np.uint8)
+        img = cv2.imdecode(np_data,cv2.IMREAD_UNCHANGED)
         
         context.logger.debug_with(
-            f"Received image:\n{image.size}", handler=HANDLER_NAME
+            f"Received image: {img.shape}", handler=HANDLER_NAME
         )
         
+        image_id = context.user_data.exporter.export_image(img)
+        
+        context.logger.info_with(f"Exported image: {image_id}", handler=HANDLER_NAME)
+        
         context.Response(
-            body="Received a http request - nothing to do",
+            body=f"Image exported {image_id}",
             headers={},
             content_type="text/plain",
             status_code=requests.codes.ok,  # pylint: disable=no-member
@@ -77,6 +74,13 @@ def http_handler(context, event):
             f"Error:\n {e}", handler=HANDLER_NAME
         )
         traceback.print_exc()
+        
+        context.Response(
+            body=f"Error exporting image {e}",
+            headers={},
+            content_type="text/plain",
+            status_code=requests.codes.server_error,  # pylint: disable=no-member
+        )
 
 
 
