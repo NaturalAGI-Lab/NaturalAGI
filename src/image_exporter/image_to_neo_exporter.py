@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from neo4j import GraphDatabase
 import numpy as np
 import cv2
+import uuid
 
 @dataclass
 class ImageNeoExporter:
@@ -16,10 +17,9 @@ class ImageNeoExporter:
 
     def export_image(self, image):
         with self.driver.session() as session:
-            result = session.execute_write(self._build_image_query, image)
-            
+            result, image_id = session.execute_write(self._build_image_query, image)            
             print(result)
-
+        return image_id
     
     
     @staticmethod
@@ -27,10 +27,11 @@ class ImageNeoExporter:
         query = ""
         
         height, width = image.shape
+        image_id = uuid.uuid4()
         
         for i in range(0, height):
             for j in range(0, width):
-                query = query + "(" + f"p{i}{j}:Pixel " + "{" + f"v: {image[i][j]}, y: {i}, x:{j}" + "}" + "), "
+                query = query + "(" + f"p{i}{j}:Pixel " + "{" + f"image_id:\"{image_id}\", " + f"v: {image[i][j]}, y: {i}, x: {j}" + "}" + "), "
                 
                 
         for i in range(0, height):
@@ -44,7 +45,7 @@ class ImageNeoExporter:
         
         result = tx.run(f"CREATE {query.strip().strip(',')}")
         
-        return result
+        return result, image_id
 
 
 if __name__ == "__main__":
