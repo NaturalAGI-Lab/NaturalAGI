@@ -35,7 +35,7 @@ docker build -t image-exporter .
 ## Sending images
 
 ```bash
-image=$(curl https://upload.wikimedia.org/wikipedia/en/7/7d/Lenna_%28test_image%29.png --output - | base64 | tr -d '\n')
+image=$(cat /home/DATA/Projects/science/NaturalAGI/tests/test-data/test-image.bmp | base64 | tr -d '\n')
 ```
 
 ```bash
