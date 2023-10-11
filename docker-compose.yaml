@@ -75,7 +75,7 @@ services:
     
     command: [ "processor", "-config",  "/opt/nuclio/function.yaml"] 
     environment:
-      - NEO4J_DSN=bolt://localhost:7687
+      - NEO4J_DSN=bolt://server1:7687
       - NEO4J_USER
       - NEO4J_PASS
     
