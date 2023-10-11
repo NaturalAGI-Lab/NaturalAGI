@@ -9,3 +9,41 @@ This component is aimed at exporting images to a graph DB, currently Neo4j
 - `nuclio_handler.py` - consists of an implementation of a nuclio function that receives images via http requests and exports them into a graph db.
 - `fucntion.yaml` - a nuclio function config.
 - `Dockerfile` - a nuclio function docker file.
+
+## Building
+
+```bash
+cd src/image_exporter
+docker build -t image-exporter .
+```
+
+## Running
+
+1. All components
+
+    ```bash
+        docker compose up
+
+    ```
+
+2. Only the image exporter
+
+    ```bash
+        docker compose up image-exporter
+    ```
+
+## Sending images
+
+```bash
+image=$(curl https://upload.wikimedia.org/wikipedia/en/7/7d/Lenna_%28test_image%29.png --output - | base64 | tr -d '\n')
+```
+
+```bash
+cat << EOF > /tmp/input.json
+{"image": "$image"}
+EOF
+```
+
+```bash
+curl -H "Content-Type: application/json" --data @/tmp/input.json http://localhost:8080
+```
