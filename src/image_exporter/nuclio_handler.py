@@ -25,6 +25,7 @@ class Settings(BaseSettings):
     neo4j_dsn: str
     neo4j_user: str
     neo4j_pass: str
+    next = ""
 
 
 def init_context(context):
@@ -40,6 +41,9 @@ def init_context(context):
 
     exporter = ImageNeoExporter(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
     setattr(context.user_data, "exporter", exporter)
+    
+    next = Settings().next.split(";")
+    setattr(context.user_data, "next", next)
 
     
 
@@ -61,6 +65,13 @@ def http_handler(context, event):
         image_id = context.user_data.exporter.export_image(img)
         
         context.logger.info_with(f"Exported image: {image_id}", handler=HANDLER_NAME)
+        
+        next_functions = context.user_data.next
+        
+        if next_functions:
+            for func in next_functions:
+                context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
+                context.platform.call_function(func, Event(body=image_id))
         
         context.Response(
             body=f"Image exported {image_id}",
