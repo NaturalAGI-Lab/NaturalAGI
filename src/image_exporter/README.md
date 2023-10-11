@@ -19,6 +19,15 @@ docker build -t image-exporter .
 
 ## Running
 
+0. Configuration
+
+The nuclio function is configured with env variables. Please configure env variables in the `docker-compose.yaml` accordingly
+
+- `NEO4J_DSN=bolt://server1:7687` - neo4j uri
+- `NEO4J_USER=neo4j` - neo4j username
+- `NEO4J_PASS=111122223333` - neo4j password
+- `NEXT_NUCLIO="func1;func2"` - list of next nuclio functions that should be called in the current function  
+
 1. All components
 
     ```bash
