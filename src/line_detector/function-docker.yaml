@@ -1,0 +1,23 @@
+metadata:
+  name: image-exporter
+  labels:
+    nuclio.io/project-name: natural-agi
+spec:
+  handler: "nuclio_handler:handler"
+  runtime: "python:3.9"
+  resources: {}
+  minReplicas: 1
+  maxReplicas: 1
+  triggers:
+    default-http:
+      class: ""
+      kind: http
+      name: default-http
+      maxWorkers: 1
+      attributes:
+        serviceType: ClusterIP
+  version: -1
+  loggerSinks:
+    - level: debug
+  securityContext: {}
+  eventTimeout: ""
