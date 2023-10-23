@@ -7,10 +7,10 @@ import cv2
 import numpy as np
 from image_repository import ImageRepository
 from lines_repository import LinesRepository
+from line_detector import LineDetector
 
 from pydantic_settings import BaseSettings
 
-from src.line_detector.line_detector import LineDetector
 
 HANDLER_NAME = "Line Detector"
 
@@ -21,7 +21,6 @@ class Settings(BaseSettings):
     neo4j_dsn: str
     neo4j_user: str
     neo4j_pass: str
-    next_nuclio = ""
 
 
 def init_context(context):
@@ -46,6 +45,7 @@ def http_handler(context, event):
     try:
 
         image_id = event.body
+        image_id = image_id.decode('utf-8') if isinstance(image_id, bytes) else image_id
 
         context.logger.debug_with(f"Received image_id: {image_id}", handler=HANDLER_NAME)
 

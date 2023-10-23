@@ -11,19 +11,17 @@ class ImageRepository:
 
     def get_image(self, image_id):
         with self.driver.session() as session:
-            records = session.execute_read(self._execute_get_image_query, image_id)
-            image = self._reconstruct_image(records)
-            return image
+            return session.execute_read(self._execute_get_image_query, image_id)
 
     @staticmethod
     def _execute_get_image_query(tx, image_id):
         query = f"MATCH (p:Pixel {{image_id: \"{image_id}\"}}) RETURN p.y AS y, p.x AS x, p.v AS v ORDER BY p.y, p.x"
-        result = tx.run(query)
-        return result
+        print(f"Query: {query}")
+        records = tx.run(query)
 
-    @staticmethod
-    def _reconstruct_image(records):
-        pixel_data = [(record["y"], record["x"], record["v"]) for record in records]
+        records_list = list(records)
+
+        pixel_data = [(record["y"], record["x"], record["v"]) for record in records_list]
         height = max([y for y, _, _ in pixel_data]) + 1
         width = max([x for _, x, _ in pixel_data]) + 1
 
@@ -32,3 +30,4 @@ class ImageRepository:
             image[y][x] = v
 
         return image
+

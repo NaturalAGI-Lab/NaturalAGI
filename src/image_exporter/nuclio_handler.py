@@ -66,11 +66,11 @@ def http_handler(context, event):
         context.logger.info_with(f"Exported image: {image_id}", handler=HANDLER_NAME)
         
         next_functions_str = context.user_data.next_nuclio
-        
-        if next_functions_str:        
+
+        if next_functions_str:
             next_nuclio = next_functions_str.split(";")
             context.logger.debug_with(f"Next functions: {next_nuclio}", handler=HANDLER_NAME)
-            
+
             if len(next_nuclio) > 0:
                 for func in next_nuclio:
                     context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)

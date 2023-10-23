@@ -1,5 +1,5 @@
 metadata:
-  name: image-exporter
+  name: line_detector
   labels:
     nuclio.io/project-name: natural-agi
 spec:
@@ -10,12 +10,9 @@ spec:
   maxReplicas: 1
   triggers:
     default-http:
-      class: ""
-      kind: http
-      name: default-http
-      maxWorkers: 1
+      kind: "http"
       attributes:
-        serviceType: ClusterIP
+        port: 8090
   version: -1
   loggerSinks:
     - level: debug
