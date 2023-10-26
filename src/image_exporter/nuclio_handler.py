@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     neo4j_dsn: str
     neo4j_user: str
     neo4j_pass: str
-    next_nuclio = ""
+    next_nuclio: str = ""
 
 
 def init_context(context):
@@ -42,8 +42,7 @@ def init_context(context):
     exporter = ImageNeoExporter(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
     setattr(context.user_data, "exporter", exporter)
     
-    next_nuclio = Settings().next.split(";")
-    setattr(context.user_data, "next_nuclio", next_nuclio)
+    setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
 
     
 
@@ -66,12 +65,16 @@ def http_handler(context, event):
         
         context.logger.info_with(f"Exported image: {image_id}", handler=HANDLER_NAME)
         
-        next_functions = context.user_data.next_nuclio
+        next_functions_str = context.user_data.next_nuclio
         
-        if next_functions:
-            for func in next_functions:
-                context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                context.platform.call_function(func, Event(body=image_id))
+        if next_functions_str:        
+            next_nuclio = next_functions_str.split(";")
+            context.logger.debug_with(f"Next functions: {next_nuclio}", handler=HANDLER_NAME)
+            
+            if len(next_nuclio) > 0:
+                for func in next_nuclio:
+                    context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
+                    context.platform.call_function(func, Event(body=image_id))
         
         context.Response(
             body=f"Image exported {image_id}",
