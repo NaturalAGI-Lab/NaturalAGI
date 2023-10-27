@@ -1,0 +1,23 @@
+[tool.poetry]
+name = "natural-agi"
+version = "0.1.0"
+description = "This project consists of components of reduction neiral netwworks concept"
+authors = ["koboh <konstboh@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+neo4j = "^5.13.0"
+opencv-python = "^4.8.1.78"
+pydantic = "^2.4.2"
+requests = "^2.31.0"
+nuclio-sdk = "^0.5.6"
+pillow = "^10.0.1"
+
+
+[tool.poetry.group.dev.dependencies]
+notebook = "^7.0.4"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

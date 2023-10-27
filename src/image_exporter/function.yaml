@@ -1,0 +1,36 @@
+metadata:
+  name: image-exporter
+  labels:
+    nuclio.io/project-name: natural-agi
+spec:
+  handler: "nuclio_handler:handler"
+  runtime: "python:3.9"
+  resources: {}
+  minReplicas: 1
+  maxReplicas: 1
+  triggers:
+    default-http:
+      class: ""
+      kind: http
+      name: default-http
+      maxWorkers: 1
+      attributes:
+        serviceType: ClusterIP
+  version: -1
+  build:
+    baseImage: "python:3.9"
+    commands:
+      - 'apt-get update -y --fix-missing'
+      - 'apt-get install -y libgl1-mesa-glx'
+      - 'pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-python neo4j Pillow'
+  loggerSinks:
+    - level: debug
+  platform: 
+    attributes:
+      restartPolicy:
+        name: always
+        maximumRetryCount: 3
+      mountMode: volume
+      # network: infrastructure_neo4j-internal
+  securityContext: {}
+  eventTimeout: ""
