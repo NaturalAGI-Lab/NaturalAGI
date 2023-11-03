@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import os
 
 
 class LineDetector:
@@ -32,24 +33,26 @@ class LineDetector:
 
 
 if __name__ == '__main__':
+    output_folder = "output"
+    if not os.path.exists(output_folder):
+        os.mkdir(output_folder)
+    
     img = np.zeros((8, 8, 3), dtype=np.uint8)
     cv2.line(img, (0, 3), (7, 3), (255, 255, 255), 1)
-    cv2.imwrite("1.png", img)
+    cv2.imwrite(f"{output_folder}/img.png", img)
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    # img = cv2.imread("img.png")
-    # img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # lines = LineDetector.detect_lines(img)
-    #
-    # # Draw detected lines in the image
-    # blank_img = np.zeros_like(img)
-    #
-    # for dline in lines:
-    #     x0 = int(round(dline[0][0]))
-    #     y0 = int(round(dline[0][1]))
-    #     x1 = int(round(dline[0][2]))
-    #     y1 = int(round(dline[0][3]))
-    #     print(f"Drawing line: x0: {x0}, y0: {y0}, x1: {x1}, y1: {y1}")
-    #     cv2.line(blank_img, (x0, y0), (x1, y1), 255, 1)
-    #
-    # cv2.imwrite("image_with_detected_lines.jpg", blank_img)
+    lines = LineDetector.detect_lines(img)
+    
+    # Draw detected lines in the image
+    blank_img = np.zeros_like(img)
+    
+    for dline in lines:
+        x0 = int(round(dline[0][0]))
+        y0 = int(round(dline[0][1]))
+        x1 = int(round(dline[0][2]))
+        y1 = int(round(dline[0][3]))
+        print(f"Drawing line: x0: {x0}, y0: {y0}, x1: {x1}, y1: {y1}")
+        cv2.line(blank_img, (x0, y0), (x1, y1), 255, 1)
+    
+    cv2.imwrite(f"{output_folder}/image_with_detected_lines.jpg", blank_img)
