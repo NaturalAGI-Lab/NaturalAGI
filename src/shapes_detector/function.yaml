@@ -1,0 +1,34 @@
+metadata:
+  name: shapes_detector
+  namespace: natural-agi
+  labels:
+    nuclio.io/project-name: natural-agi
+spec:
+  handler: "nuclio_handler:handler"
+  runtime: "python:3.9"
+  resources: {}
+  minReplicas: 1
+  maxReplicas: 1
+  triggers:
+    default-http:
+      kind: "http"
+      attributes:
+        port: 8080
+  version: -1
+  build:
+    baseImage: "python:3.9"
+    commands:
+      - 'apt-get update -y --fix-missing'
+      - 'apt-get install -y libgl1-mesa-glx'
+      - 'pip install numpy requests opencv-python pydantic-settings neo4j'
+  loggerSinks:
+    - level: debug
+  platform: 
+    attributes:
+      restartPolicy:
+        name: always
+        maximumRetryCount: 3
+      mountMode: volume
+      # network: infrastructure_neo4j-internal
+  securityContext: {}
+  eventTimeout: ""
