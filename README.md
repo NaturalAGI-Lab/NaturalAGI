@@ -4,6 +4,12 @@ AGI research artifacts
 
 ## How to run the simulation
 
+### Running testing pipeline with all infrastructure
+
+```bash
+sh deploy_functions.sh
+```
+
 ### Running a graph db
 
 #### Docker command

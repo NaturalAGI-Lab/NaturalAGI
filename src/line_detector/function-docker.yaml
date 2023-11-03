@@ -1,0 +1,20 @@
+metadata:
+  name: line_detector
+  labels:
+    nuclio.io/project-name: natural-agi
+spec:
+  handler: "nuclio_handler:handler"
+  runtime: "python:3.9"
+  resources: {}
+  minReplicas: 1
+  maxReplicas: 1
+  triggers:
+    default-http:
+      kind: "http"
+      attributes:
+        port: 8090
+  version: -1
+  loggerSinks:
+    - level: debug
+  securityContext: {}
+  eventTimeout: ""
