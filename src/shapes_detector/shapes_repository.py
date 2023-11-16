@@ -4,68 +4,47 @@ from neo4j import GraphDatabase
 
 
 class ShapesRepository:
-
     def __init__(self, uri, user, password):
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
 
     def close(self):
         self.driver.close()
 
-    def add_lines(self, lines, image_id):
+    def find_and_create_shapes(self):
         with self.driver.session() as session:
-            result = session.execute_write(self._execute_add_lines_query, lines)
-            print(result)
-            session.execute_write(self.link_lines_to_pixels, lines, image_id)
-        return result
+            result = session.write_transaction(self._find_and_create_shapes)
+            return result
 
     @staticmethod
-    def _execute_add_lines_query(tx, lines):
-        query = ""
-        for line_id, line in enumerate(lines):
-            for x1, y1, x2, y2 in line:
-                query += f"(l{line_id}:Line {{x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, d:{math.dist([x1, y1], [x2, y2])}}}), "
-
-        print(f"Generated: {query}")
-
-        result = tx.run(f"CREATE {query.strip().strip(',')}")
+    def _find_and_create_shapes(tx):
+        query = """
+            MATCH path=(l:Line)-[*3..10]-(l) 
+            WHERE ALL(node IN nodes(path)[1..-1] WHERE SINGLE(x IN nodes(path) WHERE x = node))
+            WITH DISTINCT path, [node IN nodes(path) WHERE node:Line] AS lineNodes
+            MERGE (contour:Contour)
+            SET contour.lines_conout = SIZE(lineNodes) - 1
+            WITH contour, lineNodes
+            UNWIND lineNodes AS lineNode
+            MERGE (lineNode)-[:COMPOSES]->(contour)
+            RETURN contour
+        """
+        result = tx.run(query)
+        print('Printing results')
+        for record in result:
+            print(record)
         return result
 
-    @staticmethod
-    def link_lines_to_pixels(tx, lines, image_id):
-        for line_id, line in enumerate(lines):
-            for x1, y1, x2, y2 in line:
-                # Linking line to start and end pixels
-                print(f"Trying to link {line_id} line")
-                query = f"""
-                    MATCH (p1:Pixel {{image_id:\"{image_id}\", x:{x1}, y:{y1}}}), 
-                    (l:Line {{x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}}})
-                    CREATE (p1)-[:STARTS]->(l)
-                """
-                print(f"Executing: {query}")
-                tx.run(f"{query.strip().strip(',')}")
+# TODO count of the number of lines
+# MATCH path=(l:Line)-[*3..10]-(l) 
+# WHERE ALL(node IN nodes(path)[1..-1] WHERE SINGLE(x IN nodes(path) WHERE x = node))
+# RETURN size([node IN nodes(path) WHERE node:Line]) - 1
 
-                query = f"""
-                    MATCH (p2:Pixel {{image_id:\"{image_id}\", x:{x2}, y:{y2}}}),
-                    (l:Line {{x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}}})
-                    CREATE (p2)-[:ENDS]->(l), 
-                """
-                print(f"Executing: {query}")
-                tx.run(f"{query.strip().strip(',')}")
 
-                # Connect the intermediary points (INCLUDES relation)
-                # Linear Interpolation between start and end points
-                delta_x = x2 - x1
-                delta_y = y2 - y1
-                steps = max(abs(delta_x), abs(delta_y))
-
-                for i in range(steps):
-                    xi = round(x1 + i * (delta_x / steps))
-                    yi = round(y1 + i * (delta_y / steps))
-
-                    query = f"""
-                        MATCH (pi:Pixel {{image_id:\"{image_id}\", x:{xi}, y:{yi}}}),
-                        (l:Line {{x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}}})
-                        CREATE (pi)-[:INCLUDES]->(l)
-                    """
-                    print(f"Executing: {query}")
-                    tx.run(f"{query.strip().strip(',')}")
+# TODO create Contour
+# MATCH path=(l:Line)-[*3..10]-(l) 
+# WHERE ALL(node IN nodes(path)[1..-1] WHERE SINGLE(x IN nodes(path) WHERE x = node))
+# WITH [node in nodes(path) WHERE node:Line] as nodes, path
+# CREATE (contour:Contour)
+# SET contour.lines_count = size(nodes) - 1 
+# FOREACH (node in nodes | CREATE (node)-[:COMPOSES]->(contour))
+# RETURN contour

@@ -4,7 +4,6 @@ from neo4j import GraphDatabase
 
 
 class LinesRepository:
-
     def __init__(self, uri, user, password):
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
 
@@ -13,17 +12,19 @@ class LinesRepository:
 
     def add_lines(self, lines, image_id):
         with self.driver.session() as session:
-            result = session.execute_write(self._execute_add_lines_query, lines)
+            result = session.execute_write(
+                self._execute_add_lines_query, lines, image_id
+            )
             print(result)
             session.execute_write(self.link_lines_to_pixels, lines, image_id)
         return result
 
     @staticmethod
-    def _execute_add_lines_query(tx, lines):
+    def _execute_add_lines_query(tx, lines, image_id):
         query = ""
         for line_id, line in enumerate(lines):
             for x1, y1, x2, y2 in line:
-                query += f"(l{line_id}:Line {{x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, d:{math.dist([x1, y1], [x2, y2])}}}), "
+                query += f"(l{line_id}:Line {{image_id:'{image_id}', x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, d:{round(math.dist([x1, y1], [x2, y2]))}}}), "
 
         print(f"Generated: {query}")
 
@@ -53,19 +54,53 @@ class LinesRepository:
                 tx.run(f"{query.strip().strip(',')}")
 
                 # Connect the intermediary points (INCLUDES relation)
-                # Linear Interpolation between start and end points
-                delta_x = x2 - x1
-                delta_y = y2 - y1
-                steps = max(abs(delta_x), abs(delta_y))
+                line_points = LinesRepository.get_line_coordinates((x1, y1), (x2, y2))
 
-                for i in range(steps):
-                    xi = round(x1 + i * (delta_x / steps))
-                    yi = round(y1 + i * (delta_y / steps))
-
+                for x, y in line_points:
                     query = f"""
-                        MATCH (pi:Pixel {{image_id:\"{image_id}\", x:{xi}, y:{yi}}}),
+                        MATCH (pi:Pixel {{image_id:\"{image_id}\", x:{x}, y:{y}}}),
                         (l:Line {{x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}}})
                         CREATE (pi)-[:INCLUDES]->(l)
                     """
                     print(f"Executing: {query}")
                     tx.run(f"{query.strip().strip(',')}")
+
+    @staticmethod
+    def get_line_coordinates(start, end):
+        def add_point(x, y):
+            # Add integer coordinate and also check for boundary crossing
+            points.add((int(x), int(y)))
+            if x != int(x):
+                points.add((int(x) + 1, int(y)))
+            if y != int(y):
+                points.add((int(x), int(y) + 1))
+
+        x1, y1 = start
+        x2, y2 = end
+        points = set()  # Using a set to avoid duplicates
+        dx = abs(x2 - x1)
+        dy = abs(y2 - y1)
+        x, y = x1, y1
+        sx = -1 if x1 > x2 else 1
+        sy = -1 if y1 > y2 else 1
+
+        if dx > dy:
+            err = dx / 2.0
+            while x != x2:
+                add_point(x, y)
+                err -= dy
+                if err < 0:
+                    y += sy
+                    err += dx
+                x += sx
+        else:
+            err = dy / 2.0
+            while y != y2:
+                add_point(x, y)
+                err -= dx
+                if err < 0:
+                    x += sx
+                    err += dy
+                y += sy
+        add_point(x, y)  # Add the end point
+        return list(points)

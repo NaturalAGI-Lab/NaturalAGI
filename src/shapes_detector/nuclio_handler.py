@@ -31,8 +31,8 @@ def init_context(context):
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
 
-    lines_repository = ShapesRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
-    setattr(context.user_data, "shapes_repository", lines_repository)
+    shapes_repository = ShapesRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
+    setattr(context.user_data, "shapes_repository", shapes_repository)
 
 
 def http_handler(context, event):
@@ -43,6 +43,9 @@ def http_handler(context, event):
         image_id = image_id.decode('utf-8') if isinstance(image_id, bytes) else image_id
 
         context.logger.debug_with(f"Received image_id: {image_id}", handler=HANDLER_NAME)
+        
+        result = context.user_data.shapes_repository.find_and_create_shapes()
+        print(result)
 
         context.Response(
             body=f"Shapes detected for image: {image_id}",

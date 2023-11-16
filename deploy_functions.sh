@@ -22,7 +22,7 @@ echo "IP address: $HOST_IP"
 NEO4J_PASS=111122223333
 
 # Path to the image
-IMAGE_PATH="/Users/mlapin/Development/personal/NaturalAGI/tests/test-data/test-image.bmp"
+IMAGE_PATH="/Users/mlapin/Development/personal/NaturalAGI/tests/test-data/exported_img_comp.png"
 
 # Get base64 encoded image
 BASE64_IMAGE=$(get_base64_image $IMAGE_PATH)
@@ -44,10 +44,19 @@ nuctl deploy --path src/line_detector \
     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
     -e NEO4J_USER=neo4j \
     -e NEO4J_PASS=$NEO4J_PASS \
+    -e NEXT_NUCLIO=http://"$HOST_IP":5050 \
     --http-trigger-service-type 8080
 
+# Deploy shapes_detection function
+nuctl deploy --path src/shapes_detector \
+    --platform local \
+    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+    -e NEO4J_USER=neo4j \
+    -e NEO4J_PASS=$NEO4J_PASS \
+    --http-trigger-service-type 5050
+
 # Wait for deployments to complete (adjust sleep time as needed)
-sleep 30
+# sleep 10
 
 # Invoke image_exporter
 nuctl invoke image-exporter --platform local --method POST \

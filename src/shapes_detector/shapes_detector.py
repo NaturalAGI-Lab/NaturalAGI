@@ -1,94 +1,62 @@
-import networkx as nx
-from matplotlib import pyplot as plt
+from shapely.geometry import LineString, MultiLineString
+from shapely.ops import unary_union, polygonize
 
 
 class ShapesDetection:
 
     @staticmethod
-    def find_intersection(line1, line2):
-        x1, y1, x2, y2 = line1
-        x3, y3, x4, y4 = line2
-
-        den = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)
-
-        if den == 0:
-            return None
-
-        px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / den
-        py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / den
-
-        return px, py
-
-    @staticmethod
-    def find_intersections(lines):
-        intersections = set()
-        for i, line1 in enumerate(lines):
-            for j, line2 in enumerate(lines):
-                if i >= j:
-                    continue
-
-                intersection = ShapesDetection.find_intersection(line1, line2)
-                if intersection:
-                    intersections.add(intersection)
-
-        return list(intersections)
-
-    @staticmethod
-    def point_on_line(point, line, epsilon=1e-6):
-        """Check if point is on the line within a tolerance epsilon."""
-        x, y = point
-        x1, y1, x2, y2 = line
-        # Line equation Ax + By = C
-        A = y2 - y1
-        B = x1 - x2
-        C = A * x1 + B * y1
-        return abs(A * x + B * y - C) < epsilon
-
-    @staticmethod
-    def create_graph(lines, intersection_points):
-        G = nx.Graph()
-        for x1, y1, x2, y2 in lines:
-            G.add_edge((x1, y1), (x2, y2))
-
-        for point in intersection_points:
-            for x1, y1, x2, y2 in lines:
-                if ShapesDetection.point_on_line(point, (x1, y1, x2, y2)):
-                    G.add_edge(point, (x1, y1))
-                    G.add_edge(point, (x2, y2))
-
-        return G
-
-    @staticmethod
-    def detect_shapes(G):
-        shapes = list(nx.cycle_basis(G))
-        detected_shapes = []
-
-        for shape in shapes:
-            if len(shape) == 3:
-                detected_shapes.append(('Triangle', shape))
-            elif len(shape) == 4:
-                detected_shapes.append(('Square', shape))
-            elif len(shape) > 4:
-                detected_shapes.append(('Polygon', shape))
-
-        return detected_shapes
-
-    @staticmethod
     def detect(lines):
-        intersection_points = ShapesDetection.find_intersections(lines)
-        print(f'Intersection points: {intersection_points}')
-        G = ShapesDetection.create_graph(lines, intersection_points)
-
-        # Uncomment to visualize the graph
-        nx.draw(G, with_labels=True)
-        plt.show()
-
-        return ShapesDetection.detect_shapes(G)
+        # Convert lines to LineString objects
+        line_objects = [LineString(pair) for pair in lines]
+        # Compute the union of the lines, which automatically calculates intersections
+        unified_lines = unary_union(line_objects)
+        # Polygonize the unified line structure
+        polygons = list(polygonize(unified_lines))
+        
+        ShapesDetection.print_polygon_details(polygons)
+        return polygons
+    
+    # Function to print detailed info about polygons
+    @staticmethod
+    def print_polygon_details(polygons):
+        for i, polygon in enumerate(polygons, 1):
+            # Get the exterior coordinates of the polygon
+            exterior_coords = list(polygon.exterior.coords)
+            num_sides = len(exterior_coords) - 1  # Last point is the same as the first
+            area = polygon.area
+            perimeter = polygon.length
+            
+            # Print details
+            print(f"Polygon {i}:")
+            print(f"  Number of Sides: {num_sides}")
+            print(f"  Area: {area:.2f}")
+            print(f"  Perimeter: {perimeter:.2f}")
+            print(f"  Coordinates of Vertices:")
+            for coord in exterior_coords[:-1]:  # Exclude the last point because it's a repeat of the first
+                print(f"    {coord}")
+            print("")  # Add a blank line for readability between polygons
 
 
 if __name__ == '__main__':
     # Example usage
-    lines = [(0, 0, 3, 3), (2, 1, 1, 4), (1, 3, 5, 1)]
-    shapes = ShapesDetection.detect(lines)
-    for shape_type, vertices in shapes:
-        print(f"Detected {shape_type} with vertices {vertices}")
+    # lines = [(0, 0, 3, 3), (2, 1, 1, 4), (1, 3, 5, 1)]
+    lines = [
+    # Square perimeter
+    (0, 0, 3, 0),  # Bottom side
+    (3, 0, 3, 3),  # Right side
+    (3, 3, 0, 3),  # Top side
+    (0, 3, 0, 0),  # Left side
+    
+    # Additional lines that intersect but also contribute to forming a square
+    (1, -1, 1, 4),  # Vertical line intersecting bottom side
+    (-1, 1, 4, 1),  # Horizontal line intersecting left side
+    (2, -1, 2, 4),  # Another vertical line intersecting bottom side
+    (-1, 2, 4, 2),  # Another horizontal line intersecting left side
+    
+    # Diagonals inside the square
+    (0, 0, 3, 3),  # Diagonal from bottom-left to top-right
+    (3, 0, 0, 3),  # Diagonal from bottom-right to top-left
+    ]
+    # Preprocess lines to fit the format ((x1, y1), (x2, y2))
+    preprocessed_lines = [((line[0], line[1]), (line[2], line[3])) for line in lines]
+    shapes = ShapesDetection.detect(preprocessed_lines)
