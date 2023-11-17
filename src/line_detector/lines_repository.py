@@ -54,7 +54,7 @@ class LinesRepository:
                 tx.run(f"{query.strip().strip(',')}")
 
                 # Connect the intermediary points (INCLUDES relation)
-                line_points = LinesRepository.get_line_coordinates((x1, y1), (x2, y2))
+                line_points = LinesRepository.get_line_pixels(x1, y1, x2, y2)
 
                 for x, y in line_points:
                     query = f"""
@@ -66,41 +66,60 @@ class LinesRepository:
                     tx.run(f"{query.strip().strip(',')}")
 
     @staticmethod
-    def get_line_coordinates(start, end):
-        def add_point(x, y):
-            # Add integer coordinate and also check for boundary crossing
-            points.add((int(x), int(y)))
-            if x != int(x):
-                points.add((int(x) + 1, int(y)))
-            if y != int(y):
-                points.add((int(x), int(y) + 1))
+    def get_line_pixels(x0, y0, x1, y1):
+        """Get all pixels that a line passes through, including adjacent pixels for subpixel accuracy.
 
-        x1, y1 = start
-        x2, y2 = end
-        points = set()  # Using a set to avoid duplicates
-        dx = abs(x2 - x1)
-        dy = abs(y2 - y1)
-        x, y = x1, y1
-        sx = -1 if x1 > x2 else 1
-        sy = -1 if y1 > y2 else 1
+        :param x0: x-coordinate of the start point
+        :param y0: y-coordinate of the start point
+        :param x1: x-coordinate of the end point
+        :param y1: y-coordinate of the end point
+        :returns: Set of tuples representing the coordinates of all affected pixels
+        """
+        def plot_line_low(x0, y0, x1, y1):
+            dx = x1 - x0
+            dy = y1 - y0
+            yi = 1 if dy > 0 else -1
+            dy = abs(dy)
+            D = 2*dy - dx
+            y = y0
 
-        if dx > dy:
-            err = dx / 2.0
-            while x != x2:
-                add_point(x, y)
-                err -= dy
-                if err < 0:
-                    y += sy
-                    err += dx
-                x += sx
+            points = set()
+            for x in range(x0, x1 + 1):
+                points.add((x, y))
+                if D > 0:
+                    points.add((x, y + yi))  # Add adjacent pixel
+                    y += yi
+                    D -= 2*dx
+                D += 2*dy
+            return points
+
+        def plot_line_high(x0, y0, x1, y1):
+            dx = x1 - x0
+            dy = y1 - y0
+            xi = 1 if dx > 0 else -1
+            dx = abs(dx)
+            D = 2*dx - dy
+            x = x0
+
+            points = set()
+            for y in range(y0, y1 + 1):
+                points.add((x, y))
+                if D > 0:
+                    points.add((x + xi, y))  # Add adjacent pixel
+                    x += xi
+                    D -= 2*dy
+                D += 2*dx
+            return points
+
+        x0, y0, x1, y1 = round(x0), round(y0), round(x1), round(y1)
+
+        if abs(y1 - y0) < abs(x1 - x0):
+            if x0 > x1:
+                return plot_line_low(x1, y1, x0, y0)
+            else:
+                return plot_line_low(x0, y0, x1, y1)
         else:
-            err = dy / 2.0
-            while y != y2:
-                add_point(x, y)
-                err -= dx
-                if err < 0:
-                    x += sx
-                    err += dy
-                y += sy
-        add_point(x, y)  # Add the end point
-        return list(points)
+            if y0 > y1:
+                return plot_line_high(x1, y1, x0, y0)
+            else:
+                return plot_line_high(x0, y0, x1, y1)

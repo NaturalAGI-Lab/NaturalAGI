@@ -18,7 +18,7 @@ class ShapesRepository:
     @staticmethod
     def _find_and_create_shapes(tx):
         query = """
-            MATCH path=(l:Line)-[*3..10]-(l) 
+            MATCH path=(l:Line)-[*6..12]-(l) 
             WHERE ALL(node IN nodes(path)[1..-1] WHERE SINGLE(x IN nodes(path) WHERE x = node))
             WITH DISTINCT path, [node IN nodes(path) WHERE node:Line] AS lineNodes
             MERGE (contour:Contour)

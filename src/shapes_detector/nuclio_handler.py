@@ -43,9 +43,7 @@ def http_handler(context, event):
         image_id = image_id.decode('utf-8') if isinstance(image_id, bytes) else image_id
 
         context.logger.debug_with(f"Received image_id: {image_id}", handler=HANDLER_NAME)
-        
-        result = context.user_data.shapes_repository.find_and_create_shapes()
-        print(result)
+        context.user_data.shapes_repository.find_and_create_shapes()
 
         context.Response(
             body=f"Shapes detected for image: {image_id}",

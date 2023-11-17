@@ -22,7 +22,7 @@ echo "IP address: $HOST_IP"
 NEO4J_PASS=111122223333
 
 # Path to the image
-IMAGE_PATH="/Users/mlapin/Development/personal/NaturalAGI/tests/test-data/exported_img_comp.png"
+IMAGE_PATH="/Users/mlapin/Development/personal/NaturalAGI/tests/test-data/triangle_comp.png"
 
 # Get base64 encoded image
 BASE64_IMAGE=$(get_base64_image $IMAGE_PATH)
