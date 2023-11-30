@@ -12,10 +12,7 @@ class LinesRepository:
 
     def add_lines(self, lines, image_id):
         with self.driver.session() as session:
-            result = session.execute_write(
-                self._execute_add_lines_query, lines, image_id
-            )
-            print(result)
+            result = session.execute_write(self._execute_add_lines_query, lines, image_id)
             session.execute_write(self.link_lines_to_pixels, lines, image_id)
         return result
 
@@ -24,7 +21,24 @@ class LinesRepository:
         query = ""
         for line_id, line in enumerate(lines):
             for x1, y1, x2, y2 in line:
-                query += f"(l{line_id}:Line {{image_id:'{image_id}', x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}, d:{round(math.dist([x1, y1], [x2, y2]))}}}), "
+                query += f"""
+                (l{line_id}:Line {{image_id:'{image_id}', id: {line_id}}}), 
+                
+                (length{line_id}:Length {{line_id:'{line_id}'}}), 
+                (absolute{line_id}:Absolute {{line_id:'{line_id}', value:{round(math.dist([x1, y1], [x2, y2]))}}}), 
+                (l{line_id})-[:HAS]->(length{line_id}), 
+                (length{line_id})-[:HAS]->(absolute{line_id}), 
+            
+                (orientation{line_id}:Orientation {{line_id:'{line_id}'}}),
+                (angle{line_id}:Angle {{line_id:'{line_id}', value:{LinesRepository.calculate_angle(x1, y1, x2, y2)}}}), 
+                (l{line_id})-[:HAS]->(orientation{line_id}), 
+                (orientation{line_id})-[:HAS]->(angle{line_id}),
+                
+                (location{line_id}:Location {{line_id:'{line_id}'}}),
+                (coordinates{line_id}:Coordinates {{line_id:'{line_id}', x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}}}),
+                (l{line_id})-[:HAS]->(location{line_id}), 
+                (location{line_id})-[:HAS]->(coordinates{line_id}),
+                """
 
         print(f"Generated: {query}")
 
@@ -39,16 +53,16 @@ class LinesRepository:
                 print(f"Trying to link {line_id} line")
                 query = f"""
                     MATCH (p1:Pixel {{image_id:\"{image_id}\", x:{x1}, y:{y1}}}), 
-                    (l:Line {{x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}}})
-                    CREATE (p1)-[:STARTS]->(l)
+                    (l:Line {{id:{line_id}}})
+                    CREATE (p1)<-[:STARTS]-(l)
                 """
                 print(f"Executing: {query}")
                 tx.run(f"{query.strip().strip(',')}")
 
                 query = f"""
                     MATCH (p2:Pixel {{image_id:\"{image_id}\", x:{x2}, y:{y2}}}),
-                    (l:Line {{x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}}})
-                    CREATE (p2)-[:ENDS]->(l), 
+                    (l:Line {{id:{line_id}}})
+                    CREATE (p2)<-[:ENDS]-(l), 
                 """
                 print(f"Executing: {query}")
                 tx.run(f"{query.strip().strip(',')}")
@@ -59,11 +73,17 @@ class LinesRepository:
                 for x, y in line_points:
                     query = f"""
                         MATCH (pi:Pixel {{image_id:\"{image_id}\", x:{x}, y:{y}}}),
-                        (l:Line {{x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}}})
-                        CREATE (pi)-[:INCLUDES]->(l)
+                        (l:Line {{id:{line_id}}})
+                        CREATE (pi)<-[:INCLUDES]-(l)
                     """
                     print(f"Executing: {query}")
                     tx.run(f"{query.strip().strip(',')}")
+                    
+    @staticmethod
+    def calculate_angle(x1, y1, x2, y2):
+        angle_radians = math.atan2(y2 - y1, x2 - x1)
+        angle_degrees = math.degrees(angle_radians)
+        return abs(angle_degrees)
 
     @staticmethod
     def get_line_pixels(x0, y0, x1, y1):

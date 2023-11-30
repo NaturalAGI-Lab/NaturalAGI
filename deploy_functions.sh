@@ -30,33 +30,45 @@ BASE64_IMAGE=$(get_base64_image $IMAGE_PATH)
 # Run docker compose
 docker-compose up -d  # -d flag runs containers in the background
 
-# Deploy image_exporter
+# Deploy Nuclio functions in parallel
 nuctl deploy --path src/image_exporter \
     --platform local \
     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
     -e NEO4J_USER=neo4j \
     -e NEO4J_PASS=$NEO4J_PASS \
-    -e NEXT_NUCLIO=http://"$HOST_IP":8080
+    -e NEXT_NUCLIO=http://"$HOST_IP":8080 &
+image_exporter_pid=$!
 
-# Deploy line_detection function
 nuctl deploy --path src/line_detector \
     --platform local \
     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
     -e NEO4J_USER=neo4j \
     -e NEO4J_PASS=$NEO4J_PASS \
-    -e NEXT_NUCLIO=http://"$HOST_IP":5050 \
-    --http-trigger-service-type 8080
+    -e NEXT_NUCLIO=http://"$HOST_IP":5050 &
+line_detector_pid=$!
 
-# Deploy shapes_detection function
-nuctl deploy --path src/shapes_detector \
+nuctl deploy --path src/critical_points_detector \
     --platform local \
     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
     -e NEO4J_USER=neo4j \
-    -e NEO4J_PASS=$NEO4J_PASS \
-    --http-trigger-service-type 5050
+    -e NEO4J_PASS=$NEO4J_PASS &
+critical_points_detector_pid=$!
 
-# Wait for deployments to complete (adjust sleep time as needed)
-# sleep 10
+# Uncomment the following lines to deploy the shapes_detector function
+# nuctl deploy --path src/shapes_detector \
+#     --platform local \
+#     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+#     -e NEO4J_USER=neo4j \
+#     -e NEO4J_PASS=$NEO4J_PASS \
+#     --http-trigger-service-type 5050 &
+# shapes_detector_pid=$!
+
+# Wait for the deployments to complete
+wait $image_exporter_pid
+wait $line_detector_pid
+wait $critical_points_detector_pid
+# Uncomment the following line to wait for the shapes_detector deployment
+# wait $shapes_detector_pid
 
 # Invoke image_exporter
 nuctl invoke image-exporter --platform local --method POST \
