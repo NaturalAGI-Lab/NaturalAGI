@@ -6,13 +6,14 @@ from neo4j import GraphDatabase
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
 
+
 class CriticalPointsRepository:
     def __init__(self, uri, user, password):
         logging.info("Initializing CriticalPointsRepository")
         try:
             self.driver = GraphDatabase.driver(uri, auth=(user, password))
             logging.info("Database connection established")
-            
+
         except Exception as e:
             logging.error(f"Error establishing database connection: {e}")
             raise
@@ -30,10 +31,10 @@ class CriticalPointsRepository:
         with self.driver.session() as session:
             result = session.write_transaction(self._find_and_create_points)
             logging.debug(f"Result from _find_and_create_points: {result}")
-            
+
             min_angle_point = session.read_transaction(self._find_starting_point)
             logging.debug(f"Min Angle Point: {min_angle_point}")
-            
+
             result = session.write_transaction(
                 self._create_relative_params, min_angle_point
             )
@@ -60,19 +61,22 @@ class CriticalPointsRepository:
                 (line)-[:INCLUDES]->(ap2:AnglePoint),
                 (angle:Angle)--(:Orientation)--(line)
             WHERE ap1.x <> ap2.x AND ap1.y <> ap2.y
-            MERGE (vAngle:VectorAngle {value: angle.value, line_id: line.id})<-[:HAS]-(vOrient:VectorOrientation {line_id: line.id})
-            MERGE (vOrient)<-[:HAS]-(v:Vector {line_id: line.id})
+            MERGE (v:Vector {line_id: line.id})
+            ON CREATE SET v.vector_id = randomUUID()
             MERGE (line)-[:INCLUDES]->(v)
             MERGE (v)-[:INCLUDES]->(ap1)
             MERGE (v)-[:INCLUDES]->(ap2)
-            MERGE (v)-[:HAS]->(vLocation:VectorLocation)
+            MERGE (v)-[:HAS]->(vLocation:VectorLocation {vector_id: v.vector_id})
+            MERGE (vOrient:VectorOrientation {vector_id: v.vector_id})<-[:HAS]-(v)
+            MERGE (vAngle:VectorAngle {value: angle.value, vector_id: v.vector_id})<-[:HAS]-(vOrient)
             WITH v, vLocation, ap1, ap2
-            MERGE (vLocation)-[:HAS]->(vCoordinates:VectorCoordinates)
+            MERGE (vLocation)-[:HAS]->(vCoordinates:VectorCoordinates {vector_id: v.vector_id})
             ON CREATE SET vCoordinates.x1 = ap1.x, vCoordinates.y1 = ap1.y, vCoordinates.x2 = ap2.x, vCoordinates.y2 = ap2.y
             WITH v, ap1, ap2
             MATCH (v)-[:HAS]->(vLocation:VectorLocation)-[:HAS]->(vCoordinates:VectorCoordinates)
             WITH v, vCoordinates, sqrt((vCoordinates.x2 - vCoordinates.x1) * (vCoordinates.x2 - vCoordinates.x1) + (vCoordinates.y2 - vCoordinates.y1) * (vCoordinates.y2 - vCoordinates.y1)) AS magnitude
-            MERGE (v)-[:HAS]->(vectorLength:VectorLength)-[:HAS]->(vectorMagnitude:VectorMagnitude {value: magnitude})
+            MERGE (vectorLength:VectorLength {vector_id: v.vector_id})<-[:HAS]-(v)
+            MERGE (vectorMagnitude:VectorMagnitude {value: magnitude, vector_id: v.vector_id})<-[:HAS]-(vectorLength)
         """
         logging.debug(f"Running query: {query}")
         result = tx.run(query)
@@ -114,19 +118,22 @@ class CriticalPointsRepository:
                 # Fetch the details of the current AnglePoint
                 vector_details_query = """
                     MATCH (vector:Vector)--(ap:AnglePoint)--(nextVector:Vector), (nextVector)--(loc:VectorLocation)--(coords:VectorCoordinates)
-                    WHERE id(ap) <> $ap_id AND vector.line_id = $latest_line_id
+                    WHERE id(ap) <> $ap_id AND vector.vector_id = $latest_vector_id
                     RETURN collect({vector: nextVector, location: loc, coordinates: coords, angle_point: ap}) AS VectorDetails
                 """
                 vector_details_result = tx.run(
                     vector_details_query,
                     ap_id=current_angle_point_id,
-                    latest_line_id=list(processed_vectors)[-1],
+                    latest_vector_id=list(processed_vectors)[-1],
                 )
                 vector_details_record = vector_details_result.single()
                 vector_details = vector_details_record["VectorDetails"][0]
                 current_angle_point_id = vector_details["angle_point"].id
                 logging.debug(f"Not the first vector. Result: {vector_details}")
-                next_vector, coords = vector_details['vector'], vector_details['coordinates']
+                next_vector, coords = (
+                    vector_details["vector"],
+                    vector_details["coordinates"],
+                )
             else:
                 vector_details_query = """
                     MATCH (ap:AnglePoint)-[:INCLUDES]-(vector:Vector)--(loc:VectorLocation)--(coords:VectorCoordinates)
@@ -143,13 +150,15 @@ class CriticalPointsRepository:
                 next_vector, coords = CriticalPointsRepository.find_next_vector(
                     vector_details, min_angle_point
                 )
-            
-            logging.debug(f"Next vector was found: {next_vector} with id: {next_vector['id']}")
+
+            logging.debug(
+                f"Next vector was found: {next_vector} with id: {next_vector['id']}"
+            )
 
             # Skip if the line was already processed
-            if next_vector["line_id"] in processed_vectors:
+            if next_vector["vector_id"] in processed_vectors:
                 break
-            processed_vectors.add(next_vector["line_id"])
+            processed_vectors.add(next_vector["vector_id"])
 
             result = CriticalPointsRepository.calculate_and_set_relative_params(
                 tx, min_angle_point, next_vector, coords
@@ -174,15 +183,17 @@ class CriticalPointsRepository:
         )
         logging.debug(f"Vector value: {x_vect, y_vect}")
 
-        query = f"""
+        query = """
             MATCH (vector:Vector)--(loc:VectorLocation)
-            WHERE vector.line_id = {next_vector['line_id']}
+            WHERE vector.vector_id = $next_vector_id
             WITH loc, vector
-            MERGE (loc)-[:HAS]->(vValue:VectorValue {{x: {x_vect}, y: {y_vect}}})
+            MERGE (loc)-[:HAS]->(vValue:VectorValue {vector_id: vector.vector_id, x: $x_vect, y: $y_vect})
             RETURN vValue
         """
         logging.debug(f"Running query: {query}")
-        result = tx.run(query)
+        result = tx.run(
+            query, next_vector_id=next_vector["vector_id"], x_vect=x_vect, y_vect=y_vect
+        )
         logging.debug(f"Vector value is created for the line ")
 
         (
@@ -195,25 +206,34 @@ class CriticalPointsRepository:
         logging.debug(
             f"Half planes and quadrants: {horizontal_plane, vertical_plane, quadrant}"
         )
-        query = f"""
+        query = """
             MATCH (vector:Vector)--(loc:VectorLocation)
-            WHERE vector.line_id = {next_vector['line_id']}
+            WHERE vector.vector_id = $next_vector_id
             WITH loc, vector
-            MERGE (loc)-[:HAS]->(halfPlane:HalfPlane {{horizontal_plane: "{horizontal_plane}", vertical_plane: "{vertical_plane}"}})
+            MERGE (loc)-[:HAS]->(halfPlane:HalfPlane {vector_id: vector.vector_id, horizontal_plane: $horizontal_plane, vertical_plane: $vertical_plane})
             RETURN halfPlane
         """
         logging.debug(f"Running query: {query}")
-        result = tx.run(query)
+        result = tx.run(
+            query,
+            next_vector_id=next_vector["vector_id"],
+            horizontal_plane=horizontal_plane,
+            vertical_plane=vertical_plane,
+        )
 
-        query = f"""
+        query = """
             MATCH (vector:Vector)--(loc:VectorLocation)
-            WHERE vector.line_id = {next_vector['line_id']}
+            WHERE vector.vector_id = $next_vector_id
             WITH loc, vector
-            MERGE (loc)-[:HAS]->(v:Quadrant {{quadrant: {quadrant}}})
+            MERGE (loc)-[:HAS]->(v:Quadrant {vector_id: vector.vector_id, quadrant: $quadrant})
             RETURN v
         """
         logging.debug(f"Running query: {query}")
-        result = tx.run(query)
+        result = tx.run(
+            query,
+            next_vector_id=next_vector["vector_id"],
+            quadrant = quadrant
+        )
         logging.debug(f"Half planes and quadrants are created for the line ")
         return result
 
