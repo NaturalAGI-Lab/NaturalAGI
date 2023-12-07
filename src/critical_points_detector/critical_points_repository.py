@@ -2,10 +2,13 @@ import math
 import logging
 
 from neo4j import GraphDatabase
+from magnitude_comparator import compare_vector_magnitude_and_create_nodes
+from direction_checker import check_direction_change, create_critical_point
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
+# TODO fix the following path issue
 
 class CriticalPointsRepository:
     def __init__(self, uri, user, password):
@@ -32,7 +35,7 @@ class CriticalPointsRepository:
             result = session.write_transaction(self._find_and_create_points)
             logging.debug(f"Result from _find_and_create_points: {result}")
 
-            min_angle_point = session.read_transaction(self._find_starting_point)
+            min_angle_point = session.write_transaction(self._find_starting_point)
             logging.debug(f"Min Angle Point: {min_angle_point}")
 
             result = session.write_transaction(
@@ -96,6 +99,7 @@ class CriticalPointsRepository:
             WITH n
             ORDER BY n.y, n.x
             LIMIT 1
+            MERGE (criticalPoint: CriticalPoint {reason: "First point"})-[:IS]-(n)
             RETURN n AS MinAnglePoint
         """
         logging.debug(f"Running query: {query}")
@@ -112,6 +116,7 @@ class CriticalPointsRepository:
         first_angle_point_id = min_angle_point.id
         current_angle_point_id = first_angle_point_id
         last_vector = None
+        last_direction = None
         processed_vectors = set()  # To track processed lines
 
         while True:
@@ -159,9 +164,14 @@ class CriticalPointsRepository:
             # Skip if the line was already processed
             if next_vector["vector_id"] in processed_vectors:
                 if next_vector["vector_id"] != last_vector["vector_id"]:
-                    result = CriticalPointsRepository.compare_vector_magnitude_and_create_nodes(
-                        tx, last_vector, next_vector
-                    )
+                    # Compare the direction between the last and the current vector
+                    direction_change, current_direction = check_direction_change(tx, last_vector, next_vector, last_direction)
+                    if direction_change:
+                        # If there's a direction change, create a CriticalPoint at the angle between the vectors
+                        create_critical_point(tx, last_vector, next_vector)
+                    else:
+                        logging.info("No changes in directions")
+                    result = compare_vector_magnitude_and_create_nodes(tx, last_vector, next_vector)
                 break
             processed_vectors.add(next_vector["vector_id"])
 
@@ -169,10 +179,17 @@ class CriticalPointsRepository:
                 tx, min_angle_point, next_vector, coords, last_vector
             )
         
-            if (last_vector):
-                result = CriticalPointsRepository.compare_vector_magnitude_and_create_nodes(
-                    tx, last_vector, next_vector
-                )
+            if last_vector:
+                # Compare the direction between the last and the current vector
+                direction_change, current_direction = check_direction_change(tx, last_vector, next_vector, last_direction)
+                if direction_change:
+                    # If there's a direction change, create a CriticalPoint at the angle between the vectors
+                    create_critical_point(tx, last_vector, next_vector)
+                else:
+                    logging.info("No changes in directions")
+                    
+                last_direction = current_direction
+                result = compare_vector_magnitude_and_create_nodes(tx, last_vector, next_vector)
             
             last_vector = next_vector
 
@@ -247,23 +264,6 @@ class CriticalPointsRepository:
             quadrant = quadrant
         )
         logging.debug(f"Half planes and quadrants are created for the line ")
-        return result
-    
-    @staticmethod
-    def compare_vector_magnitude_and_create_nodes(tx, vector1, vector2):
-        logging.info("Comparing vector magnitudes and creating respective nodes")
-        query = """
-            MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS]->(:VectorLength)-[:HAS]->(magnitude1:VectorMagnitude),
-                    (v2:Vector {vector_id: $vector2_id})-[:HAS]->(:VectorLength)-[:HAS]->(magnitude2:VectorMagnitude)
-            WITH v1, v2, magnitude1, magnitude2,
-                    CASE WHEN magnitude1.value > magnitude2.value THEN 'VectLonger'
-                        WHEN magnitude1.value < magnitude2.value THEN 'VectShorter'
-                        ELSE 'VectEven' END AS label
-            CREATE (vect:VectorComparison {label: label})
-            MERGE (v1)-[:IN]->(vect)-[:OUT]->(v2)
-            RETURN count(vect) as NumberOfCreatedNodes
-        """
-        result = tx.run(query, vector1_id=vector1['vector_id'], vector2_id=vector2['vector_id'])
         return result
 
     @staticmethod

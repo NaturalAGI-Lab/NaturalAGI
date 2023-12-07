@@ -31,6 +31,8 @@ HEALTHCHECK --interval=1s --timeout=3s CMD /usr/local/bin/uhttpc --url http://12
 
 COPY function-docker.yaml /opt/nuclio/function1.yaml
 COPY critical_points_repository.py /opt/nuclio/critical_points_repository.py
+COPY direction_checker.py /opt/nuclio/direction_checker.py
+COPY magnitude_comparator.py /opt/nuclio/magnitude_comparator.py
 COPY nuclio_handler.py /opt/nuclio/nuclio_handler.py
 
 # Run processor with configuration and platform configuration
