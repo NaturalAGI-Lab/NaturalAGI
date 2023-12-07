@@ -111,6 +111,7 @@ class CriticalPointsRepository:
         logging.info("Running _create_relative_params transaction")
         first_angle_point_id = min_angle_point.id
         current_angle_point_id = first_angle_point_id
+        last_vector = None
         processed_vectors = set()  # To track processed lines
 
         while True:
@@ -157,17 +158,28 @@ class CriticalPointsRepository:
 
             # Skip if the line was already processed
             if next_vector["vector_id"] in processed_vectors:
+                if next_vector["vector_id"] != last_vector["vector_id"]:
+                    result = CriticalPointsRepository.compare_vector_magnitude_and_create_nodes(
+                        tx, last_vector, next_vector
+                    )
                 break
             processed_vectors.add(next_vector["vector_id"])
 
             result = CriticalPointsRepository.calculate_and_set_relative_params(
-                tx, min_angle_point, next_vector, coords
+                tx, min_angle_point, next_vector, coords, last_vector
             )
+        
+            if (last_vector):
+                result = CriticalPointsRepository.compare_vector_magnitude_and_create_nodes(
+                    tx, last_vector, next_vector
+                )
+            
+            last_vector = next_vector
 
         return result
 
     @staticmethod
-    def calculate_and_set_relative_params(tx, min_angle_point, next_vector, coords):
+    def calculate_and_set_relative_params(tx, min_angle_point, next_vector, coords, last_vector):
         starting_x, starting_y = min_angle_point["x"], min_angle_point["y"]
         ending_x, ending_y = None, None
 
@@ -235,6 +247,23 @@ class CriticalPointsRepository:
             quadrant = quadrant
         )
         logging.debug(f"Half planes and quadrants are created for the line ")
+        return result
+    
+    @staticmethod
+    def compare_vector_magnitude_and_create_nodes(tx, vector1, vector2):
+        logging.info("Comparing vector magnitudes and creating respective nodes")
+        query = """
+            MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS]->(:VectorLength)-[:HAS]->(magnitude1:VectorMagnitude),
+                    (v2:Vector {vector_id: $vector2_id})-[:HAS]->(:VectorLength)-[:HAS]->(magnitude2:VectorMagnitude)
+            WITH v1, v2, magnitude1, magnitude2,
+                    CASE WHEN magnitude1.value > magnitude2.value THEN 'VectLonger'
+                        WHEN magnitude1.value < magnitude2.value THEN 'VectShorter'
+                        ELSE 'VectEven' END AS label
+            CREATE (vect:VectorComparison {label: label})
+            MERGE (v1)-[:IN]->(vect)-[:OUT]->(v2)
+            RETURN count(vect) as NumberOfCreatedNodes
+        """
+        result = tx.run(query, vector1_id=vector1['vector_id'], vector2_id=vector2['vector_id'])
         return result
 
     @staticmethod
