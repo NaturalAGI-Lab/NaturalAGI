@@ -130,10 +130,12 @@ class CriticalPointsRepository:
                 vector_details_result = tx.run(
                     vector_details_query,
                     ap_id=current_angle_point_id,
-                    latest_vector_id=list(processed_vectors)[-1],
+                    latest_vector_id=last_vector["vector_id"],
                 )
+                logging.debug(f"Requesting next vector with params: ap_id: {current_angle_point_id}, latest_vector_id: {last_vector['vector_id']}")
                 vector_details_record = vector_details_result.single()
                 vector_details = vector_details_record["VectorDetails"][0]
+                logging.debug(f"Received vector details: {vector_details}")
                 current_angle_point_id = vector_details["angle_point"].id
                 logging.debug(f"Not the first vector. Result: {vector_details}")
                 next_vector, coords = (
@@ -173,6 +175,7 @@ class CriticalPointsRepository:
                         logging.info("No changes in directions")
                     result = compare_vector_magnitude_and_create_nodes(tx, last_vector, next_vector)
                 break
+            
             processed_vectors.add(next_vector["vector_id"])
 
             result = CriticalPointsRepository.calculate_and_set_relative_params(
