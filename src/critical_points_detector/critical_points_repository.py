@@ -3,7 +3,7 @@ import logging
 
 from neo4j import GraphDatabase
 from magnitude_comparator import compare_vector_magnitude_and_create_nodes
-from direction_checker import check_direction_change, create_critical_point
+from direction_checker import add_direction, check_direction_change, create_critical_point
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -168,6 +168,7 @@ class CriticalPointsRepository:
                 if next_vector["vector_id"] != last_vector["vector_id"]:
                     # Compare the direction between the last and the current vector
                     direction_change, current_direction = check_direction_change(tx, last_vector, next_vector, last_direction)
+                    add_direction(tx, last_vector, next_vector, current_direction)
                     if direction_change:
                         # If there's a direction change, create a CriticalPoint at the angle between the vectors
                         create_critical_point(tx, last_vector, next_vector)
@@ -185,6 +186,7 @@ class CriticalPointsRepository:
             if last_vector:
                 # Compare the direction between the last and the current vector
                 direction_change, current_direction = check_direction_change(tx, last_vector, next_vector, last_direction)
+                add_direction(tx, last_vector, next_vector, current_direction)
                 if direction_change:
                     # If there's a direction change, create a CriticalPoint at the angle between the vectors
                     create_critical_point(tx, last_vector, next_vector)

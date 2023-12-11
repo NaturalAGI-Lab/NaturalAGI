@@ -28,7 +28,7 @@ def check_direction_change(tx, vector1, vector2, last_direction):
         dx_v2 = result['x2_v2'] - result['x1_v2']
         dy_v2 = result['y2_v2'] - result['y1_v2']
         cross_product = dx_v1 * dy_v2 - dy_v1 * dx_v2
-        current_direction = 'CounterClockwise' if cross_product > 0 else 'Clockwise' if cross_product < 0 else 'Collinear'
+        current_direction = 'CounterClockwise' if cross_product < 0 else 'Clockwise' if cross_product > 0 else 'Collinear'
 
         direction_change = last_direction and last_direction != current_direction
         logging.info(f"Direction change: {direction_change}, Current direction: {current_direction}")
@@ -38,6 +38,15 @@ def check_direction_change(tx, vector1, vector2, last_direction):
     else:
         logging.info("No matching vectors found in the database.")
         return False, last_direction
+    
+    
+def add_direction(tx, vector1, vector2, direction):
+    logging.debug(f"Adding direction: {direction} to the vectors")
+    query = """
+        MATCH (v1:Vector {vector_id: $vector1_id})-[:INCLUDES]->(ap:AnglePoint)<-[:INCLUDES]-(v2:Vector {vector_id: $vector2_id})
+        MERGE (v1)-[:DIRECTION]->(vd:VectDirection {direction: $direction})-[:DIRECTION]->(v2)
+    """
+    tx.run(query, vector1_id=vector1['vector_id'], vector2_id=vector2['vector_id'], direction=direction)
 
 
 def create_critical_point(tx, vector1, vector2):
