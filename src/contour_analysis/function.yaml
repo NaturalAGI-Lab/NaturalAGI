@@ -1,5 +1,5 @@
 metadata:
-  name: critical_points_detector
+  name: contour_analysis
   namespace: natural-agi
   labels:
     nuclio.io/project-name: natural-agi

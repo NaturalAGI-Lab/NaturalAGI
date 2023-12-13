@@ -1,16 +1,12 @@
-import json
-import base64
 import traceback
 
 import requests
-import cv2
-import numpy as np
-from shapes_repository import ShapesRepository
+from contour_analysis_repository import ContourAnalysisRepository
 
 from pydantic_settings import BaseSettings
 
 
-HANDLER_NAME = "Shapes Detector"
+HANDLER_NAME = "Contour analysis"
 
 
 class Settings(BaseSettings):
@@ -31,9 +27,8 @@ def init_context(context):
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
 
-    shapes_repository = ShapesRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
-    setattr(context.user_data, "shapes_repository", shapes_repository)
-
+    contour_analysis_repository = ContourAnalysisRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
+    setattr(context.user_data, "contour_analysis_repository", contour_analysis_repository)
 
 def http_handler(context, event):
     """Handles HTTP requests"""
@@ -43,10 +38,11 @@ def http_handler(context, event):
         image_id = image_id.decode('utf-8') if isinstance(image_id, bytes) else image_id
 
         context.logger.debug_with(f"Received image_id: {image_id}", handler=HANDLER_NAME)
-        context.user_data.shapes_repository.find_and_create_shapes()
+                        
+        context.user_data.contour_analysis_repository.analyze_contour()
 
         context.Response(
-            body=f"Shapes detected for image: {image_id}",
+            body=f"Points detected for image: {image_id}",
             headers={},
             content_type="text/plain",
             status_code=requests.codes.ok,  # pylint: disable=no-member
@@ -59,7 +55,7 @@ def http_handler(context, event):
         traceback.print_exc()
 
         context.Response(
-            body=f"Error detecting shapes for image: {e}",
+            body=f"Error detecting points for image: {e}",
             headers={},
             content_type="text/plain",
             status_code=requests.codes.server_error,  # pylint: disable=no-member
