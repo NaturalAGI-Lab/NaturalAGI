@@ -2,11 +2,18 @@ import math
 import logging
 
 from neo4j import GraphDatabase
+import numpy as np
+from helpers import calculate_half_plane_and_quadrant, find_next_vector
 from magnitude_comparator import compare_vector_magnitude_and_create_nodes
-from direction_checker import add_direction, check_direction_change, create_critical_point
+from direction_checker import (
+    add_direction,
+    check_direction_change,
+    create_critical_point,
+)
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
+
 
 class ContourAnalysisRepository:
     def __init__(self, uri, user, password):
@@ -34,9 +41,14 @@ class ContourAnalysisRepository:
             logging.debug(f"Min Angle Point: {min_angle_point}")
 
             result = session.write_transaction(
-                self._create_relative_params, min_angle_point
+                self.process_contour, min_angle_point, self.calculate_and_set_relative_params
             )
-            logging.debug(f"Result from _create_relative_params: {result}")
+            logging.debug(f"Result from calculate_and_set_relative_params: {result}")
+            
+            result = session.write_transaction(
+                self.process_contour, min_angle_point, self.calculate_magnitude_and_direction
+            )
+            logging.debug(f"Result from calculate_magnitude_and_direction: {result}")
             return result
 
     @staticmethod
@@ -54,109 +66,88 @@ class ContourAnalysisRepository:
             ORDER BY apLoc.y, apLoc.x
             LIMIT 1
             MERGE (criticalPoint: CriticalPoint {reason: "First point"})-[:IS]-(n)
-            RETURN n AS MinAnglePoint
+            RETURN {x: apLoc.x, y: apLoc.y, id: n.id} AS MinAnglePoint
         """
-        logging.debug(f"Running query: {query}")
         result = tx.run(query)
-        records = [record for record in result]  # Consuming the result
-
+        records = [record for record in result]
         min_angle_point = records[0]["MinAnglePoint"]
         logging.debug(f"Min AnglePoint is {min_angle_point}")
         return min_angle_point
 
     @staticmethod
-    def _create_relative_params(tx, min_angle_point):
-        logging.info("Running _create_relative_params transaction")
-        first_angle_point_id = min_angle_point.id
-        current_angle_point_id = first_angle_point_id
+    def process_contour(tx, min_angle_point, procedure):
+        logging.info("Running contour processing")
+        current_angle_point = min_angle_point
         last_vector = None
         last_direction = None
-        processed_vectors = set()  # To track processed lines
-
+        processed_vectors = set()
+        
         while True:
-            if len(processed_vectors):
-                # Fetch the details of the current AnglePoint
-                vector_details_query = """
-                    MATCH (vector:Vector)--(ap:AnglePoint)--(nextVector:Vector), (nextVector)--(loc:VectorLocation)--(coords:VectorCoordinates)
-                    WHERE id(ap) <> $ap_id AND vector.vector_id = $latest_vector_id
-                    RETURN collect({vector: nextVector, location: loc, coordinates: coords, angle_point: ap}) AS VectorDetails
-                """
-                vector_details_result = tx.run(
-                    vector_details_query,
-                    ap_id=current_angle_point_id,
-                    latest_vector_id=last_vector["vector_id"],
-                )
-                logging.debug(f"Requesting next vector with params: ap_id: {current_angle_point_id}, latest_vector_id: {last_vector['vector_id']}")
-                vector_details_record = vector_details_result.single()
-                vector_details = vector_details_record["VectorDetails"][0]
-                logging.debug(f"Received vector details: {vector_details}")
-                current_angle_point_id = vector_details["angle_point"].id
-                logging.debug(f"Not the first vector. Result: {vector_details}")
-                next_vector, coords = (
-                    vector_details["vector"],
-                    vector_details["coordinates"],
-                )
-            else:
-                vector_details_query = """
-                    MATCH (ap:AnglePoint)-[:INCLUDES]-(vector:Vector)--(loc:VectorLocation)--(coords:VectorCoordinates)
-                    WHERE id(ap) = $ap_id
-                    RETURN collect({vector: vector, location: loc, coordinates: coords}) AS VectorDetails
-                """
-                vector_details_result = tx.run(
-                    vector_details_query, ap_id=current_angle_point_id
-                )
-                # Fetch the details of the current AnglePoint
-                vector_details_record = vector_details_result.single()
-                vector_details = vector_details_record["VectorDetails"]
-                # Find the next line based on coordinates
-                next_vector, coords = ContourAnalysisRepository.find_next_vector(
-                    vector_details, min_angle_point
-                )
-
-            logging.debug(
-                f"Next vector was found: {next_vector} with id: {next_vector['id']}"
+            next_vector, coords, current_angle_point = ContourAnalysisRepository.get_next_vector_details(
+                tx,
+                current_angle_point,
+                processed_vectors,
+                last_vector,
+                min_angle_point,
             )
-
-            # Skip if the line was already processed
+            logging.info(f"Received next vector: {next_vector} and coords: {coords}")
+            
+            procedure(tx, last_vector, next_vector, coords, last_direction, current_angle_point)
+            
             if next_vector["vector_id"] in processed_vectors:
-                if next_vector["vector_id"] != last_vector["vector_id"]:
-                    # Compare the direction between the last and the current vector
-                    direction_change, current_direction = check_direction_change(tx, last_vector, next_vector, last_direction)
-                    add_direction(tx, last_vector, next_vector, current_direction)
-                    if direction_change:
-                        # If there's a direction change, create a CriticalPoint at the angle between the vectors
-                        create_critical_point(tx, last_vector, next_vector)
-                    else:
-                        logging.info("No changes in directions")
-                    result = compare_vector_magnitude_and_create_nodes(tx, last_vector, next_vector)
+                logging.info("----------------------------------------")
+                logging.info(f"Next vector already processed {next_vector['vector_id']}")
+                logging.info("----------------------------------------")
                 break
             
             processed_vectors.add(next_vector["vector_id"])
-
-            result = ContourAnalysisRepository.calculate_and_set_relative_params(
-                tx, min_angle_point, next_vector, coords
-            )
-        
-            if last_vector:
-                # Compare the direction between the last and the current vector
-                direction_change, current_direction = check_direction_change(tx, last_vector, next_vector, last_direction)
-                add_direction(tx, last_vector, next_vector, current_direction)
-                if direction_change:
-                    # If there's a direction change, create a CriticalPoint at the angle between the vectors
-                    create_critical_point(tx, last_vector, next_vector)
-                else:
-                    logging.info("No changes in directions")
-                    
-                last_direction = current_direction
-                result = compare_vector_magnitude_and_create_nodes(tx, last_vector, next_vector)
-            
             last_vector = next_vector
-
-        return result
+        
+        return True
 
     @staticmethod
-    def calculate_and_set_relative_params(tx, min_angle_point, next_vector, coords):
-        starting_x, starting_y = min_angle_point["x"], min_angle_point["y"]
+    def get_next_vector_details(
+        tx, current_angle_point, processed_vectors, last_vector, min_angle_point
+    ):
+        if len(processed_vectors):
+            # Fetch the details of the current AnglePoint
+            vector_details_query = """
+                MATCH (vector:Vector)--(ap:AnglePoint)--(nextVector:Vector), (nextVector)--(loc:VectorLocation)--(coords:VectorCoordinates), (ap)--(apLoc:AnglePointLocation)
+                WHERE ap.id <> $ap_id AND vector.vector_id = $latest_vector_id
+                RETURN collect({vector: nextVector, location: loc, coordinates: coords, angle_point: {id: ap.id, x: apLoc.x, y: apLoc.y}}) AS VectorDetails
+            """
+            vector_details_result = tx.run(
+                vector_details_query,
+                ap_id=current_angle_point["id"],
+                latest_vector_id=last_vector["vector_id"],
+            )
+            logging.debug(
+                f"Requesting next vector with params: ap_id: {current_angle_point['id']}, latest_vector_id: {last_vector['vector_id']}"
+            )
+            vector_details_record = vector_details_result.single()
+            vector_details = vector_details_record["VectorDetails"][0]
+            logging.debug(f"Received vector details: {vector_details}")
+            current_angle_point = vector_details["angle_point"]
+            logging.debug(f"Not the first vector. Result: {vector_details}")
+            return vector_details["vector"], vector_details["coordinates"], current_angle_point
+        else:
+            vector_details_query = """
+                MATCH (ap:AnglePoint)-[:INCLUDES]-(vector:Vector)--(loc:VectorLocation)--(coords:VectorCoordinates)
+                WHERE ap.id = $ap_id
+                RETURN collect({vector: vector, location: loc, coordinates: coords}) AS VectorDetails
+            """
+            vector_details_result = tx.run(
+                vector_details_query, ap_id=current_angle_point["id"]
+            )
+            # Fetch the details of the current AnglePoint
+            vector_details_record = vector_details_result.single()
+            vector_details = vector_details_record["VectorDetails"]
+            # Find the next line based on coordinates
+            return *find_next_vector(vector_details, min_angle_point), current_angle_point
+
+    @staticmethod
+    def calculate_and_set_relative_params(tx, last_vector, next_vector, coords, last_direction, current_angle_point):
+        starting_x, starting_y = current_angle_point["x"], current_angle_point["y"]
         ending_x, ending_y = None, None
 
         if coords["x1"] == starting_x and coords["y1"] == starting_y:
@@ -165,10 +156,11 @@ class ContourAnalysisRepository:
         else:
             ending_x = coords["x1"]
             ending_y = coords["y1"]
+        
+        logging.debug(f"Subtracting {(ending_x, ending_y), (starting_x, starting_y)}")
 
-        x_vect, y_vect = ContourAnalysisRepository.calculate_vector_value(
-            starting_x, starting_y, ending_x, ending_y
-        )
+        x_vect, y_vect = np.subtract((ending_x, ending_y), (starting_x, starting_y))
+
         logging.debug(f"Vector value: {x_vect, y_vect}")
 
         query = """
@@ -184,12 +176,8 @@ class ContourAnalysisRepository:
         )
         logging.debug(f"Vector value is created for the line ")
 
-        (
-            horizontal_plane,
-            vertical_plane,
-            quadrant,
-        ) = ContourAnalysisRepository.calculate_half_plane_and_quadrant(
-            starting_x, starting_y, ending_x, ending_y
+        horizontal_plane, vertical_plane, quadrant = calculate_half_plane_and_quadrant(
+            x_vect, y_vect
         )
         logging.debug(
             f"Half planes and quadrants: {horizontal_plane, vertical_plane, quadrant}"
@@ -218,60 +206,25 @@ class ContourAnalysisRepository:
         """
         logging.debug(f"Running query: {query}")
         result = tx.run(
-            query,
-            next_vector_id=next_vector["vector_id"],
-            quadrant = quadrant
+            query, next_vector_id=next_vector["vector_id"], quadrant=quadrant
         )
         logging.debug(f"Half planes and quadrants are created for the line ")
         return result
 
     @staticmethod
-    def find_next_vector(line_details, min_angle_point):
-        next_line = None
-        next_coords = None
-        max_sum = 0
-
-        for detail in line_details:
-            line = detail["vector"]
-            coords = detail["coordinates"]
-            ap_x = min_angle_point["x"]
-            x1, x2 = coords["x1"], coords["x2"]
-            local_sum = ap_x + x1 + x2
-
-            if local_sum > max_sum:
-                max_sum = local_sum
-                next_line = line
-                next_coords = coords
-
-        return next_line, next_coords
-
-    @staticmethod
-    def calculate_vector_value(x1, y1, x2, y2):
-        return x2 - x1, y2 - y1
-
-    @staticmethod
-    def calculate_half_plane_and_quadrant(x1, y1, x2, y2):
-        dx = x2 - x1
-        dy = y2 - y1
-
-        # Determine half-planes
-        horizontal_plane = "Upper" if dy > 0 else "Lower"
-        vertical_plane = "Right" if dx > 0 else "Left"
-        quadrant = None
-
-        # Determine quadrant
-        if dx > 0 and dy > 0:
-            quadrant = 1
-        elif dx < 0 and dy > 0:
-            quadrant = 2
-        elif dx < 0 and dy < 0:
-            quadrant = 3
-        elif dx > 0 and dy < 0:
-            quadrant = 4
+    def calculate_magnitude_and_direction(tx, last_vector, next_vector, coords, last_direction, current_angle_point):
+        if last_vector is None:
+            logging.debug("Can't compare the first vector... Skipping first iteration")
+            return
+        
+        # Compare the direction between the last and the current vector
+        direction_change, current_direction = check_direction_change(
+            tx, last_vector, next_vector, last_direction
+        )
+        add_direction(tx, last_vector, next_vector, current_direction)
+        if direction_change:
+            # If there's a direction change, create a CriticalPoint at the angle between the vectors
+            create_critical_point(tx, last_vector, next_vector)
         else:
-            quadrant = -1
-
-        logging.debug(f"Half-Planes: {horizontal_plane} and {vertical_plane}")
-        logging.debug(f"Quadrant: {quadrant}")
-
-        return horizontal_plane, vertical_plane, quadrant
+            logging.info("No changes in directions")
+        return compare_vector_magnitude_and_create_nodes(tx, last_vector, next_vector)

@@ -11,7 +11,7 @@ def check_direction_change(tx, vector1, vector2, last_direction):
         MATCH (v2)-[:HAS]->(loc2:VectorLocation)-[:HAS]->(value2:VectorValue)
         RETURN 
             value1.x AS x_v1, value1.y AS y_v1,
-            value2.x1 AS x_v2, value2.y1 AS y_v2
+            value2.x AS x_v2, value2.y AS y_v2
     """
     record = tx.run(query, vector1_id=vector1['vector_id'], vector2_id=vector2['vector_id']).single()
 
@@ -22,6 +22,8 @@ def check_direction_change(tx, vector1, vector2, last_direction):
         
         v1 = [result['x_v1'], result['y_v1']]
         v2 = [result['x_v2'], result['y_v2']]
+        
+        logging.debug(f"Cross product for: {v1, v2}")
         cross_product = np.cross(v1, v2)
         current_direction = 'CounterClockwise' if cross_product < 0 else 'Clockwise' if cross_product > 0 else 'Collinear'
 

@@ -38,6 +38,7 @@ class AnglePointsRepository:
             ORDER BY id(p)
             WITH l1, l2, collect(p)[0] as firstPixel, angleBetween
             MERGE (l1)-[:INCLUDES]->(a:AnglePoint)<-[:INCLUDES]-(l2)
+            ON CREATE SET a.id = randomUUID()
             MERGE (a)-[:HAS]->(:AnglePointLocation {x: firstPixel.x, y: firstPixel.y, angle: angleBetween})
             RETURN a
         """
