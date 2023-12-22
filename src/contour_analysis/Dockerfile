@@ -25,16 +25,16 @@ RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-py
 
 # Readiness probe
 HEALTHCHECK --interval=1s --timeout=3s CMD /usr/local/bin/uhttpc --url http://127.0.0.1:8082/ready || exit 1
+
 # USER CONTENT
-
-# END OF USER CONTENT
-
 COPY function-docker.yaml /opt/nuclio/function1.yaml
-COPY image_repository.py /opt/nuclio/image_repository.py
-COPY line_detector.py /opt/nuclio/line_detector.py
-COPY lines_repository.py /opt/nuclio/lines_repository.py
-COPY hough_builder.py /opt/nuclio/hough_builder.py
 COPY nuclio_handler.py /opt/nuclio/nuclio_handler.py
+COPY direction_checker.py /opt/nuclio/direction_checker.py
+COPY magnitude_comparator.py /opt/nuclio/magnitude_comparator.py
+COPY angle_points_repository.py /opt/nuclio/angle_points_repository.py
+COPY contour_analysis_repository.py /opt/nuclio/contour_analysis_repository.py
+COPY relative_characteristics_repository.py /opt/nuclio/relative_characteristics_repository.py
+# END OF USER CONTENT
 
 # Run processor with configuration and platform configuration
 CMD [ "processor" ]

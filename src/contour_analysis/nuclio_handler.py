@@ -1,14 +1,12 @@
 import traceback
 
 import requests
-from image_repository import ImageRepository
-from lines_repository import LinesRepository
-from line_detector import LineDetector
+from contour_analysis_repository import ContourAnalysisRepository
 
 from pydantic_settings import BaseSettings
 
 
-HANDLER_NAME = "Line Detector"
+HANDLER_NAME = "Contour analysis"
 
 
 class Settings(BaseSettings):
@@ -17,7 +15,6 @@ class Settings(BaseSettings):
     neo4j_dsn: str
     neo4j_user: str
     neo4j_pass: str
-    next_nuclio: str = ""
 
 
 def init_context(context):
@@ -30,14 +27,8 @@ def init_context(context):
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
 
-    image_repository = ImageRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
-    setattr(context.user_data, "image_repository", image_repository)
-
-    lines_repository = LinesRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
-    setattr(context.user_data, "lines_repository", lines_repository)
-    
-    setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
-
+    contour_analysis_repository = ContourAnalysisRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
+    setattr(context.user_data, "contour_analysis_repository", contour_analysis_repository)
 
 def http_handler(context, event):
     """Handles HTTP requests"""
@@ -47,25 +38,11 @@ def http_handler(context, event):
         image_id = image_id.decode('utf-8') if isinstance(image_id, bytes) else image_id
 
         context.logger.debug_with(f"Received image_id: {image_id}", handler=HANDLER_NAME)
-
-        image = context.user_data.image_repository.get_image(image_id)
-        lines = LineDetector().detect_lines(image)
-        result = context.user_data.lines_repository.add_lines(lines, image_id)
-        print(f"Result adding lines: {result}")
-        
-        next_functions_str = context.user_data.next_nuclio
-
-        if next_functions_str:
-            next_nuclio = next_functions_str.split(";")
-            context.logger.debug_with(f"Next functions: {next_nuclio}", handler=HANDLER_NAME)
-
-            if len(next_nuclio) > 0:
-                for func in next_nuclio:
-                    context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                    requests.post(func, json=str(image_id))
+                        
+        context.user_data.contour_analysis_repository.analyze_contour()
 
         context.Response(
-            body=f"Lines detected for image: {image_id}",
+            body=f"Points detected for image: {image_id}",
             headers={},
             content_type="text/plain",
             status_code=requests.codes.ok,  # pylint: disable=no-member
@@ -78,7 +55,7 @@ def http_handler(context, event):
         traceback.print_exc()
 
         context.Response(
-            body=f"Error detecting lines for image: {e}",
+            body=f"Error detecting points for image: {e}",
             headers={},
             content_type="text/plain",
             status_code=requests.codes.server_error,  # pylint: disable=no-member

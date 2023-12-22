@@ -1,58 +1,62 @@
-import cv2
+from skimage.transform import probabilistic_hough_line
+from skimage.feature import canny
+from matplotlib import cm
+from math import atan2, degrees, floor
 import numpy as np
 import os
+import cv2
+
+from hough_builder import HoughBundler
 
 
 class LineDetector:
+    def detect_lines(self, image):
+        # Convert the image to grayscale if it's not already
+        if len(image.shape) == 3:
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+        else:
+            gray = image
 
-    @staticmethod
-    def detect_lines(image):
-        H, W = image.shape[:2]
-        lsd = cv2.createLineSegmentDetector(0)
+        # edges = canny(image, sigma=1.0, low_threshold=10, high_threshold=20)
+        # lines = probabilistic_hough_line(gray, threshold=10, line_length=2, line_gap=5)
+        lines = cv2.HoughLinesP(gray, 1, np.pi / 180, 50, None, 50, 10)
+        
+        # Initialize HoughBundler
+        bundler = HoughBundler(min_distance=10, min_angle=5)
+        
+        # Process lines
+        processed_lines = bundler.process_lines(lines)
 
-        lines = lsd.detect(image)[0]
-
-        # Initialize an empty list to hold the clamped lines
-        clamped_lines = []
-
-        for line in lines:
-            x1, y1, x2, y2 = line[0]
-
-            # Clamp the coordinates
-            x1 = min(max(round(x1), 0), W - 1)
-            y1 = min(max(round(y1), 0), H - 1)
-            x2 = min(max(round(x2), 0), W - 1)
-            y2 = min(max(round(y2), 0), H - 1)
-
-            # Append the clamped line to the list
-            clamped_lines.append([[x1, y1, x2, y2]])
-
-        print(f'Original lines detected: {len(lines)}')
-        print(f'Clamped lines: {clamped_lines}')
-        return clamped_lines
+        print(f"Pre-processed lines found: {len(lines)}")
+        print(f"Post-processed lines: {len(processed_lines)}")
+        return processed_lines
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     output_folder = "output"
     if not os.path.exists(output_folder):
         os.mkdir(output_folder)
-    
-    img = np.zeros((8, 8, 3), dtype=np.uint8)
-    cv2.line(img, (0, 3), (7, 3), (255, 255, 255), 1)
+
+    img = np.zeros((500, 500, 3), dtype=np.uint8)
+    cv2.line(img, (0, 0), (300, 300), (63, 124, 172), 2)
+    cv2.line(img, (200, 100), (100, 400), (213, 225, 163), 2)
+    cv2.line(img, (100, 300), (500, 100), (189, 196, 167), 2)
     cv2.imwrite(f"{output_folder}/img.png", img)
     img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-    lines = LineDetector.detect_lines(img)
-    
+    detector = LineDetector()
+    lines = detector.detect_lines(img)
+
     # Draw detected lines in the image
     blank_img = np.zeros_like(img)
-    
+
     for dline in lines:
-        x0 = int(round(dline[0][0]))
-        y0 = int(round(dline[0][1]))
-        x1 = int(round(dline[0][2]))
-        y1 = int(round(dline[0][3]))
+        p0, p1 = dline
+        x0 = int(round(p0[0]))
+        y0 = int(round(p1[0]))
+        x1 = int(round(p0[1]))
+        y1 = int(round(p1[1]))
         print(f"Drawing line: x0: {x0}, y0: {y0}, x1: {x1}, y1: {y1}")
         cv2.line(blank_img, (x0, y0), (x1, y1), 255, 1)
-    
+
     cv2.imwrite(f"{output_folder}/image_with_detected_lines.jpg", blank_img)

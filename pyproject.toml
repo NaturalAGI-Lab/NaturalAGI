@@ -2,7 +2,7 @@
 name = "natural-agi"
 version = "0.1.0"
 description = "This project consists of components of reduction neiral netwworks concept"
-authors = ["koboh <konstboh@gmail.com>"]
+authors = ["koboh <konstboh@gmail.com>", "nlapin <nlapin.java@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
@@ -13,6 +13,9 @@ pydantic = "^2.4.2"
 requests = "^2.31.0"
 nuclio-sdk = "^0.5.6"
 pillow = "^10.0.1"
+matplotlib = "^3.8.1"
+scikit-image = "^0.22.0"
+scikit-learn = "^1.3.2"
 
 
 [tool.poetry.group.dev.dependencies]
