@@ -17,12 +17,10 @@ class LineDetector:
         else:
             gray = image
 
-        # edges = canny(image, sigma=1.0, low_threshold=10, high_threshold=20)
-        # lines = probabilistic_hough_line(gray, threshold=10, line_length=2, line_gap=5)
-        lines = cv2.HoughLinesP(gray, 1, np.pi / 180, 50, None, 50, 10)
+        lines = cv2.HoughLinesP(gray, 1, np.pi / 180, threshold=20, lines=None, minLineLength=5, maxLineGap=5)
         
         # Initialize HoughBundler
-        bundler = HoughBundler(min_distance=10, min_angle=5)
+        bundler = HoughBundler(min_distance=3, min_angle=10)
         
         # Process lines
         processed_lines = bundler.process_lines(lines)

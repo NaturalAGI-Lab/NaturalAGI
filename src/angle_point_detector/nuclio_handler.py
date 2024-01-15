@@ -42,7 +42,7 @@ def http_handler(context, event):
         image_id = event.body
         image_id = image_id.decode("utf-8") if isinstance(image_id, bytes) else image_id
 
-        context.user_data.angle_points_repository.create_angle_points()
+        context.user_data.angle_points_repository.create_angle_points(image_id)
 
         context.logger.info_with(
             f"Processed request successfully", handler=HANDLER_NAME

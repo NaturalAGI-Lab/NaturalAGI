@@ -39,7 +39,7 @@ def http_handler(context, event):
 
         context.logger.debug_with(f"Received image_id: {image_id}", handler=HANDLER_NAME)
                         
-        context.user_data.contour_analysis_repository.analyze_contour()
+        context.user_data.contour_analysis_repository.analyze_contour(image_id)
 
         context.Response(
             body=f"Points detected for image: {image_id}",

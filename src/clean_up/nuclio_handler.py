@@ -6,9 +6,7 @@ import traceback
 from nuclio_sdk import Event
 from pydantic_settings import BaseSettings
 
-from relative_characteristics_repository import VectorCharacteristicsRepository
-
-HANDLER_NAME = "vector_characteristics_definer"
+HANDLER_NAME = "clean_up"
 
 class Settings(BaseSettings):
     """Settings"""
@@ -29,10 +27,6 @@ def init_context(context):
     context.logger.debug_with(
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
-    vector_characteristics_repository = VectorCharacteristicsRepository(
-        Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass
-    )
-    setattr(context.user_data, "vector_characteristics_repository", vector_characteristics_repository)
     setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
 
     # Initialize and set context variables
@@ -48,7 +42,8 @@ def http_handler(context, event):
         image_id = event.body
         image_id = image_id.decode('utf-8') if isinstance(image_id, bytes) else image_id
 
-        context.user_data.vector_characteristics_repository.create_relative_characteristics(image_id)
+        # Placeholder for main functionality
+        # Example: result = perform_some_operation(data)
 
         context.logger.info_with(f"Processed request successfully", handler=HANDLER_NAME)
 
