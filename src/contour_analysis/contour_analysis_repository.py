@@ -12,7 +12,7 @@ from direction_checker import (
 )
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 class ContourAnalysisRepository:
@@ -56,7 +56,7 @@ class ContourAnalysisRepository:
         logging.info("Running _find_starting_point transaction")
         query = """
             MATCH path=(v:Vector {image_id: $image_id})-[*6..9]-(v) 
-            WHERE ALL(node IN nodes(path)[1..-1] WHERE SINGLE(x IN nodes(path) WHERE x = node AND NOT "Pixel" IN labels(x))) 
+            WHERE ALL(node IN nodes(path)[1..-1] WHERE SINGLE(x IN nodes(path) WHERE x = node)) 
             WITH DISTINCT path, [node IN nodes(path) WHERE node:Vector] AS vectorNodes
             UNWIND nodes(path) AS n
             WITH n
