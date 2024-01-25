@@ -81,13 +81,13 @@ nuctl invoke line_detector --platform local --method POST \
     --body "{\"image\": \"$BASE64_IMAGE\"}" \
     --content-type "application/json"
 
-# # Path to the image
-# IMAGE_PATH="/Users/mlapin/Development/personal/NaturalAGI/tests/test-data/exported_img_comp.png"
+# Path to the image
+IMAGE_PATH="/Users/mlapin/Development/personal/NaturalAGI/tests/test-data/exported_img_comp.png"
 
-# # Get base64 encoded image
-# BASE64_IMAGE=$(get_base64_image $IMAGE_PATH)
+# Get base64 encoded image
+BASE64_IMAGE=$(get_base64_image $IMAGE_PATH)
 
-# # Invoke image_exporter
-# nuctl invoke image-exporter --platform local --method POST \
-#     --body "{\"image\": \"$BASE64_IMAGE\"}" \
-#     --content-type "application/json"
+# Invoke image_exporter
+nuctl invoke line_detector --platform local --method POST \
+    --body "{\"image\": \"$BASE64_IMAGE\"}" \
+    --content-type "application/json"

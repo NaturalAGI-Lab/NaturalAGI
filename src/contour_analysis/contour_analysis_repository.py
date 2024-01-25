@@ -60,7 +60,7 @@ class ContourAnalysisRepository:
             WITH DISTINCT path, [node IN nodes(path) WHERE node:Vector] AS vectorNodes
             UNWIND nodes(path) AS n
             WITH n
-            WHERE n:AnglePoint
+            WHERE n:AnglePoint AND n.image_id = $image_id
             MATCH (n)--(apLoc:AnglePointLocation)
             WITH n, apLoc
             ORDER BY apLoc.y, apLoc.x
@@ -226,7 +226,7 @@ class ContourAnalysisRepository:
         direction_change, current_direction = check_direction_change(
             tx, image_id, last_vector, next_vector, last_direction
         )
-        add_direction(tx, image_id, last_vector, next_vector, current_direction)
+        add_direction(tx, last_vector, next_vector, current_direction)
         if direction_change:
             # If there's a direction change, create a CriticalPoint at the angle between the vectors
             create_critical_point(tx, last_vector, next_vector)

@@ -44,8 +44,13 @@ def http_handler(context, event):
     try:
         data = event.body
 
+        # Ensure 'image' key exists in the data and is not empty
+        if 'image' not in data or not data['image']:
+            context.logger.error('No image data in request')
+            return
+
         decoded_data = base64.b64decode(data['image'])
-        np_data = np.fromstring(decoded_data, np.uint8)
+        np_data = np.frombuffer(decoded_data, np.uint8)
         image = cv2.imdecode(np_data, cv2.IMREAD_UNCHANGED)
         
         image_id = uuid.uuid4()

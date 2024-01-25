@@ -3,6 +3,7 @@ import math
 
 from neo4j import GraphDatabase
 
+logging.basicConfig(level=logging.INFO)
 
 class AnglePointsRepository:
     def __init__(self, uri, user, password):
@@ -54,7 +55,12 @@ class AnglePointsRepository:
         if angle > math.pi / 2:
             angle = math.pi - angle
         
-        return math.degrees(angle)  # Convert to degrees
+        angle = math.degrees(angle)  # Convert to degrees
+
+        # Round to nearest 5
+        angle = round(angle / 5) * 5
+
+        return angle
     
     @staticmethod
     def line_intersection(line1, line2):
@@ -68,32 +74,43 @@ class AnglePointsRepository:
         px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denominator
         py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denominator
 
-        return px, py
+        
+        logging.info(f"Found line intersection point at ({px}, {py})")
+        return [int(px), int(py)]
     
     @staticmethod
-    def create_angle_points(session, intersection_data):
+    def create_angle_points(session, intersection_data, image_id):
         query = """
         UNWIND $intersection_data AS data
         MERGE (ap:AnglePoint)-[:HAS]->(:AnglePointLocation {x: data.intersection.x, y: data.intersection.y, angle: data.angle})
         ON CREATE 
-            SET ap.id = randomUUID()
+            SET ap.id = randomUUID(),
+                ap.image_id = $image_id
         WITH ap, data
         MATCH (line1:Line {id: data.line1_id})
         MATCH (line2:Line {id: data.line2_id})
         MERGE (line1)-[:INCLUDES]->(ap)
         MERGE (line2)-[:INCLUDES]->(ap)
         """
-        session.run(query, intersection_data=intersection_data)
-
+        session.run(query, intersection_data=intersection_data, image_id=image_id)
+        
     def detect_angle_points(self, image_id):
         logging.info("Creating angle points")
         with self.driver.session() as session:
             lines_result = AnglePointsRepository.fetch_line_data(session)
             intersection_data = []
+            compared_lines = set()
 
             for record in lines_result:
+                line1_id = record['line1']['id']
+                line2_id = record['line2']['id']
+                if (line1_id, line2_id) in compared_lines or (line2_id, line1_id) in compared_lines:
+                    continue
+                compared_lines.add((line1_id, line2_id))
+                
                 line1_coords = (record['coords1']['x1'], record['coords1']['y1'], record['coords1']['x2'], record['coords1']['y2'])
                 line2_coords = (record['coords2']['x1'], record['coords2']['y1'], record['coords2']['x2'], record['coords2']['y2'])
+                logging.info(f"Checking line intersection between {line1_coords} and {line2_coords}")
                 intersection = AnglePointsRepository.line_intersection(line1_coords, line2_coords)
 
                 if intersection:
@@ -105,5 +122,5 @@ class AnglePointsRepository:
                         'angle': angle
                     })
 
-            AnglePointsRepository.create_angle_points(session, intersection_data)
+            AnglePointsRepository.create_angle_points(session, intersection_data, image_id)
             
