@@ -37,8 +37,8 @@ class VectorCharacteristicsRepository:
     def _create_relative_characteristics(tx, image_id):
         logging.debug("Running _create_relative_characteristics transaction")
         query = """
-            MATCH (coord:Coordinates)--(:Location)--(line:Line {image_id: $image_id})-[:INCLUDES]->(ap1:AnglePoint)--(apLoc1:AnglePointLocation),
-                (line)-[:INCLUDES]->(ap2:AnglePoint)--(apLoc2:AnglePointLocation),
+            MATCH (coord:Coordinates)--(:Location)--(line:Line {image_id: $image_id})-[:INCLUDES]->(ap1:AnglePoint)--(apLoc1:AnglePointCoordinates),
+                (line)-[:INCLUDES]->(ap2:AnglePoint)--(apLoc2:AnglePointCoordinates),
                 (angle:Angle)--(:Orientation)--(line)
             WHERE apLoc1.x <> apLoc2.x AND apLoc1.y <> apLoc2.y
             MERGE (v:Vector {line_id: line.id, image_id: $image_id})
@@ -48,15 +48,15 @@ class VectorCharacteristicsRepository:
             MERGE (v)-[:INCLUDES]->(ap2)
             MERGE (v)-[:HAS]->(vLocation:VectorLocation {vector_id: v.vector_id, image_id: $image_id})
             MERGE (vOrient:VectorOrientation {vector_id: v.vector_id, image_id: $image_id})<-[:HAS]-(v)
-            MERGE (vAngle:VectorAngle {value: angle.value, vector_id: v.vector_id, image_id: $image_id})<-[:HAS]-(vOrient)
+            MERGE (vAngle:VectorAngle {value: angle.value})
+            MERGE (vAngle)<-[:HAS]-(vOrient)
             WITH v, vLocation, apLoc1, apLoc2
-            MERGE (vLocation)-[:HAS]->(vCoordinates:VectorCoordinates {vector_id: v.vector_id, image_id: $image_id})
-            ON CREATE SET vCoordinates.x1 = apLoc1.x, vCoordinates.y1 = apLoc1.y, vCoordinates.x2 = apLoc2.x, vCoordinates.y2 = apLoc2.y
-            WITH v, apLoc1, apLoc2
-            MATCH (v)-[:HAS]->(vLocation:VectorLocation)-[:HAS]->(vCoordinates:VectorCoordinates)
+            MERGE (vCoordinates:VectorCoordinates {x1: apLoc1.x, y1: apLoc1.y, x2: apLoc2.x, y2: apLoc2.y})
+            MERGE (vLocation)-[:HAS]->(vCoordinates)
             WITH v, vCoordinates, sqrt((vCoordinates.x2 - vCoordinates.x1) * (vCoordinates.x2 - vCoordinates.x1) + (vCoordinates.y2 - vCoordinates.y1) * (vCoordinates.y2 - vCoordinates.y1)) AS magnitude
             MERGE (vectorLength:VectorLength {vector_id: v.vector_id, image_id: $image_id})<-[:HAS]-(v)
-            MERGE (vectorMagnitude:VectorMagnitude {value: magnitude, vector_id: v.vector_id, image_id: $image_id})<-[:HAS]-(vectorLength)
+            MERGE (vectorMagnitude:VectorMagnitude {value: magnitude})
+            MERGE (vectorMagnitude)<-[:HAS]-(vectorLength)
         """
         logging.debug(f"Running query: {query}")
         tx.run(query, image_id=image_id)
@@ -65,7 +65,7 @@ class VectorCharacteristicsRepository:
     def _update_angle(tx, vector1_id, vector2_id, angle):
         query = """
             MATCH (v1:Vector {id: $vector1_id})-[:INCLUDES]->(ap:AnglePoint)<-[:INCLUDES]-(v2:Vector {id: $vector2_id})
-            MATCH (ap)-[:HAS]->(apLoc:AnglePointLocation)
+            MATCH (ap)-[:HAS]->(apLoc:AnglePointAngle)
             SET apLoc.angle = $angle
         """
         tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, angle=angle)

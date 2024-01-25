@@ -61,7 +61,7 @@ class ContourAnalysisRepository:
             UNWIND nodes(path) AS n
             WITH n
             WHERE n:AnglePoint AND n.image_id = $image_id
-            MATCH (n)--(apLoc:AnglePointLocation)
+            MATCH (n)--(apLoc:AnglePointCoordinates)
             WITH n, apLoc
             ORDER BY apLoc.y, apLoc.x
             LIMIT 1
@@ -114,7 +114,7 @@ class ContourAnalysisRepository:
         if len(processed_vectors):
             # Fetch the details of the current AnglePoint
             vector_details_query = """
-                MATCH (vector:Vector {image_id: $image_id})--(ap:AnglePoint)--(nextVector:Vector {image_id: $image_id}), (nextVector)--(loc:VectorLocation)--(coords:VectorCoordinates), (ap)--(apLoc:AnglePointLocation)
+                MATCH (vector:Vector {image_id: $image_id})--(ap:AnglePoint)--(nextVector:Vector {image_id: $image_id}), (nextVector)--(loc:VectorLocation)--(coords:VectorCoordinates), (ap)--(apLoc:AnglePointCoordinates)
                 WHERE ap.id <> $ap_id AND vector.vector_id = $latest_vector_id
                 RETURN collect({vector: nextVector, location: loc, coordinates: coords, angle_point: {id: ap.id, x: apLoc.x, y: apLoc.y}}) AS VectorDetails
             """

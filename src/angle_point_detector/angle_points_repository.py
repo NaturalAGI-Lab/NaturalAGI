@@ -82,7 +82,10 @@ class AnglePointsRepository:
     def create_angle_points(session, intersection_data, image_id):
         query = """
         UNWIND $intersection_data AS data
-        MERGE (ap:AnglePoint)-[:HAS]->(:AnglePointLocation {x: data.intersection.x, y: data.intersection.y, angle: data.angle})
+        MERGE (apCoords:AnglePointCoordinates {x: data.intersection.x, y: data.intersection.y})
+        MERGE (ap:AnglePoint)-[:HAS]->(apCoords)
+        MERGE (apAngle:AnglePointAngle {angle: data.angle})
+        MERGE (ap)-[:HAS]->(apAngle)
         ON CREATE 
             SET ap.id = randomUUID(),
                 ap.image_id = $image_id
