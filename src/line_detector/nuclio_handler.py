@@ -1,7 +1,10 @@
+import base64
 import traceback
 
 import requests
-from image_repository import ImageRepository
+import numpy as np
+import cv2
+import uuid
 from lines_repository import LinesRepository
 from line_detector import LineDetector
 
@@ -30,9 +33,6 @@ def init_context(context):
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
 
-    image_repository = ImageRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
-    setattr(context.user_data, "image_repository", image_repository)
-
     lines_repository = LinesRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass)
     setattr(context.user_data, "lines_repository", lines_repository)
     
@@ -42,13 +42,19 @@ def init_context(context):
 def http_handler(context, event):
     """Handles HTTP requests"""
     try:
+        data = event.body
 
-        image_id = event.body
-        image_id = image_id.decode('utf-8') if isinstance(image_id, bytes) else image_id
+        # Ensure 'image' key exists in the data and is not empty
+        if 'image' not in data or not data['image']:
+            context.logger.error('No image data in request')
+            return
 
-        context.logger.debug_with(f"Received image_id: {image_id}", handler=HANDLER_NAME)
-
-        image = context.user_data.image_repository.get_image(image_id)
+        decoded_data = base64.b64decode(data['image'])
+        np_data = np.frombuffer(decoded_data, np.uint8)
+        image = cv2.imdecode(np_data, cv2.IMREAD_UNCHANGED)
+        
+        image_id = uuid.uuid4()
+        
         lines = LineDetector().detect_lines(image)
         result = context.user_data.lines_repository.add_lines(lines, image_id)
         print(f"Result adding lines: {result}")

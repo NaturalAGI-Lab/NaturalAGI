@@ -13,7 +13,7 @@ spec:
     default-http:
       kind: "http"
       attributes:
-        port: 8080
+        port: 8081
   version: -1
   build:
     baseImage: "python:3.9"

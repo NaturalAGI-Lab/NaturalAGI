@@ -1,6 +1,6 @@
+from enum import Enum
 import logging
 import numpy as np
-
 
 def find_next_vector(line_details, min_angle_point):
     next_line = None
@@ -25,8 +25,8 @@ def find_next_vector(line_details, min_angle_point):
 def calculate_half_plane_and_quadrant(dx, dy):
     vector = np.array([dx, dy])
 
-    horizontal_plane = "Upper" if vector[1] > 0 else "Lower"
-    vertical_plane = "Right" if vector[0] > 0 else "Left"
+    horizontal_plane = Commons.HalfPlane.UPPER.value if vector[1] > 0 else Commons.HalfPlane.LOWER.value
+    vertical_plane = Commons.HalfPlane.RIGHT.value if vector[0] > 0 else Commons.HalfPlane.LEFT.value
 
     quadrant = np.digitize([vector[0], vector[1]], bins=[0, 0])
     quadrant_map = {1: 4, 2: 1, 3: 2, 4: 3}
@@ -36,3 +36,16 @@ def calculate_half_plane_and_quadrant(dx, dy):
     logging.debug(f"Quadrant: {quadrant}")
 
     return horizontal_plane, vertical_plane, quadrant
+
+class Commons:
+    class HalfPlane(Enum):
+        UPPER = "Upper"
+        LOWER = "Lower"
+        RIGHT = "Right"
+        LEFT = "Left"
+
+    class Structures(Enum):
+        ANGLE_POINT = "AnglePoint"
+        VECTOR = "Vector"
+        LINE = "Line"
+

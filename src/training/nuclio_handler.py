@@ -5,10 +5,9 @@ import base64
 import traceback
 from nuclio_sdk import Event
 from pydantic_settings import BaseSettings
+from training import train
 
-from relative_characteristics_repository import VectorCharacteristicsRepository
-
-HANDLER_NAME = "vector_characteristics_definer"
+HANDLER_NAME = "training"
 
 class Settings(BaseSettings):
     """Settings"""
@@ -29,10 +28,6 @@ def init_context(context):
     context.logger.debug_with(
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
-    vector_characteristics_repository = VectorCharacteristicsRepository(
-        Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass
-    )
-    setattr(context.user_data, "vector_characteristics_repository", vector_characteristics_repository)
     setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
 
     # Initialize and set context variables
@@ -42,26 +37,10 @@ def init_context(context):
 def http_handler(context, event):
     """Handles HTTP requests"""
     try:
-        # Process the event body
-        # Example: data = event.body
-
-        image_id = event.body
-        image_id = image_id.decode('utf-8') if isinstance(image_id, bytes) else image_id
-
-        context.user_data.vector_characteristics_repository.create_relative_characteristics(image_id)
-
+        
+        train()
         context.logger.info_with(f"Processed request successfully", handler=HANDLER_NAME)
-
-        next_functions_str = context.user_data.next_nuclio
-
-        if next_functions_str:
-            next_nuclio = next_functions_str.split(";")
-            context.logger.debug_with(f"Next functions: {next_nuclio}", handler=HANDLER_NAME)
-
-            if len(next_nuclio) > 0:
-                for func in next_nuclio:
-                    context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                    requests.post(func, json=str(image_id))
+        
         
         # Responding to the HTTP request
         context.Response(
