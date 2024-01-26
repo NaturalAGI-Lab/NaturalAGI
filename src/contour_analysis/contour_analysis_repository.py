@@ -37,16 +37,24 @@ class ContourAnalysisRepository:
     def analyze_contour(self, image_id):
         logging.info("Starting find_and_create_points method")
         with self.driver.session() as session:
-            min_angle_point = session.write_transaction(self._find_starting_point, image_id)
+            min_angle_point = session.write_transaction(
+                self._find_starting_point, image_id
+            )
             logging.debug(f"Min Angle Point: {min_angle_point}")
 
             result = session.write_transaction(
-                self.process_contour, image_id, min_angle_point, self.calculate_and_set_relative_params
+                self.process_contour,
+                image_id,
+                min_angle_point,
+                self.calculate_and_set_relative_params,
             )
             logging.debug(f"Result from calculate_and_set_relative_params: {result}")
-            
+
             result = session.write_transaction(
-                self.process_contour, image_id, min_angle_point, self.calculate_magnitude_and_direction
+                self.process_contour,
+                image_id,
+                min_angle_point,
+                self.calculate_magnitude_and_direction,
             )
             logging.debug(f"Result from calculate_magnitude_and_direction: {result}")
             return result
@@ -65,8 +73,8 @@ class ContourAnalysisRepository:
             WITH n, apLoc
             ORDER BY apLoc.y, apLoc.x
             LIMIT 1
-            MERGE (criticalPoint: CriticalPoint {reason: "First point", image_id: $image_id})-[:IS]-(n)
-            ON CREATE SET criticalPoint.uuid = randomUUID()
+            MERGE (criticalPoint: CriticalPoint {reason: "First point"})
+            MERGE (criticalPoint)-[:IS]-(n)
             RETURN {x: apLoc.x, y: apLoc.y, id: n.id} AS MinAnglePoint
         """
         result = tx.run(query, image_id=image_id)
@@ -82,9 +90,13 @@ class ContourAnalysisRepository:
         last_vector = None
         last_direction = None
         processed_vectors = set()
-        
+
         while True:
-            next_vector, coords, current_angle_point = ContourAnalysisRepository.get_next_vector_details(
+            (
+                next_vector,
+                coords,
+                current_angle_point,
+            ) = ContourAnalysisRepository.get_next_vector_details(
                 tx,
                 image_id,
                 current_angle_point,
@@ -93,23 +105,38 @@ class ContourAnalysisRepository:
                 min_angle_point,
             )
             logging.info(f"Received next vector: {next_vector} and coords: {coords}")
-            
-            procedure(tx, image_id, last_vector, next_vector, coords, last_direction, current_angle_point)
-            
+
+            procedure(
+                tx,
+                image_id,
+                last_vector,
+                next_vector,
+                coords,
+                last_direction,
+                current_angle_point,
+            )
+
             if next_vector["vector_id"] in processed_vectors:
                 logging.info("----------------------------------------")
-                logging.info(f"Next vector already processed {next_vector['vector_id']}")
+                logging.info(
+                    f"Next vector already processed {next_vector['vector_id']}"
+                )
                 logging.info("----------------------------------------")
                 break
-            
+
             processed_vectors.add(next_vector["vector_id"])
             last_vector = next_vector
-        
+
         return True
 
     @staticmethod
     def get_next_vector_details(
-        tx, image_id, current_angle_point, processed_vectors, last_vector, min_angle_point
+        tx,
+        image_id,
+        current_angle_point,
+        processed_vectors,
+        last_vector,
+        min_angle_point,
     ):
         if len(processed_vectors):
             # Fetch the details of the current AnglePoint
@@ -122,7 +149,7 @@ class ContourAnalysisRepository:
                 vector_details_query,
                 ap_id=current_angle_point["id"],
                 latest_vector_id=last_vector["vector_id"],
-                image_id=image_id
+                image_id=image_id,
             )
             logging.debug(
                 f"Requesting next vector with params: ap_id: {current_angle_point['id']}, latest_vector_id: {last_vector['vector_id']}"
@@ -132,7 +159,11 @@ class ContourAnalysisRepository:
             logging.debug(f"Received vector details: {vector_details}")
             current_angle_point = vector_details["angle_point"]
             logging.debug(f"Not the first vector. Result: {vector_details}")
-            return vector_details["vector"], vector_details["coordinates"], current_angle_point
+            return (
+                vector_details["vector"],
+                vector_details["coordinates"],
+                current_angle_point,
+            )
         else:
             vector_details_query = """
                 MATCH (ap:AnglePoint)-[:INCLUDES]-(vector:Vector {image_id: $image_id})--(loc:VectorLocation)--(coords:VectorCoordinates)
@@ -147,11 +178,21 @@ class ContourAnalysisRepository:
             vector_details = vector_details_record["VectorDetails"]
             # Find the next line based on coordinates
             next_line, next_coords = find_next_vector(vector_details, min_angle_point)
-            ContourAnalysisRepository.create_critical_point_for_first_vector(tx, next_line['vector_id'], image_id)
+            ContourAnalysisRepository.create_critical_point_for_first_vector(
+                tx, next_line["vector_id"], image_id
+            )
             return next_line, next_coords, current_angle_point
 
     @staticmethod
-    def calculate_and_set_relative_params(tx, image_id, last_vector, next_vector, coords, last_direction, current_angle_point):
+    def calculate_and_set_relative_params(
+        tx,
+        image_id,
+        last_vector,
+        next_vector,
+        coords,
+        last_direction,
+        current_angle_point,
+    ):
         starting_x, starting_y = current_angle_point["x"], current_angle_point["y"]
         ending_x, ending_y = None, None
 
@@ -161,7 +202,7 @@ class ContourAnalysisRepository:
         else:
             ending_x = coords["x1"]
             ending_y = coords["y1"]
-        
+
         logging.debug(f"Subtracting {(ending_x, ending_y), (starting_x, starting_y)}")
 
         x_vect, y_vect = np.subtract((ending_x, ending_y), (starting_x, starting_y))
@@ -172,8 +213,8 @@ class ContourAnalysisRepository:
             MATCH (vector:Vector)--(loc:VectorLocation)
             WHERE vector.vector_id = $next_vector_id
             WITH loc, vector
-            MERGE (loc)-[:HAS]->(vValue:VectorValue {vector_id: vector.vector_id, x: $x_vect, y: $y_vect})
-            RETURN vValue
+            MERGE (vValue:VectorValue {x: $x_vect, y: $y_vect})
+            MERGE (loc)-[:HAS]->(vValue)
         """
         logging.debug(f"Running query: {query}")
         result = tx.run(
@@ -191,8 +232,10 @@ class ContourAnalysisRepository:
             MATCH (vector:Vector)--(loc:VectorLocation)
             WHERE vector.vector_id = $next_vector_id
             WITH loc, vector
-            MERGE (loc)-[:HAS]->(halfPlane:HalfPlane {vector_id: vector.vector_id, horizontal_plane: $horizontal_plane, vertical_plane: $vertical_plane})
-            RETURN halfPlane
+            MERGE (vertical:VecticalVectorHalfPlane {vertical_plane: $vertical_plane})
+            MERGE (horizontal:HorizontalVectorHalfPlane {horizontal_plane: $horizontal_plane})
+            MERGE (loc)-[:HAS]->(vertical)
+            MERGE (loc)-[:HAS]->(horizontal)
         """
         logging.debug(f"Running query: {query}")
         result = tx.run(
@@ -206,8 +249,8 @@ class ContourAnalysisRepository:
             MATCH (vector:Vector)--(loc:VectorLocation)
             WHERE vector.vector_id = $next_vector_id
             WITH loc, vector
-            MERGE (loc)-[:HAS]->(v:Quadrant {vector_id: vector.vector_id, quadrant: $quadrant})
-            RETURN v
+            MERGE (quadrant:Quadrant {quadrant: $quadrant})
+            MERGE (loc)-[:HAS]->(quadrant)
         """
         logging.debug(f"Running query: {query}")
         result = tx.run(
@@ -217,11 +260,19 @@ class ContourAnalysisRepository:
         return result
 
     @staticmethod
-    def calculate_magnitude_and_direction(tx, image_id, last_vector, next_vector, coords, last_direction, current_angle_point):
+    def calculate_magnitude_and_direction(
+        tx,
+        image_id,
+        last_vector,
+        next_vector,
+        coords,
+        last_direction,
+        current_angle_point,
+    ):
         if last_vector is None:
             logging.debug("Can't compare the first vector... Skipping first iteration")
             return
-        
+
         # Compare the direction between the last and the current vector
         direction_change, current_direction = check_direction_change(
             tx, image_id, last_vector, next_vector, last_direction
@@ -233,16 +284,16 @@ class ContourAnalysisRepository:
         else:
             logging.info("No changes in directions")
         return compare_vector_magnitude_and_create_nodes(tx, last_vector, next_vector)
-    
-    
+
     @staticmethod
     def create_critical_point_for_first_vector(tx, vector_id, image_id):
         logging.info("Creating CriticalPoint for the First Vector in the structure")
         tx.run(
             """
                 MATCH (firstVector:Vector {vector_id: $vector_id})
-                MERGE (cp:CriticalPoint {reason: "First Line", image_id: $image_id})-[:IS]-(firstVector)
-                ON CREATE SET cp.uuid = randomUUID()
-            """, 
-            vector_id=vector_id, image_id=image_id
+                MERGE (cp:CriticalPoint {reason: "First Line"})
+                MERGE (cp)-[:IS]-(firstVector)
+            """,
+            vector_id=vector_id,
+            image_id=image_id,
         )

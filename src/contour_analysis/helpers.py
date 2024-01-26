@@ -28,9 +28,16 @@ def calculate_half_plane_and_quadrant(dx, dy):
     horizontal_plane = Commons.HalfPlane.UPPER.value if vector[1] > 0 else Commons.HalfPlane.LOWER.value
     vertical_plane = Commons.HalfPlane.RIGHT.value if vector[0] > 0 else Commons.HalfPlane.LEFT.value
 
-    quadrant = np.digitize([vector[0], vector[1]], bins=[0, 0])
-    quadrant_map = {1: 4, 2: 1, 3: 2, 4: 3}
-    quadrant = quadrant_map.get(sum(quadrant), -1)
+    if dx > 0 and dy > 0:
+        quadrant = 1
+    elif dx < 0 and dy > 0:
+        quadrant = 2
+    elif dx < 0 and dy < 0:
+        quadrant = 3
+    elif dx > 0 and dy < 0:
+        quadrant = 4
+    else:
+        quadrant = -1  # For cases where dx or dy is 0
 
     logging.debug(f"Half-Planes: {horizontal_plane} and {vertical_plane}")
     logging.debug(f"Quadrant: {quadrant}")

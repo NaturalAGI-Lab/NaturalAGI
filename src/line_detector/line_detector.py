@@ -17,10 +17,10 @@ class LineDetector:
         else:
             gray = image
 
-        lines = cv2.HoughLinesP(gray, 1, np.pi / 180, threshold=20, lines=None, minLineLength=5, maxLineGap=5)
+        lines = cv2.HoughLinesP(gray, 1, np.pi / 180, threshold=15, lines=None, minLineLength=5, maxLineGap=1)
         
         # Initialize HoughBundler
-        bundler = HoughBundler(min_distance=3, min_angle=10)
+        bundler = HoughBundler(min_distance=10, min_angle=10)
         
         # Process lines
         processed_lines = bundler.process_lines(lines)

@@ -10,7 +10,7 @@ def compare_vector_magnitude_and_create_nodes(tx, vector1, vector2):
                 CASE WHEN magnitude1.value > magnitude2.value THEN 'VectLonger'
                     WHEN magnitude1.value < magnitude2.value THEN 'VectShorter'
                     ELSE 'VectEven' END AS label
-        CREATE (vect:VectorComparison {label: label})
+        MERGE (vect:VectorComparison {label: label})
         MERGE (vl1)-[:IN]->(vect)-[:OUT]->(vl2)
         RETURN count(vect) as NumberOfCreatedNodes
     """
