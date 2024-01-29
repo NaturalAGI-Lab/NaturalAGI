@@ -21,23 +21,8 @@ echo "IP address: $HOST_IP"
 # Password to the Neo4j
 NEO4J_PASS=111122223333
 
-# Path to the image
-IMAGE_PATH="/Users/mlapin/Development/personal/NaturalAGI/tests/test-data/triangle_10_comp_inv.png"
-
-# Get base64 encoded image
-BASE64_IMAGE=$(get_base64_image $IMAGE_PATH)
-
 # Run docker compose
 docker-compose up -d  # -d flag runs containers in the background
-
-# Deploy Nuclio functions in parallel
-# nuctl deploy --path src/image_exporter \
-#     --platform local \
-#     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-#     -e NEO4J_USER=neo4j \
-#     -e NEO4J_PASS=$NEO4J_PASS \
-#     -e NEXT_NUCLIO=http://"$HOST_IP":8081 &
-# image_exporter_pid=$!``
 
 nuctl deploy --path src/line_detector \
     --platform local \
@@ -76,18 +61,19 @@ wait $ap_detector_pid
 wait $vector_characteristics_definer_pid
 wait $contour_analysis_pid
 
-# Invoke image_exporter
-nuctl invoke line_detector --platform local --method POST \
-    --body "{\"image\": \"$BASE64_IMAGE\"}" \
-    --content-type "application/json"
+# Directory containing training data images
+TRAINING_DATA_DIR="./training_data"
 
-# Path to the image
-IMAGE_PATH="/Users/mlapin/Development/personal/NaturalAGI/tests/test-data/exported_img_comp.png"
+# Iterate over each image in the training data directory
+for IMAGE_PATH in $TRAINING_DATA_DIR/*
+do
+    echo "Processing image: $IMAGE_PATH"
 
-# Get base64 encoded image
-BASE64_IMAGE=$(get_base64_image $IMAGE_PATH)
+    # Get base64 encoded image
+    BASE64_IMAGE=$(get_base64_image $IMAGE_PATH)
 
-# Invoke image_exporter
-nuctl invoke line_detector --platform local --method POST \
-    --body "{\"image\": \"$BASE64_IMAGE\"}" \
-    --content-type "application/json"
+    # Invoke line_detector with the base64 encoded image
+    nuctl invoke line_detector --platform local --method POST \
+        --body "{\"image\": \"$BASE64_IMAGE\"}" \
+        --content-type "application/json"
+done
