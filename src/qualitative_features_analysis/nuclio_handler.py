@@ -5,9 +5,9 @@ import base64
 import traceback
 from nuclio_sdk import Event
 from pydantic_settings import BaseSettings
-from training import train
+from neo4j_adapter import Neo4jConnection
 
-HANDLER_NAME = "training"
+HANDLER_NAME = "qualitative_features_analysis"
 
 class Settings(BaseSettings):
     """Settings"""
@@ -28,6 +28,10 @@ def init_context(context):
     context.logger.debug_with(
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
+    neo4j_connection = Neo4jConnection(
+        Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass
+    )
+    setattr(context.user_data, "neo4j_connection", neo4j_connection)
     setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
 
     # Initialize and set context variables
@@ -37,10 +41,24 @@ def init_context(context):
 def http_handler(context, event):
     """Handles HTTP requests"""
     try:
-        
-        train()
+        image_id = event.body
+        image_id = image_id.decode('utf-8') if isinstance(image_id, bytes) else image_id
+        context.logger.info_with(f"Processing image {image_id}", handler=HANDLER_NAME)
+
+        context.user_data.neo4j_connection.calculate_qualitative_features()
+
         context.logger.info_with(f"Processed request successfully", handler=HANDLER_NAME)
-        
+
+        next_functions_str = context.user_data.next_nuclio
+
+        if next_functions_str:
+            next_nuclio = next_functions_str.split(";")
+            context.logger.debug_with(f"Next functions: {next_nuclio}", handler=HANDLER_NAME)
+
+            if len(next_nuclio) > 0:
+                for func in next_nuclio:
+                    context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
+                    requests.post(func, json=str(image_id))
         
         # Responding to the HTTP request
         context.Response(

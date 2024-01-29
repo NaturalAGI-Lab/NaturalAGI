@@ -52,14 +52,24 @@ nuctl deploy --path src/contour_analysis \
     --platform local \
     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
     -e NEO4J_USER=neo4j \
-    -e NEO4J_PASS=$NEO4J_PASS &
+    -e NEO4J_PASS=$NEO4J_PASS \
+    -e NEXT_NUCLIO=http://"$HOST_IP":5555 &
 contour_analysis_pid=$!
+
+nuctl deploy --path src/qualitative_features_analysis \
+    --platform local \
+    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+    -e NEO4J_USER=neo4j \
+    --volume ./training_results/:/stats \
+    -e NEO4J_PASS=$NEO4J_PASS &
+qualitative_features_analysis=$!
 
 # Wait for the deployments to complete
 wait $line_detector_pid
 wait $ap_detector_pid
 wait $vector_characteristics_definer_pid
 wait $contour_analysis_pid
+wait $qualitative_features_analysis
 
 # Directory containing training data images
 TRAINING_DATA_DIR="./training_data"
