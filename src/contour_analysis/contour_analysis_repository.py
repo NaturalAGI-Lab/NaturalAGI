@@ -155,8 +155,8 @@ class ContourAnalysisRepository:
                 f"Requesting next vector with params: ap_id: {current_angle_point['id']}, latest_vector_id: {last_vector['vector_id']}"
             )
             vector_details_record = vector_details_result.single()
+            logging.debug(f"Received vector details: {vector_details_record}")
             vector_details = vector_details_record["VectorDetails"][0]
-            logging.debug(f"Received vector details: {vector_details}")
             current_angle_point = vector_details["angle_point"]
             logging.debug(f"Not the first vector. Result: {vector_details}")
             return (
@@ -232,7 +232,7 @@ class ContourAnalysisRepository:
             MATCH (vector:Vector)--(loc:VectorLocation)
             WHERE vector.vector_id = $next_vector_id
             WITH loc, vector
-            MERGE (vertical:VecticalVectorHalfPlane {vertical_plane: $vertical_plane})
+            MERGE (vertical:VerticalVectorHalfPlane {vertical_plane: $vertical_plane})
             MERGE (horizontal:HorizontalVectorHalfPlane {horizontal_plane: $horizontal_plane})
             MERGE (loc)-[:HAS]->(vertical)
             MERGE (loc)-[:HAS]->(horizontal)

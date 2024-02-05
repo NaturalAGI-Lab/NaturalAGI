@@ -1,10 +1,11 @@
-"""Generic Nuclio Handler Template"""
 import requests
 import json
 import base64
 import traceback
 from nuclio_sdk import Event
 from pydantic_settings import BaseSettings
+
+from clean_up_repository import Neo4jRepository
 
 HANDLER_NAME = "clean_up"
 
@@ -28,25 +29,14 @@ def init_context(context):
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
     setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
-
-    # Initialize and set context variables
-    # Example: setattr(context.user_data, "example_variable", value)
+    setattr(context.user_data, "clean_up_repository", Neo4jRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass))
 
 
 def http_handler(context, event):
     """Handles HTTP requests"""
     try:
-        # Process the event body
-        # Example: data = event.body
-
-        image_id = event.body
-        image_id = image_id.decode('utf-8') if isinstance(image_id, bytes) else image_id
-
-        # Placeholder for main functionality
-        # Example: result = perform_some_operation(data)
-
+        context.user_data.clean_up_repository.cleanup()
         context.logger.info_with(f"Processed request successfully", handler=HANDLER_NAME)
-
         next_functions_str = context.user_data.next_nuclio
 
         if next_functions_str:
@@ -56,7 +46,7 @@ def http_handler(context, event):
             if len(next_nuclio) > 0:
                 for func in next_nuclio:
                     context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                    requests.post(func, json=str(image_id))
+                    requests.post(func, json={})
         
         # Responding to the HTTP request
         context.Response(

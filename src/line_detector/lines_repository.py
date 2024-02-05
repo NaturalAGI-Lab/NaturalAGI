@@ -39,8 +39,6 @@ class LinesRepository:
                 (location{line_id})-[:HAS]->(coordinates{line_id}),
                 """
 
-        print(f"Generated: {query}")
-
         result = tx.run(f"CREATE {query.strip().strip(',')}")
         return result
                     

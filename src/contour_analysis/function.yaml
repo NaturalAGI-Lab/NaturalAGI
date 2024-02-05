@@ -32,3 +32,4 @@ spec:
       # network: infrastructure_neo4j-internal
   securityContext: {}
   eventTimeout: ""
+  httpTimeout: 1000

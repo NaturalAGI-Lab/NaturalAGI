@@ -28,6 +28,7 @@ HEALTHCHECK --interval=1s --timeout=3s CMD /usr/local/bin/uhttpc --url http://12
 
 # USER CONTENT
 COPY nuclio_handler.py /opt/nuclio/nuclio_handler.py
+COPY clean_up_repository.py /opt/nuclio/clean_up_repository.py
 COPY function.yaml /opt/nuclio/function.yaml
 # END OF USER CONTENT
 

@@ -52,7 +52,8 @@ def http_handler(context, event):
             if len(next_nuclio) > 0:
                 for func in next_nuclio:
                     context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                    requests.post(func, json=str(image_id))
+                    response = requests.post(func, json=str(image_id))
+                    context.logger.info_with(f"Response: {response.status_code}", handler=HANDLER_NAME)
 
         context.Response(
             body=f"Points detected for image: {image_id}",

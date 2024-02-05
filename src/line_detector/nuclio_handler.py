@@ -1,5 +1,6 @@
 import base64
-import traceback
+import os
+import glob
 
 import requests
 import numpy as np
@@ -44,51 +45,30 @@ def http_handler(context, event):
     try:
         data = event.body
 
-        # Ensure 'image' key exists in the data and is not empty
-        if 'image' not in data or not data['image']:
-            context.logger.error('No image data in request')
+        # Check if 'input_folder' key exists in the data and is not empty
+        if 'input_folder' in data and data['input_folder']:
+            input_folder = data['input_folder']
+            image_files = glob.glob(os.path.join(input_folder, '*'))
+
+            for image_file in image_files:
+                with open(image_file, 'rb') as f:
+                    image_data = f.read()
+
+                context.logger.info(f"Processing image: {image_file}")
+                process_image(context, image_data)
+            context.logger.info(f"Processed {len(image_files)} images")
+
+        # If 'input_folder' key doesn't exist, check for 'image' key
+        elif 'image' in data and data['image']:
+            image_data = base64.b64decode(data['image'])
+            process_image(context, image_data)
+
+        else:
+            context.logger.error('No image data or input folder in request')
             return
 
-        decoded_data = base64.b64decode(data['image'])
-        np_data = np.frombuffer(decoded_data, np.uint8)
-        image = cv2.imdecode(np_data, cv2.IMREAD_UNCHANGED)
-        
-        image_id = uuid.uuid4()
-        
-        lines = LineDetector().detect_lines(image)
-        result = context.user_data.lines_repository.add_lines(lines, image_id)
-        print(f"Result adding lines: {result}")
-        
-        next_functions_str = context.user_data.next_nuclio
-
-        if next_functions_str:
-            next_nuclio = next_functions_str.split(";")
-            context.logger.debug_with(f"Next functions: {next_nuclio}", handler=HANDLER_NAME)
-
-            if len(next_nuclio) > 0:
-                for func in next_nuclio:
-                    context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                    requests.post(func, json=str(image_id))
-
-        context.Response(
-            body=f"Lines detected for image: {image_id}",
-            headers={},
-            content_type="text/plain",
-            status_code=requests.codes.ok,  # pylint: disable=no-member
-        )
-
     except Exception as e:
-        context.logger.error_with(
-            f"Error:\n {e}", handler=HANDLER_NAME
-        )
-        traceback.print_exc()
-
-        context.Response(
-            body=f"Error detecting lines for image: {e}",
-            headers={},
-            content_type="text/plain",
-            status_code=requests.codes.server_error,  # pylint: disable=no-member
-        )
+        context.logger.error(f"Error processing request: {str(e)}")
 
 
 def handler(context, event):
@@ -108,3 +88,31 @@ def handler(context, event):
         context.logger.error_with(
             "Unknown trigger. Expected kafka or http", handler=HANDLER_NAME
         )
+
+def process_image(context, image_data):
+    np_data = np.frombuffer(image_data, np.uint8)
+    image = cv2.imdecode(np_data, cv2.IMREAD_UNCHANGED)
+    
+    image_id = uuid.uuid4()
+    
+    lines = LineDetector().detect_lines(image)
+    context.logger.info(f"Detected {len(lines)} lines for image: {image_id}")
+    context.user_data.lines_repository.add_lines(lines, image_id)
+    
+    next_functions_str = context.user_data.next_nuclio
+
+    if next_functions_str:
+        next_nuclio = next_functions_str.split(";")
+        context.logger.debug_with(f"Next functions: {next_nuclio}", handler=HANDLER_NAME)
+
+        if len(next_nuclio) > 0:
+            for func in next_nuclio:
+                context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
+                response = requests.post(func, json=str(image_id))
+                context.logger.info_with(f"Response: {response.status_code}", handler=HANDLER_NAME)
+
+    context.Response(
+        body=f"Lines detected for image: {image_id}",
+        headers={},
+        content_type="text/plain",
+    )
