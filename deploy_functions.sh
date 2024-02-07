@@ -63,24 +63,24 @@ nuctl deploy --path src/contour_analysis \
     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
     -e NEO4J_USER=neo4j \
     -e NEO4J_PASS=$NEO4J_PASS \
-    -e NEXT_NUCLIO=http://"$HOST_IP":5555 &
+    -e NEXT_NUCLIO=http://"$HOST_IP":5055 &
 contour_analysis_pid=$!
+
+nuctl deploy --path src/clean_up \
+    --platform local \
+    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+    -e NEO4J_USER=neo4j \
+    -e NEO4J_PASS=$NEO4J_PASS \
+    -e NEXT_NUCLIO=http://"$HOST_IP":5555 &
+clean_up=$!
 
 nuctl deploy --path src/qualitative_features_analysis \
     --platform local \
     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
     -e NEO4J_USER=neo4j \
     --volume ./training_results/:/stats \
-    -e NEO4J_PASS=$NEO4J_PASS \
-    -e NEXT_NUCLIO=http://"$HOST_IP":5055 &
-qualitative_features_analysis=$!
-
-nuctl deploy --path src/clean_up \
-    --platform local \
-    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-    -e NEO4J_USER=neo4j \
     -e NEO4J_PASS=$NEO4J_PASS &
-clean_up=$!
+qualitative_features_analysis=$!
 
 # Wait for the deployments to complete
 wait $line_detector_pid

@@ -18,6 +18,13 @@ class Neo4jConnection:
         "CriticalPoint",
     ]
 
+    IGNORABLE_NODES = [
+        "VectorLocation",
+        "Vector",
+        "AnglePoint",
+        "VectorLength",
+    ]
+
     def __init__(self, uri, user, password):
         logging.info("Initializing Neo4jConnection")
         try:
@@ -35,9 +42,57 @@ class Neo4jConnection:
             logging.error(f"Error closing database connection: {e}")
             raise
 
+    def get_top_n_nodes(self, N):
+        iteration = self.get_current_iteration()
+        logging.info(
+            f"Retrieving top {N} nodes with most relations for iteration {iteration}"
+        )
+        with self.driver.session() as session:
+            results = session.read_transaction(self._get_top_n_nodes_transaction, N)
+            self._update_qualitative_features_file(iteration, results)
+
+    @staticmethod
+    def _get_top_n_nodes_transaction(tx, N):
+        # Dynamically generated the Cypher part to exclude nodes with specified labels
+        exclusion_cypher = " AND ".join(
+            [f"NOT '{label}' IN labels(n)" for label in Neo4jConnection.IGNORABLE_NODES]
+        )
+        if exclusion_cypher:
+            exclusion_cypher = "WHERE " + exclusion_cypher
+        query = f"""
+            MATCH (n)-[r]-()
+            {exclusion_cypher}
+            RETURN labels(n) AS labels, n AS node, count(r) AS relation_count
+            ORDER BY relation_count DESC
+            LIMIT {N}
+        """
+        result = tx.run(query)
+        return [
+            {
+                "node_id": record["node"].id,
+                "labels": record["labels"],
+                "params": {k: v for k, v in record["node"].items()},
+                "relation_count": record["relation_count"],
+            }
+            for record in result
+        ]
+
+    def _update_qualitative_features_file(self, iteration, results):
+        # Assuming results is a list of dictionaries with keys 'node' and 'relations'
+        df = pd.DataFrame(results)
+        df["iteration"] = iteration
+        if os.path.exists(self.QUALITATIVE_FEATURES_FILE):
+            df.to_csv(
+                self.QUALITATIVE_FEATURES_FILE, mode="a", header=False, index=False
+            )
+        else:
+            df.to_csv(self.QUALITATIVE_FEATURES_FILE, index=False)
+
     def calculate_qualitative_features(self):
         iteration = self.get_current_iteration()
-        logging.info("Calculating quantitative features for iteration " + str(iteration))
+        logging.info(
+            "Calculating quantitative features for iteration " + str(iteration)
+        )
         with self.driver.session() as session:
             results = session.read_transaction(self._calculate_qualitative_features)
             logging.debug("Transaction for _calculate_quantitative_features completed")
@@ -59,10 +114,11 @@ class Neo4jConnection:
 
     def _update_qualitative_features_file(self, iteration, results):
         df = pd.DataFrame(results)
-        df.columns = ["node_class", "inbound_links"]
-        df['iteration'] = iteration
+        df["iteration"] = iteration
         if os.path.exists(self.QUALITATIVE_FEATURES_FILE):
-            df.to_csv(self.QUALITATIVE_FEATURES_FILE, mode='a', header=False, index=False)
+            df.to_csv(
+                self.QUALITATIVE_FEATURES_FILE, mode="a", header=False, index=False
+            )
         else:
             df.to_csv(self.QUALITATIVE_FEATURES_FILE, index=False)
 
@@ -71,5 +127,5 @@ class Neo4jConnection:
         if os.path.exists(Neo4jConnection.QUALITATIVE_FEATURES_FILE):
             existing_df = pd.read_csv(Neo4jConnection.QUALITATIVE_FEATURES_FILE)
             if not existing_df.empty:
-                return existing_df['iteration'].max() + 1
+                return existing_df["iteration"].max() + 1
         return 0
