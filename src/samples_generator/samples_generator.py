@@ -3,7 +3,8 @@ from PIL import Image, ImageDraw
 import random
 import os
 
-from image_aggregator import do_intersect, extend_line, generate_curved_line_extended, generate_zigzag_points_extended
+from image_aggregator import do_intersect, extend_line, generate_curved_line_extended, generate_zigzag_points_extended, \
+    is_triangle_valid
 
 
 def generate_triangle_images(output_dir, num_images, img_size, is_noised, curved_sides, zigzag_sides):
@@ -18,7 +19,7 @@ def generate_triangle_images(output_dir, num_images, img_size, is_noised, curved
         draw = ImageDraw.Draw(img)
 
         # Generate random vertices for the triangle
-        vertices = [(random.randint(0, img_size - 1), random.randint(0, img_size - 1)) for _ in range(3)]
+        vertices = generate_triangle(img_size)
         sides = [(vertices[0], vertices[1]), (vertices[1], vertices[2]), (vertices[2], vertices[0])]
         drawn_sides = []
 
@@ -36,19 +37,20 @@ def generate_triangle_images(output_dir, num_images, img_size, is_noised, curved
             straight_sides_num = 3 - curved_sides_num - zigzag_sides_num
 
         for k in range(curved_sides_num):
-            draw_curved_side(draw, sides[k], line_width)
+            draw_curved_side(draw, sides[k], line_width, img_size)
             drawn_sides.append(sides[k])
 
         sides = [item for item in sides if item not in drawn_sides]
 
         for m in range(zigzag_sides_num):
-            draw_zigzag_side(draw, sides[m], line_width)
+            draw_zigzag_side(draw, sides[m], line_width, img_size)
             drawn_sides.append(sides[m])
 
         sides = [item for item in sides if item not in drawn_sides]
 
         for p in range(straight_sides_num):
-            extended_start, extended_end = extend_line(sides[p][0], sides[p][1], random.randint(0, round(img_size * 0.2)))
+            extended_start, extended_end = extend_line(sides[p][0], sides[p][1],
+                                                       random.randint(round(img_size * 0.05), round(img_size * 0.3)))
             draw.line([extended_start, extended_end], fill='white', width=line_width)
 
         if is_noised:
@@ -69,17 +71,24 @@ def generate_triangle_images(output_dir, num_images, img_size, is_noised, curved
     print(f"{num_images} images have been saved to {output_dir}/")
 
 
-def draw_curved_side(draw, side, line_width):
+def generate_triangle(img_size):
+    while True:
+        vertices = [(random.randint(0, img_size - 1), random.randint(0, img_size - 1)) for _ in range(3)]
+        if is_triangle_valid(vertices):
+            return vertices
+
+
+def draw_curved_side(draw, side, line_width, img_size):
     points = generate_curved_line_extended(side[0], side[1], curvature=random.randint(0, 10),
-                                           extension=random.randint(20, 150),
+                                           extension=random.randint(round(img_size * 0.05), round(img_size * 0.3)),
                                            steps=random.randint(10, 20))
     draw.line(points, fill='white', width=line_width)
 
 
-def draw_zigzag_side(draw, side, line_width):
+def draw_zigzag_side(draw, side, line_width, img_size):
     zigzag_points = generate_zigzag_points_extended(side[0], side[1], amplitude=random.randint(1, 5),
                                                     frequency=random.randint(15, 35),
-                                                    extension=random.randint(20, 150))
+                                                    extension=random.randint(round(img_size * 0.05), round(img_size * 0.3)))
     draw.line(zigzag_points, fill='white', width=line_width)
 
 

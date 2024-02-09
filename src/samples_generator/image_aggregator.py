@@ -1,6 +1,31 @@
 import math
 
 
+def calculate_angle(a, b, c):
+    # Calculate the angle opposite side c using the law of cosines
+    angle = math.acos((a ** 2 + b ** 2 - c ** 2) / (2 * a * b))
+    return math.degrees(angle)
+
+
+def is_triangle_valid(vertices):
+    # Calculate the lengths of the sides
+    sides = [
+        math.sqrt((vertices[1][0] - vertices[0][0]) ** 2 + (vertices[1][1] - vertices[0][1]) ** 2),
+        math.sqrt((vertices[2][0] - vertices[1][0]) ** 2 + (vertices[2][1] - vertices[1][1]) ** 2),
+        math.sqrt((vertices[0][0] - vertices[2][0]) ** 2 + (vertices[0][1] - vertices[2][1]) ** 2)
+    ]
+
+    # Calculate the angles
+    angles = [
+        calculate_angle(sides[1], sides[2], sides[0]),
+        calculate_angle(sides[0], sides[2], sides[1]),
+        calculate_angle(sides[0], sides[1], sides[2])
+    ]
+
+    # Check if any angle is greater than 120 degrees
+    return all(angle <= 120 for angle in angles)
+
+
 def on_segment(p, q, r):
     return (max(p[0], r[0]) >= q[0] >= min(p[0], r[0]) and
             max(p[1], r[1]) >= q[1] >= min(p[1], r[1]))
@@ -27,7 +52,7 @@ def do_intersect(p1, q1, p2, q2):
     return False
 
 
-def extend_line(p1, p2, extend_length):
+def extend_line(p1, p2, extension):
     # Calculate the direction vector of the line
     dx = p2[0] - p1[0]
     dy = p2[1] - p1[1]
@@ -38,8 +63,8 @@ def extend_line(p1, p2, extend_length):
     dy /= length
 
     # Extend the points in both directions
-    p1_extended = (p1[0] - dx * extend_length, p1[1] - dy * extend_length)
-    p2_extended = (p2[0] + dx * extend_length, p2[1] + dy * extend_length)
+    p1_extended = (p1[0] - dx * extension, p1[1] - dy * extension)
+    p2_extended = (p2[0] + dx * extension, p2[1] + dy * extension)
 
     return p1_extended, p2_extended
 
