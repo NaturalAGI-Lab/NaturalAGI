@@ -26,22 +26,22 @@ def generate_triangle_images(output_dir, num_images, img_size, is_noised, curved
         # Generate lines width
         line_width = random.randint(1, 5)
 
-        # Generate and draw curved sides
-        for j in range(len(vertices)):
-            curved_sides_num = 0
-            zigzag_sides_num = 0
-            if curved_sides:
-                curved_sides_num = random.randint(0, 3)
-            if zigzag_sides:
-                zigzag_sides_num = random.randint(0, 3 - curved_sides_num)
-            straight_sides_num = 3 - curved_sides_num - zigzag_sides_num
+        curved_sides_num = 0
+        zigzag_sides_num = 0
+        if curved_sides:
+            curved_sides_num = random.randint(0, 3)
+        if zigzag_sides:
+            zigzag_sides_num = random.randint(0, 3 - curved_sides_num)
+        straight_sides_num = 3 - curved_sides_num - zigzag_sides_num
 
+        # Generate and draw curved sides
         for k in range(curved_sides_num):
             draw_curved_side(draw, sides[k], line_width, img_size)
             drawn_sides.append(sides[k])
 
         sides = [item for item in sides if item not in drawn_sides]
 
+        # Generate and draw curved sides
         for m in range(zigzag_sides_num):
             draw_zigzag_side(draw, sides[m], line_width, img_size)
             drawn_sides.append(sides[m])
@@ -66,7 +66,7 @@ def generate_triangle_images(output_dir, num_images, img_size, is_noised, curved
                 draw.line(line, fill='white')
 
         # Save the image
-        img.save(f"{output_dir}/triangle_{i}.bmp")
+        img.save(f"{output_dir}/triangle_{i}_{curved_sides_num}_{zigzag_sides_num}_{straight_sides_num}.bmp")
 
     print(f"{num_images} images have been saved to {output_dir}/")
 
