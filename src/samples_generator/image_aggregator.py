@@ -117,7 +117,7 @@ def generate_zigzag_points(start, end, amplitude, frequency):
     return points
 
 
-def generate_zigzag_points_extended(start, end, amplitude, frequency, extension_length):
+def generate_zigzag_points_extended(start, end, amplitude, frequency, extension):
     points = [start]
     dx = end[0] - start[0]
     dy = end[1] - start[1]
@@ -140,10 +140,10 @@ def generate_zigzag_points_extended(start, end, amplitude, frequency, extension_
     # Add extensions
     extension_start_angle = angle - math.pi
     extension_end_angle = angle
-    start_extension = (start[0] + math.cos(extension_start_angle) * extension_length,
-                       start[1] + math.sin(extension_start_angle) * extension_length)
-    end_extension = (end[0] + math.cos(extension_end_angle) * extension_length,
-                     end[1] + math.sin(extension_end_angle) * extension_length)
+    start_extension = (start[0] + math.cos(extension_start_angle) * extension,
+                       start[1] + math.sin(extension_start_angle) * extension)
+    end_extension = (end[0] + math.cos(extension_end_angle) * extension,
+                     end[1] + math.sin(extension_end_angle) * extension)
 
     # Insert start extension at the beginning and append end extension
     points = [start_extension] + points + [end_extension]

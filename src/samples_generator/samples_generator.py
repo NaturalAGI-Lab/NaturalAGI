@@ -77,11 +77,9 @@ def draw_curved_side(draw, side, line_width):
 
 
 def draw_zigzag_side(draw, side, line_width):
-    amplitude = random.randint(0, 3)
-    frequency = random.randint(20, 50)
-
-    zigzag_points = generate_zigzag_points_extended(side[0], side[1], amplitude, frequency,
-                                                    extension_length=random.randint(20, 150))
+    zigzag_points = generate_zigzag_points_extended(side[0], side[1], amplitude=random.randint(1, 5),
+                                                    frequency=random.randint(15, 35),
+                                                    extension=random.randint(20, 150))
     draw.line(zigzag_points, fill='white', width=line_width)
 
 
