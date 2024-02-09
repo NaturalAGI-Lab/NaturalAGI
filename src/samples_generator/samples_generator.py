@@ -41,13 +41,14 @@ def generate_triangle_images(output_dir, num_images, img_size, is_noised, curved
 
         sides = [item for item in sides if item not in drawn_sides]
 
-        # Generate and draw curved sides
+        # Generate and draw zigzag sides
         for m in range(zigzag_sides_num):
             draw_zigzag_side(draw, sides[m], line_width, img_size)
             drawn_sides.append(sides[m])
 
         sides = [item for item in sides if item not in drawn_sides]
 
+        # Generate and draw straight sides
         for p in range(straight_sides_num):
             extended_start, extended_end = extend_line(sides[p][0], sides[p][1],
                                                        random.randint(round(img_size * 0.05), round(img_size * 0.3)))
