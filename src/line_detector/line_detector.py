@@ -20,6 +20,11 @@ class LineDetector:
 
         lines = cv2.HoughLinesP(gray, 1, np.pi / 180, threshold=15, lines=None, minLineLength=5, maxLineGap=1)
         
+        # Check if lines is None
+        if lines is None:
+            print("No lines found")
+            return []
+        
         # Initialize HoughBundler
         bundler = HoughBundler(min_distance=10, min_angle=10)
         

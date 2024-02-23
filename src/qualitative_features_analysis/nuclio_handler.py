@@ -47,7 +47,7 @@ def http_handler(context, event):
         image_id = image_id.decode("utf-8") if isinstance(image_id, bytes) else image_id
         context.logger.info_with(f"Processing image {image_id}", handler=HANDLER_NAME)
 
-        context.user_data.neo4j_connection.get_top_n_nodes(20)
+        context.user_data.neo4j_connection.get_top_n_nodes(30)
 
         context.logger.info_with(
             f"Processed request successfully", handler=HANDLER_NAME

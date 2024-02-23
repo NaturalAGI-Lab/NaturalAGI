@@ -23,6 +23,7 @@ class Neo4jConnection:
         "Vector",
         "AnglePoint",
         "VectorLength",
+        "VectDirection",
     ]
 
     def __init__(self, uri, user, password):
@@ -88,16 +89,6 @@ class Neo4jConnection:
         else:
             df.to_csv(self.QUALITATIVE_FEATURES_FILE, index=False)
 
-    def calculate_qualitative_features(self):
-        iteration = self.get_current_iteration()
-        logging.info(
-            "Calculating quantitative features for iteration " + str(iteration)
-        )
-        with self.driver.session() as session:
-            results = session.read_transaction(self._calculate_qualitative_features)
-            logging.debug("Transaction for _calculate_quantitative_features completed")
-            self._update_qualitative_features_file(iteration, results)
-
     @staticmethod
     def _calculate_qualitative_features(tx):
         logging.debug("Running _calculate_qualitative_features transaction")
@@ -111,16 +102,6 @@ class Neo4jConnection:
         combined_query = " UNION ".join(queries)
         result = tx.run(combined_query)
         return list(result)
-
-    def _update_qualitative_features_file(self, iteration, results):
-        df = pd.DataFrame(results)
-        df["iteration"] = iteration
-        if os.path.exists(self.QUALITATIVE_FEATURES_FILE):
-            df.to_csv(
-                self.QUALITATIVE_FEATURES_FILE, mode="a", header=False, index=False
-            )
-        else:
-            df.to_csv(self.QUALITATIVE_FEATURES_FILE, index=False)
 
     @staticmethod
     def get_current_iteration():
