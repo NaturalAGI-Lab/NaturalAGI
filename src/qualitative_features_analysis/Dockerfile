@@ -27,7 +27,9 @@ RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-py
 HEALTHCHECK --interval=1s --timeout=3s CMD /usr/local/bin/uhttpc --url http://127.0.0.1:8082/ready || exit 1
 
 # USER CONTENT
+WORKDIR /stats
 COPY nuclio_handler.py /opt/nuclio/nuclio_handler.py
+COPY neo4j_adapter.py /opt/nuclio/neo4j_adapter.py
 COPY function.yaml /opt/nuclio/function.yaml
 # END OF USER CONTENT
 

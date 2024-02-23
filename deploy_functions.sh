@@ -1,5 +1,8 @@
 #!/bin/bash
 
+echo "Cleaning up previous results"
+rm -rf ./training_results/*
+
 # Down docker
 docker-compose down
 
@@ -21,6 +24,12 @@ echo "IP address: $HOST_IP"
 # Password to the Neo4j
 NEO4J_PASS=111122223333
 
+# Directory containing training data images
+TRAINING_DATA_DIR="./training_data"
+
+# Directory containing training data images for the line detector
+LINE_DETECTOR_TRAINING_DATA_DIR="/training_data/line_detector"
+
 # Run docker compose
 docker-compose up -d  # -d flag runs containers in the background
 
@@ -29,6 +38,7 @@ nuctl deploy --path src/line_detector \
     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
     -e NEO4J_USER=neo4j \
     -e NEO4J_PASS=$NEO4J_PASS \
+    --volume $TRAINING_DATA_DIR:$LINE_DETECTOR_TRAINING_DATA_DIR \
     -e NEXT_NUCLIO=http://"$HOST_IP":5052 &
 line_detector_pid=$!
 
@@ -52,28 +62,51 @@ nuctl deploy --path src/contour_analysis \
     --platform local \
     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
     -e NEO4J_USER=neo4j \
-    -e NEO4J_PASS=$NEO4J_PASS &
+    -e NEO4J_PASS=$NEO4J_PASS \
+    -e NEXT_NUCLIO=http://"$HOST_IP":5055 &
 contour_analysis_pid=$!
+
+nuctl deploy --path src/clean_up \
+    --platform local \
+    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+    -e NEO4J_USER=neo4j \
+    -e NEO4J_PASS=$NEO4J_PASS \
+    -e NEXT_NUCLIO=http://"$HOST_IP":5555 &
+clean_up=$!
+
+nuctl deploy --path src/qualitative_features_analysis \
+    --platform local \
+    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+    -e NEO4J_USER=neo4j \
+    --volume ./training_results/:/stats \
+    -e NEO4J_PASS=$NEO4J_PASS &
+qualitative_features_analysis=$!
 
 # Wait for the deployments to complete
 wait $line_detector_pid
 wait $ap_detector_pid
 wait $vector_characteristics_definer_pid
 wait $contour_analysis_pid
-
-# Directory containing training data images
-TRAINING_DATA_DIR="./training_data"
+wait $qualitative_features_analysis
+wait $clean_up
 
 # Iterate over each image in the training data directory
-for IMAGE_PATH in $TRAINING_DATA_DIR/*
-do
-    echo "Processing image: $IMAGE_PATH"
+# for IMAGE_PATH in $TRAINING_DATA_DIR/*
+# do
+#     echo "Processing image: $IMAGE_PATH"
 
-    # Get base64 encoded image
-    BASE64_IMAGE=$(get_base64_image $IMAGE_PATH)
+#     # Get base64 encoded image
+#     BASE64_IMAGE=$(get_base64_image $IMAGE_PATH)
 
-    # Invoke line_detector with the base64 encoded image
-    nuctl invoke line_detector --platform local --method POST \
-        --body "{\"image\": \"$BASE64_IMAGE\"}" \
-        --content-type "application/json"
-done
+#     # Invoke line_detector with the base64 encoded image
+#     nuctl invoke line_detector --platform local --method POST \
+#         --body "{\"image\": \"$BASE64_IMAGE\"}" \
+#         --content-type "application/json"
+# done
+
+# Or 
+
+# Invoke line_detector with the training data directory
+nuctl invoke line_detector --platform local --method POST \
+    --body "{\"input_folder\": \"$LINE_DETECTOR_TRAINING_DATA_DIR\"}" \
+    --content-type "application/json"

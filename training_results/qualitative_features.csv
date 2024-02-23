@@ -1,0 +1,781 @@
+node_id,labels,params,relation_count,iteration
+65,['VectDirection'],{'direction': 'Clockwise'},6,0
+66,['VectLonger'],{},4,0
+59,['Quadrant'],{'quadrant': 2},2,0
+67,['VectShorter'],{},2,0
+36,['VectorOrientation'],"{'vector_id': '6287dd2e-31aa-440b-9584-5ed5ca622d1f', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,0
+37,['VectorOrientation'],"{'vector_id': '63e70e0b-74a3-4f14-be85-829e35f1612e', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,0
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},2,0
+38,['VectorOrientation'],"{'vector_id': '2cadf10a-de8b-4866-aa57-bf6fb7647234', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,0
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},2,0
+43,['VectorCoordinates'],"{'y1': 33, 'x1': 26, 'y2': 32, 'x2': 31}",1,0
+42,['VectorCoordinates'],"{'y1': 32, 'x1': 31, 'y2': 33, 'x2': 26}",1,0
+41,['VectorAngle'],{'value': 113.49856567595211},1,0
+29,['AnglePointAngle'],{'angle': 20},1,0
+44,['VectorCoordinates'],"{'y1': 33, 'x1': 26, 'y2': 25, 'x2': 34}",1,0
+25,['AnglePointCoordinates'],"{'x': 34, 'y': 25}",1,0
+40,['VectorAngle'],{'value': 45.0},1,0
+52,['VectorMagnitude'],{'value': 11.313708498984761},1,0
+39,['VectorAngle'],{'value': 15.255118703057777},1,0
+28,['AnglePointAngle'],{'angle': 50},1,0
+51,['VectorMagnitude'],{'value': 5.0990195135927845},1,0
+65,['VectDirection'],{'direction': 'Clockwise'},12,1
+66,['VectLonger'],{},6,1
+67,['VectShorter'],{},6,1
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},4,1
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},3,1
+59,['Quadrant'],{'quadrant': 2},3,1
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},3,1
+105,['VectorOrientation'],"{'vector_id': 'ab3f0797-79b5-402b-8686-024d28be8aec', 'image_id': '9f42ec9c-7561-4ef0-9c03-66fd6c7684be'}",2,1
+103,['VectorOrientation'],"{'vector_id': '8bf07caf-8a65-4053-a6df-888b31573429', 'image_id': '9f42ec9c-7561-4ef0-9c03-66fd6c7684be'}",2,1
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},2,1
+28,['AnglePointAngle'],{'angle': 50},2,1
+64,['Quadrant'],{'quadrant': 4},2,1
+36,['VectorOrientation'],"{'vector_id': '6287dd2e-31aa-440b-9584-5ed5ca622d1f', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,1
+104,['VectorOrientation'],"{'vector_id': '5d15881f-fdd1-490e-bf81-be50fbdab729', 'image_id': '9f42ec9c-7561-4ef0-9c03-66fd6c7684be'}",2,1
+38,['VectorOrientation'],"{'vector_id': '2cadf10a-de8b-4866-aa57-bf6fb7647234', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,1
+54,['CriticalPoint'],{'reason': 'First point'},2,1
+37,['VectorOrientation'],"{'vector_id': '63e70e0b-74a3-4f14-be85-829e35f1612e', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,1
+55,['CriticalPoint'],{'reason': 'First Line'},2,1
+44,['VectorCoordinates'],"{'y1': 33, 'x1': 26, 'y2': 25, 'x2': 34}",1,1
+43,['VectorCoordinates'],"{'y1': 33, 'x1': 26, 'y2': 32, 'x2': 31}",1,1
+65,['VectDirection'],{'direction': 'Clockwise'},18,2
+66,['VectLonger'],{},10,2
+67,['VectShorter'],{},8,2
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},5,2
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},5,2
+59,['Quadrant'],{'quadrant': 2},4,2
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},4,2
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},4,2
+54,['CriticalPoint'],{'reason': 'First point'},3,2
+55,['CriticalPoint'],{'reason': 'First Line'},3,2
+104,['VectorOrientation'],"{'vector_id': '5d15881f-fdd1-490e-bf81-be50fbdab729', 'image_id': '9f42ec9c-7561-4ef0-9c03-66fd6c7684be'}",2,2
+96,['AnglePointAngle'],{'angle': 55},2,2
+36,['VectorOrientation'],"{'vector_id': '6287dd2e-31aa-440b-9584-5ed5ca622d1f', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,2
+103,['VectorOrientation'],"{'vector_id': '8bf07caf-8a65-4053-a6df-888b31573429', 'image_id': '9f42ec9c-7561-4ef0-9c03-66fd6c7684be'}",2,2
+105,['VectorOrientation'],"{'vector_id': 'ab3f0797-79b5-402b-8686-024d28be8aec', 'image_id': '9f42ec9c-7561-4ef0-9c03-66fd6c7684be'}",2,2
+28,['AnglePointAngle'],{'angle': 50},2,2
+64,['Quadrant'],{'quadrant': 4},2,2
+38,['VectorOrientation'],"{'vector_id': '2cadf10a-de8b-4866-aa57-bf6fb7647234', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,2
+37,['VectorOrientation'],"{'vector_id': '63e70e0b-74a3-4f14-be85-829e35f1612e', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,2
+160,['VectorOrientation'],"{'vector_id': '6b13113e-e184-43c2-b715-7eb91b963226', 'image_id': '8c08a4e4-7735-4fbb-9cc2-a1ebbcd42aec'}",2,2
+65,['VectDirection'],{'direction': 'Clockwise'},24,3
+67,['VectShorter'],{},12,3
+66,['VectLonger'],{},12,3
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},7,3
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},6,3
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},6,3
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},5,3
+55,['CriticalPoint'],{'reason': 'First Line'},4,3
+59,['Quadrant'],{'quadrant': 2},4,3
+54,['CriticalPoint'],{'reason': 'First point'},4,3
+96,['AnglePointAngle'],{'angle': 55},3,3
+182,['Quadrant'],{'quadrant': 3},3,3
+103,['VectorOrientation'],"{'vector_id': '8bf07caf-8a65-4053-a6df-888b31573429', 'image_id': '9f42ec9c-7561-4ef0-9c03-66fd6c7684be'}",2,3
+38,['VectorOrientation'],"{'vector_id': '2cadf10a-de8b-4866-aa57-bf6fb7647234', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,3
+104,['VectorOrientation'],"{'vector_id': '5d15881f-fdd1-490e-bf81-be50fbdab729', 'image_id': '9f42ec9c-7561-4ef0-9c03-66fd6c7684be'}",2,3
+37,['VectorOrientation'],"{'vector_id': '63e70e0b-74a3-4f14-be85-829e35f1612e', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,3
+36,['VectorOrientation'],"{'vector_id': '6287dd2e-31aa-440b-9584-5ed5ca622d1f', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,3
+29,['AnglePointAngle'],{'angle': 20},2,3
+28,['AnglePointAngle'],{'angle': 50},2,3
+64,['Quadrant'],{'quadrant': 4},2,3
+65,['VectDirection'],{'direction': 'Clockwise'},30,4
+67,['VectShorter'],{},16,4
+66,['VectLonger'],{},14,4
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},9,4
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},8,4
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},7,4
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},6,4
+55,['CriticalPoint'],{'reason': 'First Line'},5,4
+54,['CriticalPoint'],{'reason': 'First point'},5,4
+59,['Quadrant'],{'quadrant': 2},5,4
+182,['Quadrant'],{'quadrant': 3},4,4
+96,['AnglePointAngle'],{'angle': 55},4,4
+122,['Quadrant'],{'quadrant': 1},3,4
+85,['VectorOrientation'],"{'vector_id': 'a3201a9b-d635-4b14-b5c2-4def5d2ec2c7', 'image_id': '3607e3db-3251-4e43-bb71-d872cb559ead'}",2,4
+86,['VectorOrientation'],"{'vector_id': '8cbf187f-4cca-463d-bdaf-e00316db5b30', 'image_id': '3607e3db-3251-4e43-bb71-d872cb559ead'}",2,4
+38,['VectorOrientation'],"{'vector_id': '2cadf10a-de8b-4866-aa57-bf6fb7647234', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,4
+87,['VectorOrientation'],"{'vector_id': '693f7ece-e4ff-4f72-a876-466b7dd01c4d', 'image_id': '3607e3db-3251-4e43-bb71-d872cb559ead'}",2,4
+37,['VectorOrientation'],"{'vector_id': '63e70e0b-74a3-4f14-be85-829e35f1612e', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,4
+36,['VectorOrientation'],"{'vector_id': '6287dd2e-31aa-440b-9584-5ed5ca622d1f', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,4
+29,['AnglePointAngle'],{'angle': 20},2,4
+65,['VectDirection'],{'direction': 'Clockwise'},36,5
+67,['VectShorter'],{},20,5
+66,['VectLonger'],{},16,5
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},11,5
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},10,5
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},8,5
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},7,5
+59,['Quadrant'],{'quadrant': 2},7,5
+55,['CriticalPoint'],{'reason': 'First Line'},6,5
+54,['CriticalPoint'],{'reason': 'First point'},6,5
+182,['Quadrant'],{'quadrant': 3},4,5
+96,['AnglePointAngle'],{'angle': 55},4,5
+64,['Quadrant'],{'quadrant': 4},3,5
+29,['AnglePointAngle'],{'angle': 20},3,5
+152,['AnglePointAngle'],{'angle': 40},3,5
+122,['Quadrant'],{'quadrant': 1},3,5
+15,['VectorOrientation'],"{'vector_id': 'ea7f92a7-4341-481d-b54c-c58601501a9b', 'image_id': '71e2c165-52a3-4f6a-8b07-f684ad4d1e96'}",2,5
+37,['VectorOrientation'],"{'vector_id': '63e70e0b-74a3-4f14-be85-829e35f1612e', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,5
+36,['VectorOrientation'],"{'vector_id': '6287dd2e-31aa-440b-9584-5ed5ca622d1f', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,5
+17,['VectorOrientation'],"{'vector_id': 'c76a542f-0e37-498b-820c-af44ffca7482', 'image_id': '71e2c165-52a3-4f6a-8b07-f684ad4d1e96'}",2,5
+65,['VectDirection'],{'direction': 'Clockwise'},42,6
+67,['VectShorter'],{},24,6
+66,['VectLonger'],{},18,6
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},13,6
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},11,6
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},10,6
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},8,6
+55,['CriticalPoint'],{'reason': 'First Line'},7,6
+59,['Quadrant'],{'quadrant': 2},7,6
+54,['CriticalPoint'],{'reason': 'First point'},7,6
+182,['Quadrant'],{'quadrant': 3},6,6
+96,['AnglePointAngle'],{'angle': 55},4,6
+122,['Quadrant'],{'quadrant': 1},4,6
+64,['Quadrant'],{'quadrant': 4},3,6
+152,['AnglePointAngle'],{'angle': 40},3,6
+77,['AnglePointAngle'],{'angle': 60},3,6
+29,['AnglePointAngle'],{'angle': 20},3,6
+28,['AnglePointAngle'],{'angle': 50},3,6
+15,['VectorOrientation'],"{'vector_id': 'ea7f92a7-4341-481d-b54c-c58601501a9b', 'image_id': '71e2c165-52a3-4f6a-8b07-f684ad4d1e96'}",2,6
+37,['VectorOrientation'],"{'vector_id': '63e70e0b-74a3-4f14-be85-829e35f1612e', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,6
+65,['VectDirection'],{'direction': 'Clockwise'},48,7
+67,['VectShorter'],{},26,7
+66,['VectLonger'],{},22,7
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},15,7
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},13,7
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},11,7
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},9,7
+59,['Quadrant'],{'quadrant': 2},8,7
+55,['CriticalPoint'],{'reason': 'First Line'},8,7
+54,['CriticalPoint'],{'reason': 'First point'},8,7
+182,['Quadrant'],{'quadrant': 3},7,7
+122,['Quadrant'],{'quadrant': 1},5,7
+96,['AnglePointAngle'],{'angle': 55},4,7
+28,['AnglePointAngle'],{'angle': 50},4,7
+64,['Quadrant'],{'quadrant': 4},3,7
+152,['AnglePointAngle'],{'angle': 40},3,7
+77,['AnglePointAngle'],{'angle': 60},3,7
+29,['AnglePointAngle'],{'angle': 20},3,7
+15,['VectorOrientation'],"{'vector_id': 'ea7f92a7-4341-481d-b54c-c58601501a9b', 'image_id': '71e2c165-52a3-4f6a-8b07-f684ad4d1e96'}",2,7
+37,['VectorOrientation'],"{'vector_id': '63e70e0b-74a3-4f14-be85-829e35f1612e', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,7
+65,['VectDirection'],{'direction': 'Clockwise'},54,8
+67,['VectShorter'],{},30,8
+66,['VectLonger'],{},24,8
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},17,8
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},14,8
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},13,8
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},10,8
+54,['CriticalPoint'],{'reason': 'First point'},9,8
+182,['Quadrant'],{'quadrant': 3},9,8
+55,['CriticalPoint'],{'reason': 'First Line'},9,8
+59,['Quadrant'],{'quadrant': 2},8,8
+122,['Quadrant'],{'quadrant': 1},6,8
+96,['AnglePointAngle'],{'angle': 55},4,8
+29,['AnglePointAngle'],{'angle': 20},4,8
+28,['AnglePointAngle'],{'angle': 50},4,8
+64,['Quadrant'],{'quadrant': 4},3,8
+152,['AnglePointAngle'],{'angle': 40},3,8
+77,['AnglePointAngle'],{'angle': 60},3,8
+15,['VectorOrientation'],"{'vector_id': 'ea7f92a7-4341-481d-b54c-c58601501a9b', 'image_id': '71e2c165-52a3-4f6a-8b07-f684ad4d1e96'}",2,8
+37,['VectorOrientation'],"{'vector_id': '63e70e0b-74a3-4f14-be85-829e35f1612e', 'image_id': '296024cc-ecd9-4e5c-9ac6-539e5b0e233d'}",2,8
+65,['VectDirection'],{'direction': 'Clockwise'},60,9
+67,['VectShorter'],{},32,9
+66,['VectLonger'],{},28,9
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},19,9
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},16,9
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},14,9
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},11,9
+182,['Quadrant'],{'quadrant': 3},10,9
+55,['CriticalPoint'],{'reason': 'First Line'},10,9
+54,['CriticalPoint'],{'reason': 'First point'},10,9
+59,['Quadrant'],{'quadrant': 2},8,9
+122,['Quadrant'],{'quadrant': 1},7,9
+96,['AnglePointAngle'],{'angle': 55},5,9
+29,['AnglePointAngle'],{'angle': 20},4,9
+28,['AnglePointAngle'],{'angle': 50},4,9
+64,['Quadrant'],{'quadrant': 4},3,9
+77,['AnglePointAngle'],{'angle': 60},3,9
+27,['AnglePointAngle'],{'angle': 30},3,9
+152,['AnglePointAngle'],{'angle': 40},3,9
+15,['VectorOrientation'],"{'vector_id': 'ea7f92a7-4341-481d-b54c-c58601501a9b', 'image_id': '71e2c165-52a3-4f6a-8b07-f684ad4d1e96'}",2,9
+65,['VectDirection'],{'direction': 'Clockwise'},66,10
+67,['VectShorter'],{},34,10
+66,['VectLonger'],{},32,10
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},21,10
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},17,10
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},16,10
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},12,10
+182,['Quadrant'],{'quadrant': 3},11,10
+55,['CriticalPoint'],{'reason': 'First Line'},11,10
+54,['CriticalPoint'],{'reason': 'First point'},11,10
+59,['Quadrant'],{'quadrant': 2},9,10
+122,['Quadrant'],{'quadrant': 1},7,10
+29,['AnglePointAngle'],{'angle': 20},5,10
+96,['AnglePointAngle'],{'angle': 55},5,10
+64,['Quadrant'],{'quadrant': 4},4,10
+77,['AnglePointAngle'],{'angle': 60},4,10
+28,['AnglePointAngle'],{'angle': 50},4,10
+152,['AnglePointAngle'],{'angle': 40},4,10
+27,['AnglePointAngle'],{'angle': 30},3,10
+15,['VectorOrientation'],"{'vector_id': 'ea7f92a7-4341-481d-b54c-c58601501a9b', 'image_id': '71e2c165-52a3-4f6a-8b07-f684ad4d1e96'}",2,10
+65,['VectDirection'],{'direction': 'Clockwise'},72,11
+67,['VectShorter'],{},36,11
+66,['VectLonger'],{},36,11
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},23,11
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},19,11
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},17,11
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},13,11
+182,['Quadrant'],{'quadrant': 3},12,11
+55,['CriticalPoint'],{'reason': 'First Line'},12,11
+54,['CriticalPoint'],{'reason': 'First point'},12,11
+59,['Quadrant'],{'quadrant': 2},10,11
+122,['Quadrant'],{'quadrant': 1},8,11
+96,['AnglePointAngle'],{'angle': 55},6,11
+29,['AnglePointAngle'],{'angle': 20},5,11
+64,['Quadrant'],{'quadrant': 4},4,11
+77,['AnglePointAngle'],{'angle': 60},4,11
+28,['AnglePointAngle'],{'angle': 50},4,11
+152,['AnglePointAngle'],{'angle': 40},4,11
+27,['AnglePointAngle'],{'angle': 30},3,11
+15,['VectorOrientation'],"{'vector_id': 'ea7f92a7-4341-481d-b54c-c58601501a9b', 'image_id': '71e2c165-52a3-4f6a-8b07-f684ad4d1e96'}",2,11
+65,['VectDirection'],{'direction': 'Clockwise'},78,12
+67,['VectShorter'],{},40,12
+66,['VectLonger'],{},38,12
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},25,12
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},21,12
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},18,12
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},14,12
+182,['Quadrant'],{'quadrant': 3},13,12
+55,['CriticalPoint'],{'reason': 'First Line'},13,12
+54,['CriticalPoint'],{'reason': 'First point'},13,12
+59,['Quadrant'],{'quadrant': 2},11,12
+122,['Quadrant'],{'quadrant': 1},9,12
+96,['AnglePointAngle'],{'angle': 55},6,12
+29,['AnglePointAngle'],{'angle': 20},5,12
+64,['Quadrant'],{'quadrant': 4},4,12
+77,['AnglePointAngle'],{'angle': 60},4,12
+28,['AnglePointAngle'],{'angle': 50},4,12
+152,['AnglePointAngle'],{'angle': 40},4,12
+27,['AnglePointAngle'],{'angle': 30},3,12
+336,['AnglePointAngle'],{'angle': 25},3,12
+65,['VectDirection'],{'direction': 'Clockwise'},78,13
+67,['VectShorter'],{},44,13
+66,['VectLonger'],{},40,13
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},27,13
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},23,13
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},19,13
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},15,13
+55,['CriticalPoint'],{'reason': 'First Line'},14,13
+54,['CriticalPoint'],{'reason': 'First point'},14,13
+182,['Quadrant'],{'quadrant': 3},13,13
+59,['Quadrant'],{'quadrant': 2},13,13
+122,['Quadrant'],{'quadrant': 1},9,13
+96,['AnglePointAngle'],{'angle': 55},6,13
+422,['VectDirection'],{'direction': 'CounterClockwise'},6,13
+64,['Quadrant'],{'quadrant': 4},5,13
+29,['AnglePointAngle'],{'angle': 20},5,13
+77,['AnglePointAngle'],{'angle': 60},5,13
+28,['AnglePointAngle'],{'angle': 50},4,13
+152,['AnglePointAngle'],{'angle': 40},4,13
+27,['AnglePointAngle'],{'angle': 30},3,13
+65,['VectDirection'],{'direction': 'Clockwise'},84,14
+67,['VectShorter'],{},48,14
+66,['VectLonger'],{},42,14
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},29,14
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},24,14
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},21,14
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},16,14
+55,['CriticalPoint'],{'reason': 'First Line'},15,14
+54,['CriticalPoint'],{'reason': 'First point'},15,14
+182,['Quadrant'],{'quadrant': 3},14,14
+59,['Quadrant'],{'quadrant': 2},14,14
+122,['Quadrant'],{'quadrant': 1},9,14
+64,['Quadrant'],{'quadrant': 4},6,14
+96,['AnglePointAngle'],{'angle': 55},6,14
+422,['VectDirection'],{'direction': 'CounterClockwise'},6,14
+29,['AnglePointAngle'],{'angle': 20},5,14
+77,['AnglePointAngle'],{'angle': 60},5,14
+28,['AnglePointAngle'],{'angle': 50},4,14
+152,['AnglePointAngle'],{'angle': 40},4,14
+336,['AnglePointAngle'],{'angle': 25},4,14
+65,['VectDirection'],{'direction': 'Clockwise'},90,15
+67,['VectShorter'],{},52,15
+66,['VectLonger'],{},44,15
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},30,15
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},26,15
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},22,15
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},18,15
+55,['CriticalPoint'],{'reason': 'First Line'},16,15
+54,['CriticalPoint'],{'reason': 'First point'},16,15
+59,['Quadrant'],{'quadrant': 2},15,15
+182,['Quadrant'],{'quadrant': 3},14,15
+122,['Quadrant'],{'quadrant': 1},10,15
+64,['Quadrant'],{'quadrant': 4},7,15
+96,['AnglePointAngle'],{'angle': 55},6,15
+422,['VectDirection'],{'direction': 'CounterClockwise'},6,15
+29,['AnglePointAngle'],{'angle': 20},5,15
+77,['AnglePointAngle'],{'angle': 60},5,15
+28,['AnglePointAngle'],{'angle': 50},4,15
+27,['AnglePointAngle'],{'angle': 30},4,15
+152,['AnglePointAngle'],{'angle': 40},4,15
+65,['VectDirection'],{'direction': 'Clockwise'},90,16
+67,['VectShorter'],{},56,16
+66,['VectLonger'],{},46,16
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},32,16
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},27,16
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},24,16
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},19,16
+55,['CriticalPoint'],{'reason': 'First Line'},17,16
+54,['CriticalPoint'],{'reason': 'First point'},17,16
+182,['Quadrant'],{'quadrant': 3},16,16
+59,['Quadrant'],{'quadrant': 2},15,16
+422,['VectDirection'],{'direction': 'CounterClockwise'},12,16
+122,['Quadrant'],{'quadrant': 1},11,16
+64,['Quadrant'],{'quadrant': 4},7,16
+77,['AnglePointAngle'],{'angle': 60},6,16
+27,['AnglePointAngle'],{'angle': 30},6,16
+96,['AnglePointAngle'],{'angle': 55},6,16
+29,['AnglePointAngle'],{'angle': 20},5,16
+28,['AnglePointAngle'],{'angle': 50},4,16
+152,['AnglePointAngle'],{'angle': 40},4,16
+65,['VectDirection'],{'direction': 'Clockwise'},96,17
+67,['VectShorter'],{},58,17
+66,['VectLonger'],{},50,17
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},33,17
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},29,17
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},25,17
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},21,17
+55,['CriticalPoint'],{'reason': 'First Line'},18,17
+54,['CriticalPoint'],{'reason': 'First point'},18,17
+182,['Quadrant'],{'quadrant': 3},16,17
+59,['Quadrant'],{'quadrant': 2},16,17
+122,['Quadrant'],{'quadrant': 1},12,17
+422,['VectDirection'],{'direction': 'CounterClockwise'},12,17
+64,['Quadrant'],{'quadrant': 4},8,17
+27,['AnglePointAngle'],{'angle': 30},7,17
+77,['AnglePointAngle'],{'angle': 60},6,17
+96,['AnglePointAngle'],{'angle': 55},6,17
+29,['AnglePointAngle'],{'angle': 20},5,17
+28,['AnglePointAngle'],{'angle': 50},4,17
+152,['AnglePointAngle'],{'angle': 40},4,17
+65,['VectDirection'],{'direction': 'Clockwise'},102,18
+67,['VectShorter'],{},60,18
+66,['VectLonger'],{},54,18
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},34,18
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},31,18
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},26,18
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},23,18
+55,['CriticalPoint'],{'reason': 'First Line'},19,18
+54,['CriticalPoint'],{'reason': 'First point'},19,18
+59,['Quadrant'],{'quadrant': 2},17,18
+182,['Quadrant'],{'quadrant': 3},16,18
+122,['Quadrant'],{'quadrant': 1},13,18
+422,['VectDirection'],{'direction': 'CounterClockwise'},12,18
+64,['Quadrant'],{'quadrant': 4},9,18
+27,['AnglePointAngle'],{'angle': 30},7,18
+29,['AnglePointAngle'],{'angle': 20},6,18
+77,['AnglePointAngle'],{'angle': 60},6,18
+96,['AnglePointAngle'],{'angle': 55},6,18
+28,['AnglePointAngle'],{'angle': 50},4,18
+152,['AnglePointAngle'],{'angle': 40},4,18
+65,['VectDirection'],{'direction': 'Clockwise'},108,19
+67,['VectShorter'],{},62,19
+66,['VectLonger'],{},58,19
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},36,19
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},32,19
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},28,19
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},24,19
+55,['CriticalPoint'],{'reason': 'First Line'},20,19
+54,['CriticalPoint'],{'reason': 'First point'},20,19
+59,['Quadrant'],{'quadrant': 2},18,19
+182,['Quadrant'],{'quadrant': 3},17,19
+122,['Quadrant'],{'quadrant': 1},13,19
+422,['VectDirection'],{'direction': 'CounterClockwise'},12,19
+64,['Quadrant'],{'quadrant': 4},10,19
+77,['AnglePointAngle'],{'angle': 60},7,19
+27,['AnglePointAngle'],{'angle': 30},7,19
+29,['AnglePointAngle'],{'angle': 20},6,19
+96,['AnglePointAngle'],{'angle': 55},6,19
+28,['AnglePointAngle'],{'angle': 50},4,19
+152,['AnglePointAngle'],{'angle': 40},4,19
+65,['VectDirection'],{'direction': 'Clockwise'},114,20
+67,['VectShorter'],{},64,20
+66,['VectLonger'],{},62,20
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},37,20
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},33,20
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},30,20
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},26,20
+54,['CriticalPoint'],{'reason': 'First point'},21,20
+55,['CriticalPoint'],{'reason': 'First Line'},21,20
+59,['Quadrant'],{'quadrant': 2},18,20
+182,['Quadrant'],{'quadrant': 3},18,20
+122,['Quadrant'],{'quadrant': 1},14,20
+422,['VectDirection'],{'direction': 'CounterClockwise'},12,20
+64,['Quadrant'],{'quadrant': 4},11,20
+27,['AnglePointAngle'],{'angle': 30},7,20
+77,['AnglePointAngle'],{'angle': 60},7,20
+96,['AnglePointAngle'],{'angle': 55},6,20
+29,['AnglePointAngle'],{'angle': 20},6,20
+153,['AnglePointAngle'],{'angle': 85},4,20
+28,['AnglePointAngle'],{'angle': 50},4,20
+65,['VectDirection'],{'direction': 'Clockwise'},120,21
+67,['VectShorter'],{},68,21
+66,['VectLonger'],{},64,21
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},38,21
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},34,21
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},32,21
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},28,21
+55,['CriticalPoint'],{'reason': 'First Line'},22,21
+54,['CriticalPoint'],{'reason': 'First point'},22,21
+182,['Quadrant'],{'quadrant': 3},19,21
+59,['Quadrant'],{'quadrant': 2},18,21
+122,['Quadrant'],{'quadrant': 1},15,21
+64,['Quadrant'],{'quadrant': 4},12,21
+422,['VectDirection'],{'direction': 'CounterClockwise'},12,21
+77,['AnglePointAngle'],{'angle': 60},8,21
+27,['AnglePointAngle'],{'angle': 30},7,21
+96,['AnglePointAngle'],{'angle': 55},6,21
+29,['AnglePointAngle'],{'angle': 20},6,21
+336,['AnglePointAngle'],{'angle': 25},5,21
+153,['AnglePointAngle'],{'angle': 85},4,21
+65,['VectDirection'],{'direction': 'Clockwise'},126,22
+67,['VectShorter'],{},70,22
+66,['VectLonger'],{},68,22
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},40,22
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},36,22
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},33,22
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},29,22
+54,['CriticalPoint'],{'reason': 'First point'},23,22
+55,['CriticalPoint'],{'reason': 'First Line'},23,22
+182,['Quadrant'],{'quadrant': 3},20,22
+59,['Quadrant'],{'quadrant': 2},19,22
+122,['Quadrant'],{'quadrant': 1},16,22
+64,['Quadrant'],{'quadrant': 4},12,22
+422,['VectDirection'],{'direction': 'CounterClockwise'},12,22
+77,['AnglePointAngle'],{'angle': 60},8,22
+27,['AnglePointAngle'],{'angle': 30},7,22
+96,['AnglePointAngle'],{'angle': 55},6,22
+29,['AnglePointAngle'],{'angle': 20},6,22
+336,['AnglePointAngle'],{'angle': 25},5,22
+257,['AnglePointAngle'],{'angle': 70},5,22
+65,['VectDirection'],{'direction': 'Clockwise'},132,23
+67,['VectShorter'],{},72,23
+66,['VectLonger'],{},72,23
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},42,23
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},38,23
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},34,23
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},30,23
+55,['CriticalPoint'],{'reason': 'First Line'},24,23
+54,['CriticalPoint'],{'reason': 'First point'},24,23
+182,['Quadrant'],{'quadrant': 3},21,23
+59,['Quadrant'],{'quadrant': 2},20,23
+122,['Quadrant'],{'quadrant': 1},17,23
+64,['Quadrant'],{'quadrant': 4},12,23
+422,['VectDirection'],{'direction': 'CounterClockwise'},12,23
+77,['AnglePointAngle'],{'angle': 60},9,23
+27,['AnglePointAngle'],{'angle': 30},7,23
+96,['AnglePointAngle'],{'angle': 55},6,23
+29,['AnglePointAngle'],{'angle': 20},6,23
+336,['AnglePointAngle'],{'angle': 25},6,23
+257,['AnglePointAngle'],{'angle': 70},5,23
+65,['VectDirection'],{'direction': 'Clockwise'},138,24
+66,['VectLonger'],{},76,24
+67,['VectShorter'],{},74,24
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},44,24
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},39,24
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},36,24
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},31,24
+55,['CriticalPoint'],{'reason': 'First Line'},25,24
+54,['CriticalPoint'],{'reason': 'First point'},25,24
+182,['Quadrant'],{'quadrant': 3},23,24
+59,['Quadrant'],{'quadrant': 2},20,24
+122,['Quadrant'],{'quadrant': 1},18,24
+64,['Quadrant'],{'quadrant': 4},12,24
+422,['VectDirection'],{'direction': 'CounterClockwise'},12,24
+77,['AnglePointAngle'],{'angle': 60},9,24
+27,['AnglePointAngle'],{'angle': 30},7,24
+96,['AnglePointAngle'],{'angle': 55},6,24
+29,['AnglePointAngle'],{'angle': 20},6,24
+336,['AnglePointAngle'],{'angle': 25},6,24
+257,['AnglePointAngle'],{'angle': 70},5,24
+65,['VectDirection'],{'direction': 'Clockwise'},144,25
+67,['VectShorter'],{},78,25
+66,['VectLonger'],{},78,25
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},46,25
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},40,25
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},38,25
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},32,25
+54,['CriticalPoint'],{'reason': 'First point'},26,25
+55,['CriticalPoint'],{'reason': 'First Line'},26,25
+182,['Quadrant'],{'quadrant': 3},24,25
+59,['Quadrant'],{'quadrant': 2},21,25
+122,['Quadrant'],{'quadrant': 1},18,25
+64,['Quadrant'],{'quadrant': 4},13,25
+422,['VectDirection'],{'direction': 'CounterClockwise'},12,25
+77,['AnglePointAngle'],{'angle': 60},9,25
+27,['AnglePointAngle'],{'angle': 30},8,25
+336,['AnglePointAngle'],{'angle': 25},6,25
+96,['AnglePointAngle'],{'angle': 55},6,25
+153,['AnglePointAngle'],{'angle': 85},6,25
+29,['AnglePointAngle'],{'angle': 20},6,25
+65,['VectDirection'],{'direction': 'Clockwise'},150,26
+67,['VectShorter'],{},82,26
+66,['VectLonger'],{},80,26
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},48,26
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},41,26
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},40,26
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},33,26
+54,['CriticalPoint'],{'reason': 'First point'},27,26
+55,['CriticalPoint'],{'reason': 'First Line'},27,26
+182,['Quadrant'],{'quadrant': 3},25,26
+59,['Quadrant'],{'quadrant': 2},22,26
+122,['Quadrant'],{'quadrant': 1},18,26
+64,['Quadrant'],{'quadrant': 4},14,26
+422,['VectDirection'],{'direction': 'CounterClockwise'},12,26
+77,['AnglePointAngle'],{'angle': 60},10,26
+27,['AnglePointAngle'],{'angle': 30},8,26
+336,['AnglePointAngle'],{'angle': 25},6,26
+96,['AnglePointAngle'],{'angle': 55},6,26
+153,['AnglePointAngle'],{'angle': 85},6,26
+29,['AnglePointAngle'],{'angle': 20},6,26
+65,['VectDirection'],{'direction': 'Clockwise'},150,27
+66,['VectLonger'],{},84,27
+67,['VectShorter'],{},84,27
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},50,27
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},42,27
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},42,27
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},34,27
+55,['CriticalPoint'],{'reason': 'First Line'},28,27
+54,['CriticalPoint'],{'reason': 'First point'},28,27
+182,['Quadrant'],{'quadrant': 3},27,27
+59,['Quadrant'],{'quadrant': 2},22,27
+122,['Quadrant'],{'quadrant': 1},19,27
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,27
+64,['Quadrant'],{'quadrant': 4},14,27
+77,['AnglePointAngle'],{'angle': 60},10,27
+27,['AnglePointAngle'],{'angle': 30},9,27
+29,['AnglePointAngle'],{'angle': 20},7,27
+336,['AnglePointAngle'],{'angle': 25},6,27
+96,['AnglePointAngle'],{'angle': 55},6,27
+153,['AnglePointAngle'],{'angle': 85},6,27
+65,['VectDirection'],{'direction': 'Clockwise'},156,28
+67,['VectShorter'],{},88,28
+66,['VectLonger'],{},86,28
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},51,28
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},44,28
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},43,28
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},36,28
+54,['CriticalPoint'],{'reason': 'First point'},29,28
+55,['CriticalPoint'],{'reason': 'First Line'},29,28
+182,['Quadrant'],{'quadrant': 3},27,28
+59,['Quadrant'],{'quadrant': 2},23,28
+122,['Quadrant'],{'quadrant': 1},20,28
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,28
+64,['Quadrant'],{'quadrant': 4},15,28
+77,['AnglePointAngle'],{'angle': 60},11,28
+27,['AnglePointAngle'],{'angle': 30},9,28
+29,['AnglePointAngle'],{'angle': 20},7,28
+96,['AnglePointAngle'],{'angle': 55},6,28
+153,['AnglePointAngle'],{'angle': 85},6,28
+28,['AnglePointAngle'],{'angle': 50},6,28
+65,['VectDirection'],{'direction': 'Clockwise'},162,29
+67,['VectShorter'],{},92,29
+66,['VectLonger'],{},88,29
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},53,29
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},45,29
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},45,29
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},37,29
+55,['CriticalPoint'],{'reason': 'First Line'},30,29
+54,['CriticalPoint'],{'reason': 'First point'},30,29
+182,['Quadrant'],{'quadrant': 3},28,29
+59,['Quadrant'],{'quadrant': 2},24,29
+122,['Quadrant'],{'quadrant': 1},20,29
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,29
+64,['Quadrant'],{'quadrant': 4},16,29
+77,['AnglePointAngle'],{'angle': 60},12,29
+27,['AnglePointAngle'],{'angle': 30},9,29
+96,['AnglePointAngle'],{'angle': 55},7,29
+29,['AnglePointAngle'],{'angle': 20},7,29
+153,['AnglePointAngle'],{'angle': 85},6,29
+28,['AnglePointAngle'],{'angle': 50},6,29
+65,['VectDirection'],{'direction': 'Clockwise'},168,30
+67,['VectShorter'],{},96,30
+66,['VectLonger'],{},90,30
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},55,30
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},47,30
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},46,30
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},38,30
+55,['CriticalPoint'],{'reason': 'First Line'},31,30
+54,['CriticalPoint'],{'reason': 'First point'},31,30
+182,['Quadrant'],{'quadrant': 3},29,30
+59,['Quadrant'],{'quadrant': 2},25,30
+122,['Quadrant'],{'quadrant': 1},20,30
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,30
+64,['Quadrant'],{'quadrant': 4},17,30
+77,['AnglePointAngle'],{'angle': 60},12,30
+27,['AnglePointAngle'],{'angle': 30},9,30
+96,['AnglePointAngle'],{'angle': 55},7,30
+29,['AnglePointAngle'],{'angle': 20},7,30
+153,['AnglePointAngle'],{'angle': 85},6,30
+28,['AnglePointAngle'],{'angle': 50},6,30
+65,['VectDirection'],{'direction': 'Clockwise'},174,31
+67,['VectShorter'],{},98,31
+66,['VectLonger'],{},94,31
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},56,31
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},49,31
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},47,31
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},40,31
+54,['CriticalPoint'],{'reason': 'First point'},32,31
+55,['CriticalPoint'],{'reason': 'First Line'},32,31
+182,['Quadrant'],{'quadrant': 3},30,31
+59,['Quadrant'],{'quadrant': 2},25,31
+122,['Quadrant'],{'quadrant': 1},21,31
+64,['Quadrant'],{'quadrant': 4},18,31
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,31
+77,['AnglePointAngle'],{'angle': 60},12,31
+27,['AnglePointAngle'],{'angle': 30},10,31
+96,['AnglePointAngle'],{'angle': 55},7,31
+257,['AnglePointAngle'],{'angle': 70},7,31
+29,['AnglePointAngle'],{'angle': 20},7,31
+153,['AnglePointAngle'],{'angle': 85},6,31
+65,['VectDirection'],{'direction': 'Clockwise'},180,32
+67,['VectShorter'],{},100,32
+66,['VectLonger'],{},98,32
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},58,32
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},50,32
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},49,32
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},41,32
+54,['CriticalPoint'],{'reason': 'First point'},33,32
+55,['CriticalPoint'],{'reason': 'First Line'},33,32
+182,['Quadrant'],{'quadrant': 3},31,32
+59,['Quadrant'],{'quadrant': 2},26,32
+122,['Quadrant'],{'quadrant': 1},22,32
+64,['Quadrant'],{'quadrant': 4},18,32
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,32
+77,['AnglePointAngle'],{'angle': 60},13,32
+27,['AnglePointAngle'],{'angle': 30},10,32
+96,['AnglePointAngle'],{'angle': 55},7,32
+257,['AnglePointAngle'],{'angle': 70},7,32
+29,['AnglePointAngle'],{'angle': 20},7,32
+153,['AnglePointAngle'],{'angle': 85},6,32
+65,['VectDirection'],{'direction': 'Clockwise'},186,33
+67,['VectShorter'],{},104,33
+66,['VectLonger'],{},100,33
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},60,33
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},51,33
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},51,33
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},42,33
+55,['CriticalPoint'],{'reason': 'First Line'},34,33
+54,['CriticalPoint'],{'reason': 'First point'},34,33
+182,['Quadrant'],{'quadrant': 3},31,33
+59,['Quadrant'],{'quadrant': 2},27,33
+122,['Quadrant'],{'quadrant': 1},23,33
+64,['Quadrant'],{'quadrant': 4},18,33
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,33
+77,['AnglePointAngle'],{'angle': 60},14,33
+27,['AnglePointAngle'],{'angle': 30},10,33
+29,['AnglePointAngle'],{'angle': 20},8,33
+96,['AnglePointAngle'],{'angle': 55},7,33
+257,['AnglePointAngle'],{'angle': 70},7,33
+153,['AnglePointAngle'],{'angle': 85},6,33
+65,['VectDirection'],{'direction': 'Clockwise'},192,34
+67,['VectShorter'],{},108,34
+66,['VectLonger'],{},102,34
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},62,34
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},53,34
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},52,34
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},43,34
+55,['CriticalPoint'],{'reason': 'First Line'},35,34
+54,['CriticalPoint'],{'reason': 'First point'},35,34
+182,['Quadrant'],{'quadrant': 3},31,34
+59,['Quadrant'],{'quadrant': 2},29,34
+122,['Quadrant'],{'quadrant': 1},23,34
+64,['Quadrant'],{'quadrant': 4},19,34
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,34
+77,['AnglePointAngle'],{'angle': 60},14,34
+27,['AnglePointAngle'],{'angle': 30},10,34
+29,['AnglePointAngle'],{'angle': 20},8,34
+96,['AnglePointAngle'],{'angle': 55},7,34
+28,['AnglePointAngle'],{'angle': 50},7,34
+257,['AnglePointAngle'],{'angle': 70},7,34
+65,['VectDirection'],{'direction': 'Clockwise'},198,35
+67,['VectShorter'],{},112,35
+66,['VectLonger'],{},104,35
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},64,35
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},54,35
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},54,35
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},44,35
+55,['CriticalPoint'],{'reason': 'First Line'},36,35
+54,['CriticalPoint'],{'reason': 'First point'},36,35
+182,['Quadrant'],{'quadrant': 3},31,35
+59,['Quadrant'],{'quadrant': 2},30,35
+122,['Quadrant'],{'quadrant': 1},23,35
+64,['Quadrant'],{'quadrant': 4},20,35
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,35
+77,['AnglePointAngle'],{'angle': 60},15,35
+27,['AnglePointAngle'],{'angle': 30},10,35
+29,['AnglePointAngle'],{'angle': 20},8,35
+96,['AnglePointAngle'],{'angle': 55},7,35
+153,['AnglePointAngle'],{'angle': 85},7,35
+28,['AnglePointAngle'],{'angle': 50},7,35
+65,['VectDirection'],{'direction': 'Clockwise'},204,36
+67,['VectShorter'],{},116,36
+66,['VectLonger'],{},106,36
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},66,36
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},56,36
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},55,36
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},45,36
+55,['CriticalPoint'],{'reason': 'First Line'},37,36
+54,['CriticalPoint'],{'reason': 'First point'},37,36
+59,['Quadrant'],{'quadrant': 2},32,36
+182,['Quadrant'],{'quadrant': 3},31,36
+122,['Quadrant'],{'quadrant': 1},23,36
+64,['Quadrant'],{'quadrant': 4},21,36
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,36
+77,['AnglePointAngle'],{'angle': 60},15,36
+27,['AnglePointAngle'],{'angle': 30},10,36
+29,['AnglePointAngle'],{'angle': 20},9,36
+96,['AnglePointAngle'],{'angle': 55},8,36
+153,['AnglePointAngle'],{'angle': 85},7,36
+28,['AnglePointAngle'],{'angle': 50},7,36
+65,['VectDirection'],{'direction': 'Clockwise'},210,37
+67,['VectShorter'],{},120,37
+66,['VectLonger'],{},108,37
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},68,37
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},58,37
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},56,37
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},46,37
+55,['CriticalPoint'],{'reason': 'First Line'},38,37
+54,['CriticalPoint'],{'reason': 'First point'},38,37
+59,['Quadrant'],{'quadrant': 2},34,37
+182,['Quadrant'],{'quadrant': 3},31,37
+122,['Quadrant'],{'quadrant': 1},23,37
+64,['Quadrant'],{'quadrant': 4},22,37
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,37
+77,['AnglePointAngle'],{'angle': 60},15,37
+27,['AnglePointAngle'],{'angle': 30},11,37
+29,['AnglePointAngle'],{'angle': 20},9,37
+96,['AnglePointAngle'],{'angle': 55},8,37
+153,['AnglePointAngle'],{'angle': 85},7,37
+28,['AnglePointAngle'],{'angle': 50},7,37
+65,['VectDirection'],{'direction': 'Clockwise'},216,38
+67,['VectShorter'],{},122,38
+66,['VectLonger'],{},112,38
+57,['VerticalVectorHalfPlane'],{'vertical_plane': 'Left'},69,38
+58,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Upper'},60,38
+63,['HorizontalVectorHalfPlane'],{'horizontal_plane': 'Lower'},57,38
+62,['VerticalVectorHalfPlane'],{'vertical_plane': 'Right'},48,38
+55,['CriticalPoint'],{'reason': 'First Line'},39,38
+54,['CriticalPoint'],{'reason': 'First point'},39,38
+59,['Quadrant'],{'quadrant': 2},35,38
+182,['Quadrant'],{'quadrant': 3},31,38
+122,['Quadrant'],{'quadrant': 1},24,38
+64,['Quadrant'],{'quadrant': 4},23,38
+422,['VectDirection'],{'direction': 'CounterClockwise'},18,38
+77,['AnglePointAngle'],{'angle': 60},15,38
+27,['AnglePointAngle'],{'angle': 30},11,38
+29,['AnglePointAngle'],{'angle': 20},9,38
+96,['AnglePointAngle'],{'angle': 55},8,38
+257,['AnglePointAngle'],{'angle': 70},8,38
+336,['AnglePointAngle'],{'angle': 25},8,38

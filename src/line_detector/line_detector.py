@@ -5,6 +5,7 @@ from math import atan2, degrees, floor
 import numpy as np
 import os
 import cv2
+import argparse
 
 from hough_builder import HoughBundler
 
@@ -19,6 +20,11 @@ class LineDetector:
 
         lines = cv2.HoughLinesP(gray, 1, np.pi / 180, threshold=15, lines=None, minLineLength=5, maxLineGap=1)
         
+        # Check if lines is None
+        if lines is None:
+            print("No lines found")
+            return []
+        
         # Initialize HoughBundler
         bundler = HoughBundler(min_distance=10, min_angle=10)
         
@@ -31,30 +37,24 @@ class LineDetector:
 
 
 if __name__ == "__main__":
-    output_folder = "output"
-    if not os.path.exists(output_folder):
-        os.mkdir(output_folder)
-
-    img = np.zeros((500, 500, 3), dtype=np.uint8)
-    cv2.line(img, (0, 0), (300, 300), (63, 124, 172), 2)
-    cv2.line(img, (200, 100), (100, 400), (213, 225, 163), 2)
-    cv2.line(img, (100, 300), (500, 100), (189, 196, 167), 2)
-    cv2.imwrite(f"{output_folder}/img.png", img)
-    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
+    parser = argparse.ArgumentParser(description="Detect lines in an image")
+    parser.add_argument('--folder_path', type=str, default="", help="Path to the folder containing images")
+    
+    args = parser.parse_args()
+    
     detector = LineDetector()
-    lines = detector.detect_lines(img)
-
-    # Draw detected lines in the image
-    blank_img = np.zeros_like(img)
-
-    for dline in lines:
-        p0, p1 = dline
-        x0 = int(round(p0[0]))
-        y0 = int(round(p1[0]))
-        x1 = int(round(p0[1]))
-        y1 = int(round(p1[1]))
-        print(f"Drawing line: x0: {x0}, y0: {y0}, x1: {x1}, y1: {y1}")
-        cv2.line(blank_img, (x0, y0), (x1, y1), 255, 1)
-
-    cv2.imwrite(f"{output_folder}/image_with_detected_lines.jpg", blank_img)
+    
+    folder_path = args.folder_path
+    image_files = os.listdir(folder_path)
+    
+    for image_file in image_files:
+        image_path = os.path.join(folder_path, image_file)
+        image = cv2.imread(image_path)
+        lines = detector.detect_lines(image)
+        # Remove the files with lines not equal to 3
+        if len(lines) != 3:
+            print('Removing image: ', image_path)
+            os.remove(image_path)
+        print('Image path: ', image_path)
+        print('Number of lines: ', len(lines))
+        print('---------------------------------')

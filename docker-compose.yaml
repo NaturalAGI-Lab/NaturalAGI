@@ -28,12 +28,18 @@ services:
     environment:
       - NEO4J_AUTH
       - NEO4J_PLUGINS
+      - NEO4J_dbms_memory_transaction_total_max=512M
 
     # Simple check testing whether the port 7474 is opened.
     # If so, the instance running inside the container is considered as "healthy".
     # This status can be checked using the "docker ps" command.
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider localhost:7474 || exit 1"]
+    deploy:
+      resources:
+        limits:
+          cpus: '3.0'
+          memory: 2048M
 
   nuclio-dashboard:
     

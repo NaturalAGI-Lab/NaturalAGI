@@ -3,6 +3,7 @@ import logging
 from neo4j import GraphDatabase
 import numpy as np
 
+logging.basicConfig(level=logging.INFO)
 
 class VectorCharacteristicsRepository:
     def __init__(self, uri, user, password):
@@ -40,7 +41,7 @@ class VectorCharacteristicsRepository:
             MATCH (coord:Coordinates)--(:Location)--(line:Line {image_id: $image_id})-[:INCLUDES]->(ap1:AnglePoint)--(apLoc1:AnglePointCoordinates),
                 (line)-[:INCLUDES]->(ap2:AnglePoint)--(apLoc2:AnglePointCoordinates),
                 (angle:Angle)--(:Orientation)--(line)
-            WHERE apLoc1.x <> apLoc2.x AND apLoc1.y <> apLoc2.y
+            WHERE apLoc1.x <> apLoc2.x OR apLoc1.y <> apLoc2.y
             MERGE (v:Vector {line_id: line.id, image_id: $image_id})
             ON CREATE SET v.vector_id = randomUUID()
             MERGE (line)-[:INCLUDES]->(v)

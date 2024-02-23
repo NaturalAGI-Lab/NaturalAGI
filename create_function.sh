@@ -119,6 +119,7 @@ metadata:
   labels:
     nuclio.io/project-name: "default"
 spec:
+  httpTimeout: 1000
   handler: "nuclio_handler:handler"
   runtime: "python:3.9"
   env:
