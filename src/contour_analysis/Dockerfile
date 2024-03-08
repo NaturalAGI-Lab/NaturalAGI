@@ -34,6 +34,7 @@ COPY magnitude_comparator.py /opt/nuclio/magnitude_comparator.py
 COPY angle_points_repository.py /opt/nuclio/angle_points_repository.py
 COPY contour_analysis_repository.py /opt/nuclio/contour_analysis_repository.py
 COPY relative_characteristics_repository.py /opt/nuclio/relative_characteristics_repository.py
+COPY quadrant_checker.py /opt/nuclio/quadrant_checker.py
 # END OF USER CONTENT
 
 # Run processor with configuration and platform configuration

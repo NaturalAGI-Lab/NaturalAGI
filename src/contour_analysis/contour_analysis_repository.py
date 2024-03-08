@@ -3,6 +3,10 @@ import logging
 
 from neo4j import GraphDatabase
 import numpy as np
+from quadrant_checker import (
+    check_quadrant_change,
+    mark_quadrant_change,
+)
 from helpers import calculate_half_plane_and_quadrant, find_next_vector
 from magnitude_comparator import compare_vector_magnitude_and_create_nodes
 from direction_checker import (
@@ -63,14 +67,8 @@ class ContourAnalysisRepository:
     def _find_starting_point(tx, image_id):
         logging.info("Running _find_starting_point transaction")
         query = """
-            MATCH path=(v:Vector {image_id: $image_id})-[*6..9]-(v) 
-            WHERE ALL(node IN nodes(path)[1..-1] WHERE SINGLE(x IN nodes(path) WHERE x = node)) 
-            WITH DISTINCT path, [node IN nodes(path) WHERE node:Vector] AS vectorNodes
-            UNWIND nodes(path) AS n
-            WITH n
-            WHERE n:AnglePoint AND n.image_id = $image_id
-            MATCH (n)--(apLoc:AnglePointCoordinates)
-            WITH n, apLoc
+            MATCH (apLoc:AnglePointCoordinates)--(n:AnglePoint {image_id: $image_id})
+            WITH apLoc, n
             ORDER BY apLoc.y, apLoc.x
             LIMIT 1
             MERGE (criticalPoint: CriticalPoint {reason: "First point"})
@@ -79,6 +77,7 @@ class ContourAnalysisRepository:
         """
         result = tx.run(query, image_id=image_id)
         records = [record for record in result]
+        logging.info(f"Records: {records}")
         min_angle_point = records[0]["MinAnglePoint"]
         logging.debug(f"Min AnglePoint is {min_angle_point}")
         return min_angle_point
@@ -256,7 +255,19 @@ class ContourAnalysisRepository:
         result = tx.run(
             query, next_vector_id=next_vector["vector_id"], quadrant=quadrant
         )
-        logging.debug(f"Half planes and quadrants are created for the line ")
+        logging.debug("Half planes and quadrants are created for the line ")
+
+        if last_vector is not None:
+            is_quadrant_changed = check_quadrant_change(
+                tx, last_vector["vector_id"], next_vector["vector_id"]
+            )
+
+            if is_quadrant_changed:
+                logging.info("Quadrant change detected")
+                mark_quadrant_change(
+                    tx, last_vector["vector_id"], next_vector["vector_id"]
+                )
+
         return result
 
     @staticmethod
