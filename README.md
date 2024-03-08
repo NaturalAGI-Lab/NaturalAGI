@@ -165,15 +165,7 @@ $$
 
 ### VectorDirection
 
-Given two vectors 
-
-$$\vec{v}_1 = [x_{v1}, y_{v1}]$$
-
- and 
-
- $$\vec{v}_2 = [x_{v2}, y_{v2}]$$
- 
- the cross product in a two-dimensional space can be represented using the determinant of a matrix formed by these vectors:
+Given two vectors $\vec{v}_1 = [x_{v1}, y_{v1}]$ and $\vec{v}_2 = [x_{v2}, y_{v2}]$ the cross product in a two-dimensional space can be represented using the determinant of a matrix formed by these vectors:
 
 $$
 \vec{v}_1 \times \vec{v}_2 = \begin{vmatrix}
