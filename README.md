@@ -61,4 +61,4 @@ There are list of prefixes in the system for different structures:
 | ------------------------ | -------- | ---------------------------------------------------------------------------------------------------- |
 | **Vector**Direction      | Location | Determining whether a vector moves clockwise or counterclockwise                                     |
 | **Vector**Comparison     | Location | Compares the magnitudes of vectors that intersect to assess their relative influence or significance |
-| **Vector**QuadrantChange | Location | TODO add description                                                                                 |
+| **Vector**QuadrantChange | Location | Determining whether a vector changed a direction of development to the new quadrant                  |
