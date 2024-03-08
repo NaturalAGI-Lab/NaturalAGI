@@ -77,26 +77,32 @@ $$
 \vec{v}_1 = \begin{bmatrix} x_2 - x_1 \\ y_2 - y_1 \end{bmatrix}, \quad \vec{v}_2 = \begin{bmatrix} x_4 - x_3 \\ y_4 - y_3 \end{bmatrix}
 $$
 
-2. Dot product of vectors   
+2. Dot product of vectors
+
 $$
 \vec{v}_1 \cdot \vec{v}_2 = (x_2 - x_1)(x_4 - x_3) + (y_2 - y_1)(y_4 - y_3)
 $$
 
 3. Magnitude of vectors
+
 $$
 ||\vec{v}_1|| = \sqrt{(x_2 - x_1)^2 + (y_2 - y_1)^2}, \quad ||\vec{v}_2|| = \sqrt{(x_4 - x_3)^2 + (y_4 - y_3)^2}
 $$
 
 4. Cosine of the angle
+
 $$
 \cos(\theta) = \frac{\vec{v}_1 \cdot \vec{v}_2}{||\vec{v}_1|| \cdot ||\vec{v}_2||}
 $$
+
 Ensure the cosine value is within the valid range:
+
 $$
 \cos(\theta) = \max(\min(\cos(\theta), 1), -1)
 $$
 
 5. Angle in radians
+
 $$
 \theta = \arccos(\cos(\theta)) \times \left(\frac{180}{\pi}\right)
 $$
@@ -165,21 +171,21 @@ $$
 
 ### VectorDirection
 
-Given two vectors $\vec{v}_1 = [x_{v1}, y_{v1}]$ and $\vec{v}_2 = [x_{v2}, y_{v2}]$ the cross product in a two-dimensional space can be represented using the determinant of a matrix formed by these vectors:
+Given two vectors $`\vec{v}_1 = [x_{v1}, y_{v1}]`$ and $`\vec{v}_2 = [x_{v2}, y_{v2}]`$ the cross product in a two-dimensional space can be represented using the determinant of a matrix formed by these vectors:
 
-$$
+```math
 \vec{v}_1 \times \vec{v}_2 = \begin{vmatrix}
 \hat{i} & \hat{j} \\
 x_{v1} & y_{v1} \\
 x_{v2} & y_{v2} \\
 \end{vmatrix}
-$$
+```
 
 This determinant simplifies to:
 
-$$
+```math
 \vec{v}_1 \times \vec{v}_2 = (x_{v1} \cdot y_{v2} - y_{v1} \cdot x_{v2})
-$$
+```
 
 In the context of two-dimensional space, the directionality given by the cross product can be interpreted as:
 
