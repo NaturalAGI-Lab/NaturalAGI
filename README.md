@@ -144,6 +144,7 @@ $$
 The half-plane in which the vector lies, determined by its orientation and position. The half-plane is calculated using the formula:
 
 Horizontal half-plane:
+
 $$
 \begin{cases}
 \text{UPPER} & \text{if } dy > 0 \\
@@ -152,6 +153,7 @@ $$
 $$
 
 Vertical half-plane:
+
 $$
 \begin{cases}
 \text{RIGHT} & \text{if } dx > 0 \\
@@ -164,9 +166,13 @@ $$
 ### VectorDirection
 
 Given two vectors 
+
 $$\vec{v}_1 = [x_{v1}, y_{v1}]$$
+
  and 
+
  $$\vec{v}_2 = [x_{v2}, y_{v2}]$$
+ 
  the cross product in a two-dimensional space can be represented using the determinant of a matrix formed by these vectors:
 
 $$
