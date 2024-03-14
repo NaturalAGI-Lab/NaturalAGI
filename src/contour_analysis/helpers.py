@@ -23,10 +23,8 @@ def find_next_vector(line_details, min_angle_point):
 
 
 def calculate_half_plane_and_quadrant(dx, dy):
-    vector = np.array([dx, dy])
-
-    horizontal_plane = Commons.HalfPlane.UPPER.value if vector[1] > 0 else Commons.HalfPlane.LOWER.value
-    vertical_plane = Commons.HalfPlane.RIGHT.value if vector[0] > 0 else Commons.HalfPlane.LEFT.value
+    horizontal_plane = Commons.HalfPlane.UPPER.value if dy > 0 else Commons.HalfPlane.LOWER.value
+    vertical_plane = Commons.HalfPlane.RIGHT.value if dx > 0 else Commons.HalfPlane.LEFT.value
 
     if dx > 0 and dy > 0:
         quadrant = 1
