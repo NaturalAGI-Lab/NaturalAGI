@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use this software, datasets or research results, please cite it as below."
+authors:
+- family-names: "Bokhan"
+  given-names: "Kostiantyn"
+  orcid: "https://orcid.org/0000-0003-3375-2527"
+- family-names: "Nikita"
+  given-names: "Lapin"
+  orcid: "https://orcid.org/0009-0003-6307-1172"
+- family-names: "Yurii"
+  given-names: "Parzhyn"
+  orcid: "https://orcid.org/0000-0001-5727-1918"
+- family-names: "Vlad"
+  given-names: "Trocenko"
+  orcid: "https://orcid.org/0000-0001-5727-1918"
+title: "Natural AGI simulation tool"
+version: 1.0.0
+doi: 10.5281/zenodo.1234
+date-released: 2024-03-16
+url: "https://github.com/kbokh/NaturalAGI"
