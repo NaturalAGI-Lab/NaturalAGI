@@ -8,22 +8,12 @@ logging.basicConfig(level=logging.INFO)
 
 class Neo4jConnection:
     QUALITATIVE_FEATURES_FILE = "stats/qualitative_features.csv"
-    QUALITATIVE_FEATURES = [
-        "VectLonger",
-        "VectShorter",
-        "VectDirection",
-        "Quadrant",
-        "VerticalVectorHalfPlane",
-        "HorizontalVectorHalfPlane",
-        "CriticalPoint",
-    ]
 
     IGNORABLE_NODES = [
         "VectorLocation",
         "Vector",
         "AnglePoint",
         "VectorLength",
-        "VectDirection",
     ]
 
     def __init__(self, uri, user, password):
@@ -88,20 +78,6 @@ class Neo4jConnection:
             )
         else:
             df.to_csv(self.QUALITATIVE_FEATURES_FILE, index=False)
-
-    @staticmethod
-    def _calculate_qualitative_features(tx):
-        logging.debug("Running _calculate_qualitative_features transaction")
-        queries = []
-        for node_class in Neo4jConnection.QUALITATIVE_FEATURES:
-            query = f"""
-                MATCH (n:{node_class})-[r]-()
-                RETURN '{node_class}' as node_class, count(r) as inbound_links
-            """
-            queries.append(query)
-        combined_query = " UNION ".join(queries)
-        result = tx.run(combined_query)
-        return list(result)
 
     @staticmethod
     def get_current_iteration():

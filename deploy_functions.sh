@@ -25,7 +25,7 @@ echo "IP address: $HOST_IP"
 NEO4J_PASS=111122223333
 
 # Directory containing training data images
-TRAINING_DATA_DIR="./training_data"
+TRAINING_DATA_DIR="./tests/generated_samples"
 
 # Directory containing training data images for the line detector
 LINE_DETECTOR_TRAINING_DATA_DIR="/training_data/line_detector"

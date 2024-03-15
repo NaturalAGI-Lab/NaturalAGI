@@ -15,7 +15,7 @@ from logic.relative_params_service import (
 from model.angle_point import AnglePoint
 from model.vector_details import VectorDetails
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 def find_starting_point(
@@ -78,11 +78,6 @@ def traverse_contour(
 
         current_vector, current_angle_point = result
 
-        if current_vector.uuid in processed_vector_ids:
-            logging.info(f"Vector {current_vector.uuid} already processed")
-            logging.info("No more vectors to process")
-            break
-
         calculate_and_set_relative_params(tx, current_vector, current_angle_point)
 
         if len(processed_vectors) > 0 and check_quadrant_change(
@@ -97,6 +92,11 @@ def traverse_contour(
 
         processed_vectors.append(current_vector)
         processed_angle_points.append(current_angle_point)
+
+        if current_vector.uuid in processed_vector_ids:
+            logging.info(f"Last vector {current_vector.uuid} processed")
+            logging.info("No more vectors to process")
+            break
 
 
 def _get_next_vector(
@@ -128,7 +128,7 @@ def _get_next_vector(
         MATCH (v:Vector {vector_id: $last_vector_id})--(ap:AnglePoint {id: $ap_id})--(nextVector:Vector)--(nextAp:AnglePoint), 
             (nextVector:Vector)--(loc:VectorLocation)--(coords:VectorCoordinates), 
             (nextAp:AnglePoint)--(apLoc:AnglePointCoordinates)
-        WHERE NOT nextVector.vector_id IN $processed_vectors_ids AND NOT nextAp.id = $ap_id
+        WHERE NOT nextAp.id = $ap_id
         RETURN nextVector.vector_id AS uuid, coords.x1 AS x1, coords.y1 AS y1, coords.x2 AS x2, coords.y2 AS y2, apLoc.x AS ap_x, apLoc.y AS ap_y, nextAp.id AS ap_id
     """
     result: Record | None = tx.run(
