@@ -50,10 +50,14 @@ class Neo4jConnection:
         )
         if exclusion_cypher:
             exclusion_cypher = "WHERE " + exclusion_cypher
+        # The query now considers both incoming and outgoing relationships
         query = f"""
-            MATCH (n)-[r]-()
+            MATCH (n)
             {exclusion_cypher}
-            RETURN labels(n) AS labels, n AS node, count(r) AS relation_count
+            OPTIONAL MATCH (n)<-[in_r]-()
+            OPTIONAL MATCH (n)-[out_r]->()
+            WITH n, count(DISTINCT in_r) AS in_count, count(DISTINCT out_r) AS out_count
+            RETURN labels(n) AS labels, n AS node, in_count + out_count AS relation_count
             ORDER BY relation_count DESC
             LIMIT {N}
         """

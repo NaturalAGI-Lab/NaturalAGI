@@ -89,24 +89,3 @@ wait $vector_characteristics_definer_pid
 wait $contour_analysis_pid
 wait $qualitative_features_analysis
 wait $clean_up
-
-# Iterate over each image in the training data directory
-# for IMAGE_PATH in $TRAINING_DATA_DIR/*
-# do
-#     echo "Processing image: $IMAGE_PATH"
-
-#     # Get base64 encoded image
-#     BASE64_IMAGE=$(get_base64_image $IMAGE_PATH)
-
-#     # Invoke line_detector with the base64 encoded image
-#     nuctl invoke line_detector --platform local --method POST \
-#         --body "{\"image\": \"$BASE64_IMAGE\"}" \
-#         --content-type "application/json"
-# done
-
-# Or 
-
-# Invoke line_detector with the training data directory
-nuctl invoke line_detector --platform local --method POST \
-    --body "{\"input_folder\": \"$LINE_DETECTOR_TRAINING_DATA_DIR\"}" \
-    --content-type "application/json"

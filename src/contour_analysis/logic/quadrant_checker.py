@@ -33,10 +33,10 @@ def mark_quadrant_change(
     - vector2_id (str): The ID of the second vector.
     """
     query = """
-        MATCH (v1:Vector {vector_id: $vector1_id})--(loc1:VectorLocation)--(q1:Quadrant)
-        MATCH (v2:Vector {vector_id: $vector2_id})--(loc2:VectorLocation)--(q2:Quadrant)
+        MATCH (v1:Vector {vector_id: $vector1_id})--(loc1:VectorLocation)
+        MATCH (v2:Vector {vector_id: $vector2_id})--(loc2:VectorLocation)
         MERGE (quad_change:QuadrantChange)
-        MERGE (q1)-[:CHANGE]->(quad_change)-[:CHANGE]->(q2)
+        MERGE (loc1)-[:CHANGE]->(quad_change)-[:CHANGE]->(loc2)
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id)
 
