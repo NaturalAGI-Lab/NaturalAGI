@@ -48,7 +48,11 @@ def http_handler(context, event):
             f"Received image_id: {image_id}", handler=HANDLER_NAME
         )
 
-        context.user_data.contour_analysis_repository.analyze_contour(image_id)
+        try:
+            context.user_data.contour_analysis_repository.analyze_contour(image_id)
+        except Exception as e:
+            context.logger.error_with(f"Error analyzing contour:\n {e}", handler=HANDLER_NAME)
+            traceback.print_exc()
 
         next_functions_str = context.user_data.next_nuclio
 

@@ -1,6 +1,7 @@
 import logging
 
 from neo4j import GraphDatabase
+from logic.exposition_analyzer import analyze_exposition
 from logic.contour_traverse import (
     find_starting_point,
     traverse_contour,
@@ -39,5 +40,7 @@ class ContourAnalysisRepository:
                 image_id,
                 min_angle_point,
             )
+
+            session.write_transaction(analyze_exposition, image_id)
             logging.debug(f"Result from calculate_and_set_relative_params: {result}")
             return result
