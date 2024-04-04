@@ -8,7 +8,7 @@ from logic.contour_traverse import (
 )
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 
 
 class ContourAnalysisRepository:
