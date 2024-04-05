@@ -35,6 +35,8 @@ class PostProcessingRepository:
             session.write_transaction(self._create_graph_projection)
             session.write_transaction(self._rank_nodes_transaction)
             session.write_transaction(self._degree_centrality)
+            session.write_transaction(self._delete_nodes_with_low_degree)
+            session.write_transaction(self._count_99_percentile_of_structural_elements)
             session.write_transaction(self._delete_graph_projection)
 
     def _merge_node_transaction(self, tx: ManagedTransaction, node_label: str):
@@ -67,7 +69,7 @@ class PostProcessingRepository:
             }}) YIELD nodePropertiesWritten
         """
         tx.run(query)
-        
+
     def _degree_centrality(self, tx: ManagedTransaction):
         query = f"""
             CALL gds.degree.write('{PostProcessingRepository.PROJECTION_NAME}', {{
@@ -76,7 +78,41 @@ class PostProcessingRepository:
             }}) YIELD nodePropertiesWritten
         """
         tx.run(query)
-        
+
+    def _delete_nodes_with_low_degree(self, tx: ManagedTransaction):
+        query = """
+            CALL {
+                MATCH (n)
+                WHERE NOT n:Vector AND NOT n:AnglePoint
+                WITH n.degreeScore AS degreeScore
+                RETURN apoc.agg.percentiles(degreeScore, [0.5])[0] AS medianDegreeScore
+            }
+            WITH medianDegreeScore
+            MATCH (n)
+            WHERE NOT n:Vector AND NOT n:AnglePoint
+            AND n.degreeScore <= medianDegreeScore
+            DETACH DELETE n
+        """
+        tx.run(query)
+
+    def _count_99_percentile_of_structural_elements(
+        self, tx: ManagedTransaction
+    ) -> tuple[int, int]:
+        query = """
+            MATCH (vector:Vector)
+            WITH vector.image_id AS imageId, COUNT(vector) AS vectorCount
+            WITH apoc.agg.percentiles(vectorCount, [0.99]) AS vector99thPercentile
+            MATCH (anglePoint:AnglePoint)
+            WITH anglePoint.image_id AS imageId, COUNT(anglePoint) AS anglePointCount, vector99thPercentile
+            WITH vector99thPercentile, anglePointCount
+            WITH vector99thPercentile, apoc.agg.percentiles(anglePointCount, [0.99]) AS anglePoint99thPercentile
+            RETURN vector99thPercentile[0], anglePoint99thPercentile[0]
+        """
+        result = tx.run(query).single()
+        logging.info(
+            f"99th percentile of the vector count: {result[0]}, angle point: {result[1]}"
+        )
+
     def _delete_graph_projection(self, tx: ManagedTransaction):
         query = f"""
             CALL gds.graph.drop('{PostProcessingRepository.PROJECTION_NAME}')
