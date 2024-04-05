@@ -32,14 +32,6 @@ class ImageNeoExporter:
         for i in range(0, height):
             for j in range(0, width):
                 query = query + "(" + f"p{i}_{j}:Pixel " + "{" + f"image_id:\"{image_id}\", " + f"v: {image[i][j]}, y: {i}, x: {j}" + "}" + "), "
-                
-                
-        # for i in range(0, height):
-        #     for j in range(0, width):
-        #             query = (query + f"(p{i}_{j})" + "-[:RIGHT]->" + f"(p{i}_{j+1}), ") if (j+1) < width else query
-        #             query = (query + f"(p{i}_{j})" + "-[:BOTTOM]->" + f"(p{i+1}_{j}), ") if (i+1) < height else query
-        #             query = (query + f"(p{i}_{j})" + "-[:LEFT]->" + f"(p{i}_{j-1}), ") if (j-1) >= 0 else query
-        #             query = (query + f"(p{i}_{j})" + "-[:UP]->" + f"(p{i-1}_{j}), ") if (i-1) >= 0 else query
                     
         print(f"Generated: {query}")
         

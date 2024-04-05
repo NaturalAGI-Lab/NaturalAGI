@@ -47,9 +47,9 @@ def calculate_direction(
     vector2_id: str,
 ) -> Union[str, None]:
     query = """
-        MATCH (v1:Vector {vector_id: $vector1_id})-[:INCLUDES]->(ap:AnglePoint)<-[:INCLUDES]-(v2:Vector {vector_id: $vector2_id})
-        MATCH (v1)-[:HAS]->(loc1:VectorLocation)-[:HAS]->(value1:VectorValue)
-        MATCH (v2)-[:HAS]->(loc2:VectorLocation)-[:HAS]->(value2:VectorValue)
+        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
+        MATCH (v1)-[:HAS_VECTOR_LOCATION]->(loc1:VectorLocation)-[:HAS_VECTOR_VALUE]->(value1:VectorValue)
+        MATCH (v2)-[:HAS_VECTOR_LOCATION]->(loc2:VectorLocation)-[:HAS_VECTOR_VALUE]->(value2:VectorValue)
         RETURN 
             value1.x AS x_v1, value1.y AS y_v1,
             value2.x AS x_v2, value2.y AS y_v2
@@ -85,9 +85,9 @@ def calculate_direction(
 def add_direction(tx, vector1_id: str, vector2_id: str, direction: str):
     logging.debug(f"Adding direction: {direction} to the vectors")
     query = """
-        MATCH (vl1:VectorLocation)--(v1:Vector {vector_id: $vector1_id})-[:INCLUDES]->(ap:AnglePoint)<-[:INCLUDES]-(v2:Vector {vector_id: $vector2_id})--(vl2:VectorLocation)
+        MATCH (vl1:VectorLocation)--(v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})--(vl2:VectorLocation)
         MERGE (vd:VectDirection {direction: $direction})
-        MERGE (vl1)-[:DIRECTION]->(vd)-[:DIRECTION]->(vl2)
+        MERGE (vl1)-[:HAS_DIRECTION]->(vd)-[:HAS_DIRECTION]->(vl2)
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, direction=direction)
 
@@ -95,9 +95,9 @@ def add_direction(tx, vector1_id: str, vector2_id: str, direction: str):
 def create_critical_point(tx, vector1_id: str, vector2_id: str):
     logging.info("Finding angle point between two vectors")
     query = """
-        MATCH (v1:Vector {vector_id: $vector1_id})-[:INCLUDES]->(ap:AnglePoint)<-[:INCLUDES]-(v2:Vector {vector_id: $vector2_id})
+        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
         MERGE (cp:CriticalPoint {reason: "Direction Change"})
-        MERGE (cp)-[:IS]-(ap)
+        MERGE (cp)-[:IS_CRITICAL_POINT]-(ap)
         RETURN cp
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id).single()

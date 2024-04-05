@@ -44,9 +44,9 @@ def _analyze_contour_development(tx: ManagedTransaction, image_id: str) -> None:
 def _mark_monotony_development(tx: ManagedTransaction, image_id: str) -> None:
     logging.info(f"Marking monotony development for image {image_id}")
     query = """
-        MATCH (vectorDirection:VectDirection)--(:VectorLocation {image_id: $image_id})
+        MATCH (vectorLocation:VectorLocation {image_id: $image_id})
         MERGE (mono:Monotony)
-        MERGE (vectorDirection)-[:HAS_MONOTONY]->(mono)
+        MERGE (vectorLocation)-[:HAS_MONOTONY]->(mono)
     """
     tx.run(query, image_id=image_id)
 
@@ -54,9 +54,9 @@ def _mark_monotony_development(tx: ManagedTransaction, image_id: str) -> None:
 def _mark_non_monotony_development(tx: ManagedTransaction, image_id: str) -> None:
     logging.info(f"Marking non-monotony development for image {image_id}")
     query = """
-        MATCH (vectorDirection:VectDirection)--(:VectorLocation {image_id: $image_id})
+        MATCH (vectorLocation:VectorLocation {image_id: $image_id})
         MERGE (nonMono:NonMonotony)
-        MERGE (vectorDirection)-[:HAS_NON_MONOTONY]->(nonMono)
+        MERGE (vectorLocation)-[:HAS_NON_MONOTONY]->(nonMono)
     """
     tx.run(query, image_id=image_id)
 

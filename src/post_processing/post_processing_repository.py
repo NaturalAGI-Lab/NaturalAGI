@@ -50,14 +50,6 @@ class PostProcessingRepository:
 
     def _create_graph_projection(self, tx: ManagedTransaction):
         try:
-            drop_query = f"""
-                CALL gds.graph.drop('{PostProcessingRepository.PROJECTION_NAME}') YIELD graphName
-                """
-            tx.run(drop_query)
-        except Exception as e:
-            logging.info(f"Graph projection does not exist: {e}")
-
-        try:
             create_query = f"""
                 CALL gds.graph.project('{PostProcessingRepository.PROJECTION_NAME}', '*', '*')
                 """
@@ -79,7 +71,8 @@ class PostProcessingRepository:
     def _degree_centrality(self, tx: ManagedTransaction):
         query = f"""
             CALL gds.degree.write('{PostProcessingRepository.PROJECTION_NAME}', {{
-                writeProperty: 'degreeCentrality'
+                writeProperty: 'degreeScore',
+                orientation: 'UNDIRECTED'
             }}) YIELD nodePropertiesWritten
         """
         tx.run(query)
