@@ -47,17 +47,14 @@ class VectorCharacteristicsRepository:
             MERGE (line)-[:IS_VECTOR]->(v)
             MERGE (v)-[:HAS_ANGLE_POINT]->(ap1)
             MERGE (v)-[:HAS_ANGLE_POINT]->(ap2)
-            MERGE (v)-[:HAS_VECTOR_LOCATION]->(vLocation:VectorLocation {vector_id: v.vector_id, image_id: $image_id})
-            MERGE (vOrient:VectorOrientation {vector_id: v.vector_id, image_id: $image_id})<-[:HAS_VECTOR_ORIENTATION]-(v)
             MERGE (vAngle:VectorAngle {value: angle.value})
-            MERGE (vAngle)<-[:HAS_VECTOR_ANGLE]-(vOrient)
-            WITH v, vLocation, apLoc1, apLoc2
+            MERGE (vAngle)<-[:HAS_VECTOR_ANGLE]-(v)
+            WITH v, apLoc1, apLoc2
             MERGE (vCoordinates:VectorCoordinates {x1: apLoc1.x, y1: apLoc1.y, x2: apLoc2.x, y2: apLoc2.y})
-            MERGE (vLocation)-[:HAS_VECTOR_COORDINATES]->(vCoordinates)
+            MERGE (v)-[:HAS_VECTOR_COORDINATES]->(vCoordinates)
             WITH v, vCoordinates, sqrt((vCoordinates.x2 - vCoordinates.x1) * (vCoordinates.x2 - vCoordinates.x1) + (vCoordinates.y2 - vCoordinates.y1) * (vCoordinates.y2 - vCoordinates.y1)) AS magnitude
-            MERGE (vectorLength:VectorLength {vector_id: v.vector_id, image_id: $image_id})<-[:HAS_VECTOR_LENGTH]-(v)
             MERGE (vectorMagnitude:VectorMagnitude {value: magnitude})
-            MERGE (vectorMagnitude)<-[:HAS_MAGNITUDE]-(vectorLength)
+            MERGE (vectorMagnitude)<-[:HAS_MAGNITUDE]-(v)
         """
         logging.debug(f"Running query: {query}")
         tx.run(query, image_id=image_id)

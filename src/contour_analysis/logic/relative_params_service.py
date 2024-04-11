@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import logging
 from neo4j import ManagedTransaction
 import numpy as np
@@ -43,11 +45,11 @@ def calculate_and_set_relative_params(
     logging.debug(f"Vector value: {x_vect, y_vect}")
 
     query = """
-        MATCH (vector:Vector)--(loc:VectorLocation)
+        MATCH (vector:Vector)
         WHERE vector.vector_id = $vector_id
-        WITH loc, vector
+        WITH vector
         MERGE (vValue:VectorValue {x: $x_vect, y: $y_vect})
-        MERGE (loc)-[:HAS_VECTOR_VALUE]->(vValue)
+        MERGE (vector)-[:HAS_VECTOR_VALUE]->(vValue)
     """
     result = tx.run(query, vector_id=vector.uuid, x_vect=x_vect, y_vect=y_vect)
     logging.debug("Vector value is created for the line")
@@ -59,13 +61,13 @@ def calculate_and_set_relative_params(
         f"Half planes and quadrants: {horizontal_plane, vertical_plane, quadrant}"
     )
     query = """
-        MATCH (vector:Vector)--(loc:VectorLocation)
+        MATCH (vector:Vector)
         WHERE vector.vector_id = $vector_id
-        WITH loc, vector
+        WITH vector
         MERGE (vertical:VerticalVectorHalfPlane {vertical_plane: $vertical_plane})
         MERGE (horizontal:HorizontalVectorHalfPlane {horizontal_plane: $horizontal_plane})
-        MERGE (loc)-[:HAS_VERTICAL_VECTOR_HALF_PLANE]->(vertical)
-        MERGE (loc)-[:HAS_HORIZONTAL_VECTOR_HALF_PLANE]->(horizontal)
+        MERGE (vector)-[:HAS_VERTICAL_VECTOR_HALF_PLANE]->(vertical)
+        MERGE (vector)-[:HAS_HORIZONTAL_VECTOR_HALF_PLANE]->(horizontal)
     """
     result = tx.run(
         query,
@@ -75,11 +77,11 @@ def calculate_and_set_relative_params(
     )
 
     query = """
-        MATCH (vector:Vector)--(loc:VectorLocation)
+        MATCH (vector:Vector)
         WHERE vector.vector_id = $vector_id
-        WITH loc, vector
+        WITH vector
         MERGE (quadrant:Quadrant {quadrant: $quadrant})
-        MERGE (loc)-[:HAS_QUADRANT]->(quadrant)
+        MERGE (vector)-[:HAS_QUADRANT]->(quadrant)
     """
     result = tx.run(query, vector_id=vector.uuid, quadrant=quadrant)
     logging.debug("Half planes and quadrants are created for the line ")

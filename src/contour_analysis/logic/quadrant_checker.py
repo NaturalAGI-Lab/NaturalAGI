@@ -33,10 +33,10 @@ def mark_quadrant_change(
     - vector2_id (str): The ID of the second vector.
     """
     query = """
-        MATCH (v1:Vector {vector_id: $vector1_id})--(loc1:VectorLocation)
-        MATCH (v2:Vector {vector_id: $vector2_id})--(loc2:VectorLocation)
+        MATCH (v1:Vector {vector_id: $vector1_id})
+        MATCH (v2:Vector {vector_id: $vector2_id})
         MERGE (quad_change:QuadrantChange)
-        MERGE (loc1)-[:HAS_QUADRANT_CHANGE]->(quad_change)-[:HAS_QUADRANT_CHANGE]->(loc2)
+        MERGE (v1)-[:HAS_QUADRANT_CHANGE]->(quad_change)-[:HAS_QUADRANT_CHANGE]->(v2)
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id)
 
@@ -54,7 +54,7 @@ def _get_vector_quadrant(tx: ManagedTransaction, vector_id: str) -> int:
     """
 
     query: str = """
-        MATCH (v:Vector {vector_id: $vector_id})--(loc:VectorLocation)--(quadrant:Quadrant)
+        MATCH (v:Vector {vector_id: $vector_id})--(quadrant:Quadrant)
         RETURN quadrant.quadrant AS quadrant
     """
     return tx.run(query, vector_id=vector_id).single()["quadrant"]
