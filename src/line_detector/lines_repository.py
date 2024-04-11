@@ -25,18 +25,18 @@ class LinesRepository:
                 
                 (length{line_id}:Length {{line_id:'{line_id}'}}), 
                 (absolute{line_id}:Absolute {{line_id:'{line_id}', value:{round(math.dist([x1, y1], [x2, y2]))}}}), 
-                (l{line_id})-[:HAS]->(length{line_id}), 
-                (length{line_id})-[:HAS]->(absolute{line_id}), 
+                (l{line_id})-[:HAS_LENGTH]->(length{line_id}), 
+                (length{line_id})-[:HAS_ABSOLUTE]->(absolute{line_id}), 
             
                 (orientation{line_id}:Orientation {{line_id:'{line_id}'}}),
                 (angle{line_id}:Angle {{line_id:'{line_id}', value:{LinesRepository.calculate_angle(x1, y1, x2, y2)}}}), 
-                (l{line_id})-[:HAS]->(orientation{line_id}), 
-                (orientation{line_id})-[:HAS]->(angle{line_id}),
+                (l{line_id})-[:HAS_ORIENTATION]->(orientation{line_id}), 
+                (orientation{line_id})-[:HAS_ANGLE]->(angle{line_id}),
                 
                 (location{line_id}:Location {{line_id:'{line_id}'}}),
                 (coordinates{line_id}:Coordinates {{line_id:'{line_id}', x1:{x1}, y1:{y1}, x2:{x2}, y2:{y2}}}),
-                (l{line_id})-[:HAS]->(location{line_id}), 
-                (location{line_id})-[:HAS]->(coordinates{line_id}),
+                (l{line_id})-[:HAS_LOCATION]->(location{line_id}), 
+                (location{line_id})-[:HAS_COORDINATES]->(coordinates{line_id}),
                 """
 
         result = tx.run(f"CREATE {query.strip().strip(',')}")

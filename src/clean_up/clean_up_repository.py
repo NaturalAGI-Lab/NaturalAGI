@@ -1,5 +1,6 @@
 from neo4j import GraphDatabase
 
+
 class Neo4jRepository:
     CLASSES_TO_REMOVE = [
         "Line",
@@ -10,7 +11,7 @@ class Neo4jRepository:
         "Location",
         "Coordinates",
     ]
-    
+
     def __init__(self, uri, username, password):
         self.driver = GraphDatabase.driver(uri, auth=(username, password))
 

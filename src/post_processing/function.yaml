@@ -1,0 +1,24 @@
+apiVersion: "nuclio.io/v1"
+kind: "Function"
+metadata:
+  name: post_processing
+  labels:
+    nuclio.io/project-name: "default"
+spec:
+  httpTimeout: 1000
+  handler: "nuclio_handler:handler"
+  runtime: "python:3.9"
+  env:
+    - name: EXAMPLE_ENV_VAR
+      value: "some-value"
+  build:
+    baseImage: "python:3.9"
+    commands:
+      - 'apt-get update -y --fix-missing'
+      - 'apt-get install -y libgl1-mesa-glx'
+      - 'pip install numpy requests pydantic-settings neo4j'
+  triggers:
+    default-http:
+      kind: "http"
+      attributes:
+        port: 5051

@@ -29,7 +29,7 @@ def find_starting_point(
         ORDER BY apLoc.y, apLoc.x
         LIMIT 1
         MERGE (criticalPoint: CriticalPoint {reason: "First point"})
-        MERGE (criticalPoint)-[:IS]-(n)
+        MERGE (criticalPoint)<-[:IS_CRITICAL_POINT]-(n)
         RETURN {x: apLoc.x, y: apLoc.y, id: n.id} AS MinAnglePoint
     """
     result: Record | None = tx.run(query, image_id=image_id).single()
@@ -169,7 +169,7 @@ def _get_first_vector(tx: ManagedTransaction, min_angle_point_id: int) -> Vector
         ORDER BY sum_x DESC
         LIMIT 1
         MERGE (cp:CriticalPoint {reason: "First Line"})
-        MERGE (cp)-[:IS]-(v)
+        MERGE (cp)<-[:IS_CRITICAL_POINT]-(v)
         RETURN v.vector_id AS uuid, coords.x1 AS x1, coords.y1 AS y1, coords.x2 AS x2, coords.y2 AS y2
     """
 

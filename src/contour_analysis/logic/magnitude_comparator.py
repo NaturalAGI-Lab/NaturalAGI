@@ -5,8 +5,8 @@ def compare_vector_magnitude_and_create_nodes(tx, vector1_id: str, vector2_id: s
     logging.info("Comparing vector magnitudes and creating respective nodes")
     # First, compare the magnitudes to determine the label
     compare_query = """
-      MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS]->(:VectorLength)-[:HAS]->(magnitude1:VectorMagnitude),
-            (v2:Vector {vector_id: $vector2_id})-[:HAS]->(:VectorLength)-[:HAS]->(magnitude2:VectorMagnitude)
+      MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_VECTOR_LENGTH]->(:VectorLength)-[:HAS_MAGNITUDE]->(magnitude1:VectorMagnitude),
+            (v2:Vector {vector_id: $vector2_id})-[:HAS_VECTOR_LENGTH]->(:VectorLength)-[:HAS_MAGNITUDE]->(magnitude2:VectorMagnitude)
       RETURN CASE WHEN magnitude1.value > magnitude2.value THEN 'VectLonger'
                   WHEN magnitude1.value < magnitude2.value THEN 'VectShorter'
                   ELSE 'VectEqual' END AS label

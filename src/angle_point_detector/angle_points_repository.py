@@ -83,17 +83,16 @@ class AnglePointsRepository:
         query = """
         UNWIND $intersection_data AS data
         MERGE (apCoords:AnglePointCoordinates {x: data.intersection.x, y: data.intersection.y})
-        MERGE (ap:AnglePoint)-[:HAS]->(apCoords)
+        MERGE (ap:AnglePoint {id: randomUUID(), image_id: $image_id})
+        MERGE (ap)-[:HAS_COORDINATES]->(apCoords)
         MERGE (apAngle:AnglePointAngle {angle: data.angle})
-        MERGE (ap)-[:HAS]->(apAngle)
-        ON CREATE 
-            SET ap.id = randomUUID(),
-                ap.image_id = $image_id
+        MERGE (ap)-[:HAS_ANGLE]->(apAngle)
+        
         WITH ap, data
         MATCH (line1:Line {id: data.line1_id})
         MATCH (line2:Line {id: data.line2_id})
-        MERGE (line1)-[:INCLUDES]->(ap)
-        MERGE (line2)-[:INCLUDES]->(ap)
+        MERGE (line1)-[:HAS_ANGLE_POINT]->(ap)
+        MERGE (line2)-[:HAS_ANGLE_POINT]->(ap)
         """
         session.run(query, intersection_data=intersection_data, image_id=image_id)
         

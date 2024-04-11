@@ -43,7 +43,7 @@ services:
 
   nuclio-dashboard:
     
-    image: quay.io/nuclio/dashboard:stable-amd64
+    image: quay.io/nuclio/dashboard:stable-arm64
 
     hostname: nuclio-dashboard
     container_name: nuclio-dashboard

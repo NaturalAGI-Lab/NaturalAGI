@@ -36,7 +36,7 @@ def mark_quadrant_change(
         MATCH (v1:Vector {vector_id: $vector1_id})--(loc1:VectorLocation)
         MATCH (v2:Vector {vector_id: $vector2_id})--(loc2:VectorLocation)
         MERGE (quad_change:QuadrantChange)
-        MERGE (loc1)-[:CHANGE]->(quad_change)-[:CHANGE]->(loc2)
+        MERGE (loc1)-[:HAS_QUADRANT_CHANGE]->(quad_change)-[:HAS_QUADRANT_CHANGE]->(loc2)
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id)
 
