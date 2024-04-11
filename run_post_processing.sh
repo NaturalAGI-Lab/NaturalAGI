@@ -1,0 +1,1 @@
+nuctl invoke post_processing --platform local --method POST
