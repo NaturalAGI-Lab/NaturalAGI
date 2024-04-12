@@ -86,7 +86,7 @@ class PostProcessingRepository:
                 MATCH (n)
                 WHERE NOT n:Vector AND NOT n:AnglePoint
                 WITH n.degreeScore AS degreeScore
-                RETURN apoc.agg.percentiles(degreeScore, [0.99])[0] AS thresholdDegreeScore
+                RETURN apoc.agg.percentiles(degreeScore, [0.995])[0] AS thresholdDegreeScore
             }
             WITH thresholdDegreeScore
             MATCH (n)

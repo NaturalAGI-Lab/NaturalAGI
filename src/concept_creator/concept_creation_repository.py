@@ -50,7 +50,7 @@ class ConceptCreationRepository:
         """Links all the features left from the statistical reduction to the new concept"""
         query = """
             MATCH (n)
-            WHERE NOT (n:StructuralElements OR n:Vector OR n:AnglePoint)
+            WHERE NOT (n:StructuralElements OR n:Vector OR n:AnglePoint OR n:TriangleConcept)
             MATCH (concept:TriangleConcept)
             MERGE (n)-[:IS_PART_OF_CONCEPT]->(concept)
         """
@@ -70,7 +70,7 @@ class ConceptCreationRepository:
             MATCH (vector:Vector)
             WITH vector.image_id AS imageId, COUNT(vector) AS vectorCount
             WITH apoc.agg.percentiles(vectorCount, [0.99]) AS vector99thPercentile
-            MATCH (anglePoint:AnglePoint)
+            MATCH (anglePoint:AnglePoint)-[:IS_CRITICAL_POINT]->(cp:CriticalPoint {reason: 'Quadrant Change'})
             WITH anglePoint.image_id AS imageId, COUNT(anglePoint) AS anglePointCount, vector99thPercentile
             WITH vector99thPercentile, anglePointCount
             WITH vector99thPercentile, apoc.agg.percentiles(anglePointCount, [0.99]) AS anglePoint99thPercentile
