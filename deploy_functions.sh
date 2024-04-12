@@ -81,6 +81,13 @@ nuctl deploy --path src/post_processing \
     -e NEO4J_PASS=$NEO4J_PASS &
 post_processing=$!
 
+nuctl deploy --path src/concept_creator \
+    --platform local \
+    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+    -e NEO4J_USER=neo4j \
+    -e NEO4J_PASS=$NEO4J_PASS &
+concept_creator=$!
+
 # nuctl deploy --path src/qualitative_features_analysis \
 #     --platform local \
 #     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
@@ -96,4 +103,5 @@ wait $vector_characteristics_definer_pid
 wait $contour_analysis_pid
 wait $clean_up
 wait $post_processing
+wait $concept_creator
 # # wait $qualitative_features_analysis

@@ -2,29 +2,25 @@
 
 ## How to run the simulation
 
-### Running testing pipeline with all infrastructure
+Currently, the simulation is running in a local environment and has 3 stages:
+1. Deployment of the nuclio functions and the graph database
+2. Running the training script that is sending the data to the pre-detectors
+3. Running the statistical reduction on the generated training data
+
+### Deployment of the nuclio functions and the graph database
 
 ```bash
 sh deploy_functions.sh
 ```
 
-### Running a graph db
-
-#### Docker command
+### Running the training script
 
 ```bash
-docker run \
-    --restart always \
-    --publish=7474:7474 --publish=7687:7687 \
-    --env NEO4J_AUTH=neo4j/your_password \ 
-    --env NEO4J_PLUGINS='["graph-data-science"]' \
-    neo4j:5.12.0
+sh run_training.sh
 ```
 
-#### Docker compose command
-
-Go to the folder `infrastructure`
+### Running the statistical reduction
 
 ```bash
-docker compose up
+sh run_post_processing.sh
 ```
