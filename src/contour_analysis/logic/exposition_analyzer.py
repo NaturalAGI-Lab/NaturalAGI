@@ -19,7 +19,7 @@ def analyze_exposition(tx: ManagedTransaction, image_id: str) -> None:
     """
     logging.info(f"Analyzing exposition for image {image_id}")
     _analyze_contour_development(tx, image_id)
-    # _analyze_contour_type(tx, image_id)
+    _analyze_contour_type(tx, image_id)
 
 
 def _analyze_contour_development(tx: ManagedTransaction, image_id: str) -> None:
@@ -75,9 +75,30 @@ def _analyze_contour_type(tx: ManagedTransaction, image_id: str) -> None:
     """
 
     query = """
-        MATCH p=(v:Vector {image_id: $image_id})-[*]->(v)
-        RETURN p
+        MATCH (v:Vector {image_id: $image_id})
+        CALL apoc.path.expand(v, '>', 'AnglePoint|Vector', 0, 100) YIELD path
+        WHERE last(nodes(path)) = v
+        RETURN path
     """
     result: Result = tx.run(query, image_id=image_id)
     result_list = list(result)
+
+    if result_list:
+        # If a path is found, create a 'Closed' node and link it to all Vector and AnglePoint nodes
+        query = """
+            MATCH (n)
+            WHERE (n:Vector OR n:AnglePoint) AND n.image_id = $image_id
+            MERGE (closed:Closed)
+            MERGE (n)-[:HAS_CONTOUR_TYPE]->(closed)
+        """
+    else:
+        # If no path is found, create an 'Open' node and link it to all Vector and AnglePoint nodes
+        query = """
+            MATCH (n)
+            WHERE (n:Vector OR n:AnglePoint) AND n.image_id = $image_id
+            MERGE (open:Open)
+            MERGE (n)-[:HAS_CONTOUR_TYPE]->(open)
+        """
+
+    tx.run(query, image_id=image_id)
     logging.info(f"_analyze_contour_type: {result_list}")

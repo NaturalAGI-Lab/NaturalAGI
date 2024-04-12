@@ -1,7 +1,3 @@
-from skimage.transform import probabilistic_hough_line
-from skimage.feature import canny
-from matplotlib import cm
-from math import atan2, degrees, floor
 import numpy as np
 import os
 import cv2
