@@ -126,7 +126,7 @@ def _get_next_vector(
 
     query = """
         MATCH (v:Vector {vector_id: $last_vector_id})--(ap:AnglePoint {id: $ap_id})--(nextVector:Vector)--(nextAp:AnglePoint), 
-            (nextVector:Vector)--(loc:VectorLocation)--(coords:VectorCoordinates), 
+            (nextVector:Vector)--(coords:VectorCoordinates), 
             (nextAp:AnglePoint)--(apLoc:AnglePointCoordinates)
         WHERE NOT nextAp.id = $ap_id
         RETURN nextVector.vector_id AS uuid, coords.x1 AS x1, coords.y1 AS y1, coords.x2 AS x2, coords.y2 AS y2, apLoc.x AS ap_x, apLoc.y AS ap_y, nextAp.id AS ap_id
@@ -164,7 +164,7 @@ def _get_first_vector(tx: ManagedTransaction, min_angle_point_id: int) -> Vector
         VectorDetails: The first vector of the contour.
     """
     query = """
-        MATCH (ap:AnglePoint {id: $id})--(v:Vector)--(loc:VectorLocation)--(coords:VectorCoordinates)
+        MATCH (ap:AnglePoint {id: $id})--(v:Vector)--(coords:VectorCoordinates)
         WITH v, coords, ap, (ap.x + coords.x1 + coords.x2) AS sum_x
         ORDER BY sum_x DESC
         LIMIT 1

@@ -32,7 +32,7 @@ def calculate_magnitude_and_direction(
 
 def get_last_direction(tx: ManagedTransaction, last_vector_id: str) -> Union[str, None]:
     query = """
-        MATCH (:Vector {vector_id: $last_vector_id})--(:VectorLocation)--(vd:VectDirection)
+        MATCH (:Vector {vector_id: $last_vector_id})--(vd:VectDirection)
         RETURN vd.direction AS direction
     """
     result: Record | None = tx.run(query, last_vector_id=last_vector_id).single()
@@ -48,8 +48,8 @@ def calculate_direction(
 ) -> Union[str, None]:
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
-        MATCH (v1)-[:HAS_VECTOR_LOCATION]->(loc1:VectorLocation)-[:HAS_VECTOR_VALUE]->(value1:VectorValue)
-        MATCH (v2)-[:HAS_VECTOR_LOCATION]->(loc2:VectorLocation)-[:HAS_VECTOR_VALUE]->(value2:VectorValue)
+        MATCH (v1)-[:HAS_VECTOR_VALUE]->(value1:VectorValue)
+        MATCH (v2)-[:HAS_VECTOR_VALUE]->(value2:VectorValue)
         RETURN 
             value1.x AS x_v1, value1.y AS y_v1,
             value2.x AS x_v2, value2.y AS y_v2
@@ -85,9 +85,9 @@ def calculate_direction(
 def add_direction(tx, vector1_id: str, vector2_id: str, direction: str):
     logging.debug(f"Adding direction: {direction} to the vectors")
     query = """
-        MATCH (vl1:VectorLocation)--(v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})--(vl2:VectorLocation)
+        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})--(v2:Vector)
         MERGE (vd:VectDirection {direction: $direction})
-        MERGE (vl1)-[:HAS_DIRECTION]->(vd)-[:HAS_DIRECTION]->(vl2)
+        MERGE (v1)-[:HAS_DIRECTION]->(vd)-[:HAS_DIRECTION]->(v2)
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, direction=direction)
 
