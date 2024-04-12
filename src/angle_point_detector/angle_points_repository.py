@@ -57,9 +57,6 @@ class AnglePointsRepository:
         
         angle = math.degrees(angle)  # Convert to degrees
 
-        # Round to nearest 5
-        angle = round(angle / 5) * 5
-
         return angle
     
     @staticmethod

@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings
 
 
 HANDLER_NAME = "Line Detector"
-MAX_IMAGES = float('inf')
+MAX_IMAGES = float("inf")
 
 
 class Settings(BaseSettings):

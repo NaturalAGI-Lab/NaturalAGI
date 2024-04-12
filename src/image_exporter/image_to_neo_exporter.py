@@ -3,7 +3,6 @@
 from dataclasses import dataclass
 from neo4j import GraphDatabase
 import numpy as np
-import cv2
 import uuid
 
 @dataclass
