@@ -2,6 +2,8 @@ import logging
 
 from neo4j import GraphDatabase, ManagedTransaction
 
+logging.basicConfig(level=logging.DEBUG)
+
 
 class PostProcessingRepository:
     PROJECTION_NAME = "agi_projection"
@@ -112,6 +114,7 @@ class PostProcessingRepository:
         logging.info(
             f"99th percentile of the vector count: {result[0]}, angle point: {result[1]}"
         )
+        return result[0], result[1]
 
     def _delete_graph_projection(self, tx: ManagedTransaction):
         query = f"""

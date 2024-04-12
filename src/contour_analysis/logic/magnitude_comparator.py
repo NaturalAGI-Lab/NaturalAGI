@@ -1,7 +1,6 @@
 import logging
 
 
-# TODO: can it be cleaned up?
 def compare_vector_magnitude_and_create_nodes(tx, vector1_id: str, vector2_id: str):
     logging.info("Comparing vector magnitudes and creating respective nodes")
     # First, compare the magnitudes to determine the label
