@@ -21,19 +21,13 @@ COPY --from=uhttpc /home/nuclio/bin/uhttpc /usr/local/bin/uhttpc
 RUN apt-get update && apt-get install -y libgl1-mesa-glx
 
 RUN pip install --upgrade pip
-RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-python neo4j Pillow
+RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-python
 
 # Readiness probe
 HEALTHCHECK --interval=1s --timeout=3s CMD /usr/local/bin/uhttpc --url http://127.0.0.1:8082/ready || exit 1
 # USER CONTENT
-
+COPY . /opt/nuclio/
 # END OF USER CONTENT
-
-COPY function-docker.yaml /opt/nuclio/function1.yaml
-COPY line_detector.py /opt/nuclio/line_detector.py
-COPY lines_repository.py /opt/nuclio/lines_repository.py
-COPY hough_builder.py /opt/nuclio/hough_builder.py
-COPY nuclio_handler.py /opt/nuclio/nuclio_handler.py
 
 # Run processor with configuration and platform configuration
 CMD [ "processor" ]

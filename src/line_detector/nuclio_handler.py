@@ -1,4 +1,5 @@
 import base64
+import json
 import os
 import glob
 
@@ -6,11 +7,10 @@ import requests
 import numpy as np
 import cv2
 import uuid
-from lines_repository import LinesRepository
-from line_detector import LineDetector
 
 from pydantic_settings import BaseSettings
 
+from line_detector import detect_lines
 
 HANDLER_NAME = "Line Detector"
 MAX_IMAGES = float("inf")
@@ -18,10 +18,6 @@ MAX_IMAGES = float("inf")
 
 class Settings(BaseSettings):
     """Settings"""
-
-    neo4j_dsn: str
-    neo4j_user: str
-    neo4j_pass: str
     next_nuclio: str = ""
 
 
@@ -34,11 +30,6 @@ def init_context(context):
     context.logger.debug_with(
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
-
-    lines_repository = LinesRepository(
-        Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass
-    )
-    setattr(context.user_data, "lines_repository", lines_repository)
 
     setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
 
@@ -110,9 +101,9 @@ def process_image(context, image_data):
 
     image_id = uuid.uuid4()
 
-    lines = LineDetector().detect_lines(image)
-    context.logger.info(f"Detected {len(lines)} lines for image: {image_id}")
-    context.user_data.lines_repository.add_lines(lines, image_id)
+    lines = detect_lines(image)
+    context.logger.info(f"Detected {lines} lines for image: {image_id}")
+    # context.user_data.lines_repository.add_lines(lines, image_id)
 
     next_functions_str = context.user_data.next_nuclio
 
@@ -125,8 +116,15 @@ def process_image(context, image_data):
         if len(next_nuclio) > 0:
             for func in next_nuclio:
                 context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                response = requests.post(func, json=str(image_id))
+                ser_result = json.dumps({"image_id": str(image_id), "lines": lines})
                 context.logger.info_with(
+                    f"Sending data: {ser_result}", handler=HANDLER_NAME
+                )
+                response = requests.post(
+                    func, json=ser_result
+                )
+                context.logger.info_with(
+
                     f"Response: {response.status_code}", handler=HANDLER_NAME
                 )
 
