@@ -101,9 +101,7 @@ def process_image(context, image_data):
 
     image_id = uuid.uuid4()
 
-    raw_lines = detect_lines(image)
-    lines = [{'id': str(uuid.uuid4()), 'x1': line[0], 'y1': line[1], 'x2': line[2], 'y2': line[3]} for line in
-             raw_lines]
+    lines = detect_lines(image)
     context.logger.info(f"Detected {len(lines)} lines for image: {image_id}")
 
     next_functions_str = context.user_data.next_nuclio

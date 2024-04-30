@@ -1,6 +1,6 @@
-# Angle Point Detector
+# Contour analysis
 
-## Response
+## Expected input
 ```json5
 {
   "image_id": "7919dee1-e791-46de-ab5d-124474145498",

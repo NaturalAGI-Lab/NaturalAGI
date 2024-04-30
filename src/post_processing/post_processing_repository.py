@@ -35,7 +35,7 @@ class PostProcessingRepository:
         logging.info("Starting rank_nodes method")
         with self.driver.session() as session:
             session.write_transaction(self._create_graph_projection)
-            session.write_transaction(self._rank_nodes_transaction)
+            # session.write_transaction(self._rank_nodes_transaction)
             session.write_transaction(self._degree_centrality)
             session.write_transaction(self._delete_nodes_with_low_degree)
             session.write_transaction(self._delete_graph_projection)
@@ -61,15 +61,15 @@ class PostProcessingRepository:
             logging.error(f"Error creating graph projection: {e}")
             raise
 
-    def _rank_nodes_transaction(self, tx: ManagedTransaction):
-        query = f"""
-            CALL gds.pageRank.write('{PostProcessingRepository.PROJECTION_NAME}', {{
-                maxIterations: 20,
-                dampingFactor: 0.85,
-                writeProperty: 'nodeScore'
-            }}) YIELD nodePropertiesWritten
-        """
-        tx.run(query)
+    # def _rank_nodes_transaction(self, tx: ManagedTransaction):
+    #     query = f"""
+    #         CALL gds.pageRank.write('{PostProcessingRepository.PROJECTION_NAME}', {{
+    #             maxIterations: 20,
+    #             dampingFactor: 0.85,
+    #             writeProperty: 'nodeScore'
+    #         }}) YIELD nodePropertiesWritten
+    #     """
+    #     tx.run(query)
 
     def _degree_centrality(self, tx: ManagedTransaction):
         query = f"""
