@@ -1,8 +1,9 @@
 """Generic Nuclio Handler Template"""
+
+import json
 import requests
 import traceback
-from nuclio_sdk import Event
-from angle_points_repository import AnglePointsRepository
+from angle_points_repository import calculate_angle_points
 from pydantic_settings import BaseSettings
 
 HANDLER_NAME = "angle_point_detector"
@@ -10,10 +11,6 @@ HANDLER_NAME = "angle_point_detector"
 
 class Settings(BaseSettings):
     """Settings"""
-
-    neo4j_dsn: str
-    neo4j_user: str
-    neo4j_pass: str
     next_nuclio: str = ""
 
 
@@ -28,21 +25,27 @@ def init_context(context):
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
 
-    angle_points_repository = AnglePointsRepository(
-        Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass
-    )
-    setattr(context.user_data, "angle_points_repository", angle_points_repository)
-
     setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
 
 
 def http_handler(context, event):
     """Handles HTTP requests"""
     try:
-        image_id = event.body
-        image_id = image_id.decode("utf-8") if isinstance(image_id, bytes) else image_id
+        # Get JSON from the event.body
+        line_detector_results = json.loads(event.body)
 
-        context.user_data.angle_points_repository.detect_angle_points(image_id)
+        context.logger.info_with(
+            f"Received request: {line_detector_results}", handler=HANDLER_NAME
+        )
+
+        lines = line_detector_results["lines"]
+        context.logger.info_with(f"Lines: {lines}", handler=HANDLER_NAME)
+
+        angle_points = calculate_angle_points(lines)
+
+        context.logger.info_with(
+            f"Angle points: {angle_points}", handler=HANDLER_NAME
+        )
 
         context.logger.info_with(
             f"Processed request successfully", handler=HANDLER_NAME
@@ -59,8 +62,15 @@ def http_handler(context, event):
             if len(next_nuclio) > 0:
                 for func in next_nuclio:
                     context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                    response = requests.post(func, json=str(image_id))
-                    context.logger.info_with(f"Response: {response.status_code}", handler=HANDLER_NAME)
+                    line_detector_results["angle_points"] = angle_points
+                    ser_result = json.dumps(line_detector_results)
+                    context.logger.info_with(
+                        f"Sending: {ser_result}", handler=HANDLER_NAME
+                    )
+                    response = requests.post(func, json=ser_result)
+                    context.logger.info_with(
+                        f"Response: {response.status_code}", handler=HANDLER_NAME
+                    )
 
         # Responding to the HTTP request
         context.Response(

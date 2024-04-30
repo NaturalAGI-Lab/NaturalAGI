@@ -101,9 +101,10 @@ def process_image(context, image_data):
 
     image_id = uuid.uuid4()
 
-    lines = detect_lines(image)
-    context.logger.info(f"Detected {lines} lines for image: {image_id}")
-    # context.user_data.lines_repository.add_lines(lines, image_id)
+    raw_lines = detect_lines(image)
+    lines = [{'id': str(uuid.uuid4()), 'x1': line[0], 'y1': line[1], 'x2': line[2], 'y2': line[3]} for line in
+             raw_lines]
+    context.logger.info(f"Detected {len(lines)} lines for image: {image_id}")
 
     next_functions_str = context.user_data.next_nuclio
 
