@@ -1,5 +1,5 @@
 import unittest
-from src.angle_point_detector.angle_points_repository import line_intersection, calculate_angle, calculate_angle_points
+from angle_point_detector.angle_points_repository import line_intersection, calculate_angle, calculate_angle_points
 
 
 class LineIntersectionTests(unittest.TestCase):

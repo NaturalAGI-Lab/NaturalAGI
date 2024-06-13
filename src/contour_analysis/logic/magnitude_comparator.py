@@ -2,7 +2,7 @@ import logging
 
 
 def compare_vector_magnitude_and_create_nodes(tx, vector1_id: str, vector2_id: str):
-    logging.info("Comparing vector magnitudes and creating respective nodes")
+    logging.info(f"Comparing vector magnitudes and creating respective nodes between vector1:{vector1_id} and vector2{vector2_id}")
     # First, compare the magnitudes to determine the label
     compare_query = """
       MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_MAGNITUDE]->(magnitude1:VectorMagnitude),

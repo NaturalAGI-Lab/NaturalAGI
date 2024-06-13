@@ -57,6 +57,7 @@ def _get_vector_quadrant(tx: ManagedTransaction, vector_id: str) -> int:
         int: Quadrant value of the vector.
     """
 
+    print(f"Quadrant check, vector:{vector_id}")
     query: str = """
         MATCH (v:Vector {vector_id: $vector_id})--(quadrant:Quadrant)
         RETURN quadrant.quadrant AS quadrant

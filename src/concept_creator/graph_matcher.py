@@ -1,18 +1,11 @@
 import logging
 
 from neo4j import GraphDatabase
-from logic.exposition_analyzer import analyze_exposition
-from logic.contour_traverse import (
-    process_input_data
-)
-
-# Configure logging
-logging.basicConfig(level=logging.DEBUG)
 
 
-class ContourAnalysisRepository:
+class GraphMatcher:
     def __init__(self, uri, user, password):
-        logging.info("Initializing ContourAnalysisRepository")
+        logging.info("Initializing GraphMatcher")
         try:
             self.driver = GraphDatabase.driver(uri, auth=(user, password))
             logging.info("Database connection established")
@@ -29,13 +22,15 @@ class ContourAnalysisRepository:
             logging.error(f"Error closing database connection: {e}")
             raise
 
-    def analyze_contour(self, input_data):
-        logging.info(f"Starting analyze_contour method for image {input_data['image_id']}")
+    def match_graph(self):
         with self.driver.session() as session:
-            result = session.write_transaction(
-                process_input_data,
-                input_data
-            )
-
-            logging.debug(f"Result from calculate_and_set_relative_params: {result}")
+            result = session.read_transaction(self._match_graph)
             return result
+
+    def _match_graph(self, tx):
+        # Get starting point of concept graph (node_index = 'C') and starting points of all the other graphs (node_index = '$index')
+        # traverse the graph in the way of line -> critical point (reason: first line)
+        query = """
+            MATCH (startingPoint:StartingPoint {node_index: 'C'})
+        """
+        return

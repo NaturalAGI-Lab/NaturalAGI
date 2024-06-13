@@ -13,9 +13,12 @@ def line_intersection(line1, line2):
     px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denominator
     py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denominator
 
-    # Check if the intersection point is within the boundaries of both lines
-    if min(x1, x2) <= px <= max(x1, x2) and min(y1, y2) <= py <= max(y1, y2) and \
-            min(x3, x4) <= px <= max(x3, x4) and min(y3, y4) <= py <= max(y3, y4):
+    delta = 5  # Define your delta. This allows the intersection point to be up to 5 units outside the line bounds.
+
+    # Check if the intersection point is within the extended boundaries of both lines
+    if min(x1, x2) - delta <= px <= max(x1, x2) + delta and min(y1, y2) - delta <= py <= max(y1, y2) + delta and \
+            min(x3, x4) - delta <= px <= max(x3, x4) + delta and min(y3, y4) - delta <= py <= max(y3, y4) + delta:
+
         return [int(px), int(py)]
     else:
         return None

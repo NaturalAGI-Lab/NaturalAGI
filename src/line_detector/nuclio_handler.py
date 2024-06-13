@@ -42,6 +42,7 @@ def http_handler(context, event):
 
         # Check if 'input_folder' key exists in the data and is not empty
         if "input_folder" in data and data["input_folder"]:
+            print(f"input floder: {data['input_folder']}")
             input_folder = data["input_folder"]
             image_files = glob.glob(os.path.join(input_folder, "*"))
 

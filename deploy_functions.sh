@@ -25,10 +25,10 @@ echo "IP address: $HOST_IP"
 NEO4J_PASS=111122223333
 
 # Directory containing training data images
-TRAINING_DATA_DIR="./tests/generated_samples"
+TRAINING_DATA_DIR="/Users/vladtrotsenko/ai/NaturalAGI/training_data/line_detector"
 
 # Directory containing training data images for the line detector
-LINE_DETECTOR_TRAINING_DATA_DIR="/training_data/line_detector"
+LINE_DETECTOR_TRAINING_DATA_DIR="/Users/vladtrotsenko/ai/NaturalAGI/training_data/line_detector"
 
 # Run docker compose
 #docker-compose up -d  # -d flag runs containers in the background

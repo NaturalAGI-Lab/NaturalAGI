@@ -47,11 +47,11 @@ def http_handler(context, event):
             f"Input data: {input_data}", handler=HANDLER_NAME
         )
 
-        # try:
-        #     # context.user_data.contour_analysis_repository.analyze_contour(image_id)
-        # except Exception as e:
-        #     context.logger.error_with(f"Error analyzing contour:\n {e}", handler=HANDLER_NAME)
-        #     traceback.print_exc()
+        try:
+            context.user_data.contour_analysis_repository.analyze_contour(input_data)
+        except Exception as e:
+            context.logger.error_with(f"Error analyzing contour:\n {e}", handler=HANDLER_NAME)
+            traceback.print_exc()
 
         # next_functions_str = context.user_data.next_nuclio
         #
