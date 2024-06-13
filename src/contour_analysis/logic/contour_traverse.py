@@ -43,7 +43,7 @@ def process_input_data(
     # logging.info(f"No data in the DB so far. Image {image_id} will be considered as the Concept one")
     save_vectors_data(tx, lines, image_id, 'C')
     save_intersection_data(tx, image_id, angle_points, 'C')
-    traverse_contour(tx, image_id, angle_points[0], 0)
+    traverse_contour(tx, image_id, angle_points[0])
     mark_first_line(tx, 'C')
 
 
@@ -63,7 +63,6 @@ def traverse_contour(
         tx: ManagedTransaction,
         image_id: str,
         min_angle_point: AnglePoint,
-        node_index
 ) -> None:
     """
     Traverses the contour for a given image.
@@ -85,7 +84,7 @@ def traverse_contour(
 
         logging.info(f"1. processed_vector_ids {processed_vector_ids}")
 
-        result = _get_next_vector(tx, processed_angle_points, processed_vector_ids, node_index)
+        result = _get_next_vector(tx, processed_angle_points, processed_vector_ids)
         logging.info(f"Result from _get_next_vector: {result}")
 
         if result is None:
@@ -111,7 +110,7 @@ def traverse_contour(
             )
 
         processed_vectors.append(current_vector)
-        processed_angle_points.append(current_angle_point.id)
+        processed_angle_points.append(current_angle_point)
 
         if len(processed_vector_ids) == 3:
             logging.info(f"Last vector {current_vector.id} processed")
@@ -123,7 +122,6 @@ def _get_next_vector(
         tx: ManagedTransaction,
         processed_angle_points: list[AnglePoint],
         processed_vectors_ids: list[str],
-        node_index
 ) -> Union[tuple[VectorDetails, AnglePoint], None]:
     """
     Get the next vector to be processed.
@@ -145,36 +143,46 @@ def _get_next_vector(
             processed_angle_points[0],
         )
 
-    print(f"Last vector id:{processed_vectors_ids[-1]}, angle_point_id:{get_attribute(processed_angle_points, 'id')}")
+    print(f"Last vector id:{processed_vectors_ids[-1]}, angle_point_id:{processed_angle_points[-1].id}")
 
     query = """
         MATCH (v:Vector {vector_id: $last_vector_id})--(ap:AnglePoint {id: $ap_id})--(nextVector:Vector)--(nextAp:AnglePoint),
             (nextVector:Vector)--(coords:Coordinates),
             (nextAp:AnglePoint)--(apLoc:AnglePointCoordinates),
+            (nextAp)--(angle:AnglePointAngle),
             (nextVector)--(l:Length)
         WHERE NOT nextAp.id = $ap_id
-        RETURN nextVector.vector_id AS id, coords.x1 AS x1, coords.y1 AS y1, coords.x2 AS x2, coords.y2 AS y2, apLoc.x AS ap_x, apLoc.y AS ap_y, nextAp.id AS ap_id, l.value AS length
+        RETURN nextVector AS vector, coords AS vector_coords, nextAp AS next_ap, apLoc AS apLoc, l.value AS length,
+            angle.angle AS angle
     """
     result: Record | None = tx.run(
         query,
         last_vector_id=processed_vectors_ids[-1],
-        ap_id=get_attribute(processed_angle_points, 'id'),
+        ap_id=processed_angle_points[-1].id,
         processed_vectors_ids=processed_vectors_ids,
-        # round_id=node_index
     ).single()
 
     if result is None:
         return None
 
     vector_details = VectorDetails(
-        id=result["id"],
-        x1=result["x1"],
-        y1=result["y1"],
-        x2=result["x2"],
-        y2=result["y2"],
+        id=result["vector"]["vector_id"],
+        x1=result["vector_coords"]["x1"],
+        y1=result["vector_coords"]["y1"],
+        x2=result["vector_coords"]["x2"],
+        y2=result["vector_coords"]["y2"],
         length=result["length"]
     )
-    angle_point = AnglePoint(x=result["ap_x"], y=result["ap_y"], id=result["ap_id"])
+
+    angle_point = AnglePoint(
+        x=result["apLoc"]["x"],
+        y=result["apLoc"]["y"],
+        id=result["next_ap"]["id"],
+        angle=result["angle"],
+        line1=processed_vectors_ids[-1],
+        line2=vector_details.id
+    )
+
     print(f"result of running next vector: {vector_details}, next angle point: {angle_point}")
     return vector_details, angle_point
 
@@ -213,10 +221,3 @@ def _get_first_vector(tx: ManagedTransaction, min_angle_point_id: int) -> Vector
             y2=result["y2"],
             length=result["length"]
         )
-
-
-def get_attribute(obj, attr):
-    if isinstance(obj, dict):
-        return obj.get(attr, None)  # None is default if key doesn't exist
-    else:
-        return getattr(obj, attr, None)  # None is default if attribute doesn't exist

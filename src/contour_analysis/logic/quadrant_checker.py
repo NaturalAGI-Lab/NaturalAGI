@@ -26,6 +26,7 @@ def mark_quadrant_change(
 ) -> None:
     """
     Mark the change in quadrant between two vectors.
+    As well as create a CriticalPoint at the angle between the vectors, so we know it's a critical point.
 
     Parameters:
     - tx (ManagedTransaction): The Neo4j transaction object.

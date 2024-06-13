@@ -19,7 +19,7 @@ def save_vectors_data(tx, vectors: List[VectorDetails], image_id: str, node_inde
             (v)-[:HAS_LENGTH]->(length),  
     
             (angle:Angle {vector_id: $vector_id, value: $angle, round_id: $node_index}), 
-            (v)-[:HAS_ANGLE]->(angle), 
+            (v)-[:HAS_ANGLE]->(angle),
     
             (coordinates:Coordinates {vector_id:$vector_id, x1: $x1, y1: $y1, x2: $x2, y2: $y2, round_id: $node_index}),
             (v)-[:HAS_COORDINATES]->(coordinates)

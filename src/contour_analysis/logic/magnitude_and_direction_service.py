@@ -8,7 +8,7 @@ from logic.magnitude_comparator import (
 )
 from neo4j import ManagedTransaction, Record
 
-
+logging.basicConfig(level=logging.DEBUG)
 def calculate_magnitude_and_direction(
     tx: ManagedTransaction,
     last_vector_id: str,
@@ -78,14 +78,14 @@ def calculate_direction(
 
         return current_direction
     else:
-        logging.info("No matching vectors found in the database.")
+        logging.warning("No matching vectors found in the database.")
         return None
 
 
 def add_direction(tx, vector1_id: str, vector2_id: str, direction: str):
     logging.debug(f"Adding direction: {direction} to the vectors")
     query = """
-        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})--(v2:Vector)
+        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
         MERGE (vd:VectDirection {direction: $direction})
         MERGE (v1)-[:HAS_DIRECTION]->(vd)-[:HAS_DIRECTION]->(v2)
     """
