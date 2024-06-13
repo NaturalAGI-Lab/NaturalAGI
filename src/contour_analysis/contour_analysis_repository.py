@@ -1,10 +1,12 @@
 import logging
 
 from neo4j import GraphDatabase
-from logic.exposition_analyzer import analyze_exposition
+
+from converter.angle_point_converter import AnglePointConverter
 from logic.contour_traverse import (
     process_input_data
 )
+from converter.vector_details_converter import VectorDetailsConverter
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -31,10 +33,14 @@ class ContourAnalysisRepository:
 
     def analyze_contour(self, input_data):
         logging.info(f"Starting analyze_contour method for image {input_data['image_id']}")
+        angle_points = AnglePointConverter.dict_to_angle_points(input_data['angle_points'])
+        vector_details = VectorDetailsConverter.dict_to_vector_details(input_data['lines'])
         with self.driver.session() as session:
             result = session.write_transaction(
                 process_input_data,
-                input_data
+                input_data['image_id'],
+                angle_points,
+                vector_details,
             )
 
             logging.debug(f"Result from calculate_and_set_relative_params: {result}")

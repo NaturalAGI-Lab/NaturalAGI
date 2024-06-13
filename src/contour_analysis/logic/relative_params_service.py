@@ -59,7 +59,7 @@ def calculate_and_set_relative_params(
         MERGE (vValue:VectorValue {x: $x_vect, y: $y_vect})
         MERGE (vector)-[:HAS_VECTOR_VALUE]->(vValue)
     """
-    result = tx.run(query, vector_id=vector.uuid, x_vect=x_vect, y_vect=y_vect)
+    result = tx.run(query, vector_id=vector.id, x_vect=x_vect, y_vect=y_vect)
     print("Vector value is created for the line")
 
     horizontal_plane, vertical_plane, quadrant = calculate_half_plane_and_quadrant(
@@ -79,7 +79,7 @@ def calculate_and_set_relative_params(
     """
     result = tx.run(
         query,
-        vector_id=vector.uuid,
+        vector_id=vector.id,
         horizontal_plane=horizontal_plane,
         vertical_plane=vertical_plane,
     )
@@ -91,8 +91,8 @@ def calculate_and_set_relative_params(
         MERGE (quadrant:Quadrant {quadrant: $quadrant})
         MERGE (vector)-[:HAS_QUADRANT]->(quadrant)
     """
-    result = tx.run(query, vector_id=vector.uuid, quadrant=quadrant)
-    print(f"Half planes and quadrants are created for the vector: {vector.uuid} quadrant:{quadrant} ")
+    result = tx.run(query, vector_id=vector.id, quadrant=quadrant)
+    print(f"Half planes and quadrants are created for the vector: {vector.id} quadrant:{quadrant} ")
     return result
 
 

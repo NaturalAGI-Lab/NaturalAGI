@@ -6,7 +6,7 @@ from model.angle_point import AnglePoint
 # noinspection PyTypeChecker
 class AnglePointConverter:
     @staticmethod
-    def dict_to_angle_point(angle_point_dict: Dict[str, Any]) -> AnglePoint:
+    def dict_to_angle_points(angle_point_dict: Dict[str, Any]) -> List[AnglePoint]:
         angle_points: List[AnglePoint] = []
         for angle_point in angle_point_dict:
             angle_points.append(
