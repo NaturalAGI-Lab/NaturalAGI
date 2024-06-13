@@ -33,11 +33,11 @@ def save_intersection_data(tx: ManagedTransaction,
                            node_index):
     query: str = """
             UNWIND $angle_points AS data
-            MERGE (ap:AnglePoint {id: data.id, image_id: $image_id, round_id: $node_index})
-            MERGE (apCoords:AnglePointCoordinates {x: data.x, y: data.y, round_id: $node_index}) 
-            MERGE (ap)-[:HAS_COORDINATES]->(apCoords)
-            MERGE (apAngle:AnglePointAngle {angle: data.angle, round_id: $node_index})
-            MERGE (ap)-[:HAS_ANGLE]->(apAngle)
+            CREATE (ap:AnglePoint {id: data.id, image_id: $image_id, round_id: $node_index})
+            CREATE (apCoords:AnglePointCoordinates {x: data.x, y: data.y, round_id: $node_index}) 
+            CREATE (ap)-[:HAS_COORDINATES]->(apCoords)
+            CREATE (apAngle:AnglePointAngle {angle: data.angle, round_id: $node_index})
+            CREATE (ap)-[:HAS_ANGLE]->(apAngle)
 
             WITH ap, data
             MATCH (vector1:Vector {vector_id: data.line1, round_id: $node_index})

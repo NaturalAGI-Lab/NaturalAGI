@@ -56,10 +56,11 @@ def calculate_and_set_relative_params(
         MATCH (vector:Vector)
         WHERE vector.vector_id = $vector_id
         WITH vector
-        MERGE (vValue:VectorValue {x: $x_vect, y: $y_vect})
-        MERGE (vector)-[:HAS_VECTOR_VALUE]->(vValue)
+        CREATE (vValue:VectorValue {x: $x_vect, y: $y_vect})
+        WITH vector, vValue
+        CREATE (vector)-[:HAS_VECTOR_VALUE]->(vValue)
     """
-    result = tx.run(query, vector_id=vector.id, x_vect=x_vect, y_vect=y_vect)
+    tx.run(query, vector_id=vector.id, x_vect=x_vect, y_vect=y_vect)
     print("Vector value is created for the line")
 
     horizontal_plane, vertical_plane, quadrant = calculate_half_plane_and_quadrant(
@@ -72,10 +73,10 @@ def calculate_and_set_relative_params(
         MATCH (vector:Vector)
         WHERE vector.vector_id = $vector_id
         WITH vector
-        MERGE (vertical:VerticalVectorHalfPlane {vertical_plane: $vertical_plane})
-        MERGE (horizontal:HorizontalVectorHalfPlane {horizontal_plane: $horizontal_plane})
-        MERGE (vector)-[:HAS_VERTICAL_VECTOR_HALF_PLANE]->(vertical)
-        MERGE (vector)-[:HAS_HORIZONTAL_VECTOR_HALF_PLANE]->(horizontal)
+        CREATE (vertical:VerticalVectorHalfPlane {vertical_plane: $vertical_plane})
+        CREATE (horizontal:HorizontalVectorHalfPlane {horizontal_plane: $horizontal_plane})
+        CREATE (vector)-[:HAS_VERTICAL_VECTOR_HALF_PLANE]->(vertical)
+        CREATE (vector)-[:HAS_HORIZONTAL_VECTOR_HALF_PLANE]->(horizontal)
     """
     result = tx.run(
         query,
@@ -88,8 +89,8 @@ def calculate_and_set_relative_params(
         MATCH (vector:Vector)
         WHERE vector.vector_id = $vector_id
         WITH vector
-        MERGE (quadrant:Quadrant {quadrant: $quadrant})
-        MERGE (vector)-[:HAS_QUADRANT]->(quadrant)
+        CREATE (quadrant:Quadrant {quadrant: $quadrant})
+        CREATE (vector)-[:HAS_QUADRANT]->(quadrant)
     """
     result = tx.run(query, vector_id=vector.id, quadrant=quadrant)
     print(f"Half planes and quadrants are created for the vector: {vector.id} quadrant:{quadrant} ")

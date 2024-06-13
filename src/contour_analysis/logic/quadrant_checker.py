@@ -36,12 +36,12 @@ def mark_quadrant_change(
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})
         MATCH (v2:Vector {vector_id: $vector2_id})
-        MERGE (quad_change:QuadrantChange)
-        MERGE (v1)-[:HAS_QUADRANT_CHANGE]->(quad_change)-[:HAS_QUADRANT_CHANGE]->(v2)
-        MERGE (cp:CriticalPoint {reason: 'Quadrant Change'})
+        CREATE (quad_change:QuadrantChange)
+        CREATE (v1)-[:HAS_QUADRANT_CHANGE]->(quad_change)-[:HAS_QUADRANT_CHANGE]->(v2)
+        CREATE (cp:CriticalPoint {reason: 'Quadrant Change'})
         WITH v1, v2, cp
         MATCH (v1)--(ap:AnglePoint)--(v2)
-        MERGE (ap)-[:IS_CRITICAL_POINT]->(cp)
+        CREATE (ap)-[:IS_CRITICAL_POINT]->(cp)
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id)
 

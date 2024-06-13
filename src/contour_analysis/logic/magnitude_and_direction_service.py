@@ -86,8 +86,8 @@ def add_direction(tx, vector1_id: str, vector2_id: str, direction: str):
     logging.debug(f"Adding direction: {direction} to the vectors")
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
-        MERGE (vd:VectDirection {direction: $direction})
-        MERGE (v1)-[:HAS_DIRECTION]->(vd)-[:HAS_DIRECTION]->(v2)
+        CREATE (vd:VectDirection {direction: $direction})
+        CREATE (v1)-[:HAS_DIRECTION]->(vd)-[:HAS_DIRECTION]->(v2)
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, direction=direction)
 
@@ -96,8 +96,8 @@ def create_critical_point(tx, vector1_id: str, vector2_id: str):
     logging.info("Finding angle point between two vectors")
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
-        MERGE (cp:CriticalPoint {reason: "Direction Change"})
-        MERGE (cp)-[:IS_CRITICAL_POINT]-(ap)
+        CREATE (cp:CriticalPoint {reason: "Direction Change"})
+        CREATE (cp)-[:IS_CRITICAL_POINT]->(ap)
         RETURN cp
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id).single()

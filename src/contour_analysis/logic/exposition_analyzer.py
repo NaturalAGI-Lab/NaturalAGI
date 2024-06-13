@@ -45,8 +45,8 @@ def _mark_monotony_development(tx: ManagedTransaction, image_id: str) -> None:
     logging.info(f"Marking monotony development for image {image_id}")
     query = """
         MATCH (vector:Vector {image_id: $image_id})
-        MERGE (mono:Monotony)
-        MERGE (vector)-[:HAS_MONOTONY]->(mono)
+        CREATE (mono:Monotony)
+        CREATE (vector)-[:HAS_MONOTONY]->(mono)
     """
     tx.run(query, image_id=image_id)
 
@@ -55,8 +55,8 @@ def _mark_non_monotony_development(tx: ManagedTransaction, image_id: str) -> Non
     logging.info(f"Marking non-monotony development for image {image_id}")
     query = """
         MATCH (vector:Vector {image_id: $image_id})
-        MERGE (nonMono:NonMonotony)
-        MERGE (vector)-[:HAS_NON_MONOTONY]->(nonMono)
+        CREATE (nonMono:NonMonotony)
+        CREATE (vector)-[:HAS_NON_MONOTONY]->(nonMono)
     """
     tx.run(query, image_id=image_id)
 
@@ -88,16 +88,16 @@ def _analyze_contour_type(tx: ManagedTransaction, image_id: str) -> None:
         query = """
             MATCH (n)
             WHERE (n:Vector OR n:AnglePoint) AND n.image_id = $image_id
-            MERGE (closed:Closed)
-            MERGE (n)-[:HAS_CONTOUR_TYPE]->(closed)
+            CREATE (closed:Closed)
+            CREATE (n)-[:HAS_CONTOUR_TYPE]->(closed)
         """
     else:
         # If no path is found, create an 'Open' node and link it to all Vector and AnglePoint nodes
         query = """
             MATCH (n)
             WHERE (n:Vector OR n:AnglePoint) AND n.image_id = $image_id
-            MERGE (open:Open)
-            MERGE (n)-[:HAS_CONTOUR_TYPE]->(open)
+            CREATE (open:Open)
+            CREATE (n)-[:HAS_CONTOUR_TYPE]->(open)
         """
 
     tx.run(query, image_id=image_id)

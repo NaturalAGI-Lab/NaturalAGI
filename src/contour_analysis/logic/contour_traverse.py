@@ -95,8 +95,8 @@ def traverse_contour(
 
         logging.info(f"2. processed_vector_ids {processed_vector_ids}, current {current_vector.id}")
 
-        logging.info(f"current_angle_point: {current_angle_point}")
-        calculate_and_set_relative_params(tx, current_vector, current_angle_point)
+        if current_vector.id not in processed_vector_ids:
+            calculate_and_set_relative_params(tx, current_vector, current_angle_point)
 
         if len(processed_vectors) > 0 and check_quadrant_change(
                 tx, processed_vectors[-1].id, current_vector.id
@@ -112,7 +112,7 @@ def traverse_contour(
         processed_vectors.append(current_vector)
         processed_angle_points.append(current_angle_point)
 
-        if len(processed_vector_ids) == 3:
+        if current_vector.id in processed_vector_ids:
             logging.info(f"Last vector {current_vector.id} processed")
             logging.info("No more vectors to process")
             break
@@ -203,8 +203,8 @@ def _get_first_vector(tx: ManagedTransaction, min_angle_point_id: int) -> Vector
         WITH v, coords, ap, (ap.x + coords.x1 + coords.x2) AS sum_x, l.value AS length
         ORDER BY sum_x DESC
         LIMIT 1
-        MERGE (cp:CriticalPoint {reason: "First Line"})
-        MERGE (cp)<-[:IS_CRITICAL_POINT]-(v)
+        CREATE (cp:CriticalPoint {reason: "First Line"})
+        CREATE (cp)<-[:IS_CRITICAL_POINT]-(v)
         RETURN v.vector_id AS id, coords.x1 AS x1, coords.y1 AS y1, coords.x2 AS x2, coords.y2 AS y2, length
     """
 
