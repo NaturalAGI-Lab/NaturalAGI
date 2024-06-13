@@ -25,10 +25,10 @@ echo "IP address: $HOST_IP"
 NEO4J_PASS=111122223333
 
 # Directory containing training data images
-TRAINING_DATA_DIR="/Users/vladtrotsenko/ai/NaturalAGI/training_data/line_detector"
+TRAINING_DATA_DIR="./tests/generated_samples"
 
 # Directory containing training data images for the line detector
-LINE_DETECTOR_TRAINING_DATA_DIR="/Users/vladtrotsenko/ai/NaturalAGI/training_data/line_detector"
+LINE_DETECTOR_TRAINING_DATA_DIR="/training_data/line_detector"
 
 # Run docker compose
 #docker-compose up -d  # -d flag runs containers in the background
@@ -51,32 +51,32 @@ nuctl deploy --path src/contour_analysis \
     -e NEO4J_PASS=$NEO4J_PASS &
 contour_analysis_pid=$!
 
-nuctl deploy --path src/post_processing \
-    --platform local \
-    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-    -e NEO4J_USER=neo4j \
-    -e NEO4J_PASS=$NEO4J_PASS &
-post_processing=$!
-
-nuctl deploy --path src/concept_creator \
-    --platform local \
-    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-    -e NEO4J_USER=neo4j \
-    -e NEO4J_PASS=$NEO4J_PASS &
-concept_creator=$!
-
- nuctl deploy --path src/qualitative_features_analysis \
-     --platform local \
-     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-     -e NEO4J_USER=neo4j \
-     --volume ./training_results/:/stats \
-     -e NEO4J_PASS=$NEO4J_PASS &
- qualitative_features_analysis=$!
+#nuctl deploy --path src/post_processing \
+#    --platform local \
+#    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+#    -e NEO4J_USER=neo4j \
+#    -e NEO4J_PASS=$NEO4J_PASS &
+#post_processing=$!
+#
+#nuctl deploy --path src/concept_creator \
+#    --platform local \
+#    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+#    -e NEO4J_USER=neo4j \
+#    -e NEO4J_PASS=$NEO4J_PASS &
+#concept_creator=$!
+#
+# nuctl deploy --path src/qualitative_features_analysis \
+#     --platform local \
+#     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+#     -e NEO4J_USER=neo4j \
+#     --volume ./training_results/:/stats \
+#     -e NEO4J_PASS=$NEO4J_PASS &
+# qualitative_features_analysis=$!
 
 # Wait for the deployments to complete
 wait $line_detector_pid
 wait $ap_detector_pid
 wait $contour_analysis_pid
-wait $post_processing
-wait $concept_creator
-wait $qualitative_features_analysis
+#wait $post_processing
+#wait $concept_creator
+#wait $qualitative_features_analysis

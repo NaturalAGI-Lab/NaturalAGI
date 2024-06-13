@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-import math
-
 import logging
-from typing import Union
-from neo4j import ManagedTransaction, Record
+import math
+from typing import Union, List
 
-from logic.magnitude_and_direction_service import (
-    calculate_magnitude_and_direction,
-)
+from converter.angle_point_converter import AnglePointConverter
 from logic.quadrant_checker import (
     check_quadrant_change,
     mark_quadrant_change,
@@ -19,6 +15,7 @@ from logic.relative_params_service import (
 )
 from model.angle_point import AnglePoint
 from model.vector_details import VectorDetails
+from neo4j import ManagedTransaction, Record
 
 logging.basicConfig(level=logging.INFO)
 
@@ -48,7 +45,10 @@ def process_input_data(
         logging.info(f"No data in the DB so far. Image {input_data['image_id']} will be considered as the Concept one")
         _execute_add_lines_query(tx, input_data["lines"], input_data["image_id"], 'C')
         persist_intersection_data(tx, input_data["image_id"], input_data["lines"], input_data["angle_points"], 'C')
-        traverse_contour(tx, input_data["image_id"], input_data['angle_points'][0], 0)
+
+        angle_points: List[AnglePoint] = AnglePointConverter.dict_to_angle_point(input_data['angle_points'])
+        traverse_contour(tx, input_data["image_id"], angle_points[0], 0)
+
         mark_first_line(tx, 'C')
 
 
@@ -197,10 +197,10 @@ def persist_intersection_data(
 
 
 def traverse_contour(
-    tx: ManagedTransaction,
-    image_id: str,
-    min_angle_point: AnglePoint,
-    node_index
+        tx: ManagedTransaction,
+        image_id: str,
+        min_angle_point: AnglePoint,
+        node_index
 ) -> None:
     """
     Traverses the contour for a given image.
@@ -212,10 +212,9 @@ def traverse_contour(
     Returns:
         None
     """
-    # _create_relative_characteristics(tx, image_id)
     logging.info(f"Traversing contour for image {image_id}")
 
-    processed_angle_points: list[AnglePoint] = [min_angle_point.id]
+    processed_angle_points: list[AnglePoint] = [min_angle_point]
     processed_vectors: list[VectorDetails] = []
 
     while True:
@@ -238,7 +237,7 @@ def traverse_contour(
         calculate_and_set_relative_params(tx, current_vector, current_angle_point)
 
         if len(processed_vectors) > 0 and check_quadrant_change(
-            tx, processed_vectors[-1].uuid, current_vector.uuid
+                tx, processed_vectors[-1].uuid, current_vector.uuid
         ):
             print(f"mark_quadrant_change: v1:{processed_vectors[-1].uuid}, v2:{current_vector.uuid}")
             mark_quadrant_change(tx, processed_vectors[-1].uuid, current_vector.uuid)
@@ -279,11 +278,11 @@ def _get_next_vector(
     )
     if len(processed_vectors_ids) == 0:
         return (
-            _get_first_vector(tx, processed_angle_points[0]['id']),
+            _get_first_vector(tx, processed_angle_points[0].id),
             processed_angle_points[0],
         )
 
-    print(f"Last vector id:{processed_vectors_ids[-1]}, angle_point_id:{get_attribute(processed_angle_points,'id')}")
+    print(f"Last vector id:{processed_vectors_ids[-1]}, angle_point_id:{get_attribute(processed_angle_points, 'id')}")
 
     query = """
         MATCH (v:Vector {vector_id: $last_vector_id})--(ap:AnglePoint {id: $ap_id})--(nextVector:Vector)--(nextAp:AnglePoint),
@@ -295,7 +294,7 @@ def _get_next_vector(
     result: Record | None = tx.run(
         query,
         last_vector_id=processed_vectors_ids[-1],
-        ap_id=get_attribute(processed_angle_points,'id'),
+        ap_id=get_attribute(processed_angle_points, 'id'),
         processed_vectors_ids=processed_vectors_ids,
         # round_id=node_index
     ).single()

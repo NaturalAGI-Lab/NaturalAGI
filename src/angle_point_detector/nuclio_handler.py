@@ -63,7 +63,7 @@ def http_handler(context, event):
                 for func in next_nuclio:
                     context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
                     line_detector_results["angle_points"] = angle_points
-                    ser_result = json.dumps(line_detector_results)
+                    ser_result = json.dumps(line_detector_results, indent=4)
                     context.logger.info_with(
                         f"Sending: {ser_result}", handler=HANDLER_NAME
                     )

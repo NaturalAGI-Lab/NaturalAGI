@@ -4,7 +4,7 @@
 #     exit 1
 # fi
 
-folder_path="/Users/vladtrotsenko/ai/NaturalAGI/training_data/line_detector"
+folder_path="/training_data/line_detector"
 
 echo "Running training with the folder path: $folder_path"
 

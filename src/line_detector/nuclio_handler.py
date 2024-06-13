@@ -1,19 +1,18 @@
 import base64
+import glob
 import json
 import os
-import glob
-
-import requests
-import numpy as np
-import cv2
 import uuid
 
+import cv2
+import numpy as np
+import requests
 from pydantic_settings import BaseSettings
 
 from line_detector import detect_lines
 
 HANDLER_NAME = "Line Detector"
-MAX_IMAGES = float("inf")
+MAX_IMAGES = 1  # float("inf")
 
 
 class Settings(BaseSettings):
@@ -116,7 +115,7 @@ def process_image(context, image_data):
         if len(next_nuclio) > 0:
             for func in next_nuclio:
                 context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                ser_result = json.dumps({"image_id": str(image_id), "lines": lines})
+                ser_result = json.dumps({"image_id": str(image_id), "lines": lines}, indent=4)
                 context.logger.info_with(
                     f"Sending data: {ser_result}", handler=HANDLER_NAME
                 )
