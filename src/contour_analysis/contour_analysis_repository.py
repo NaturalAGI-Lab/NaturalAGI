@@ -3,10 +3,11 @@ import logging
 from neo4j import GraphDatabase
 
 from converter.angle_point_converter import AnglePointConverter
+from converter.vector_details_converter import VectorDetailsConverter
 from logic.contour_traverse import (
     process_input_data
 )
-from converter.vector_details_converter import VectorDetailsConverter
+from logic.graph_reduction.merger import merge_graphs
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -42,6 +43,8 @@ class ContourAnalysisRepository:
                 angle_points,
                 vector_details,
             )
+
+            session.write_transaction(merge_graphs)
 
             logging.debug(f"Result from calculate_and_set_relative_params: {result}")
             return result

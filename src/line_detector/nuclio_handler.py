@@ -12,12 +12,12 @@ from pydantic_settings import BaseSettings
 from line_detector import detect_lines
 
 HANDLER_NAME = "Line Detector"
-MAX_IMAGES = 1  # float("inf")
 
 
 class Settings(BaseSettings):
     """Settings"""
     next_nuclio: str = ""
+    images_limit: int = float("inf")
 
 
 def init_context(context):
@@ -31,6 +31,7 @@ def init_context(context):
     )
 
     setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
+    setattr(context.user_data, "images_limit", Settings().images_limit)
 
 
 def http_handler(context, event):
@@ -46,10 +47,9 @@ def http_handler(context, event):
             image_files = glob.glob(os.path.join(input_folder, "*"))
 
             for image_file in image_files:
-                if images_count >= MAX_IMAGES:
-                    context.logger.info(
-                        f"Reached maximum number of images: {MAX_IMAGES}"
-                    )
+                images_limit = context.user_data.images_limit
+                if images_count >= images_limit:
+                    context.logger.info(f"Reached maximum number of images: {images_limit}")
                     break
 
                 with open(image_file, "rb") as f:

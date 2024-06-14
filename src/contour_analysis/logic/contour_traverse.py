@@ -48,15 +48,15 @@ def process_input_data(
 
 
 def mark_first_line(tx, node_index):
-    query = f"""
-        MATCH (apStartingPoint:StartingPoint {{round_id: '{node_index}'}})--(ap:AnglePoint)--(v:Vector)--(loc:Location)--(coords:Coordinates)
+    query = """
+        MATCH (apStartingPoint:StartingPoint {round_id: $node_index})--(ap:AnglePoint)--(v:Vector)--(loc:Location)--(coords:Coordinates)
         WITH v, (ap.x + coords.x1 + coords.x2) AS sum_x
         ORDER BY sum_x DESC
         LIMIT 1
-        CREATE (cp:CriticalPoint {{reason: "First Line"}})
+        CREATE (cp:CriticalPoint {reason: "First Line"})
         CREATE (cp)<-[:IS_CRITICAL_POINT]-(v)
     """
-    return tx.run(query)
+    return tx.run(query, node_index=node_index).single()
 
 
 def traverse_contour(

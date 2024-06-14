@@ -1,10 +1,10 @@
 from pydantic import BaseModel
 
 
-class VectorDetails(BaseModel):
-    id: str
+class VectorCoordinates(BaseModel):
+    vector_id: str
     x1: float
     y1: float
     x2: float
     y2: float
-    length: float
+    round_id: str

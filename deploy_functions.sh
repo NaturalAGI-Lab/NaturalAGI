@@ -36,6 +36,7 @@ LINE_DETECTOR_TRAINING_DATA_DIR="/training_data/line_detector"
 nuctl deploy --path src/line_detector \
     --platform local \
     --volume $TRAINING_DATA_DIR:$LINE_DETECTOR_TRAINING_DATA_DIR \
+    -e IMAGES_LIMIT=2 \
     -e NEXT_NUCLIO=http://"$HOST_IP":5052 &
 line_detector_pid=$!
 
