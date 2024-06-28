@@ -7,7 +7,7 @@ from converter.vector_details_converter import VectorDetailsConverter
 from logic.contour_traverse import (
     process_input_data
 )
-from logic.graph_reduction.merger import merge_graphs
+from logic.exposition_analyzer import analyze_exposition
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -44,7 +44,7 @@ class ContourAnalysisRepository:
                 vector_details,
             )
 
-            session.write_transaction(merge_graphs)
+            session.write_transaction(analyze_exposition, input_data['image_id'])
 
             logging.debug(f"Result from calculate_and_set_relative_params: {result}")
             return result
