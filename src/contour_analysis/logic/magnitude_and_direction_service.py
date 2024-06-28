@@ -2,17 +2,19 @@ import logging
 from typing import Union
 
 import numpy as np
+from neo4j import ManagedTransaction, Record
 
 from logic.magnitude_comparator import (
     compare_vector_magnitude_and_create_nodes,
 )
-from neo4j import ManagedTransaction, Record
 
 logging.basicConfig(level=logging.DEBUG)
+
+
 def calculate_magnitude_and_direction(
-    tx: ManagedTransaction,
-    last_vector_id: str,
-    next_vector_id: str,
+        tx: ManagedTransaction,
+        last_vector_id: str,
+        next_vector_id: str,
 ):
     if last_vector_id is None:
         logging.debug("Can't compare the first vector... Skipping first iteration")
@@ -42,9 +44,9 @@ def get_last_direction(tx: ManagedTransaction, last_vector_id: str) -> Union[str
 
 
 def calculate_direction(
-    tx: ManagedTransaction,
-    vector1_id: str,
-    vector2_id: str,
+        tx: ManagedTransaction,
+        vector1_id: str,
+        vector2_id: str,
 ) -> Union[str, None]:
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})

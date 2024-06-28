@@ -8,6 +8,7 @@ from logic.contour_traverse import (
     process_input_data
 )
 from logic.exposition_analyzer import analyze_exposition
+from logic.tertiary_features.tertiary_features_service import find_tertiary_features
 
 # Configure logging
 logging.basicConfig(level=logging.DEBUG)
@@ -45,6 +46,8 @@ class ContourAnalysisRepository:
             )
 
             session.write_transaction(analyze_exposition, input_data['image_id'])
+
+            session.read_transaction(find_tertiary_features, input_data['image_id'])
 
             logging.debug(f"Result from calculate_and_set_relative_params: {result}")
             return result

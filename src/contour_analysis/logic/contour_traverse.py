@@ -24,39 +24,9 @@ def process_input_data(
         angle_points: List[AnglePoint],
         lines: List[VectorDetails]
 ) -> None:
-    # query: str = """
-    #     MATCH (n)
-    #     RETURN COUNT(n) > 0 AS hasNodes
-    #  """
-    # result: bool | None = tx.run(query).single()["hasNodes"]
-
-    # if result:
-    #     logging.info(f"Data is already there in the DB {image_id}")
-    #     print(lines)
-    #     for i in range(len(lines)):
-    #         save_vectors_data(tx, lines, image_id, i)
-    #         save_intersection_data(tx, image_id, angle_points, i)
-    #         traverse_contour(tx, image_id, angle_points[0], i)
-    #         lines = [lines[-1]] + lines[:-1]
-    #         mark_first_line(tx, i)
-    # else:
-    # logging.info(f"No data in the DB so far. Image {image_id} will be considered as the Concept one")
     save_vectors_data(tx, lines, image_id, 'C')
     save_intersection_data(tx, image_id, angle_points, 'C')
     traverse_contour(tx, image_id, angle_points[0])
-    mark_first_line(tx, 'C')
-
-
-def mark_first_line(tx, node_index):
-    query = """
-        MATCH (apStartingPoint:StartingPoint {round_id: $node_index})--(ap:AnglePoint)--(v:Vector)--(loc:Location)--(coords:Coordinates)
-        WITH v, (ap.x + coords.x1 + coords.x2) AS sum_x
-        ORDER BY sum_x DESC
-        LIMIT 1
-        CREATE (cp:CriticalPoint {reason: "First Line"})
-        CREATE (cp)<-[:IS_CRITICAL_POINT]-(v)
-    """
-    return tx.run(query, node_index=node_index).single()
 
 
 def traverse_contour(
@@ -187,13 +157,13 @@ def _get_next_vector(
     return vector_details, angle_point
 
 
-def _get_first_vector(tx: ManagedTransaction, min_angle_point_id: int) -> VectorDetails:
+def _get_first_vector(tx: ManagedTransaction, min_angle_point_id: str) -> VectorDetails:
     """
     Get the first vector of the contour by the clockwise traversal from the minimum angle point.
 
     Args:
         tx (ManagedTransaction): The managed transaction object.
-        min_angle_point (AnglePoint): The minimum angle point.
+        min_angle_point_id (str): The minimum angle point id.
 
     Returns:
         VectorDetails: The first vector of the contour.
