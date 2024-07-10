@@ -6,7 +6,6 @@ from typing import Union, List
 from neo4j import ManagedTransaction, Record
 
 from logic.data_saver import save_vectors_data, save_intersection_data
-from logic.magnitude_and_direction_service import calculate_magnitude_and_direction
 from logic.quadrant_checker import (
     check_quadrant_change,
     mark_quadrant_change,
@@ -24,8 +23,8 @@ def process_input_data(
         angle_points: List[AnglePoint],
         lines: List[VectorDetails]
 ) -> None:
-    save_vectors_data(tx, lines, image_id, 'C')
-    save_intersection_data(tx, image_id, angle_points, 'C')
+    save_vectors_data(tx, lines, image_id)
+    save_intersection_data(tx, image_id, angle_points)
     traverse_contour(tx, image_id, angle_points[0])
 
 
@@ -74,10 +73,11 @@ def traverse_contour(
             print(f"mark_quadrant_change: v1:{processed_vectors[-1].id}, v2:{current_vector.id}")
             mark_quadrant_change(tx, processed_vectors[-1].id, current_vector.id)
 
-        if len(processed_vectors) > 0:
-            calculate_magnitude_and_direction(
-                tx, processed_vectors[-1].id, current_vector.id
-            )
+        # TODO think how to apply it to the new graph structure
+        # if len(processed_vectors) > 0:
+        #     calculate_magnitude_and_direction(
+        #         tx, processed_vectors[-1].id, current_vector.id
+        #     )
 
         processed_vectors.append(current_vector)
         processed_angle_points.append(current_angle_point)
@@ -173,8 +173,9 @@ def _get_first_vector(tx: ManagedTransaction, min_angle_point_id: str) -> Vector
         WITH v, coords, ap, (ap.x + coords.x1 + coords.x2) AS sum_x, l.value AS length
         ORDER BY sum_x DESC
         LIMIT 1
-        CREATE (cp:CriticalPoint {reason: "First Line"})
-        CREATE (cp)<-[:IS_CRITICAL_POINT]-(v)
+        MERGE (cp:CriticalPoint {reason: "First Line"})<-[:IS_CRITICAL_POINT]-(v)
+        ON CREATE SET cp.weight = 1
+        ON MATCH SET cp.weight = cp.weight + 1
         RETURN v.vector_id AS id, coords.x1 AS x1, coords.y1 AS y1, coords.x2 AS x2, coords.y2 AS y2, length
     """
 

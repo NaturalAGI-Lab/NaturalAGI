@@ -17,7 +17,7 @@ HANDLER_NAME = "Line Detector"
 class Settings(BaseSettings):
     """Settings"""
     next_nuclio: str = ""
-    images_limit: int = float("inf")
+    images_limit: int = 1000
 
 
 def init_context(context):

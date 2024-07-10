@@ -45,9 +45,9 @@ class ContourAnalysisRepository:
                 vector_details,
             )
 
-            session.write_transaction(analyze_exposition, input_data['image_id'])
+            # session.write_transaction(analyze_exposition, input_data['image_id'])
 
-            session.read_transaction(find_tertiary_features, input_data['image_id'])
+            # session.read_transaction(find_tertiary_features, input_data['image_id'])
 
             logging.debug(f"Result from calculate_and_set_relative_params: {result}")
             return result

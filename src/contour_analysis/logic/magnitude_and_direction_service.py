@@ -98,8 +98,8 @@ def create_critical_point(tx, vector1_id: str, vector2_id: str):
     logging.info("Finding angle point between two vectors")
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
-        CREATE (cp:CriticalPoint {reason: "Direction Change"})
-        CREATE (cp)-[:IS_CRITICAL_POINT]->(ap)
-        RETURN cp
+        MERGE (cp:CriticalPoint {reason: "Direction Change"})-[:IS_CRITICAL_POINT]->(ap)
+        ON CREATE SET cp.weight = 1
+        ON MATCH SET cp.weight = cp.weight + 1
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id).single()

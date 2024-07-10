@@ -43,7 +43,11 @@ def calculate_angle(line1, line2):
 
     angle = int(math.degrees(angle))  # Convert to degrees
 
-    return angle
+    return round_to_nearest(angle, 5)
+
+
+def round_to_nearest(number, n):
+    return round(number / n) * n
 
 
 def calculate_angle_points(lines):
