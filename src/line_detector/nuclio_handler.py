@@ -1,28 +1,23 @@
 import base64
-import os
 import glob
-
-import requests
-import numpy as np
-import cv2
+import json
+import os
 import uuid
-from lines_repository import LinesRepository
-from line_detector import LineDetector
 
+import cv2
+import numpy as np
+import requests
 from pydantic_settings import BaseSettings
 
+from line_detector import detect_lines
 
 HANDLER_NAME = "Line Detector"
-MAX_IMAGES = float("inf")
 
 
 class Settings(BaseSettings):
     """Settings"""
-
-    neo4j_dsn: str
-    neo4j_user: str
-    neo4j_pass: str
     next_nuclio: str = ""
+    images_limit: int = 1000
 
 
 def init_context(context):
@@ -35,12 +30,8 @@ def init_context(context):
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
 
-    lines_repository = LinesRepository(
-        Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass
-    )
-    setattr(context.user_data, "lines_repository", lines_repository)
-
     setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
+    setattr(context.user_data, "images_limit", Settings().images_limit)
 
 
 def http_handler(context, event):
@@ -51,14 +42,14 @@ def http_handler(context, event):
 
         # Check if 'input_folder' key exists in the data and is not empty
         if "input_folder" in data and data["input_folder"]:
+            print(f"input floder: {data['input_folder']}")
             input_folder = data["input_folder"]
             image_files = glob.glob(os.path.join(input_folder, "*"))
 
             for image_file in image_files:
-                if images_count >= MAX_IMAGES:
-                    context.logger.info(
-                        f"Reached maximum number of images: {MAX_IMAGES}"
-                    )
+                images_limit = context.user_data.images_limit
+                if images_count >= images_limit:
+                    context.logger.info(f"Reached maximum number of images: {images_limit}")
                     break
 
                 with open(image_file, "rb") as f:
@@ -110,9 +101,8 @@ def process_image(context, image_data):
 
     image_id = uuid.uuid4()
 
-    lines = LineDetector().detect_lines(image)
+    lines = detect_lines(image)
     context.logger.info(f"Detected {len(lines)} lines for image: {image_id}")
-    context.user_data.lines_repository.add_lines(lines, image_id)
 
     next_functions_str = context.user_data.next_nuclio
 
@@ -125,8 +115,15 @@ def process_image(context, image_data):
         if len(next_nuclio) > 0:
             for func in next_nuclio:
                 context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                response = requests.post(func, json=str(image_id))
+                ser_result = json.dumps({"image_id": str(image_id), "lines": lines}, indent=4)
                 context.logger.info_with(
+                    f"Sending data: {ser_result}", handler=HANDLER_NAME
+                )
+                response = requests.post(
+                    func, json=ser_result
+                )
+                context.logger.info_with(
+
                     f"Response: {response.status_code}", handler=HANDLER_NAME
                 )
 

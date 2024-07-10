@@ -2,17 +2,19 @@ import logging
 from typing import Union
 
 import numpy as np
+from neo4j import ManagedTransaction, Record
 
 from logic.magnitude_comparator import (
     compare_vector_magnitude_and_create_nodes,
 )
-from neo4j import ManagedTransaction, Record
+
+logging.basicConfig(level=logging.DEBUG)
 
 
 def calculate_magnitude_and_direction(
-    tx: ManagedTransaction,
-    last_vector_id: str,
-    next_vector_id: str,
+        tx: ManagedTransaction,
+        last_vector_id: str,
+        next_vector_id: str,
 ):
     if last_vector_id is None:
         logging.debug("Can't compare the first vector... Skipping first iteration")
@@ -42,9 +44,9 @@ def get_last_direction(tx: ManagedTransaction, last_vector_id: str) -> Union[str
 
 
 def calculate_direction(
-    tx: ManagedTransaction,
-    vector1_id: str,
-    vector2_id: str,
+        tx: ManagedTransaction,
+        vector1_id: str,
+        vector2_id: str,
 ) -> Union[str, None]:
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
@@ -78,16 +80,16 @@ def calculate_direction(
 
         return current_direction
     else:
-        logging.info("No matching vectors found in the database.")
+        logging.warning("No matching vectors found in the database.")
         return None
 
 
 def add_direction(tx, vector1_id: str, vector2_id: str, direction: str):
     logging.debug(f"Adding direction: {direction} to the vectors")
     query = """
-        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})--(v2:Vector)
-        MERGE (vd:VectDirection {direction: $direction})
-        MERGE (v1)-[:HAS_DIRECTION]->(vd)-[:HAS_DIRECTION]->(v2)
+        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
+        CREATE (vd:VectDirection {direction: $direction})
+        CREATE (v1)-[:HAS_DIRECTION]->(vd)-[:HAS_DIRECTION]->(v2)
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, direction=direction)
 
@@ -96,8 +98,8 @@ def create_critical_point(tx, vector1_id: str, vector2_id: str):
     logging.info("Finding angle point between two vectors")
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
-        MERGE (cp:CriticalPoint {reason: "Direction Change"})
-        MERGE (cp)-[:IS_CRITICAL_POINT]-(ap)
-        RETURN cp
+        MERGE (cp:CriticalPoint {reason: "Direction Change"})-[:IS_CRITICAL_POINT]->(ap)
+        ON CREATE SET cp.weight = 1
+        ON MATCH SET cp.weight = cp.weight + 1
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id).single()

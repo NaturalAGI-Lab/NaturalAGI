@@ -1,10 +1,10 @@
+import json
 import traceback
 
 import requests
-from contour_analysis_repository import ContourAnalysisRepository
-
 from pydantic_settings import BaseSettings
 
+from contour_analysis_repository import ContourAnalysisRepository
 
 HANDLER_NAME = "Contour analysis"
 
@@ -41,37 +41,36 @@ def http_handler(context, event):
     """Handles HTTP requests"""
     try:
 
-        image_id = event.body
-        image_id = image_id.decode("utf-8") if isinstance(image_id, bytes) else image_id
+        input_data = json.loads(event.body)
 
         context.logger.debug_with(
-            f"Received image_id: {image_id}", handler=HANDLER_NAME
+            f"Input data: {input_data}", handler=HANDLER_NAME
         )
 
         try:
-            context.user_data.contour_analysis_repository.analyze_contour(image_id)
+            context.user_data.contour_analysis_repository.analyze_contour(input_data)
         except Exception as e:
             context.logger.error_with(f"Error analyzing contour:\n {e}", handler=HANDLER_NAME)
             traceback.print_exc()
 
-        next_functions_str = context.user_data.next_nuclio
-
-        if next_functions_str:
-            next_nuclio = next_functions_str.split(";")
-            context.logger.debug_with(
-                f"Next functions: {next_nuclio}", handler=HANDLER_NAME
-            )
-
-            if len(next_nuclio) > 0:
-                for func in next_nuclio:
-                    context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                    response = requests.post(func, json=str(image_id))
-                    context.logger.info_with(
-                        f"Response: {response.status_code}", handler=HANDLER_NAME
-                    )
+        # next_functions_str = context.user_data.next_nuclio
+        #
+        # if next_functions_str:
+        #     next_nuclio = next_functions_str.split(";")
+        #     context.logger.debug_with(
+        #         f"Next functions: {next_nuclio}", handler=HANDLER_NAME
+        #     )
+        #
+        #     if len(next_nuclio) > 0:
+        #         for func in next_nuclio:
+        #             context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
+        #             response = requests.post(func, json=str(image_id))
+        #             context.logger.info_with(
+        #                 f"Response: {response.status_code}", handler=HANDLER_NAME
+        #             )
 
         context.Response(
-            body=f"Points detected for image: {image_id}",
+            body=f"Contour analyzed for image: {input_data['image_id']}",
             headers={},
             content_type="text/plain",
             status_code=requests.codes.ok,  # pylint: disable=no-member

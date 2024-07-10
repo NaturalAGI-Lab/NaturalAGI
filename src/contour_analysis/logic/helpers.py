@@ -1,6 +1,6 @@
-from enum import Enum
 import logging
-import numpy as np
+from enum import Enum
+
 
 def find_next_vector(line_details, min_angle_point):
     next_line = None
@@ -28,11 +28,11 @@ def calculate_half_plane_and_quadrant(dx, dy):
 
     if dx > 0 and dy > 0:
         quadrant = 1
-    elif dx < 0 and dy > 0:
+    elif dx < 0 < dy:
         quadrant = 2
     elif dx < 0 and dy < 0:
         quadrant = 3
-    elif dx > 0 and dy < 0:
+    elif dx > 0 > dy:
         quadrant = 4
     else:
         quadrant = -1  # For cases where dx or dy is 0
@@ -41,6 +41,7 @@ def calculate_half_plane_and_quadrant(dx, dy):
     logging.debug(f"Quadrant: {quadrant}")
 
     return horizontal_plane, vertical_plane, quadrant
+
 
 class Commons:
     class HalfPlane(Enum):
@@ -53,4 +54,3 @@ class Commons:
         ANGLE_POINT = "AnglePoint"
         VECTOR = "Vector"
         LINE = "Line"
-
