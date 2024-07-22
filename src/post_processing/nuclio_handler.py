@@ -1,12 +1,14 @@
 """Generic Nuclio Handler Template"""
-import requests
 import traceback
+
+import requests
 from pydantic_settings import BaseSettings
 
 from post_processing_repository import PostProcessingRepository
 from post_processing_service import PostProcessingService
 
 HANDLER_NAME = "post_processing"
+
 
 class Settings(BaseSettings):
     """Settings"""
@@ -28,20 +30,15 @@ def init_context(context):
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
     setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
-    setattr(context.user_data, "post_processing_repository", PostProcessingRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass))
-    setattr(context.user_data, "post_processing_service", PostProcessingService(context.user_data.post_processing_repository))
+    setattr(context.user_data, "post_processing_repository",
+            PostProcessingRepository(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass))
+    setattr(context.user_data, "post_processing_service",
+            PostProcessingService(context.user_data.post_processing_repository))
 
 
 def http_handler(context, event):
     """Handles HTTP requests"""
     try:
-        # Process the event body
-        # Example: data = event.body
-
-        image_id = event.body
-        image_id = image_id.decode('utf-8') if isinstance(image_id, bytes) else image_id
-
-        context.logger.info_with(f"Processing image: {image_id}", handler=HANDLER_NAME)
         context.user_data.post_processing_service.process()
 
         context.logger.info_with("Processed request successfully", handler=HANDLER_NAME)
@@ -55,8 +52,8 @@ def http_handler(context, event):
             if len(next_nuclio) > 0:
                 for func in next_nuclio:
                     context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                    requests.post(func, json=str(image_id))
-        
+                    requests.post(func)
+
         # Responding to the HTTP request
         context.Response(
             body="Response message",

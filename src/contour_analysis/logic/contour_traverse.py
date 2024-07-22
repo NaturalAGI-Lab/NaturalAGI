@@ -31,7 +31,7 @@ def process_input_data(
 def traverse_contour(
         tx: ManagedTransaction,
         image_id: str,
-        min_angle_point: AnglePoint,
+        min_angle_point: AnglePoint
 ) -> None:
     """
     Traverses the contour for a given image.
@@ -53,7 +53,7 @@ def traverse_contour(
 
         logging.info(f"1. processed_vector_ids {processed_vector_ids}")
 
-        result = _get_next_vector(tx, processed_angle_points, processed_vector_ids)
+        result = _get_next_vector(tx, processed_angle_points, processed_vector_ids, image_id)
         logging.info(f"Result from _get_next_vector: {result}")
 
         if result is None:
@@ -65,13 +65,13 @@ def traverse_contour(
         logging.info(f"2. processed_vector_ids {processed_vector_ids}, current {current_vector.id}")
 
         if current_vector.id not in processed_vector_ids:
-            calculate_and_set_relative_params(tx, current_vector, current_angle_point)
+            calculate_and_set_relative_params(tx, current_vector, current_angle_point, image_id)
 
         if len(processed_vectors) > 0 and check_quadrant_change(
                 tx, processed_vectors[-1].id, current_vector.id
         ):
             print(f"mark_quadrant_change: v1:{processed_vectors[-1].id}, v2:{current_vector.id}")
-            mark_quadrant_change(tx, processed_vectors[-1].id, current_vector.id)
+            mark_quadrant_change(tx, processed_vectors[-1].id, current_vector.id, image_id)
 
         # TODO think how to apply it to the new graph structure
         # if len(processed_vectors) > 0:
@@ -87,11 +87,23 @@ def traverse_contour(
             logging.info("No more vectors to process")
             break
 
+    # Delete the first critical point at the end of the traversal
+    delete_first_critical_point(tx)
+
+
+def delete_first_critical_point(tx: ManagedTransaction) -> None:
+    query = """
+        MATCH (cp:CriticalPoint {reason: "First Line"})
+        DETACH DELETE cp
+    """
+    tx.run(query)
+
 
 def _get_next_vector(
         tx: ManagedTransaction,
         processed_angle_points: list[AnglePoint],
         processed_vectors_ids: list[str],
+        image_id: str
 ) -> Union[tuple[VectorDetails, AnglePoint], None]:
     """
     Get the next vector to be processed.
@@ -100,6 +112,7 @@ def _get_next_vector(
         tx (ManagedTransaction): The managed transaction object.
         processed_angle_points (list[AnglePoint]): The list of processed angle points.
         processed_vectors_ids (list[str]): The list of processed vector IDs.
+        image_id (str): The image id.
 
     Returns:
         VectorDetails: The next vector to be processed.
@@ -109,7 +122,7 @@ def _get_next_vector(
     )
     if len(processed_vectors_ids) == 0:
         return (
-            _get_first_vector(tx, processed_angle_points[0].id),
+            _get_first_vector(tx, processed_angle_points[0].id, image_id),
             processed_angle_points[0],
         )
 
@@ -157,13 +170,14 @@ def _get_next_vector(
     return vector_details, angle_point
 
 
-def _get_first_vector(tx: ManagedTransaction, min_angle_point_id: str) -> VectorDetails:
+def _get_first_vector(tx: ManagedTransaction, min_angle_point_id: str, image_id: str) -> VectorDetails:
     """
     Get the first vector of the contour by the clockwise traversal from the minimum angle point.
 
     Args:
         tx (ManagedTransaction): The managed transaction object.
         min_angle_point_id (str): The minimum angle point id.
+        image_id (str): The image id.
 
     Returns:
         VectorDetails: The first vector of the contour.
@@ -173,13 +187,14 @@ def _get_first_vector(tx: ManagedTransaction, min_angle_point_id: str) -> Vector
         WITH v, coords, ap, (ap.x + coords.x1 + coords.x2) AS sum_x, l.value AS length
         ORDER BY sum_x DESC
         LIMIT 1
-        MERGE (cp:CriticalPoint {reason: "First Line"})<-[:IS_CRITICAL_POINT]-(v)
-        ON CREATE SET cp.weight = 1
-        ON MATCH SET cp.weight = cp.weight + 1
+        MERGE (cp:CriticalPoint:Feature {reason: "First Line"})
+        ON CREATE SET cp.weight = 1, cp.samples = [$image_id]
+        ON MATCH SET cp.weight = cp.weight + 1, cp.samples = CASE WHEN $image_id IN cp.samples THEN cp.samples ELSE cp.samples + $image_id END
+        CREATE (v)-[:IS_CRITICAL_POINT]->(cp)
         RETURN v.vector_id AS id, coords.x1 AS x1, coords.y1 AS y1, coords.x2 AS x2, coords.y2 AS y2, length
     """
 
-    result: Record | None = tx.run(query, id=min_angle_point_id).single()
+    result: Record | None = tx.run(query, id=min_angle_point_id, image_id=image_id).single()
 
     if result is None:
         raise ValueError(f"No vectors found for angle point {min_angle_point_id}")

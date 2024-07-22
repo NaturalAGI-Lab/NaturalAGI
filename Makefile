@@ -6,3 +6,7 @@ run_with_training:
 	@echo "Running tests..."
 	sh run_training.sh
 	@echo "Done!"
+
+post_processing:
+	sh run_post_processing.sh
+

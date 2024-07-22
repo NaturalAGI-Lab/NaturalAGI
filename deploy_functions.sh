@@ -37,7 +37,7 @@ nuctl deploy --path src/line_detector \
     --platform local \
     --volume $TRAINING_DATA_DIR:$LINE_DETECTOR_TRAINING_DATA_DIR \
     -e NEXT_NUCLIO=http://"$HOST_IP":5052 &
-#    -e IMAGES_LIMIT=10 &
+#    -e IMAGES_LIMIT=2 &
 line_detector_pid=$!
 
 nuctl deploy --path src/angle_point_detector \
@@ -52,19 +52,19 @@ nuctl deploy --path src/contour_analysis \
     -e NEO4J_PASS=$NEO4J_PASS &
 contour_analysis_pid=$!
 
-#nuctl deploy --path src/post_processing \
-#    --platform local \
-#    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-#    -e NEO4J_USER=neo4j \
-#    -e NEO4J_PASS=$NEO4J_PASS &
-#post_processing=$!
-#
-#nuctl deploy --path src/concept_creator \
-#    --platform local \
-#    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-#    -e NEO4J_USER=neo4j \
-#    -e NEO4J_PASS=$NEO4J_PASS &
-#concept_creator=$!
+nuctl deploy --path src/post_processing \
+   --platform local \
+   -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+   -e NEO4J_USER=neo4j \
+   -e NEO4J_PASS=$NEO4J_PASS &
+post_processing=$!
+
+nuctl deploy --path src/concept_creator \
+   --platform local \
+   -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+   -e NEO4J_USER=neo4j \
+   -e NEO4J_PASS=$NEO4J_PASS &
+concept_creator=$!
 #
 # nuctl deploy --path src/qualitative_features_analysis \
 #     --platform local \
@@ -78,6 +78,6 @@ contour_analysis_pid=$!
 wait $line_detector_pid
 wait $ap_detector_pid
 wait $contour_analysis_pid
-#wait $post_processing
-#wait $concept_creator
+wait $post_processing
+wait $concept_creator
 #wait $qualitative_features_analysis

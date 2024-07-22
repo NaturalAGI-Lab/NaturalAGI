@@ -1,4 +1,5 @@
 import logging
+from typing import Any, Dict, List
 
 from neo4j import GraphDatabase, ManagedTransaction
 
@@ -31,6 +32,11 @@ class PostProcessingRepository:
             for node_label in node_labels:
                 session.write_transaction(self._merge_node_transaction, node_label)
 
+    def stabilize_structures(self) -> List[Dict[str, Any]]:
+        logging.info("Starting stabilize_structures method")
+        with self.driver.session() as session:
+            return session.write_transaction(self.find_stable_structures)
+
     def rank_nodes(self):
         logging.info("Starting rank_nodes method")
         with self.driver.session() as session:
@@ -39,6 +45,41 @@ class PostProcessingRepository:
             session.write_transaction(self._degree_centrality)
             session.write_transaction(self._delete_nodes_with_low_degree)
             session.write_transaction(self._delete_graph_projection)
+
+    def find_stable_structures(self, tx: ManagedTransaction) -> List[Dict[str, Any]]:
+        query = """
+            CALL {
+                MATCH (n)
+                WHERE n:Vector OR n:AnglePoint OR n:Feature
+                RETURN max(size(n.samples)) AS maxSamples
+            }
+            WITH maxSamples
+            MATCH (n)
+            WHERE (n:Vector OR n:AnglePoint OR n:Feature)
+                AND size(n.samples) < maxSamples
+            DETACH DELETE n
+        """
+        result = tx.run(query)
+        return [dict(record) for record in result]
+
+    def _reduce_low_weight_features(self, tx: ManagedTransaction) -> None:
+        """
+        Reduce low weight features. Logic is following: to get the 95 percentile of the weight of the features and then
+        delete all the features that have a weight lower than this percentile.
+        :param tx: ManagedTransaction
+        :return: None
+        """
+        query = """
+            CALL {
+                MATCH (n)
+                WITH n.weight AS weight
+                RETURN apoc.agg.percentiles(weight, [0.95])[0] AS thresholdWeight
+            }
+            WITH thresholdWeight
+            MATCH (n)
+            WHERE n.weight <= thresholdWeight
+            DETACH DELETE n
+        """
 
     def _merge_node_transaction(self, tx: ManagedTransaction, node_label: str):
         query = f"""

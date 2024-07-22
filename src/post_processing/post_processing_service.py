@@ -9,4 +9,4 @@ class PostProcessingService:
         # self.post_processing_repository.merge_nodes_location(
         #     ["VectorLocation", "VectorLength", "VectorOrientation"]
         # )
-        self.post_processing_repository.rank_nodes()
+        self.post_processing_repository.stabilize_structures()

@@ -28,7 +28,7 @@ HEALTHCHECK --interval=1s --timeout=3s CMD /usr/local/bin/uhttpc --url http://12
 
 # USER CONTENT
 COPY . /opt/nuclio/
-# END OF USER CONTENT
+# END OF USER CONTENTw
 
 # Run processor with configuration and platform configuration
 CMD [ "processor" ]

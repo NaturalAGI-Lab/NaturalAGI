@@ -19,6 +19,7 @@ def calculate_and_set_relative_params(
         tx: ManagedTransaction,
         vector: VectorDetails,
         angle_point: AnglePoint,
+        image_id: str
 ) -> None:
     """
     Calculates and sets the relative parameters for a given image.
@@ -51,13 +52,13 @@ def calculate_and_set_relative_params(
 
     query = """
         MATCH (vector:Vector {vector_id: $vector_id})
-        MERGE (vValue: VectorValue {x: $x_vect, y: $y_vect})
-        ON CREATE SET vValue.weight = 1
-        ON MATCH SET vValue.weight = vValue.weight + 1
+        MERGE (vValue:VectorValue:Feature {x: $x_vect, y: $y_vect})
+        ON CREATE SET vValue.weight = 1, vValue.samples = [$image_id]
+        ON MATCH SET vValue.weight = vValue.weight + 1, vValue.samples = CASE WHEN $image_id IN vValue.samples THEN vValue.samples ELSE vValue.samples + $image_id END
         WITH vector, vValue
         MERGE (vector)-[:HAS_VECTOR_VALUE]->(vValue)
     """
-    tx.run(query, vector_id=vector.id, x_vect=x_vect, y_vect=y_vect)
+    tx.run(query, vector_id=vector.id, x_vect=x_vect, y_vect=y_vect, image_id=image_id)
     print("Vector value is created for the line")
 
     horizontal_plane, vertical_plane, quadrant = calculate_half_plane_and_quadrant(
@@ -69,13 +70,13 @@ def calculate_and_set_relative_params(
     query = """
         MATCH (vector:Vector {vector_id: $vector_id})
         
-        MERGE (vertical:VerticalVectorHalfPlane {vertical_plane: $vertical_plane})
-        ON CREATE SET vertical.weight = 1
-        ON MATCH SET vertical.weight = vertical.weight + 1
+        MERGE (vertical:VerticalVectorHalfPlane:Feature {vertical_plane: $vertical_plane})
+        ON CREATE SET vertical.weight = 1, vertical.samples = [$image_id]
+        ON MATCH SET vertical.weight = vertical.weight + 1, vertical.samples = CASE WHEN $image_id IN vertical.samples THEN vertical.samples ELSE vertical.samples + $image_id END
         
-        MERGE (horizontal:HorizontalVectorHalfPlane {horizontal_plane: $horizontal_plane})
-        ON CREATE SET horizontal.weight = 1
-        ON MATCH SET horizontal.weight = horizontal.weight + 1
+        MERGE (horizontal:HorizontalVectorHalfPlane:Feature {horizontal_plane: $horizontal_plane})
+        ON CREATE SET horizontal.weight = 1, horizontal.samples = [$image_id]
+        ON MATCH SET horizontal.weight = horizontal.weight + 1, horizontal.samples = CASE WHEN $image_id IN horizontal.samples THEN horizontal.samples ELSE horizontal.samples + $image_id END
         
         MERGE (vector)-[:HAS_VERTICAL_VECTOR_HALF_PLANE]->(vertical)
         MERGE (vector)-[:HAS_HORIZONTAL_VECTOR_HALF_PLANE]->(horizontal)
@@ -85,15 +86,16 @@ def calculate_and_set_relative_params(
         vector_id=vector.id,
         horizontal_plane=horizontal_plane,
         vertical_plane=vertical_plane,
+        image_id=image_id
     )
 
     query = """
         MATCH (vector:Vector {vector_id: $vector_id})
-        MERGE (quadrant:Quadrant {quadrant: $quadrant})
-        ON CREATE SET quadrant.weight = 1
-        ON MATCH SET quadrant.weight = quadrant.weight + 1
+        MERGE (quadrant:Quadrant:Feature {quadrant: $quadrant})
+        ON CREATE SET quadrant.weight = 1, quadrant.samples = [$image_id]
+        ON MATCH SET quadrant.weight = quadrant.weight + 1, quadrant.samples = CASE WHEN $image_id IN quadrant.samples THEN quadrant.samples ELSE quadrant.samples + $image_id END
         MERGE (vector)-[:HAS_QUADRANT]->(quadrant)
     """
-    tx.run(query, vector_id=vector.id, quadrant=quadrant)
+    tx.run(query, vector_id=vector.id, quadrant=quadrant, image_id=image_id)
     print(f"Half planes and quadrants are created for the vector: {vector.id} quadrant:{quadrant} ")
     return

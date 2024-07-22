@@ -17,7 +17,7 @@ def compare_vector_magnitude_and_create_nodes(tx, vector1_id: str, vector2_id: s
     create_node_query = f"""
       MATCH (v1:Vector {{vector_id: $vector1_id}}),
                   (v2:Vector {{vector_id: $vector2_id}})
-      CREATE (vect:{label})
+      CREATE (vect:{label}:Feature)
       CREATE (v1)-[:IN]->(vect)-[:OUT]->(v2)
     """
     tx.run(create_node_query, vector1_id=vector1_id, vector2_id=vector2_id)

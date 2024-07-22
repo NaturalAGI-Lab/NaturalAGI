@@ -15,6 +15,7 @@ def calculate_magnitude_and_direction(
         tx: ManagedTransaction,
         last_vector_id: str,
         next_vector_id: str,
+        image_id: str,
 ):
     if last_vector_id is None:
         logging.debug("Can't compare the first vector... Skipping first iteration")
@@ -22,7 +23,7 @@ def calculate_magnitude_and_direction(
 
     last_direction = get_last_direction(tx, last_vector_id)
     current_direction = calculate_direction(tx, last_vector_id, next_vector_id)
-    add_direction(tx, last_vector_id, next_vector_id, current_direction)
+    add_direction(tx, last_vector_id, next_vector_id, current_direction, image_id)
 
     if last_direction and last_direction != current_direction:
         # If there's a direction change, create a CriticalPoint at the angle between the vectors
@@ -84,21 +85,23 @@ def calculate_direction(
         return None
 
 
-def add_direction(tx, vector1_id: str, vector2_id: str, direction: str):
+def add_direction(tx, vector1_id: str, vector2_id: str, direction: str, image_id: str):
     logging.debug(f"Adding direction: {direction} to the vectors")
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
-        CREATE (vd:VectDirection {direction: $direction})
+        MERGE (vd:VectDirection:Feature {direction: $direction})
+        ON CREATE SET vd.weight = 1, vd.samples = [$image_id]
+        ON MATCH SET vd.weight = vd.weight + 1, vd.samples = CASE WHEN $image_id IN vd.samples THEN vd.samples ELSE vd.samples + [$image_id] END
         CREATE (v1)-[:HAS_DIRECTION]->(vd)-[:HAS_DIRECTION]->(v2)
     """
-    tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, direction=direction)
+    tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, direction=direction, image_id=image_id)
 
 
 def create_critical_point(tx, vector1_id: str, vector2_id: str):
     logging.info("Finding angle point between two vectors")
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
-        MERGE (cp:CriticalPoint {reason: "Direction Change"})-[:IS_CRITICAL_POINT]->(ap)
+        MERGE (cp:CriticalPoint:Feature {reason: "Direction Change"})-[:IS_CRITICAL_POINT]->(ap)
         ON CREATE SET cp.weight = 1
         ON MATCH SET cp.weight = cp.weight + 1
     """
