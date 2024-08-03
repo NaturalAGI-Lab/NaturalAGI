@@ -23,6 +23,11 @@ def calculate_magnitude_and_direction(
 
     last_direction = get_last_direction(tx, last_vector_id)
     current_direction = calculate_direction(tx, last_vector_id, next_vector_id)
+    
+    if current_direction is None:
+        logging.warning(f"Could not calculate direction for vectors {last_vector_id} and {next_vector_id}")
+        return
+
     add_direction(tx, last_vector_id, next_vector_id, current_direction, image_id)
 
     if last_direction and last_direction != current_direction:
@@ -54,8 +59,8 @@ def calculate_direction(
         MATCH (v1)-[:HAS_VECTOR_VALUE]->(value1:VectorValue)
         MATCH (v2)-[:HAS_VECTOR_VALUE]->(value2:VectorValue)
         RETURN 
-            value1.x AS x_v1, value1.y AS y_v1,
-            value2.x AS x_v2, value2.y AS y_v2
+            value1.x AS x1, value1.y AS y1,
+            value2.x AS x2, value2.y AS y2
     """
     record = tx.run(
         query,
@@ -64,22 +69,21 @@ def calculate_direction(
     ).single()
 
     if record:
-        # Convert Record to dictionary for modification
-        result = dict(record)
-        logging.info(result)
+        x1, y1, x2, y2 = record["x1"], record["y1"], record["x2"], record["y2"]
+        
+        # Calculate vectors
+        v1 = [x2 - x1, y2 - y1]
+        v2 = [x2 - x1, y2 - y1]
 
-        v1 = [result["x_v1"], result["y_v1"]]
-        v2 = [result["x_v2"], result["y_v2"]]
-
-        logging.debug(f"Cross product for: {v1, v2}")
+        logging.debug(f"Vectors: v1={v1}, v2={v2}")
         cross_product = np.cross(v1, v2)
-        current_direction = (
-            "CounterClockwise"
-            if cross_product < 0
-            else "Clockwise" if cross_product > 0 else "Collinear"
-        )
-
-        return current_direction
+        
+        if cross_product < 0:
+            return "CounterClockwise"
+        elif cross_product > 0:
+            return "Clockwise"
+        else:
+            return "Collinear"
     else:
         logging.warning("No matching vectors found in the database.")
         return None

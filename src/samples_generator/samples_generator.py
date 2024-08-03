@@ -89,6 +89,17 @@ def generate_triangle_images(output_dir: str, num_images: int, img_size: int, is
 
                 draw.line(line, fill='white')
 
+        # Randomly rotate the image
+        rotation_angle = random.randint(0, 359)
+        img = img.rotate(rotation_angle, resample=Image.BICUBIC, expand=True)
+
+        # Crop the image to remove any black borders after rotation
+        bbox = img.getbbox()
+        img = img.crop(bbox)
+
+        # Resize the image back to the original size
+        img = img.resize((img_size, img_size), Image.LANCZOS)
+
         # Generate timestamp for the filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
 

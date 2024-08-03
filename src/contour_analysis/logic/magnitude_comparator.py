@@ -19,7 +19,7 @@ def compare_vector_magnitude_and_create_nodes(tx, vector1_id: str, vector2_id: s
                   (v2:Vector {{vector_id: $vector2_id}})
       MERGE (vect:{label}:Feature)
       ON CREATE SET vect.samples = [$image_id]
-      ON MATCH SET vect.samples = vect.samples + $image_id
+      ON MATCH SET vect.samples = CASE WHEN $image_id IN vect.samples THEN vect.samples ELSE vect.samples + [$image_id] END
       MERGE (v1)-[:IN]->(vect)-[:OUT]->(v2)
     """
     tx.run(create_node_query, vector1_id=vector1_id, vector2_id=vector2_id, image_id=image_id)
