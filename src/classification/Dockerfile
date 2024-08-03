@@ -21,12 +21,13 @@ COPY --from=uhttpc /home/nuclio/bin/uhttpc /usr/local/bin/uhttpc
 RUN apt-get update && apt-get install -y libgl1-mesa-glx
 
 RUN pip install --upgrade pip
-RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-python
+RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-python neo4j Pillow
 
 # Readiness probe
 HEALTHCHECK --interval=1s --timeout=3s CMD /usr/local/bin/uhttpc --url http://127.0.0.1:8082/ready || exit 1
+
 # USER CONTENT
-ADD . /opt/nuclio/
+COPY . /opt/nuclio/$FUNCTION_NAME
 # END OF USER CONTENT
 
 # Run processor with configuration and platform configuration

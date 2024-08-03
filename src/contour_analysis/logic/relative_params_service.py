@@ -53,8 +53,8 @@ def calculate_and_set_relative_params(
     query = """
         MATCH (vector:Vector {vector_id: $vector_id})
         MERGE (vValue:VectorValue:Feature {x: $x_vect, y: $y_vect})
-        ON CREATE SET vValue.weight = 1, vValue.samples = [$image_id]
-        ON MATCH SET vValue.weight = vValue.weight + 1, vValue.samples = CASE WHEN $image_id IN vValue.samples THEN vValue.samples ELSE vValue.samples + $image_id END
+        ON CREATE SET vValue.samples = [$image_id]
+        ON MATCH SET vValue.samples = CASE WHEN $image_id IN vValue.samples THEN vValue.samples ELSE vValue.samples + $image_id END
         WITH vector, vValue
         MERGE (vector)-[:HAS_VECTOR_VALUE]->(vValue)
     """
@@ -70,13 +70,13 @@ def calculate_and_set_relative_params(
     query = """
         MATCH (vector:Vector {vector_id: $vector_id})
         
-        MERGE (vertical:VerticalVectorHalfPlane:Feature {vertical_plane: $vertical_plane})
-        ON CREATE SET vertical.weight = 1, vertical.samples = [$image_id]
-        ON MATCH SET vertical.weight = vertical.weight + 1, vertical.samples = CASE WHEN $image_id IN vertical.samples THEN vertical.samples ELSE vertical.samples + $image_id END
+        MERGE (vertical:VerticalVectorHalfPlane:Feature {value: $vertical_plane})
+        ON CREATE SET vertical.samples = [$image_id]
+        ON MATCH SET vertical.samples = CASE WHEN $image_id IN vertical.samples THEN vertical.samples ELSE vertical.samples + $image_id END
         
-        MERGE (horizontal:HorizontalVectorHalfPlane:Feature {horizontal_plane: $horizontal_plane})
-        ON CREATE SET horizontal.weight = 1, horizontal.samples = [$image_id]
-        ON MATCH SET horizontal.weight = horizontal.weight + 1, horizontal.samples = CASE WHEN $image_id IN horizontal.samples THEN horizontal.samples ELSE horizontal.samples + $image_id END
+        MERGE (horizontal:HorizontalVectorHalfPlane:Feature {value: $horizontal_plane})
+        ON CREATE SET horizontal.samples = [$image_id]
+        ON MATCH SET horizontal.samples = CASE WHEN $image_id IN horizontal.samples THEN horizontal.samples ELSE horizontal.samples + $image_id END
         
         MERGE (vector)-[:HAS_VERTICAL_VECTOR_HALF_PLANE]->(vertical)
         MERGE (vector)-[:HAS_HORIZONTAL_VECTOR_HALF_PLANE]->(horizontal)
@@ -91,9 +91,9 @@ def calculate_and_set_relative_params(
 
     query = """
         MATCH (vector:Vector {vector_id: $vector_id})
-        MERGE (quadrant:Quadrant:Feature {quadrant: $quadrant})
-        ON CREATE SET quadrant.weight = 1, quadrant.samples = [$image_id]
-        ON MATCH SET quadrant.weight = quadrant.weight + 1, quadrant.samples = CASE WHEN $image_id IN quadrant.samples THEN quadrant.samples ELSE quadrant.samples + $image_id END
+        MERGE (quadrant:Quadrant:Feature {value: $quadrant})
+        ON CREATE SET quadrant.samples = [$image_id]
+        ON MATCH SET quadrant.samples = CASE WHEN $image_id IN quadrant.samples THEN quadrant.samples ELSE quadrant.samples + $image_id END
         MERGE (vector)-[:HAS_QUADRANT]->(quadrant)
     """
     tx.run(query, vector_id=vector.id, quadrant=quadrant, image_id=image_id)

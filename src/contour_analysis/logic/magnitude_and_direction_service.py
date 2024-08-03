@@ -27,10 +27,10 @@ def calculate_magnitude_and_direction(
 
     if last_direction and last_direction != current_direction:
         # If there's a direction change, create a CriticalPoint at the angle between the vectors
-        create_critical_point(tx, last_vector_id, next_vector_id)
+        create_critical_point(tx, last_vector_id, next_vector_id, image_id)
     else:
         logging.info("No changes in directions")
-    return compare_vector_magnitude_and_create_nodes(tx, last_vector_id, next_vector_id)
+    return compare_vector_magnitude_and_create_nodes(tx, last_vector_id, next_vector_id, image_id)
 
 
 def get_last_direction(tx: ManagedTransaction, last_vector_id: str) -> Union[str, None]:
@@ -90,19 +90,19 @@ def add_direction(tx, vector1_id: str, vector2_id: str, direction: str, image_id
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
         MERGE (vd:VectDirection:Feature {direction: $direction})
-        ON CREATE SET vd.weight = 1, vd.samples = [$image_id]
-        ON MATCH SET vd.weight = vd.weight + 1, vd.samples = CASE WHEN $image_id IN vd.samples THEN vd.samples ELSE vd.samples + [$image_id] END
+        ON CREATE SET vd.samples = [$image_id]
+        ON MATCH SET vd.samples = CASE WHEN $image_id IN vd.samples THEN vd.samples ELSE vd.samples + [$image_id] END
         CREATE (v1)-[:HAS_DIRECTION]->(vd)-[:HAS_DIRECTION]->(v2)
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, direction=direction, image_id=image_id)
 
 
-def create_critical_point(tx, vector1_id: str, vector2_id: str):
+def create_critical_point(tx, vector1_id: str, vector2_id: str, image_id: str):
     logging.info("Finding angle point between two vectors")
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
         MERGE (cp:CriticalPoint:Feature {reason: "Direction Change"})-[:IS_CRITICAL_POINT]->(ap)
-        ON CREATE SET cp.weight = 1
-        ON MATCH SET cp.weight = cp.weight + 1
+        ON CREATE SET cp.samples = [$image_id]
+        ON MATCH SET cp.samples = CASE WHEN $image_id IN cp.samples THEN cp.samples ELSE cp.samples + [$image_id] END
     """
-    tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id).single()
+    tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, image_id=image_id)

@@ -1,7 +1,6 @@
 import json
 import traceback
 
-import requests
 from pydantic_settings import BaseSettings
 
 from contour_analysis_repository import ContourAnalysisRepository
@@ -37,8 +36,8 @@ def init_context(context):
     setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
 
 
-def http_handler(context, event):
-    """Handles HTTP requests"""
+def kafka_handler(context, event):
+    """Handles Kafka messages"""
     try:
 
         input_data = json.loads(event.body)
@@ -53,39 +52,9 @@ def http_handler(context, event):
             context.logger.error_with(f"Error analyzing contour:\n {e}", handler=HANDLER_NAME)
             traceback.print_exc()
 
-        # next_functions_str = context.user_data.next_nuclio
-        #
-        # if next_functions_str:
-        #     next_nuclio = next_functions_str.split(";")
-        #     context.logger.debug_with(
-        #         f"Next functions: {next_nuclio}", handler=HANDLER_NAME
-        #     )
-        #
-        #     if len(next_nuclio) > 0:
-        #         for func in next_nuclio:
-        #             context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-        #             response = requests.post(func, json=str(image_id))
-        #             context.logger.info_with(
-        #                 f"Response: {response.status_code}", handler=HANDLER_NAME
-        #             )
-
-        context.Response(
-            body=f"Contour analyzed for image: {input_data['image_id']}",
-            headers={},
-            content_type="text/plain",
-            status_code=requests.codes.ok,  # pylint: disable=no-member
-        )
-
     except Exception as e:
         context.logger.error_with(f"Error:\n {e}", handler=HANDLER_NAME)
         traceback.print_exc()
-
-        context.Response(
-            body=f"Error detecting points for image: {e}",
-            headers={},
-            content_type="text/plain",
-            status_code=requests.codes.server_error,  # pylint: disable=no-member
-        )
 
 
 def handler(context, event):
@@ -98,8 +67,8 @@ def handler(context, event):
         f"{HANDLER_NAME}: Input Headers: {event.headers}", handler=HANDLER_NAME
     )
 
-    if event.trigger.kind == "http":
-        http_handler(context, event)
+    if event.trigger.kind == "kafka-cluster":
+        kafka_handler(context, event)
 
     else:
         context.logger.error_with(

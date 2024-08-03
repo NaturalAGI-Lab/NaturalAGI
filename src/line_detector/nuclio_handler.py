@@ -1,22 +1,27 @@
-import base64
 import glob
 import json
+import logging
 import os
 import uuid
 
 import cv2
 import numpy as np
-import requests
 from pydantic_settings import BaseSettings
+from kafka import KafkaProducer
 
 from line_detector import detect_lines
+from dlq_model import DLQModel
 
 HANDLER_NAME = "Line Detector"
 
 
 class Settings(BaseSettings):
     """Settings"""
-    next_nuclio: str = ""
+
+    kafka_topic: str
+    dlq_topic: str
+    kafka_bootstrap_servers: str
+    kafka_group_id: str = "line-detector"
     images_limit: int = 1000
 
 
@@ -26,12 +31,21 @@ def init_context(context):
     Args:
         context ([type]): Nuclio context
     """
+    settings = Settings()
     context.logger.debug_with(
-        f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
+        f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
     )
 
-    setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
-    setattr(context.user_data, "images_limit", Settings().images_limit)
+    # Initialize Kafka producer with JSON serializer
+    producer = KafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
+        key_serializer=lambda k: json.dumps(k).encode('utf-8') if k else None
+    )
+    setattr(context.user_data, "kafka_topic", settings.kafka_topic)
+    setattr(context.user_data, "dlq_topic", settings.dlq_topic)
+    setattr(context.user_data, "kafka_producer", producer)
+    setattr(context.user_data, "images_limit", settings.images_limit)
 
 
 def http_handler(context, event):
@@ -40,16 +54,19 @@ def http_handler(context, event):
         data = event.body
         images_count = 0
 
+        logging.info(f"Data: {data}")
+
         # Check if 'input_folder' key exists in the data and is not empty
         if "input_folder" in data and data["input_folder"]:
-            print(f"input floder: {data['input_folder']}")
             input_folder = data["input_folder"]
             image_files = glob.glob(os.path.join(input_folder, "*"))
 
             for image_file in image_files:
                 images_limit = context.user_data.images_limit
                 if images_count >= images_limit:
-                    context.logger.info(f"Reached maximum number of images: {images_limit}")
+                    context.logger.info(
+                        f"Reached maximum number of images: {images_limit}"
+                    )
                     break
 
                 with open(image_file, "rb") as f:
@@ -61,19 +78,51 @@ def http_handler(context, event):
 
             context.logger.info(f"Processed {len(image_files)} images")
 
-        # If 'input_folder' key doesn't exist, check for 'image' key
-        elif "image" in data and data["image"]:
-            image_data = base64.b64decode(data["image"])
+        # If 'input_folder' key doesn't exist, check for 'image_path' key
+        elif "image_path" in data and data["image_path"]:
+            image_path = data["image_path"]
+            context.logger.info(f"Processing single image: {image_path}")
+            with open(image_path, "rb") as f:
+                image_data = f.read()
             process_image(context, image_data)
 
         else:
-            context.logger.error("No image data or input folder in request")
-            return
+            error_message = "No image data or input folder in request"
+            context.logger.error(error_message)
+            dlq_model = DLQModel(
+                source="line_detector",
+                message=error_message,
+                value=data
+            )
+            context.user_data.kafka_producer.send(
+                context.user_data.dlq_topic,
+                value=dlq_model.model_dump()
+            )
+            return context.Response(
+                body=error_message,
+                status_code=400,
+                content_type="text/plain"
+            )
 
         context.logger.info("Processed request successfully")
 
     except Exception as e:
-        context.logger.error(f"Error processing request: {str(e)}")
+        error_message = f"Error processing request: {str(e)}"
+        context.logger.error(error_message)
+        dlq_model = DLQModel(
+            source="line_detector",
+            message=error_message,
+            value=data if 'data' in locals() else {}
+        )
+        context.user_data.kafka_producer.send(
+            context.user_data.dlq_topic,
+            value=dlq_model.model_dump()
+        )
+        return context.Response(
+            body=error_message,
+            status_code=500,
+            content_type="text/plain"
+        )
 
 
 def handler(context, event):
@@ -104,28 +153,13 @@ def process_image(context, image_data):
     lines = detect_lines(image)
     context.logger.info(f"Detected {len(lines)} lines for image: {image_id}")
 
-    next_functions_str = context.user_data.next_nuclio
+    kafka_producer = context.user_data.kafka_producer
 
-    if next_functions_str:
-        next_nuclio = next_functions_str.split(";")
-        context.logger.debug_with(
-            f"Next functions: {next_nuclio}", handler=HANDLER_NAME
+    if kafka_producer:
+        kafka_producer.send(
+            context.user_data.kafka_topic,
+            value={"image_id": str(image_id), "lines": lines},
         )
-
-        if len(next_nuclio) > 0:
-            for func in next_nuclio:
-                context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                ser_result = json.dumps({"image_id": str(image_id), "lines": lines}, indent=4)
-                context.logger.info_with(
-                    f"Sending data: {ser_result}", handler=HANDLER_NAME
-                )
-                response = requests.post(
-                    func, json=ser_result
-                )
-                context.logger.info_with(
-
-                    f"Response: {response.status_code}", handler=HANDLER_NAME
-                )
 
     context.Response(
         body=f"Lines detected for image: {image_id}",

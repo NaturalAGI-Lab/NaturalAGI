@@ -1,4 +1,6 @@
 import argparse
+import math
+from datetime import datetime
 
 from PIL import Image, ImageDraw
 import random
@@ -8,19 +10,30 @@ from image_aggregator import do_intersect, extend_line, generate_curved_line_ext
     is_triangle_valid
 
 
-def generate_triangle_images(output_dir, num_images, img_size, is_noised, curved_sides, zigzag_sides, broken_sides):
+def generate_triangle_images(output_dir: str, num_images: int, img_size: int, is_noised: bool, curved_sides: bool, zigzag_sides: bool, broken_sides: bool, specified_angle: float | None) -> None:
     global curved_sides_num, zigzag_sides_num, straight_sides_num
+    
     # Create the output directory if it doesn't exist
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
+    # Calculate the silent zone size (5% of the image size)
+    silent_zone = int(img_size * 0.05)
+    
+    # Adjust the effective image size for triangle generation
+    effective_img_size = img_size - 2 * silent_zone
+
     for i in range(num_images):
-        # Create a blank image with white background
+        # Create a blank image with black background
         img = Image.new('RGB', (img_size, img_size), 'black')
         draw = ImageDraw.Draw(img)
 
-        # Generate random vertices for the triangle
-        vertices = generate_triangle(img_size)
+        # Generate random vertices for the triangle within the effective image size
+        vertices = generate_triangle(effective_img_size, specified_angle)
+        
+        # Adjust vertices to account for the silent zone
+        vertices = [(x + silent_zone, y + silent_zone) for x, y in vertices]
+        
         sides = [(vertices[0], vertices[1]), (vertices[1], vertices[2]), (vertices[2], vertices[0])]
         drawn_sides = []
 
@@ -76,16 +89,60 @@ def generate_triangle_images(output_dir, num_images, img_size, is_noised, curved
 
                 draw.line(line, fill='white')
 
-        # Save the image
-        img.save(f"{output_dir}/triangle_{i}_{curved_sides_num}_{zigzag_sides_num}_{straight_sides_num}.bmp")
+        # Generate timestamp for the filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
+
+        # Save the image with timestamp in the filename
+        img.save(f"{output_dir}/triangle_{curved_sides_num}_{zigzag_sides_num}_{straight_sides_num}_{timestamp}.bmp")
 
     print(f"{num_images} images have been saved to {output_dir}/")
 
 
-def generate_triangle(img_size):
+def generate_triangle(img_size: int, specified_angle: float | None) -> list[tuple[int, int]]:
     while True:
-        vertices = [(random.randint(0, img_size - 1), random.randint(0, img_size - 1)) for _ in range(3)]
-        if is_triangle_valid(vertices):
+        if specified_angle is None:
+            vertices = [(random.randint(0, img_size - 1), random.randint(0, img_size - 1)) for _ in range(3)]
+        else:
+            # Generate the first vertex randomly
+            vertex1 = (random.randint(0, img_size - 1), random.randint(0, img_size - 1))
+
+            # Generate the second vertex based on the specified angle
+            angle_rad = math.radians(specified_angle)
+            radius1 = random.randint(int(img_size * 0.2), int(img_size * 0.8))
+            vertex2 = (
+                int(vertex1[0] + radius1 * math.cos(angle_rad)),
+                int(vertex1[1] + radius1 * math.sin(angle_rad))
+            )
+
+            # Ensure the second vertex is within the image bounds
+            vertex2 = (max(0, min(vertex2[0], img_size - 1)),
+                       max(0, min(vertex2[1], img_size - 1)))
+
+            # Generate the third vertex to form the specified angle at vertex1
+            radius2 = random.randint(int(img_size * 0.2), int(img_size * 0.8))
+            
+            # Calculate the vector from vertex1 to vertex2
+            v1_to_v2 = (vertex2[0] - vertex1[0], vertex2[1] - vertex1[1])
+            
+            # Rotate this vector by the specified angle to get the direction for vertex3
+            rotated_x = v1_to_v2[0] * math.cos(angle_rad) - v1_to_v2[1] * math.sin(angle_rad)
+            rotated_y = v1_to_v2[0] * math.sin(angle_rad) + v1_to_v2[1] * math.cos(angle_rad)
+            
+            # Normalize the rotated vector and scale it by radius2
+            length = math.sqrt(rotated_x**2 + rotated_y**2)
+            vertex3 = (
+                int(vertex1[0] + (rotated_x / length) * radius2),
+                int(vertex1[1] + (rotated_y / length) * radius2)
+            )
+
+            # Ensure the third vertex is within the image bounds
+            vertex3 = (max(0, min(vertex3[0], img_size - 1)),
+                       max(0, min(vertex3[1], img_size - 1)))
+
+            vertices = [vertex1, vertex2, vertex3]
+
+        # Check if all vertices are distinct and form a valid triangle
+        if len(set(vertices)) == 3 and is_triangle_valid(vertices):
             return vertices
 
 
@@ -98,9 +155,9 @@ def draw_curved_side(draw, side, line_width, img_size):
 
 def draw_zigzag_side(draw, side, line_width, img_size):
     zigzag_points = generate_zigzag_points_extended(side[0], side[1], amplitude=random.randint(1, 5),
-                                                    frequency=random.randint(15, 35),
-                                                    extension=random.randint(round(img_size * 0.05),
-                                                                             round(img_size * 0.3)))
+                                                        frequency=random.randint(15, 35),
+                                                        extension=random.randint(round(img_size * 0.05),
+                                                                                 round(img_size * 0.3)))
     draw.line(zigzag_points, fill='white', width=line_width)
 
 
@@ -153,8 +210,10 @@ if __name__ == "__main__":
                         help="Flag to allow zigzag polygons as triangle's sides")
     parser.add_argument('--broken_sides', type=bool, default=False,
                         help="Flag to allow broken triangle's sides")
+    parser.add_argument('--specified_angle', type=float, default=None,
+                        help="Specify the angle of the second vertex relative to the first vertex")
 
     args = parser.parse_args()
 
     generate_triangle_images(args.output_dir, args.num_images, args.img_size, args.is_noised, args.curved_sides,
-                             args.zigzag_sides, args.broken_sides)
+                             args.zigzag_sides, args.broken_sides, args.specified_angle)

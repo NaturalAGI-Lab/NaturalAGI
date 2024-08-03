@@ -1,20 +1,60 @@
 #!/bin/bash
 
+# Function to log messages
+log() {
+    local message="$1"
+    echo "[INFO] $message"
+}
+
+# Function to log errors
+log_error() {
+    local message="$1"
+    echo "[ERROR] $message" >&2
+}
+
+# Function to find an available port
+find_available_port() {
+    local start_port=5000
+    local end_port=6000
+
+    for ((port=$start_port; port<=$end_port; port++)); do
+        if ! lsof -i:$port >/dev/null; then
+            echo $port
+            return
+        fi
+    done
+
+    log_error "No available ports found in the range $start_port-$end_port"
+    exit 1
+}
+
 # Check if a function name is provided
-if [ "$#" -ne 2 ]; then
-    echo "Usage: $0 <function-name> <port>"
+if [ "$#" -lt 1 ]; then
+    log_error "Usage: $0 <function-name> [port]"
     exit 1
 fi
 
-# Read the function name from the first argument
+# Read the function name and port from the arguments
 FUNCTION_NAME="$1"
+PORT="${2:-$(find_available_port)}"
 
-# Read the port from the second argument
-PORT="$2"
+# Check if the port is a valid number
+if ! [[ "$PORT" =~ ^[0-9]+$ ]]; then
+    log_error "Error: Port must be a number"
+    exit 1
+fi
 
 # Create a new directory for the function
-mkdir "src/$FUNCTION_NAME"
-cd "src/$FUNCTION_NAME"
+FUNCTION_DIR="src/$FUNCTION_NAME"
+if ! mkdir -p "$FUNCTION_DIR"; then
+    log_error "Error: Failed to create directory $FUNCTION_DIR"
+    exit 1
+fi
+
+if ! cd "$FUNCTION_DIR"; then
+    log_error "Error: Failed to change to directory $FUNCTION_DIR"
+    exit 1
+fi
 
 # Create a Python file for the function
 cat > nuclio_handler.py <<EOF
@@ -73,13 +113,12 @@ def http_handler(context, event):
             next_nuclio = next_functions_str.split(";")
             context.logger.debug_with(f"Next functions: {next_nuclio}", handler=HANDLER_NAME)
 
-            if len(next_nuclio) > 0:
-                for func in next_nuclio:
-                    context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                    requests.post(func, json=str(image_id))
+            for func in next_nuclio:
+                context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
+                requests.post(func, json=str(image_id))
         
         # Responding to the HTTP request
-        context.Response(
+        return context.Response(
             body=f"Response message",
             headers={},
             content_type="text/plain",
@@ -90,7 +129,7 @@ def http_handler(context, event):
         context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)
         traceback.print_exc()
 
-        context.Response(
+        return context.Response(
             body=f"Error: {e}",
             headers={},
             content_type="text/plain",
@@ -105,10 +144,16 @@ def handler(context, event):
     context.logger.info_with(f"{HANDLER_NAME}: Input Headers: {event.headers}", handler=HANDLER_NAME)
 
     if event.trigger.kind == "http":
-        http_handler(context, event)
+        return http_handler(context, event)
     else:
         context.logger.error_with("Unknown trigger. Only HTTP supported", handler=HANDLER_NAME)
 EOF
+
+# Check if the Python file was created successfully
+if [ ! -f nuclio_handler.py ]; then
+    log_error "Error: Failed to create nuclio_handler.py"
+    exit 1
+fi
 
 # Create a Nuclio function configuration file with the specified port
 cat > function.yaml <<EOF
@@ -138,23 +183,28 @@ spec:
         port: $PORT
 EOF
 
+# Check if the function configuration file was created successfully
+if [ ! -f function.yaml ]; then
+    log_error "Error: Failed to create function.yaml"
+    exit 1
+fi
 
 # Create the Dockerfile
-cat > Dockerfile <<EOF
+cat > Dockerfile <<'EOF'
 ARG ARTIFACTS_TOKEN=""
 ARG NUCLIO_LABEL=1.12.5
 ARG NUCLIO_ARCH=amd64
 ARG NUCLIO_BASE_IMAGE=python:3.9
-ARG NUCLIO_ONBUILD_IMAGE=quay.io/nuclio/handler-builder-python-onbuild:\${NUCLIO_LABEL}-\${NUCLIO_ARCH}
+ARG NUCLIO_ONBUILD_IMAGE=quay.io/nuclio/handler-builder-python-onbuild:${NUCLIO_LABEL}-${NUCLIO_ARCH}
 
 # Supplies processor uhttpc, used for healthcheck
 FROM nuclio/uhttpc:0.0.1-amd64 as uhttpc
 
 # Supplies processor binary, wrapper
-FROM \${NUCLIO_ONBUILD_IMAGE} as processor
+FROM ${NUCLIO_ONBUILD_IMAGE} as processor
 
 # From the base image
-FROM \${NUCLIO_BASE_IMAGE}
+FROM ${NUCLIO_BASE_IMAGE}
 
 # Copy required objects from the suppliers
 COPY --from=processor /home/nuclio/bin/processor /usr/local/bin/processor
@@ -176,3 +226,11 @@ COPY . /opt/nuclio/$FUNCTION_NAME
 # Run processor with configuration and platform configuration
 CMD [ "processor" ]
 EOF
+
+# Check if the Dockerfile was created successfully
+if [ ! -f Dockerfile ]; then
+    log_error "Error: Failed to create Dockerfile"
+    exit 1
+fi
+
+log "Function '$FUNCTION_NAME' created successfully in $FUNCTION_DIR on port $PORT"

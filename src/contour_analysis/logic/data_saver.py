@@ -15,27 +15,24 @@ def save_vectors_data(tx, vectors: List[VectorDetails], image_id: str):
             """
             // Create or match Length node
             MERGE (length:Length:Feature {value: $length})
-            ON CREATE SET length.weight = 1, length.samples = [$image_id]
-            ON MATCH SET length.weight = length.weight + 1, length.samples = CASE WHEN $image_id IN length.samples THEN length.samples ELSE length.samples + $image_id END
+            ON CREATE SET length.samples = [$image_id]
+            ON MATCH SET length.samples = CASE WHEN $image_id IN length.samples THEN length.samples ELSE length.samples + $image_id END
             
             // Create or match Angle node
             MERGE (angle:Angle:Feature {value: $angle})
-            ON CREATE SET angle.weight = 1, angle.samples = [$image_id]
-            ON MATCH SET angle.weight = angle.weight + 1, angle.samples = CASE WHEN $image_id IN angle.samples THEN angle.samples ELSE angle.samples + $image_id END
+            ON CREATE SET angle.samples = [$image_id]
+            ON MATCH SET angle.samples = CASE WHEN $image_id IN angle.samples THEN angle.samples ELSE angle.samples + $image_id END
             
             // Create or match Coordinates node
             MERGE (coordinates:Coordinates:Feature {x1: $x1, y1: $y1, x2: $x2, y2: $y2})
-            ON CREATE SET coordinates.weight = 1, coordinates.samples = [$image_id]
-            ON MATCH SET coordinates.weight = coordinates.weight + 1, coordinates.samples = CASE WHEN $image_id IN coordinates.samples THEN coordinates.samples ELSE coordinates.samples + $image_id END
+            ON CREATE SET coordinates.samples = [$image_id]
+            ON MATCH SET coordinates.samples = CASE WHEN $image_id IN coordinates.samples THEN coordinates.samples ELSE coordinates.samples + $image_id END
             
-            // Create or match Vector node based on relationships
-            MERGE (v:Vector)-[:HAS_ANGLE]->(angle)
-            // Set initial properties if created, or increment if matched
-            ON CREATE SET v.image_id = $image_id, v.vector_id = $vector_id, v.samples = [$image_id]
-            ON MATCH SET v.image_id = $image_id, v.vector_id = $vector_id, v.samples = v.samples + $image_id
-            
-            MERGE (v)-[:HAS_LENGTH]->(length)
-            MERGE (v)-[:HAS_COORDINATES]->(coordinates)
+            // Always create a new Vector node
+            CREATE (v:Vector {image_id: $image_id, vector_id: $vector_id, samples: [$image_id]})
+            CREATE (v)-[:HAS_ANGLE]->(angle)
+            CREATE (v)-[:HAS_LENGTH]->(length)
+            CREATE (v)-[:HAS_COORDINATES]->(coordinates)
             """,
             image_id=image_id, vector_id=vector.id, length=vector.length, angle=angle, x1=vector.x1, y1=vector.y1,
             x2=vector.x2, y2=vector.y2)
@@ -49,13 +46,13 @@ def save_intersection_data(tx: ManagedTransaction,
             
             // Create or match AnglePointCoordinates node
             MERGE (apCoords:AnglePointCoordinates:Feature {x: data.x, y: data.y})
-            ON CREATE SET apCoords.weight = 1, apCoords.samples = [$image_id]
-            ON MATCH SET apCoords.weight = apCoords.weight + 1, apCoords.samples = CASE WHEN $image_id IN apCoords.samples THEN apCoords.samples ELSE apCoords.samples + $image_id END
+            ON CREATE SET apCoords.samples = [$image_id]
+            ON MATCH SET apCoords.samples = CASE WHEN $image_id IN apCoords.samples THEN apCoords.samples ELSE apCoords.samples + $image_id END
             
             // Create or match AnglePointAngle node
             MERGE (apAngle:AnglePointAngle:Feature {angle: data.angle})
-            ON CREATE SET apAngle.weight = 1, apAngle.samples = [$image_id]
-            ON MATCH SET apAngle.weight = apAngle.weight + 1, apAngle.samples = CASE WHEN $image_id IN apAngle.samples THEN apAngle.samples ELSE apAngle.samples + $image_id END
+            ON CREATE SET apAngle.samples = [$image_id]
+            ON MATCH SET apAngle.samples = CASE WHEN $image_id IN apAngle.samples THEN apAngle.samples ELSE apAngle.samples + $image_id END
             
             MERGE (ap:AnglePoint)-[:HAS_ANGLE]->(apAngle)
         

@@ -41,8 +41,8 @@ def mark_quadrant_change(
         WITH v1, v2
         MATCH (v1)--(ap:AnglePoint)--(v2)
         MERGE (ap)-[:IS_CRITICAL_POINT]->(cp:CriticalPoint:Feature {reason: 'Quadrant Change'})
-        ON CREATE SET cp.weight = 1, cp.samples = [$image_id]
-        ON MATCH SET cp.weight = cp.weight + 1, cp.samples = CASE WHEN $image_id IN cp.samples THEN cp.samples ELSE cp.samples + [$image_id] END
+        ON CREATE SET cp.samples = [$image_id]
+        ON MATCH SET cp.samples = CASE WHEN $image_id IN cp.samples THEN cp.samples ELSE cp.samples + [$image_id] END
     """
     tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, image_id=image_id)
 
@@ -62,6 +62,6 @@ def _get_vector_quadrant(tx: ManagedTransaction, vector_id: str) -> int:
     print(f"Quadrant check, vector:{vector_id}")
     query: str = """
         MATCH (v:Vector {vector_id: $vector_id})--(quadrant:Quadrant)
-        RETURN quadrant.quadrant AS quadrant
+        RETURN quadrant.value AS quadrant
     """
     return tx.run(query, vector_id=vector_id).single()["quadrant"]

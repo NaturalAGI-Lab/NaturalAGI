@@ -3,6 +3,7 @@
 import requests
 import traceback
 from pydantic_settings import BaseSettings
+import json
 
 from concept_creation_repository import ConceptCreationRepository
 
@@ -45,10 +46,12 @@ def http_handler(context, event):
     """Handles HTTP requests"""
     try:
 
-        context.user_data.concept_creation_repository.create_concept()
+        repo = context.user_data.concept_creation_repository
+        concept_id = repo.create_concept()
+        repo.close()
 
         context.logger.info_with(
-            "Processed request successfully", handler=HANDLER_NAME
+            f"Processed request successfully, concept_id: {concept_id}", handler=HANDLER_NAME
         )
 
         next_functions_str = context.user_data.next_nuclio
@@ -59,16 +62,15 @@ def http_handler(context, event):
                 f"Next functions: {next_nuclio}", handler=HANDLER_NAME
             )
 
-            if len(next_nuclio) > 0:
-                for func in next_nuclio:
-                    context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
-                    requests.post(func)
+            for func in next_nuclio:
+                context.logger.info_with(f"Calling {func}", handler=HANDLER_NAME)
+                requests.post(func, json={"concept_id": concept_id})
 
         # Responding to the HTTP request
-        context.Response(
-            body="Response message",
+        return context.Response(
+            body=json.dumps({"concept_id": concept_id}),
             headers={},
-            content_type="text/plain",
+            content_type="application/json",
             status_code=200,
         )
 
@@ -76,7 +78,7 @@ def http_handler(context, event):
         context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)
         traceback.print_exc()
 
-        context.Response(
+        return context.Response(
             body=f"Error: {e}",
             headers={},
             content_type="text/plain",
