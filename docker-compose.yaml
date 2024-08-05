@@ -1,5 +1,3 @@
-version: '3.8'
-# Custom top-level network
 networks:
   neo4j-internal:
     driver: bridge
@@ -28,8 +26,9 @@ services:
     # Passes the following environment variables to the container
     environment:
       - NEO4J_AUTH
-      - NEO4J_PLUGINS
+      - NEO4J_PLUGINS=["graph-data-science", "apoc"]
       - NEO4J_dbms_memory_transaction_total_max=512M
+      - NEO4J_dbms.security.procedures.unrestricted=apoc.*
 
     # Simple check testing whether the port 7474 is opened.
     # If so, the instance running inside the container is considered as "healthy".

@@ -10,11 +10,10 @@ tertiary_features_strategies = [
     # OpenContourStrategy(),
     # CriticalPointsStrategy(),
     # VectorsStrategy()
-    AnglePointsStrategy(),
+    # AnglePointsStrategy(),
     # QuadrantChangeStrategy()
 ]
 
 
-def create_tertiary_features(tx: ManagedTransaction, image_id: str):
-    for service in tertiary_features_strategies:
-        service.execute(tx, image_id)
+def create_tertiary_features(tx: ManagedTransaction, image_id: str, session_id: str):
+    AnglePointsStrategy(session_id).execute(tx, image_id)

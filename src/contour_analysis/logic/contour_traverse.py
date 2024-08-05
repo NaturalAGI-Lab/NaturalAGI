@@ -23,14 +23,15 @@ def process_input_data(
     image_id: str,
     angle_points: List[AnglePoint],
     lines: List[VectorDetails],
+    session_id: str,
 ) -> None:
-    save_vectors_data(tx, lines, image_id)
-    save_intersection_data(tx, image_id, angle_points)
-    traverse_contour(tx, image_id, angle_points[0])
+    save_vectors_data(tx, lines, image_id, session_id)
+    save_intersection_data(tx, image_id, angle_points, session_id)
+    traverse_contour(tx, image_id, angle_points[0], session_id)
 
 
 def traverse_contour(
-    tx: ManagedTransaction, image_id: str, min_angle_point: AnglePoint
+    tx: ManagedTransaction, image_id: str, min_angle_point: AnglePoint, session_id: str
 ) -> None:
     """
     Traverses the contour for a given image.
@@ -69,7 +70,7 @@ def traverse_contour(
 
         if current_vector.id not in processed_vector_ids:
             calculate_and_set_relative_params(
-                tx, current_vector, current_angle_point, image_id
+                tx, current_vector, current_angle_point, image_id, session_id
             )
 
         if len(processed_vectors) > 0 and check_quadrant_change(
@@ -79,12 +80,12 @@ def traverse_contour(
                 f"mark_quadrant_change: v1:{processed_vectors[-1].id}, v2:{current_vector.id}"
             )
             mark_quadrant_change(
-                tx, processed_vectors[-1].id, current_vector.id, image_id
+                tx, processed_vectors[-1].id, current_vector.id, image_id, session_id
             )
 
         if len(processed_vectors) > 0:
             calculate_magnitude_and_direction(
-                tx, processed_vectors[-1].id, current_vector.id, image_id
+                tx, processed_vectors[-1].id, current_vector.id, image_id, session_id
             )
 
         processed_vectors.append(current_vector)

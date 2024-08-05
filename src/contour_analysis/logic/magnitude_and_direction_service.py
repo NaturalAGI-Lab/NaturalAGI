@@ -16,6 +16,7 @@ def calculate_magnitude_and_direction(
         last_vector_id: str,
         next_vector_id: str,
         image_id: str,
+        session_id: str
 ):
     if last_vector_id is None:
         logging.debug("Can't compare the first vector... Skipping first iteration")
@@ -28,14 +29,14 @@ def calculate_magnitude_and_direction(
         logging.warning(f"Could not calculate direction for vectors {last_vector_id} and {next_vector_id}")
         return
 
-    add_direction(tx, last_vector_id, next_vector_id, current_direction, image_id)
+    add_direction(tx, last_vector_id, next_vector_id, current_direction, image_id, session_id)
 
     if last_direction and last_direction != current_direction:
         # If there's a direction change, create a CriticalPoint at the angle between the vectors
-        create_critical_point(tx, last_vector_id, next_vector_id, image_id)
+        create_critical_point(tx, last_vector_id, next_vector_id, image_id, session_id)
     else:
         logging.info("No changes in directions")
-    return compare_vector_magnitude_and_create_nodes(tx, last_vector_id, next_vector_id, image_id)
+    return compare_vector_magnitude_and_create_nodes(tx, last_vector_id, next_vector_id, image_id, session_id)
 
 
 def get_last_direction(tx: ManagedTransaction, last_vector_id: str) -> Union[str, None]:
@@ -89,24 +90,24 @@ def calculate_direction(
         return None
 
 
-def add_direction(tx, vector1_id: str, vector2_id: str, direction: str, image_id: str):
+def add_direction(tx, vector1_id: str, vector2_id: str, direction: str, image_id: str, session_id: str):
     logging.debug(f"Adding direction: {direction} to the vectors")
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
-        MERGE (vd:VectDirection:Feature {direction: $direction})
+        MERGE (vd:VectDirection:Feature {direction: $direction, session_id: $session_id})
         ON CREATE SET vd.samples = [$image_id]
         ON MATCH SET vd.samples = CASE WHEN $image_id IN vd.samples THEN vd.samples ELSE vd.samples + [$image_id] END
         CREATE (v1)-[:HAS_DIRECTION]->(vd)-[:HAS_DIRECTION]->(v2)
     """
-    tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, direction=direction, image_id=image_id)
+    tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, direction=direction, image_id=image_id, session_id=session_id)
 
 
-def create_critical_point(tx, vector1_id: str, vector2_id: str, image_id: str):
+def create_critical_point(tx, vector1_id: str, vector2_id: str, image_id: str, session_id: str):
     logging.info("Finding angle point between two vectors")
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
-        MERGE (cp:CriticalPoint:Feature {reason: "Direction Change"})-[:IS_CRITICAL_POINT]->(ap)
+        MERGE (cp:CriticalPoint:Feature {reason: "Direction Change", session_id: $session_id})-[:IS_CRITICAL_POINT]->(ap)
         ON CREATE SET cp.samples = [$image_id]
         ON MATCH SET cp.samples = CASE WHEN $image_id IN cp.samples THEN cp.samples ELSE cp.samples + [$image_id] END
     """
-    tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, image_id=image_id)
+    tx.run(query, vector1_id=vector1_id, vector2_id=vector2_id, image_id=image_id, session_id=session_id)

@@ -1,7 +1,4 @@
-import glob
 import json
-import logging
-import os
 import uuid
 
 import cv2
@@ -22,7 +19,6 @@ class Settings(BaseSettings):
     dlq_topic: str
     kafka_bootstrap_servers: str
     kafka_group_id: str = "line-detector"
-    images_limit: int = 1000
 
 
 def init_context(context):
@@ -45,106 +41,45 @@ def init_context(context):
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
     setattr(context.user_data, "kafka_producer", producer)
-    setattr(context.user_data, "images_limit", settings.images_limit)
 
 
-def http_handler(context, event):
-    """Handles HTTP requests"""
+def handler(context, event):
+    """Nuclio handler"""
     try:
-        data = event.body
-        images_count = 0
+        context.logger.info_with(
+            f"Got request: {event.trigger.kind}", handler=HANDLER_NAME
+        )
 
-        logging.info(f"Data: {data}")
-
-        # Check if 'input_folder' key exists in the data and is not empty
-        if "input_folder" in data and data["input_folder"]:
-            input_folder = data["input_folder"]
-            image_files = glob.glob(os.path.join(input_folder, "*"))
-
-            for image_file in image_files:
-                images_limit = context.user_data.images_limit
-                if images_count >= images_limit:
-                    context.logger.info(
-                        f"Reached maximum number of images: {images_limit}"
-                    )
-                    break
-
-                with open(image_file, "rb") as f:
-                    image_data = f.read()
-
-                context.logger.info(f"Processing image: {image_file}")
-                process_image(context, image_data)
-                images_count += 1
-
-            context.logger.info(f"Processed {len(image_files)} images")
-
-        # If 'input_folder' key doesn't exist, check for 'image_path' key
-        elif "image_path" in data and data["image_path"]:
-            image_path = data["image_path"]
-            context.logger.info(f"Processing single image: {image_path}")
-            with open(image_path, "rb") as f:
-                image_data = f.read()
-            process_image(context, image_data)
-
+        if event.trigger.kind == "kafka-cluster":
+            message = json.loads(event.body.decode('utf-8'))
+            process_image(context, message)
         else:
-            error_message = "No image data or input folder in request"
-            context.logger.error(error_message)
-            dlq_model = DLQModel(
-                source="line_detector",
-                message=error_message,
-                value=data
-            )
-            context.user_data.kafka_producer.send(
-                context.user_data.dlq_topic,
-                value=dlq_model.model_dump()
-            )
-            return context.Response(
-                body=error_message,
-                status_code=400,
-                content_type="text/plain"
-            )
-
-        context.logger.info("Processed request successfully")
+            raise ValueError("Unknown trigger. Expected kafka-cluster")
 
     except Exception as e:
-        error_message = f"Error processing request: {str(e)}"
-        context.logger.error(error_message)
+        context.logger.error_with(f"Error processing message: {e}", handler=HANDLER_NAME)
         dlq_model = DLQModel(
-            source="line_detector",
-            message=error_message,
-            value=data if 'data' in locals() else {}
+            source=HANDLER_NAME,
+            message=str(e),
+            value=event.body.decode('utf-8')
         )
         context.user_data.kafka_producer.send(
             context.user_data.dlq_topic,
             value=dlq_model.model_dump()
         )
-        return context.Response(
-            body=error_message,
-            status_code=500,
-            content_type="text/plain"
-        )
 
 
-def handler(context, event):
-    """Nuclio handler"""
+def process_image(context, message):
+    operation = message.get('operation')
+    parameters = message.get('parameters', {})
+    image_path = parameters.get('image_path')
 
-    context.logger.info_with(
-        f"Got request: {event.trigger.kind} {event.content_type}", handler=HANDLER_NAME
-    )
-    context.logger.info_with(
-        f"{HANDLER_NAME}: Input Headers: {event.headers}", handler=HANDLER_NAME
-    )
+    if not image_path:
+        raise ValueError("Image path not provided in the message")
 
-    if event.trigger.kind == "http":
-        http_handler(context, event)
+    with open(image_path, "rb") as f:
+        image_data = f.read()
 
-    else:
-        context.logger.error_with(
-            "Unknown trigger. Expected kafka or http", handler=HANDLER_NAME
-        )
-
-
-def process_image(context, image_data):
     np_data = np.frombuffer(image_data, np.uint8)
     image = cv2.imdecode(np_data, cv2.IMREAD_UNCHANGED)
 
@@ -158,11 +93,12 @@ def process_image(context, image_data):
     if kafka_producer:
         kafka_producer.send(
             context.user_data.kafka_topic,
-            value={"image_id": str(image_id), "lines": lines},
+            value={
+                "operation": operation,
+                "image_id": str(image_id),
+                "lines": lines,
+                "parameters": parameters
+            },
         )
 
-    context.Response(
-        body=f"Lines detected for image: {image_id}",
-        headers={},
-        content_type="text/plain",
-    )
+    context.logger.info(f"Lines detected for image: {image_id}")

@@ -20,7 +20,7 @@ spec:
       attributes:
         initialOffset: earliest
         topics:
-          - line-detector-output
+          - line-detector-output-topic
         brokers:
           - ${KAFKA_BOOTSTRAP_SERVERS}
         consumerGroup: angle-point-detector-group

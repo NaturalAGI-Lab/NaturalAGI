@@ -1,4 +1,6 @@
 # Makefile for Nuclio function deployment and execution
+include .env
+export
 
 # Default goal
 .DEFAULT_GOAL := all
@@ -21,14 +23,22 @@ NC := \033[0m # No Color
 
 HOST_IP := $(shell ipconfig getifaddr en0)
 
+LOCAL_STORAGE=./tests/generated_samples
+NUCLIO_STORAGE=/opt/nuclio/shared_storage
+
 DLQ_TOPIC = dlq-topic
-LINE_DETECTOR_KAFKA_TOPIC = line-detector-output-topic
+CONNECTOR_KAFKA_TOPIC = connector-output-topic
+LINE_DETECTOR_TOPIC = line-detector-output-topic
 ANGLE_POINT_DETECTOR_KAFKA_TOPIC = angle-point-detector-output-topic
 
-TOPICS = $(LINE_DETECTOR_KAFKA_TOPIC) $(DLQ_TOPIC) $(ANGLE_POINT_DETECTOR_KAFKA_TOPIC)
+TOPICS = $(CONNECTOR_KAFKA_TOPIC) $(LINE_DETECTOR_TOPIC) $(ANGLE_POINT_DETECTOR_KAFKA_TOPIC) $(DLQ_TOPIC)
+
+# Add these variables near the top of the Makefile, after other variable definitions
+OPERATION ?= train
+CONCEPT_NAME ?= default_concept
 
 # Phony targets
-.PHONY: all deploy train post_process classify send_random_image clean help start_services create_kafka_topics list_kafka_topics
+.PHONY: all deploy train post_process classify send_random_image clean help start_services create_kafka_topics list_kafka_topics send_to_connector
 
 # Kafka-related targets
 .PHONY: create_kafka_topics list_kafka_topics
@@ -58,11 +68,11 @@ list_kafka_topics:
 	@cat $(TOPICS)
 
 # Main targets
-all: start_services create_kafka_topics deploy train post_process
+all: start_services create_kafka_topics deploy train send_to_connector post_process
 
 deploy:
 	@echo -e "${BLUE}Deploying functions...${NC}"
-	@if sh $(DEPLOY_SCRIPT) $(LINE_DETECTOR_KAFKA_TOPIC) $(DLQ_TOPIC) $(ANGLE_POINT_DETECTOR_KAFKA_TOPIC); then \
+	@if sh $(DEPLOY_SCRIPT) $(LINE_DETECTOR_TOPIC) $(DLQ_TOPIC) $(ANGLE_POINT_DETECTOR_KAFKA_TOPIC); then \
 		echo -e "${GREEN}Deployment successful.${NC}"; \
 	else \
 		echo -e "${RED}Deployment failed.${NC}"; \
@@ -87,18 +97,6 @@ post_process:
 		exit 1; \
 	fi
 
-send_random_image:
-	@echo -e "${BLUE}Selecting a random image and sending to line detector...${NC}"
-	@RANDOM_IMAGE=$$(find ./tests/generated_samples -type f | sort -R | head -n 1); \
-	if [ -z "$$RANDOM_IMAGE" ]; then \
-		echo -e "${RED}No images found in ./tests/generated_samples${NC}"; \
-		exit 1; \
-	fi; \
-	IMAGE_NAME=$$(basename "$$RANDOM_IMAGE"); \
-	echo -e "${BLUE}Selected image: $$IMAGE_NAME${NC}"; \
-	RESPONSE=$$(nuctl invoke line_detector --platform local --method POST --content-type "application/json" --body '{"image_path": "'"$$RANDOM_IMAGE"'"}'); \
-	echo -e "${GREEN}Image sent to line detector. Check the logs for the image_id.${NC}"
-
 classify:
 	@echo -e "${BLUE}Classifying with concept_id: $(CONCEPT_ID) and image_id: $(IMAGE_ID)${NC}"
 	@nuctl invoke classification --platform local --method POST \
@@ -114,7 +112,7 @@ clean:
 
 help:
 	@echo "Available targets:"
-	@echo "  all                - Deploy functions, create Kafka topics, run training, and post-process (default)"
+	@echo "  all                - Deploy functions, create Kafka topics, run training, send data to connector, and post-process (default)"
 	@echo "  deploy             - Deploy Nuclio functions"
 	@echo "  create_kafka_topics - Create Kafka topics"
 	@echo "  list_kafka_topics  - List existing Kafka topics"
@@ -124,3 +122,12 @@ help:
 	@echo "  classify           - Run classification with given concept_id and image_id"
 	@echo "  clean              - Clean up training results"
 	@echo "  help               - Show this help message"
+	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
+
+send_to_connector:
+	@echo -e "${BLUE}Sending data to connector...${NC}"
+	@curl -X POST http://localhost:5002 \
+		-H "Content-Type: application/json" \
+		-d '{"operation": "$(OPERATION)", "parameters": {"dataset_path": "$(NUCLIO_STORAGE)", "concept_name": "$(CONCEPT_NAME)"}}' || \
+		(echo -e "${RED}Failed to send data to connector.${NC}" && exit 1)
+	@echo -e "\n${GREEN}Data sent to connector successfully.${NC}"

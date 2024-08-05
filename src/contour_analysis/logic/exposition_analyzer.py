@@ -4,7 +4,7 @@ import logging
 from neo4j import ManagedTransaction, Result
 
 
-def analyze_exposition(tx: ManagedTransaction, image_id: str) -> None:
+def analyze_exposition(tx: ManagedTransaction, image_id: str, session_id: str) -> None:
     """
     Analyzes the contour development for a given image.
     The contour development is considered to be monotonic if all the vectors have the same direction.
@@ -13,16 +13,16 @@ def analyze_exposition(tx: ManagedTransaction, image_id: str) -> None:
     Args:
         tx (ManagedTransaction): The managed transaction object for database operations.
         image_id (int): The ID of the image to analyze.
-
+        session_id (str): The ID of the session to analyze.
     Returns:
         None
     """
     logging.info(f"Analyzing exposition for image {image_id}")
-    _analyze_contour_development(tx, image_id)
-    _analyze_contour_type(tx, image_id)
+    _analyze_contour_development(tx, image_id, session_id)
+    _analyze_contour_type(tx, image_id, session_id)
 
 
-def _analyze_contour_development(tx: ManagedTransaction, image_id: str) -> None:
+def _analyze_contour_development(tx: ManagedTransaction, image_id: str, session_id: str) -> None:
     logging.info(f"Analyzing contour development for image {image_id}")
     query = """
         MATCH (vectorDirection:VectDirection)--(:Vector {image_id: $image_id})
@@ -35,37 +35,37 @@ def _analyze_contour_development(tx: ManagedTransaction, image_id: str) -> None:
         logging.warning(f"No vector directions found for image {image_id}")
         return
     elif len(result_list) == 1:
-        _mark_monotony_development(tx, image_id)
+        _mark_monotony_development(tx, image_id, session_id)
     else:
-        _mark_non_monotony_development(tx, image_id)
+        _mark_non_monotony_development(tx, image_id, session_id)
         return
 
 
-def _mark_monotony_development(tx: ManagedTransaction, image_id: str) -> None:
+def _mark_monotony_development(tx: ManagedTransaction, image_id: str, session_id: str) -> None:
     logging.info(f"Marking monotony development for image {image_id}")
     query = """
         MATCH (vector:Vector {image_id: $image_id})
-        MERGE (mono:Monotony:Feature)
+        MERGE (mono:Monotony:Feature {session_id: $session_id})
         ON CREATE SET mono.samples = [$image_id]
         ON MATCH SET mono.samples = CASE WHEN $image_id IN mono.samples THEN mono.samples ELSE mono.samples + [$image_id] END
         CREATE (vector)-[:HAS_MONOTONY]->(mono)
     """
-    tx.run(query, image_id=image_id)
+    tx.run(query, image_id=image_id, session_id=session_id)
 
 
-def _mark_non_monotony_development(tx: ManagedTransaction, image_id: str) -> None:
+def _mark_non_monotony_development(tx: ManagedTransaction, image_id: str, session_id: str) -> None:
     logging.info(f"Marking non-monotony development for image {image_id}")
     query = """
         MATCH (vector:Vector {image_id: $image_id})
-        MERGE (nonMono:NonMonotony:Feature)
+        MERGE (nonMono:NonMonotony:Feature {session_id: $session_id})
         ON CREATE SET nonMono.samples = [$image_id]
         ON MATCH SET nonMono.samples = CASE WHEN $image_id IN nonMono.samples THEN nonMono.samples ELSE nonMono.samples + $image_id END
         CREATE (vector)-[:HAS_NON_MONOTONY]->(nonMono)
     """
-    tx.run(query, image_id=image_id)
+    tx.run(query, image_id=image_id, session_id=session_id)
 
 
-def _analyze_contour_type(tx: ManagedTransaction, image_id: str) -> None:
+def _analyze_contour_type(tx: ManagedTransaction, image_id: str, session_id: str) -> None:
     """
     Analyzes the contour type for a given image. If query is able to find the path from the
     starting vector back to itself, then the contour is considered to be closed.
@@ -92,7 +92,7 @@ def _analyze_contour_type(tx: ManagedTransaction, image_id: str) -> None:
         query = """
             MATCH (n)
             WHERE (n:Vector OR n:AnglePoint) AND n.image_id = $image_id
-            MERGE (closed:Closed:Feature)
+            MERGE (closed:Closed:Feature {session_id: $session_id})
             ON CREATE SET closed.samples = [$image_id]
             ON MATCH SET closed.samples = CASE WHEN $image_id IN closed.samples THEN closed.samples ELSE closed.samples + $image_id END
             MERGE (n)-[:HAS_CONTOUR_TYPE]->(closed)
@@ -102,11 +102,11 @@ def _analyze_contour_type(tx: ManagedTransaction, image_id: str) -> None:
         query = """
             MATCH (n)
             WHERE (n:Vector OR n:AnglePoint) AND n.image_id = $image_id
-            MERGE (open:Open:Feature)
+            MERGE (open:Open:Feature {session_id: $session_id})
             ON CREATE SET open.samples = [$image_id]
             ON MATCH SET open.samples = CASE WHEN $image_id IN open.samples THEN open.samples ELSE open.samples + $image_id END
             MERGE (n)-[:HAS_CONTOUR_TYPE]->(open)
         """
 
-    tx.run(query, image_id=image_id)
+    tx.run(query, image_id=image_id, session_id=session_id)
     logging.info(f"_analyze_contour_type: {result_list}")

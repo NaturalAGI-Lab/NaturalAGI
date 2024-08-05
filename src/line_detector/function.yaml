@@ -9,11 +9,6 @@ spec:
   resources: {}
   minReplicas: 1
   maxReplicas: 1
-  triggers:
-    default-http:
-      kind: "http"
-      attributes:
-        port: 8081
   version: -1
   build:
     baseImage: "python:3.9"
@@ -29,7 +24,6 @@ spec:
         name: always
         maximumRetryCount: 3
       mountMode: volume
-      # network: infrastructure_neo4j-internal
   securityContext: {}
   eventTimeout: ""
   httpTimeout: 1000

@@ -42,16 +42,18 @@ class ContourAnalysisRepository:
             input_data["lines"]
         )
         with self.driver.session() as session:
+            session_id = input_data["parameters"]["session_id"]
             result = session.write_transaction(
                 process_input_data,
                 input_data["image_id"],
                 angle_points,
                 vector_details,
+                session_id
             )
 
-            session.write_transaction(analyze_exposition, input_data["image_id"])
+            session.write_transaction(analyze_exposition, input_data["image_id"], session_id)
 
-            session.write_transaction(create_tertiary_features, input_data["image_id"])
+            session.write_transaction(create_tertiary_features, input_data["image_id"], session_id)
 
             logging.debug(f"Result from calculate_and_set_relative_params: {result}")
             return result
