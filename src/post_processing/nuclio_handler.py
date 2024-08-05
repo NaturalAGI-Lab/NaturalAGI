@@ -1,4 +1,5 @@
 """Generic Nuclio Handler Template"""
+import json
 import traceback
 
 import requests
@@ -39,9 +40,10 @@ def init_context(context):
 def http_handler(context, event):
     """Handles HTTP requests"""
     try:
-        context.user_data.post_processing_service.process()
+        session_id = json.loads(event.body).get("session_id")
+        context.user_data.post_processing_service.process(session_id)
 
-        context.logger.info_with("Processed request successfully", handler=HANDLER_NAME)
+        context.logger.info_with(f"Processed request successfully for session_id: {session_id}", handler=HANDLER_NAME)
 
         next_functions_str = context.user_data.next_nuclio
 

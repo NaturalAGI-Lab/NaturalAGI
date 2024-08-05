@@ -43,19 +43,22 @@ class ConceptCreationRepository:
             logging.error(f"Error closing database connection: {e}")
             raise
 
-    def create_concept(self):
+    def create_concept(self, session_id: str) -> str:
         """
         Create a new concept in the Neo4j database.
+
+        Args:
+            session_id (str): The unique identifier for the session.
 
         Returns:
             str: The unique identifier (hash) of the created concept.
         """
         logging.info("Starting create_concept method")
         with self.driver.session() as session:
-            concept_id = session.write_transaction(self._create_concept)
+            concept_id = session.write_transaction(self._create_concept, session_id)
         return concept_id
 
-    def _create_concept(self, tx: ManagedTransaction) -> str:
+    def _create_concept(self, tx: ManagedTransaction, session_id: str) -> str:
         """
         Internal method to create a concept within a database transaction.
 
@@ -69,6 +72,7 @@ class ConceptCreationRepository:
 
         Args:
             tx (ManagedTransaction): The Neo4j transaction object.
+            session_id (str): The unique identifier for the session.
 
         Returns:
             str: The unique identifier (hash) of the created concept.
@@ -78,10 +82,10 @@ class ConceptCreationRepository:
         """
         # Fetch the AnglePointCount node
         query = """
-            MATCH (apc:AnglePointsCount)
+            MATCH (apc:AnglePointsCount {session_id: $session_id})
             RETURN apc.count AS count
         """
-        result = tx.run(query)
+        result = tx.run(query, session_id=session_id)
         count_data = result.single()
         if not count_data:
             raise ValueError("No AnglePointCount node found")
@@ -91,23 +95,23 @@ class ConceptCreationRepository:
         # Create new AnglePoints
         create_query = """
             UNWIND range(1, $count) AS idx
-            CREATE (ap:AnglePoint {id: idx})
+            CREATE (ap:AnglePoint {id: idx, session_id: $session_id})
             RETURN count(ap) AS angle_point_count
         """
-        result = tx.run(create_query, count=count)
+        result = tx.run(create_query, count=count, session_id=session_id)
         angle_point_count = result.single()["angle_point_count"]
 
         # Connect all remaining nodes to the new AnglePoints and collect their values
         connect_query = """
-            MATCH (n)
+            MATCH (n {session_id: $session_id})
             WHERE NOT n:AnglePoint AND NOT n:Concept
             WITH collect(n) AS nodes
-            MATCH (ap:AnglePoint)
+            MATCH (ap:AnglePoint {session_id: $session_id})
             UNWIND nodes AS n
             CREATE (n)-[:CONNECTED_TO]->(ap)
             RETURN collect(DISTINCT n.value) AS node_values
         """
-        result = tx.run(connect_query)
+        result = tx.run(connect_query, session_id=session_id)
         node_values = result.single()["node_values"]
 
         # Generate hash from meaningful values
@@ -115,22 +119,22 @@ class ConceptCreationRepository:
 
         # Assign concept_id to all related nodes
         assign_concept_id_query = """
-            MATCH (n)-[:CONNECTED_TO]-(:AnglePoint)
+            MATCH (n {session_id: $session_id})-[:CONNECTED_TO]-(:AnglePoint {session_id: $session_id})
             SET n.concept_id = $concept_id
             WITH n
-            MATCH (ap:AnglePoint)
+            MATCH (ap:AnglePoint {session_id: $session_id})
             SET ap.concept_id = $concept_id
         """
-        tx.run(assign_concept_id_query, concept_id=concept_id)
+        tx.run(assign_concept_id_query, concept_id=concept_id, session_id=session_id)
 
         # Create a Concept node
         create_concept_node_query = """
-            CREATE (c:Concept {id: $concept_id})
+            CREATE (c:Concept {id: $concept_id, session_id: $session_id})
             WITH c
             MATCH (n {concept_id: $concept_id})
             CREATE (c)-[:INCLUDES]->(n)
         """
-        tx.run(create_concept_node_query, concept_id=concept_id)
+        tx.run(create_concept_node_query, concept_id=concept_id, session_id=session_id)
 
         return concept_id
 

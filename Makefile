@@ -36,6 +36,7 @@ TOPICS = $(CONNECTOR_KAFKA_TOPIC) $(LINE_DETECTOR_TOPIC) $(ANGLE_POINT_DETECTOR_
 # Add these variables near the top of the Makefile, after other variable definitions
 OPERATION ?= train
 CONCEPT_NAME ?= default_concept
+SESSION_ID ?= default_session
 
 # Phony targets
 .PHONY: all deploy train post_process classify send_random_image clean help start_services create_kafka_topics list_kafka_topics send_to_connector
@@ -79,18 +80,9 @@ deploy:
 		exit 1; \
 	fi
 
-train:
-	@echo -e "${BLUE}Running training...${NC}"
-	@if sh $(TRAINING_SCRIPT); then \
-		echo -e "${GREEN}Training completed successfully.${NC}"; \
-	else \
-		echo -e "${RED}Training failed.${NC}"; \
-		exit 1; \
-	fi
-
 post_process:
 	@echo -e "${BLUE}Running post-processing...${NC}"
-	@if sh $(POST_PROCESSING_SCRIPT); then \
+	@if sh $(POST_PROCESSING_SCRIPT) $(SESSION_ID); then \
 		echo -e "${GREEN}Post-processing completed successfully.${NC}"; \
 	else \
 		echo -e "${RED}Post-processing failed.${NC}"; \
@@ -128,6 +120,6 @@ send_to_connector:
 	@echo -e "${BLUE}Sending data to connector...${NC}"
 	@curl -X POST http://localhost:5002 \
 		-H "Content-Type: application/json" \
-		-d '{"operation": "$(OPERATION)", "parameters": {"dataset_path": "$(NUCLIO_STORAGE)", "concept_name": "$(CONCEPT_NAME)"}}' || \
+		-d '{"operation": "$(OPERATION)", "parameters": {"dataset_path": "$(NUCLIO_STORAGE)", "concept_name": "$(CONCEPT_NAME)", "session_id": "$(SESSION_ID)"}}' || \
 		(echo -e "${RED}Failed to send data to connector.${NC}" && exit 1)
 	@echo -e "\n${GREEN}Data sent to connector successfully.${NC}"

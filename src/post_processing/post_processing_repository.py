@@ -31,23 +31,23 @@ class PostProcessingRepository:
             for node_label in node_labels:
                 session.write_transaction(self._merge_node_transaction, node_label)
 
-    def stabilize_structures(self) -> List[Dict[str, Any]]:
+    def stabilize_structures(self, session_id: str) -> List[Dict[str, Any]]:
         logging.info("Starting stabilize_structures method")
         with self.driver.session() as session:
-            return session.write_transaction(self.find_stable_structures)
+            return session.write_transaction(self.find_stable_structures, session_id)
 
-    def find_stable_structures(self, tx: ManagedTransaction) -> List[Dict[str, Any]]:
+    def find_stable_structures(self, tx: ManagedTransaction, session_id: str) -> List[Dict[str, Any]]:
         query = """
             CALL {
-                MATCH (n)
+                MATCH (n {session_id: $session_id})
                 WHERE n:Vector OR n:AnglePoint OR n:Feature
                 RETURN max(size(n.samples)) AS maxSamples
             }
             WITH maxSamples
-            MATCH (n)
+            MATCH (n {session_id: $session_id})
             WHERE (n:Vector OR n:AnglePoint OR n:Feature)
                 AND size(n.samples) < maxSamples
             DETACH DELETE n
         """
-        result = tx.run(query)
+        result = tx.run(query, session_id=session_id)
         return [dict(record) for record in result]

@@ -45,13 +45,13 @@ def init_context(context):
 def http_handler(context, event):
     """Handles HTTP requests"""
     try:
-
+        session_id = json.loads(event.body).get("session_id")
         repo = context.user_data.concept_creation_repository
-        concept_id = repo.create_concept()
+        concept_id = repo.create_concept(session_id)
         repo.close()
 
         context.logger.info_with(
-            f"Processed request successfully, concept_id: {concept_id}", handler=HANDLER_NAME
+            f"Processed request successfully, concept_id: {concept_id} for session_id: {session_id}", handler=HANDLER_NAME
         )
 
         next_functions_str = context.user_data.next_nuclio
