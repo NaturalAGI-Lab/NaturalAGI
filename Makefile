@@ -8,7 +8,6 @@ export
 # Variables
 SHELL := /bin/bash
 DEPLOY_SCRIPT := deploy_functions.sh
-TRAINING_SCRIPT := run_training.sh
 POST_PROCESSING_SCRIPT := run_post_processing.sh
 
 # Default values for classification
@@ -116,10 +115,26 @@ help:
 	@echo "  help               - Show this help message"
 	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
 
+train:
+	@echo -e "${BLUE}Running training script...${NC}"
+	@make send_to_connector OPERATION=train CONCEPT_NAME=$(CONCEPT_NAME)
+	@echo -e "${GREEN}Training script completed.${NC}"
+
+train_square:
+	@echo -e "${BLUE}Running training script...${NC}"
+	@make send_to_connector OPERATION=train CONCEPT_NAME=$(CONCEPT_NAME) NUCLIO_STORAGE=$(NUCLIO_STORAGE)/square
+	@echo -e "${GREEN}Training script completed.${NC}"
+
+train_triangle:
+	@echo -e "${BLUE}Running training script...${NC}"
+	@make send_to_connector OPERATION=train CONCEPT_NAME=$(CONCEPT_NAME) NUCLIO_STORAGE=$(NUCLIO_STORAGE)/triangle
+	@echo -e "${GREEN}Training script completed.${NC}"
+
+
 send_to_connector:
 	@echo -e "${BLUE}Sending data to connector...${NC}"
 	@curl -X POST http://localhost:5002 \
 		-H "Content-Type: application/json" \
-		-d '{"operation": "$(OPERATION)", "parameters": {"dataset_path": "$(NUCLIO_STORAGE)", "concept_name": "$(CONCEPT_NAME)", "session_id": "$(SESSION_ID)"}}' || \
+		-d '{"operation": "$(OPERATION)", "parameters": {"dataset_path": "$(NUCLIO_STORAGE)", "concept_name": "$(CONCEPT_NAME)"}}' || \
 		(echo -e "${RED}Failed to send data to connector.${NC}" && exit 1)
 	@echo -e "\n${GREEN}Data sent to connector successfully.${NC}"

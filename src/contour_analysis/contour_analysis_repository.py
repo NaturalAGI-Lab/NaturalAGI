@@ -9,7 +9,7 @@ from logic.exposition_analyzer import analyze_exposition
 from logic.tertiary_features.tertiary_features_service import create_tertiary_features
 
 # Configure logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 class ContourAnalysisRepository:

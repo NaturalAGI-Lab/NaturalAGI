@@ -55,9 +55,7 @@ def save_intersection_data(tx: ManagedTransaction,
             ON CREATE SET apAngle.samples = [$image_id]
             ON MATCH SET apAngle.samples = CASE WHEN $image_id IN apAngle.samples THEN apAngle.samples ELSE apAngle.samples + $image_id END
             
-            MERGE (ap:AnglePoint {session_id: $session_id})-[:HAS_ANGLE]->(apAngle)
-            ON CREATE SET ap.id = data.id, ap.image_id = $image_id, ap.samples = [$image_id]
-            ON MATCH SET ap.id = data.id, ap.image_id = $image_id, ap.samples = ap.samples + $image_id
+            CREATE (ap:AnglePoint {session_id: $session_id, id: data.id, image_id: $image_id, samples: [$image_id]})-[:HAS_ANGLE]->(apAngle)
             
             MERGE (ap)-[:HAS_COORDINATES]->(apCoords)
 

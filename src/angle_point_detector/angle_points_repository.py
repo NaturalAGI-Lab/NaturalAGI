@@ -23,22 +23,37 @@ def line_intersection(line1: Dict[str, int], line2: Dict[str, int]) -> Optional[
     else:
         return None
 
-def calculate_angle(line1: Dict[str, int], line2: Dict[str, int], intersection: Tuple[int, int]) -> int:
-    # Calculate side lengths
-    a = math.sqrt((line1['x2'] - intersection[0])**2 + (line1['y2'] - intersection[1])**2)
-    b = math.sqrt((line2['x2'] - intersection[0])**2 + (line2['y2'] - intersection[1])**2)
-    c = math.sqrt((line1['x2'] - line2['x2'])**2 + (line1['y2'] - line2['y2'])**2)
+def calculate_angle(line1: Dict[str, int], line2: Dict[str, int], intersection: Tuple[int, int]) -> float:
+    # Calculate direction vectors
+    dx1 = line1['x2'] - line1['x1'] 
+    dy1 = line1['y2'] - line1['y1']
+    dx2 = line2['x2'] - line2['x1']
+    dy2 = line2['y2'] - line2['y1']
     
-    # Calculate angle using the law of cosines
-    cos_angle = (a**2 + b**2 - c**2) / (2 * a * b)
+    # Calculate dot product and magnitudes
+    dot = dx1*dx2 + dy1*dy2
+    mag1 = math.sqrt(dx1**2 + dy1**2) 
+    mag2 = math.sqrt(dx2**2 + dy2**2)
     
-    # Clamp the value to avoid domain errors due to floating point imprecision
-    cos_angle = max(min(cos_angle, 1), -1)
+    # Check for zero-length lines
+    if mag1 == 0 or mag2 == 0:
+        raise ValueError("Cannot calculate angle for zero-length line")
+        
+    # Calculate cosine of angle and clip to valid range
+    cos_angle = dot / (mag1 * mag2)
+    cos_angle = max(-1, min(cos_angle, 1))
     
-    # Calculate angle in degrees
-    angle = math.degrees(math.acos(cos_angle))
+    # Calculate angle in radians
+    angle_rad = math.acos(cos_angle)
     
-    return round_to_nearest(int(angle), 5)
+    # Convert to degrees
+    angle_deg = math.degrees(angle_rad)
+    
+    # Ensure angle is between 0 and 180
+    if angle_deg > 180:
+        angle_deg = 360 - angle_deg
+        
+    return round(angle_deg, 5)
 
 def round_to_nearest(number: int, n: int) -> int:
     return round(number / n) * n
@@ -56,7 +71,7 @@ def calculate_angle_points(lines: List[Dict[str, int]]) -> List[Dict[str, any]]:
                     'id': str(uuid.uuid4()),
                     'x': intersection[0],
                     'y': intersection[1],
-                    'angle': angle,
+                    'angle': round_to_nearest(angle, 5),
                     'line1': line1['id'],
                     'line2': line2['id'],
                 })

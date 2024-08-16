@@ -1,35 +1,41 @@
 import argparse
+import datetime
 import os
 import random
 from PIL import Image, ImageDraw
 
 
-def _generate_square(img_size):
+def _generate_square(img_size: int) -> Image.Image:
     img = Image.new("L", (img_size, img_size), color="black")
     draw = ImageDraw.Draw(img)
 
-    square_size = random.randint(round(img_size * 0.1), round(img_size * 0.5))
+    max_square_size = round(img_size * 0.5)
+    min_square_size = round(img_size * 0.1)
+    square_size = random.randint(min_square_size, max_square_size)
+
+    max_start_point = img_size - square_size
     start_point = (
-        random.randint(0, img_size - square_size),
-        random.randint(0, img_size - square_size),
+        random.randint(0, max_start_point),
+        random.randint(0, max_start_point),
     )
     end_point = (start_point[0] + square_size, start_point[1] + square_size)
 
-    draw.rectangle([start_point, end_point], outline="white", width=img_size // 50)
+    line_width = 3
+    draw.rectangle([start_point, end_point], outline="white", width=line_width)
 
-    # Add random rotation
     angle = random.randint(0, 360)
-    img = img.rotate(angle)
+    rotated_img = img.rotate(angle, expand=True)
 
-    return img
+    return rotated_img
 
 
-def generate_square_samples(output_dir, num_images, img_size):
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
+def generate_square_samples(output_dir: str, num_images: int, img_size: int) -> None:
+    os.makedirs(output_dir, exist_ok=True)
 
-    for i in range(num_images):
-        _generate_square(img_size).save(os.path.join(output_dir, f"square_{i}.png"))
+    for _ in range(num_images):
+        timestamp = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
+        square_img = _generate_square(img_size)
+        square_img.save(os.path.join(output_dir, f"square_{timestamp}.png"))
 
 
 if __name__ == "__main__":

@@ -55,7 +55,7 @@ class ConceptCreationRepository:
         """
         logging.info("Starting create_concept method")
         with self.driver.session() as session:
-            concept_id = session.write_transaction(self._create_concept, session_id)
+            concept_id = session.execute_write(self._create_concept, session_id)
         return concept_id
 
     def _create_concept(self, tx: ManagedTransaction, session_id: str) -> str:
@@ -116,6 +116,26 @@ class ConceptCreationRepository:
 
         # Generate hash from meaningful values
         concept_id = self._generate_concept_hash(angle_point_count, node_values)
+
+        # Check if concept with this hash already exists
+        check_concept_query = """
+            MATCH (c:Concept {id: $concept_id})
+            RETURN count(c) AS concept_count
+        """
+        result = tx.run(check_concept_query, concept_id=concept_id)
+        concept_exists = result.single()["concept_count"] > 0
+
+        if concept_exists:
+            # Remove all nodes for this session
+            remove_nodes_query = """
+                MATCH (n {session_id: $session_id})
+                DETACH DELETE n
+            """
+            tx.run(remove_nodes_query, session_id=session_id)
+            
+            error_message = f"Concept with id {concept_id} already exists. All nodes for session {session_id} have been removed."
+            logging.error(error_message)
+            return
 
         # Assign concept_id to all related nodes
         assign_concept_id_query = """

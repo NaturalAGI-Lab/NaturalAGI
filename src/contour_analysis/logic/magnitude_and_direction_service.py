@@ -8,22 +8,36 @@ from logic.magnitude_comparator import (
     compare_vector_magnitude_and_create_nodes,
 )
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 
 def calculate_magnitude_and_direction(
         tx: ManagedTransaction,
+        last_vector_start: tuple[float, float],
+        last_vector_end: tuple[float, float],
+        angle_point: tuple[float, float],
+        current_vector_start: tuple[float, float],
+        current_vector_end: tuple[float, float],
         last_vector_id: str,
         next_vector_id: str,
         image_id: str,
         session_id: str
 ):
     if last_vector_id is None:
-        logging.debug("Can't compare the first vector... Skipping first iteration")
+        logging.info("Can't compare the first vector... Skipping first iteration")
         return
 
     last_direction = get_last_direction(tx, last_vector_id)
-    current_direction = calculate_direction(tx, last_vector_id, next_vector_id)
+    logging.info(f"Last direction: {last_direction}")
+    
+    current_direction = calculate_direction(
+        last_vector_start,
+        last_vector_end,
+        angle_point,
+        current_vector_start,
+        current_vector_end
+    )
+    logging.info(f"Current direction: {current_direction}")
     
     if current_direction is None:
         logging.warning(f"Could not calculate direction for vectors {last_vector_id} and {next_vector_id}")
@@ -51,47 +65,44 @@ def get_last_direction(tx: ManagedTransaction, last_vector_id: str) -> Union[str
 
 
 def calculate_direction(
-        tx: ManagedTransaction,
-        vector1_id: str,
-        vector2_id: str,
-) -> Union[str, None]:
-    query = """
-        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
-        MATCH (v1)-[:HAS_VECTOR_VALUE]->(value1:VectorValue)
-        MATCH (v2)-[:HAS_VECTOR_VALUE]->(value2:VectorValue)
-        RETURN 
-            value1.x AS x1, value1.y AS y1,
-            value2.x AS x2, value2.y AS y2
-    """
-    record = tx.run(
-        query,
-        vector1_id=vector1_id,
-        vector2_id=vector2_id,
-    ).single()
+        last_vector_start: tuple[float, float],
+        last_vector_end: tuple[float, float],
+        angle_point: tuple[float, float],
+        current_vector_start: tuple[float, float],
+        current_vector_end: tuple[float, float]
+) -> str:
+    logging.info(f"All points: last_vector_start={last_vector_start}, last_vector_end={last_vector_end}, angle_point={angle_point}, current_vector_start={current_vector_start}, current_vector_end={current_vector_end}")
+    
+    # Define a threshold for coordinate approximation
+    threshold = 5
+    
+    # Determine the starting point and endpoint for each vector
+    if abs(last_vector_start[0] - angle_point[0]) < threshold and abs(last_vector_start[1] - angle_point[1]) < threshold:
+        logging.info("Last vector start is approximately equal to the angle point")
+        last_vector_start = last_vector_end
+    if abs(current_vector_start[0] - angle_point[0]) < threshold and abs(current_vector_start[1] - angle_point[1]) < threshold:
+        logging.info("Current vector start is approximately equal to the angle point")
+        current_vector_end = current_vector_start
 
-    if record:
-        x1, y1, x2, y2 = record["x1"], record["y1"], record["x2"], record["y2"]
-        
-        # Calculate vectors
-        v1 = [x2 - x1, y2 - y1]
-        v2 = [x2 - x1, y2 - y1]
+    logging.info(f"Last vector start: {last_vector_start}, Current vector end: {current_vector_end}")
+    
+    # Calculate vectors
+    v1 = [angle_point[0] - last_vector_start[0], angle_point[1] - last_vector_start[1]]
+    v2 = [current_vector_end[0] - angle_point[0], current_vector_end[1] - angle_point[1]]
 
-        logging.debug(f"Vectors: v1={v1}, v2={v2}")
-        cross_product = np.cross(v1, v2)
-        
-        if cross_product < 0:
-            return "CounterClockwise"
-        elif cross_product > 0:
-            return "Clockwise"
-        else:
-            return "Collinear"
+    logging.info(f"Vectors: v1={v1}, v2={v2}")
+    cross_product = np.cross(v1, v2)
+    
+    if cross_product < 0:
+        return "CounterClockwise"
+    elif cross_product > 0:
+        return "Clockwise"
     else:
-        logging.warning("No matching vectors found in the database.")
-        return None
+        return "Collinear"
 
 
 def add_direction(tx, vector1_id: str, vector2_id: str, direction: str, image_id: str, session_id: str):
-    logging.debug(f"Adding direction: {direction} to the vectors")
+    logging.info(f"Adding direction: {direction} to the vectors")
     query = """
         MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
         MERGE (vd:VectDirection:Feature {direction: $direction, session_id: $session_id})

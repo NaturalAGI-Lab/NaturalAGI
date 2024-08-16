@@ -84,8 +84,20 @@ def traverse_contour(
             )
 
         if len(processed_vectors) > 0:
+            last_vector = processed_vectors[-1]
+            last_angle_point = processed_angle_points[-1]
+            logging.debug(f"Processing vectors: last_vector={last_vector}, current_vector={current_vector}")
             calculate_magnitude_and_direction(
-                tx, processed_vectors[-1].id, current_vector.id, image_id, session_id
+                tx,
+                (last_vector.x1, last_vector.y1),
+                (last_vector.x2, last_vector.y2),
+                (last_angle_point.x, last_angle_point.y),
+                (current_vector.x1, current_vector.y1),
+                (current_vector.x2, current_vector.y2),
+                last_vector.id,
+                current_vector.id,
+                image_id,
+                session_id,
             )
 
         processed_vectors.append(current_vector)

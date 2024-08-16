@@ -18,7 +18,7 @@ def generate_triangle_images(output_dir: str, num_images: int, img_size: int, is
         os.makedirs(output_dir)
 
     # Calculate the silent zone size (5% of the image size)
-    silent_zone = int(img_size * 0.05)
+    silent_zone = int(img_size * 0.10)
     
     # Adjust the effective image size for triangle generation
     effective_img_size = img_size - 2 * silent_zone
@@ -30,10 +30,7 @@ def generate_triangle_images(output_dir: str, num_images: int, img_size: int, is
 
         # Generate random vertices for the triangle within the effective image size
         vertices = generate_triangle(effective_img_size, specified_angle)
-        
-        # Adjust vertices to account for the silent zone
-        vertices = [(x + silent_zone, y + silent_zone) for x, y in vertices]
-        
+                
         sides = [(vertices[0], vertices[1]), (vertices[1], vertices[2]), (vertices[2], vertices[0])]
         drawn_sides = []
 
@@ -73,8 +70,7 @@ def generate_triangle_images(output_dir: str, num_images: int, img_size: int, is
 
         # Generate and draw straight sides
         for p in range(straight_sides_num):
-            extended_start, extended_end = extend_line(sides[p][0], sides[p][1],
-                                                       random.randint(round(img_size * 0.05), round(img_size * 0.3)))
+            extended_start, extended_end = extend_line(sides[p][0], sides[p][1], 0)
             draw.line([extended_start, extended_end], fill='white', width=line_width)
 
         if is_noised:
@@ -92,13 +88,6 @@ def generate_triangle_images(output_dir: str, num_images: int, img_size: int, is
         # Randomly rotate the image
         rotation_angle = random.randint(0, 359)
         img = img.rotate(rotation_angle, resample=Image.BICUBIC, expand=True)
-
-        # Crop the image to remove any black borders after rotation
-        bbox = img.getbbox()
-        img = img.crop(bbox)
-
-        # Resize the image back to the original size
-        img = img.resize((img_size, img_size), Image.LANCZOS)
 
         # Generate timestamp for the filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S_%f")
