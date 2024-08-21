@@ -1,6 +1,7 @@
 import argparse
 import logging
 import os
+from typing import Dict, List, Union
 import uuid
 
 import cv2
@@ -16,22 +17,31 @@ def _get_line_length(line: list) -> float:
     return np.sqrt((line[2] - line[0]) ** 2 + (line[3] - line[1]) ** 2)
 
 
-def detect_lines(image) -> list:
+def detect_lines(image: np.ndarray) -> list:
     # Convert the image to grayscale if it's not already
     if len(image.shape) == 3:
         gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
     else:
         gray = image
 
-    lines = cv2.HoughLinesP(gray, 1, np.pi / 180, threshold=30, lines=None, minLineLength=30, maxLineGap=10)
+    height, width = gray.shape[:2]
+    
+    # Calculate relative parameters
+    min_line_length = int(0.1 * min(height, width)) 
+    max_line_gap = int(0.1 * min(height, width)) 
+    threshold = int(0.25 * min(height, width)) 
+
+    lines = cv2.HoughLinesP(gray, 1, np.pi / 180, threshold=threshold, 
+                            minLineLength=min_line_length, maxLineGap=max_line_gap)
 
     # Check if lines is None
     if lines is None:
         print("No lines found")
         return []
 
-    # Initialize HoughBundler
-    bundler = HoughBundler(min_distance=15, min_angle=15)
+    # Initialize HoughBundler with relative parameters
+    min_distance = int(0.1 * min(height, width)) 
+    bundler = HoughBundler(min_distance=min_distance, min_angle=15)
 
     # Process lines
     processed_lines = bundler.process_lines(lines)
@@ -47,6 +57,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Detect lines in an image")
     parser.add_argument("--folder_path", type=str, default="", help="Path to the folder containing images")
     parser.add_argument("--num_lines", type=int, default=3, help="Number of lines to detect")
+    parser.add_argument("--min_distance_factor", type=float, default=0.02, 
+                        help="Minimum distance factor for HoughBundler (relative to image size)")
+    parser.add_argument("--min_angle", type=float, default=15, 
+                        help="Minimum angle for HoughBundler")
 
     args = parser.parse_args()
 
@@ -60,6 +74,14 @@ if __name__ == "__main__":
     for image_file in image_files:
         image_path = os.path.join(folder_path, image_file)
         image = cv2.imread(image_path)
+        
+        # Calculate min_distance based on image size
+        height, width = image.shape[:2]
+        min_distance = int(args.min_distance_factor * min(height, width))
+        
+        # Initialize HoughBundler with relative min_distance
+        bundler = HoughBundler(min_distance=min_distance, min_angle=args.min_angle)
+        
         lines = detect_lines(image)
         if len(lines) == num_lines:
             valid_images_count += 1

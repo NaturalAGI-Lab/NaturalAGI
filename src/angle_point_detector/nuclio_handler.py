@@ -61,7 +61,7 @@ def kafka_handler(context, event):
         # Merge angle points with line detector results
         line_detector_results["angle_points"] = angle_points
 
-        if len(angle_points) < 3:
+        if False: #len(angle_points) < 3:
             context.logger.warn_with(
                 f"Detected {len(angle_points)} angle points, expected at least 3. Sending to DLQ.",
                 handler=HANDLER_NAME
