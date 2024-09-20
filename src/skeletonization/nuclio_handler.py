@@ -4,18 +4,11 @@ import json
 from kafka import KafkaProducer
 import traceback
 from src.skeletonization.skeleton_points_repository import calculate_angle_points
-from pydantic_settings import BaseSettings
 from dlq_model import DLQModel
+from settings import Settings
+from skeletonization import gng_skeletonization, net_to_json
 
-HANDLER_NAME = "angle_point_detector"
-
-
-class Settings(BaseSettings):
-    """Settings"""
-    kafka_topic: str
-    dlq_topic: str 
-    kafka_bootstrap_servers: str
-    kafka_group_id: str = "growing-neural-gas"
+HANDLER_NAME = "skeletonization"
 
 
 def init_context(context):
@@ -43,45 +36,25 @@ def kafka_handler(context, event):
     """Handles Kafka messages"""
     try:
         # Get JSON from the event.body
-        line_detector_results = json.loads(event.body)
+        body = json.loads(event.body)
 
         context.logger.info_with(
-            f"Received request: {line_detector_results}", handler=HANDLER_NAME
+            f"Received request: {body}", handler=HANDLER_NAME
         )
 
-        lines = line_detector_results["lines"]
-        context.logger.info_with(f"Lines: {lines}", handler=HANDLER_NAME)
+        net = gng_skeletonization(body["image_path"], Settings())
+        json_net = net_to_json(net)
+        context.logger.info_with(f"Net: {json_net}", handler=HANDLER_NAME)
 
-        angle_points = calculate_angle_points(lines)
-
-        context.logger.info_with(
-            f"Angle points: {angle_points}", handler=HANDLER_NAME
-        )
-
-        # Merge angle points with line detector results
-        line_detector_results["angle_points"] = angle_points
-
-        if False: #len(angle_points) < 3:
-            context.logger.warn_with(
-                f"Detected {len(angle_points)} angle points, expected at least 3. Sending to DLQ.",
-                handler=HANDLER_NAME
-            )
-            dlq_model = DLQModel(
-                source=HANDLER_NAME,
-                message="Invalid number of angle points",
-                value=line_detector_results
-            )
-            context.user_data.kafka_producer.send(
-                context.user_data.dlq_topic,
-                value=dlq_model.model_dump()
-            )
+        if False: 
+            pass
         else:
             context.logger.info_with(
                 "Processed request successfully", handler=HANDLER_NAME
             )
             context.user_data.kafka_producer.send(
                 context.user_data.kafka_topic,
-                value=line_detector_results
+                value=json_net
             )
 
     except Exception as e:
@@ -91,7 +64,7 @@ def kafka_handler(context, event):
         dlq_model = DLQModel(
             source=HANDLER_NAME,
             message=str(e),
-            value=line_detector_results if 'line_detector_results' in locals() else {}
+            value=json_net if 'json_net' in locals() else {}
         )
         context.user_data.kafka_producer.send(
             context.user_data.dlq_topic,

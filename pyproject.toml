@@ -29,6 +29,6 @@ build-backend = "poetry.core.masonry.api"
 optional = true
 
 [tool.poetry.group.skeletonization.dependencies]
-networkx = "*"
 scipy = "*"
 numpy = "*"
+ypstruct = "^0.0.2"
