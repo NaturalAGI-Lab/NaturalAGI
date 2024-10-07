@@ -1,9 +1,9 @@
 import numpy as np
 from ypstruct import structure
-import cv2
+from settings import Settings
 
 # Fit a Growing Neural Gas Network
-def fit(data, params):
+def fit(data, params: Settings):
 
     # Data Size and Dimension
     ndata = data.shape[0]
@@ -116,7 +116,7 @@ def fit(data, params):
             E *= delta
 
         # Display Iteration Info
-        print("Iteration {0}".format(it))
+        # print("Iteration {0}".format(it))
 
     net = structure()
     net.w = w

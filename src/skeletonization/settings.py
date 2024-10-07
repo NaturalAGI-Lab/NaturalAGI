@@ -8,15 +8,16 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str
     kafka_group_id: str = "growing-neural-gas"
     # # Neural Gas Parameters
-    N = 40
-    maxit = 50
-    L = 40
-    epsilon_b = 0.2
-    epsilon_n = 0.01
-    alpha = 0.5
-    delta = 0.995
-    T = 50
-    cnr_threshold = 0
+    N: int = 40
+    maxit: int = 50
+    L: int = 40
+    epsilon_b: float = 0.2
+    epsilon_n: float = 0.01
+    alpha: float = 0.5
+    delta: float = 0.995
+    T: int = 50
+    cnr_threshold: float = 0
+    skeletonization_threshold: float = 160
     
 def gng_parameters(settings: Settings):
     
@@ -29,6 +30,6 @@ def gng_parameters(settings: Settings):
     params.epsilon_n = settings.epsilon_n
     params.alpha = settings.alpha
     params.delta = settings.delta
-    params.T = settingsT
+    params.T = settings.T
     
     return params

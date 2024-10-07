@@ -26,45 +26,53 @@ nuctl deploy --path src/connector \
     -e DLQ_TOPIC="${DLQ_TOPIC}" \
     -e KAFKA_TOPIC="${CONNECTOR_KAFKA_TOPIC}"
 
-nuctl deploy --path src/line_detector \
+nuctl deploy --path src/skeletonization \
     --platform local \
     --volume "${LOCAL_STORAGE}":${NUCLIO_STORAGE} \
-    --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["'$CONNECTOR_KAFKA_TOPIC'"], "brokers": ["'$KAFKA_BROKERS'"], "consumerGroup": "line-detector-group"}}}' \
     -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
     -e DLQ_TOPIC="${DLQ_TOPIC}" \
-    -e KAFKA_TOPIC="${LINE_DETECTOR_TOPIC}"
+    --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["'$CONNECTOR_KAFKA_TOPIC'"], "brokers": ["'$KAFKA_BROKERS'"], "consumerGroup": "skeletonization-group"}}}' \
+    -e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}"
 
-nuctl deploy --path src/angle_point_detector \
-    --platform local \
-    -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
-    -e DLQ_TOPIC="${DLQ_TOPIC}" \
-    -e KAFKA_TOPIC="${ANGLE_POINT_DETECTOR_KAFKA_TOPIC}" \
-    --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["'$LINE_DETECTOR_TOPIC'"], "brokers": ["'$KAFKA_BROKERS'"], "consumerGroup": "angle-point-detector-group"}}}' \
-    -e NEXT_NUCLIO=http://"$HOST_IP":5050
+# nuctl deploy --path src/line_detector \
+#     --platform local \
+#     --volume "${LOCAL_STORAGE}":${NUCLIO_STORAGE} \
+#     --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["'$CONNECTOR_KAFKA_TOPIC'"], "brokers": ["'$KAFKA_BROKERS'"], "consumerGroup": "line-detector-group"}}}' \
+#     -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
+#     -e DLQ_TOPIC="${DLQ_TOPIC}" \
+#     -e KAFKA_TOPIC="${LINE_DETECTOR_TOPIC}"
+
+# nuctl deploy --path src/angle_point_detector \
+#     --platform local \
+#     -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
+#     -e DLQ_TOPIC="${DLQ_TOPIC}" \
+#     -e KAFKA_TOPIC="${ANGLE_POINT_DETECTOR_KAFKA_TOPIC}" \
+#     --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["'$LINE_DETECTOR_TOPIC'"], "brokers": ["'$KAFKA_BROKERS'"], "consumerGroup": "angle-point-detector-group"}}}' \
+#     -e NEXT_NUCLIO=http://"$HOST_IP":5050
 
 nuctl deploy --path src/contour_analysis \
     --platform local \
-    --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["'$ANGLE_POINT_DETECTOR_KAFKA_TOPIC'"], "brokers": ["'$KAFKA_BROKERS'"], "consumerGroup": "contour-analysis-group"}}}' \
+    --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["'$SKELETONIZATION_KAFKA_TOPIC'"], "brokers": ["'$KAFKA_BROKERS'"], "consumerGroup": "contour-analysis-group"}}}' \
     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
     -e NEO4J_USER=neo4j \
     -e NEO4J_PASS=$NEO4J_PASS
 
-nuctl deploy --path src/post_processing \
-   --platform local \
-   -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-   -e NEO4J_USER=neo4j \
-   -e NEO4J_PASS=$NEO4J_PASS
+# nuctl deploy --path src/post_processing \
+#    --platform local \
+#    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+#    -e NEO4J_USER=neo4j \
+#    -e NEO4J_PASS=$NEO4J_PASS
 
-nuctl deploy --path src/concept_creator \
-   --platform local \
-   -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-   -e NEO4J_USER=neo4j \
-   -e NEO4J_PASS=$NEO4J_PASS
+# nuctl deploy --path src/concept_creator \
+#    --platform local \
+#    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+#    -e NEO4J_USER=neo4j \
+#    -e NEO4J_PASS=$NEO4J_PASS
 
-nuctl deploy --path src/classification \
-   --platform local \
-   -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-   -e NEO4J_USER=neo4j \
-   -e NEO4J_PASS=$NEO4J_PASS
+# nuctl deploy --path src/classification \
+#    --platform local \
+#    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+#    -e NEO4J_USER=neo4j \
+#    -e NEO4J_PASS=$NEO4J_PASS
 
 echo "All functions deployed sequentially"

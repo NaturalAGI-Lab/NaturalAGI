@@ -1,12 +1,14 @@
 """Generic Nuclio Handler Template"""
 
 import json
+import cv2
 from kafka import KafkaProducer
 import traceback
-from src.skeletonization.skeleton_points_repository import calculate_angle_points
 from dlq_model import DLQModel
 from settings import Settings
-from skeletonization import gng_skeletonization, net_to_json
+from skeleton_gng_mapper import SkeletonGNGMapper
+from graph_serializer import GraphSerializer
+
 
 HANDLER_NAME = "skeletonization"
 
@@ -36,26 +38,32 @@ def kafka_handler(context, event):
     """Handles Kafka messages"""
     try:
         # Get JSON from the event.body
-        body = json.loads(event.body)
+        data = json.loads(event.body)
 
         context.logger.info_with(
-            f"Received request: {body}", handler=HANDLER_NAME
+            f"Received request: {data}", handler=HANDLER_NAME
         )
+        
+        operation = data.get('operation')
+        parameters = data.get('parameters', {})
+        
+        context.logger.info_with(f"Received request: {event.trigger.kind}", handler=HANDLER_NAME)
+        context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
+        context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
 
-        net = gng_skeletonization(body["image_path"], Settings())
-        json_net = net_to_json(net)
+        image = cv2.imread(parameters["image_path"])
+        net = SkeletonGNGMapper(Settings()).process_image(image)
+        json_net = GraphSerializer.serialize(net)
         context.logger.info_with(f"Net: {json_net}", handler=HANDLER_NAME)
 
-        if False: 
-            pass
-        else:
-            context.logger.info_with(
-                "Processed request successfully", handler=HANDLER_NAME
-            )
-            context.user_data.kafka_producer.send(
-                context.user_data.kafka_topic,
-                value=json_net
-            )
+        context.logger.info_with(
+            "Processed request successfully", handler=HANDLER_NAME
+        )
+        data["skeleton"] = json_net
+        context.user_data.kafka_producer.send(
+            context.user_data.kafka_topic,
+            value=data
+        )
 
     except Exception as e:
         context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)

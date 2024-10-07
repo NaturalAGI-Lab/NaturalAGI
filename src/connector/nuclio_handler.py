@@ -47,6 +47,11 @@ def http_handler(context, event):
         parameters = data.get('parameters', {})
         session_id = str(uuid.uuid4())
         
+        context.logger.info_with(f"Received request: {event.trigger.kind}", handler=HANDLER_NAME)
+        context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
+        context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
+        context.logger.info_with(f"Session ID: {session_id}", handler=HANDLER_NAME)
+        
         if operation == 'train':
             dataset_path = parameters.get('dataset_path')
             concept_name = parameters.get('concept_name')

@@ -22,15 +22,16 @@ NC := \033[0m # No Color
 
 HOST_IP := $(shell ipconfig getifaddr en0)
 
-LOCAL_STORAGE=./tests/generated_samples
+LOCAL_STORAGE=./tests/generated_samples/sk-test
 NUCLIO_STORAGE=/opt/nuclio/shared_storage
 
 DLQ_TOPIC = dlq-topic
 CONNECTOR_KAFKA_TOPIC = connector-output-topic
 LINE_DETECTOR_TOPIC = line-detector-output-topic
 ANGLE_POINT_DETECTOR_KAFKA_TOPIC = angle-point-detector-output-topic
+SKELETONIZATION_KAFKA_TOPIC = skeletonization-output-topic
 
-TOPICS = $(CONNECTOR_KAFKA_TOPIC) $(LINE_DETECTOR_TOPIC) $(ANGLE_POINT_DETECTOR_KAFKA_TOPIC) $(DLQ_TOPIC)
+TOPICS = $(CONNECTOR_KAFKA_TOPIC) $(LINE_DETECTOR_TOPIC) $(ANGLE_POINT_DETECTOR_KAFKA_TOPIC) $(DLQ_TOPIC) $(SKELETONIZATION_KAFKA_TOPIC)
 
 # Add these variables near the top of the Makefile, after other variable definitions
 OPERATION ?= train

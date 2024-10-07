@@ -13,14 +13,14 @@ spec:
     commands:
       - 'apt-get update -y --fix-missing'
       - 'apt-get install -y libgl1-mesa-glx'
-      - 'pip install numpy pydantic-settings kafka-python'
+      - 'pip install numpy pydantic-settings kafka-python rdp scikit-image networkx ypstruct opencv-python'
   triggers:
     kafka-trigger:
       kind: kafka-cluster
       attributes:
         initialOffset: earliest
         topics:
-          - line-detector-output-topic
+          - connector-output-topic
         brokers:
           - ${KAFKA_BOOTSTRAP_SERVERS}
         consumerGroup: skeletonization-group
