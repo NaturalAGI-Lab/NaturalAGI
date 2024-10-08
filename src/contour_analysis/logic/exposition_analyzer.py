@@ -80,7 +80,7 @@ def _analyze_contour_type(tx: ManagedTransaction, image_id: str, session_id: str
 
     query = """
         MATCH (v:Vector {image_id: $image_id})
-        CALL apoc.path.expand(v, '>', 'AnglePoint|Vector', 0, 100) YIELD path
+        CALL apoc.path.expand(v, '>', 'IntersectionPoint|Vector', 0, 100) YIELD path
         WHERE last(nodes(path)) = v AND size(nodes(path)) > 2
         RETURN path
     """
@@ -88,20 +88,20 @@ def _analyze_contour_type(tx: ManagedTransaction, image_id: str, session_id: str
     result_list = list(result)
 
     if result_list:
-        # If a path is found, create a 'Closed' node and link it to all Vector and AnglePoint nodes
+        # If a path is found, create a 'Closed' node and link it to all Vector and IntersectionPoint nodes
         query = """
             MATCH (n)
-            WHERE (n:Vector OR n:AnglePoint) AND n.image_id = $image_id
+            WHERE (n:Vector OR n:IntersectionPoint) AND n.image_id = $image_id
             MERGE (closed:Closed:Feature {session_id: $session_id})
             ON CREATE SET closed.samples = [$image_id]
             ON MATCH SET closed.samples = CASE WHEN $image_id IN closed.samples THEN closed.samples ELSE closed.samples + $image_id END
             MERGE (n)-[:HAS_CONTOUR_TYPE]->(closed)
         """
     else:
-        # If no path is found, create an 'Open' node and link it to all Vector and AnglePoint nodes
+        # If no path is found, create an 'Open' node and link it to all Vector and IntersectionPoint nodes
         query = """
             MATCH (n)
-            WHERE (n:Vector OR n:AnglePoint) AND n.image_id = $image_id
+            WHERE (n:Vector OR n:IntersectionPoint) AND n.image_id = $image_id
             MERGE (open:Open:Feature {session_id: $session_id})
             ON CREATE SET open.samples = [$image_id]
             ON MATCH SET open.samples = CASE WHEN $image_id IN open.samples THEN open.samples ELSE open.samples + $image_id END

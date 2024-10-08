@@ -43,7 +43,7 @@ These parameters help in determining whether two lines should be grouped togethe
 
 The `HoughBundler` class is used to refine the output of the Hough Transform by grouping and merging line segments that are close to each other and have similar orientations. This is particularly useful in applications such as image analysis, where detecting and processing structural elements like lines is crucial.
 
-## 2. Angle Points Detector
+## 2. Angle Points Detector (NOT USED)
 
 The `AnglePointsDetector` module is designed to handle the detection and calculation of angle points formed by the intersection of lines. This module includes functions to find the intersection points of lines, calculate the angles between intersecting lines, and generate angle points with unique identifiers. Below is a detailed description of the implementation of this module.
 

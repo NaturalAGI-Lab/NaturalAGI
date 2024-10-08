@@ -41,7 +41,7 @@ def mark_quadrant_change(
         // CREATE (quad_change:QuadrantChange:Feature {image_id: $image_id})
         // CREATE (v1)-[:HAS_QUADRANT_CHANGE]->(quad_change)-[:HAS_QUADRANT_CHANGE]->(v2)
         WITH v1, v2
-        MATCH (v1)--(ap:AnglePoint)--(v2)
+        MATCH (v1)--(ap:IntersectionPoint)--(v2)
         MERGE (ap)-[:IS_CRITICAL_POINT]->(cp:CriticalPoint:Feature {reason: 'Quadrant Change', session_id: $session_id})
         ON CREATE SET cp.samples = [$image_id]
         ON MATCH SET cp.samples = CASE WHEN $image_id IN cp.samples THEN cp.samples ELSE cp.samples + [$image_id] END

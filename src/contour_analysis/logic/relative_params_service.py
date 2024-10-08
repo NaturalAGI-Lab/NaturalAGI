@@ -4,7 +4,7 @@ import numpy as np
 from neo4j import ManagedTransaction
 
 from logic.helpers import calculate_half_plane_and_quadrant
-from model.angle_point import Point
+from src.contour_analysis.model.point import Point
 from model.vector_details import VectorDetails
 
 
@@ -18,7 +18,7 @@ def get_attribute(obj, attr):
 def calculate_and_set_relative_params(
     tx: ManagedTransaction,
     vector: VectorDetails,
-    angle_point: Point,
+    point: Point,
     image_id: str,
     session_id: str,
 ) -> None:
@@ -28,13 +28,13 @@ def calculate_and_set_relative_params(
     Args:
         tx (ManagedTransaction): The managed transaction object.
         vector (VectorDetails): The vector details object.
-        angle_point (AnglePoint): The angle point object.
+        point (Point): The point object.
     Returns:
         None
     """
-    print(f"X:{get_attribute(angle_point, 'x')}")
-    starting_x: float = get_attribute(angle_point, "x")
-    starting_y: float = get_attribute(angle_point, "y")
+    print(f"X:{get_attribute(point, 'x')}")
+    starting_x: float = get_attribute(point, "x")
+    starting_y: float = get_attribute(point, "y")
 
     if vector.x1 == starting_x and vector.y1 == starting_y:
         ending_x = vector.x2

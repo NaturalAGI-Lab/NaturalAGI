@@ -4,7 +4,11 @@
 
 There are list of prefixes in the system for different structures:
 
-- **AnglePoint** (intercestion point of 2 lines/vectors)
+- **Point** (base class for all points)
+- **CornerPoint** (A corner point represents a sharp change in direction of a contour)
+- **InflectionPoint** (An inflection point is where the curvature of a contour changes sign, i.e., where it transitions from being concave to convex or vice versa.)
+- **IntersectionPoint** (An intersection point is where two or more line segments of the contour cross each other.)
+- **EndPoint** (An end point is the last point of a contour)
 - **Vector** (line that has been truncated to the angle points)
 - **Line** (result of line detector activation)
 - **CriticalPoint** (point of the exposition that is critical for the recognized structure)

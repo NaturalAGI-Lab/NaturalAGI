@@ -36,11 +36,12 @@ class PostProcessingRepository:
         with self.driver.session() as session:
             return session.write_transaction(self.find_stable_structures, session_id)
 
+    # TODO refactor this to support any type of points
     def find_stable_structures(self, tx: ManagedTransaction, session_id: str) -> List[Dict[str, Any]]:
         query = """
             CALL {
                 MATCH (n {session_id: $session_id})
-                WHERE n:Vector OR n:AnglePoint OR n:Feature
+                WHERE n:Vector OR n:Point OR n:Feature
                 RETURN max(size(n.samples)) AS maxSamples
             }
             CALL {

@@ -104,7 +104,7 @@ def calculate_direction(
 def add_direction(tx, vector1_id: str, vector2_id: str, direction: str, image_id: str, session_id: str):
     logging.info(f"Adding direction: {direction} to the vectors")
     query = """
-        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
+        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_POINT]->(ap:IntersectionPoint)<-[:HAS_POINT]-(v2:Vector {vector_id: $vector2_id})
         MERGE (vd:VectDirection:Feature {direction: $direction, session_id: $session_id})
         ON CREATE SET vd.samples = [$image_id]
         ON MATCH SET vd.samples = CASE WHEN $image_id IN vd.samples THEN vd.samples ELSE vd.samples + [$image_id] END
@@ -116,7 +116,7 @@ def add_direction(tx, vector1_id: str, vector2_id: str, direction: str, image_id
 def create_critical_point(tx, vector1_id: str, vector2_id: str, image_id: str, session_id: str):
     logging.info("Finding angle point between two vectors")
     query = """
-        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_ANGLE_POINT]->(ap:AnglePoint)<-[:HAS_ANGLE_POINT]-(v2:Vector {vector_id: $vector2_id})
+        MATCH (v1:Vector {vector_id: $vector1_id})-[:HAS_POINT]->(ap:IntersectionPoint)<-[:HAS_POINT]-(v2:Vector {vector_id: $vector2_id})
         MERGE (cp:CriticalPoint:Feature {reason: "Direction Change", session_id: $session_id})-[:IS_CRITICAL_POINT]->(ap)
         ON CREATE SET cp.samples = [$image_id]
         ON MATCH SET cp.samples = CASE WHEN $image_id IN cp.samples THEN cp.samples ELSE cp.samples + [$image_id] END

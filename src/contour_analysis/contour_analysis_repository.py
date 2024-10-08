@@ -1,10 +1,7 @@
 import logging
 
 from neo4j import GraphDatabase
-from networkx import Graph
 
-from converter.angle_point_converter import AnglePointConverter
-from converter.vector_details_converter import VectorDetailsConverter
 from logic.contour_traverse import process_input_data
 from logic.exposition_analyzer import analyze_exposition
 from logic.tertiary_features.tertiary_features_service import create_tertiary_features

@@ -8,7 +8,7 @@ from logic.repository.vector_repository import VectorRepository
 def merge_graphs(tx: ManagedTransaction) -> None:
     """
     Merges the graphs of the structures in the database.
-    It groups the structural elements (Vector, AnglePoint) by image_id and element id, then build the string representation
+    It groups the structural elements (Vector, Point) by image_id and element id, then build the string representation
     of the properties of the structural elements in each group.
     Then we use Levenshtein distance to compare the string representations of the groups.
     If the distance is less than a certain threshold, we merge the groups.

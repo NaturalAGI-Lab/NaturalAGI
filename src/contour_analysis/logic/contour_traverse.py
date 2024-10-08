@@ -12,7 +12,7 @@ from logic.quadrant_checker import (
     mark_quadrant_change,
 )
 from logic.relative_params_service import calculate_and_set_relative_params
-from model.angle_point import AnglePoint, EndPoint, Point
+from model.point import IntersectionPoint, EndPoint, Point, CornerPoint
 from model.vector_details import VectorDetails
 from logic.magnitude_and_direction_service import calculate_magnitude_and_direction
 
@@ -26,10 +26,10 @@ def process_input_data(
     lines: List[VectorDetails],
     session_id: str,
 ) -> None:
-    angle_points = [p for p in points if isinstance(p, AnglePoint)]
+    intersection_points = [p for p in points if isinstance(p, IntersectionPoint)]
     end_points = [p for p in points if isinstance(p, EndPoint)]
     save_vectors_data(tx, lines, image_id, session_id)
-    save_intersection_data(tx, image_id, angle_points, session_id)
+    save_intersection_data(tx, image_id, intersection_points, session_id)
     save_points_data(tx, end_points, image_id, session_id)
     traverse_contour(tx, image_id, session_id, points, lines)
 
@@ -52,7 +52,7 @@ def traverse_contour(
 
     def get_connected_lines(point: Point) -> List[VectorDetails]:
         connected = []
-        if isinstance(point, AnglePoint):
+        if isinstance(point, IntersectionPoint):
             line_ids = [point.line1, point.line2]
         elif isinstance(point, EndPoint):
             line_ids = [point.line]
@@ -68,7 +68,7 @@ def traverse_contour(
         angle_points = [
             p
             for p in points_dict.values()
-            if isinstance(p, AnglePoint)
+            if isinstance(p, IntersectionPoint)
             and (p.line1 == line.id or p.line2 == line.id)
             and p.id != current_point.id
         ]

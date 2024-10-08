@@ -4,7 +4,7 @@ from typing import List
 
 from neo4j import ManagedTransaction
 
-from model.angle_point import AnglePoint, EndPoint, Point
+from model.point import IntersectionPoint, EndPoint, Point
 from model.vector_details import VectorDetails
 
 
@@ -47,34 +47,34 @@ def save_vectors_data(tx, vectors: List[VectorDetails], image_id: str, session_i
 
 
 def save_intersection_data(
-    tx: ManagedTransaction, image_id: str, angle_points: List[AnglePoint], session_id: str
+    tx: ManagedTransaction, image_id: str, intersection_points: List[IntersectionPoint], session_id: str
 ):
     query: str = """
             UNWIND $angle_points AS data
             
             // Create or match PointCoordinates node
-            MERGE (apCoords:PointCoordinates:Feature {x: data.x, y: data.y, session_id: $session_id})
-            ON CREATE SET apCoords.samples = [$image_id]
-            ON MATCH SET apCoords.samples = CASE WHEN $image_id IN apCoords.samples THEN apCoords.samples ELSE apCoords.samples + $image_id END
+            MERGE (pointCoords:PointCoordinates:Feature {x: data.x, y: data.y, session_id: $session_id})
+            ON CREATE SET pointCoords.samples = [$image_id]
+            ON MATCH SET pointCoords.samples = CASE WHEN $image_id IN pointCoords.samples THEN pointCoords.samples ELSE pointCoords.samples + $image_id END
             
-            // Create or match AnglePointAngle node
-            MERGE (apAngle:AnglePointAngle:Feature {angle: data.angle, session_id: $session_id})
-            ON CREATE SET apAngle.samples = [$image_id]
-            ON MATCH SET apAngle.samples = CASE WHEN $image_id IN apAngle.samples THEN apAngle.samples ELSE apAngle.samples + $image_id END
+            // Create or match IntersectionPointAngle node
+            MERGE (ipAngle:IntersectionPointAngle:Feature {angle: data.angle, session_id: $session_id})
+            ON CREATE SET ipAngle.samples = [$image_id]
+            ON MATCH SET ipAngle.samples = CASE WHEN $image_id IN ipAngle.samples THEN ipAngle.samples ELSE ipAngle.samples + $image_id END
             
-            CREATE (ap:AnglePoint {session_id: $session_id, id: data.id, image_id: $image_id, samples: [$image_id]})-[:HAS_ANGLE]->(apAngle)
+            CREATE (point:IntersectionPoint {session_id: $session_id, id: data.id, image_id: $image_id, samples: [$image_id]})-[:HAS_ANGLE]->(ipAngle)
             
-            MERGE (ap)-[:HAS_COORDINATES]->(apCoords)
+            MERGE (point)-[:HAS_COORDINATES]->(pointCoords)
 
-            WITH ap, data
+            WITH point, data
             MATCH (vector1:Vector {vector_id: data.line1, session_id: $session_id})
             MATCH (vector2:Vector {vector_id: data.line2, session_id: $session_id})
-            MERGE (vector1)-[:HAS_ANGLE_POINT]->(ap)
-            MERGE (vector2)-[:HAS_ANGLE_POINT]->(ap)
+            MERGE (vector1)-[:HAS_ANGLE_POINT]->(point)
+            MERGE (vector2)-[:HAS_ANGLE_POINT]->(point)
         """
-    points_ = [vars(angle_point) for angle_point in angle_points]
+    points_ = [vars(intersection_point) for intersection_point in intersection_points]
     logging.info(
-        f"Saving intersection data for image {image_id} with {points_} angle points"
+        f"Saving intersection data for image {image_id} with {len(points_)} points"
     )
     tx.run(query, angle_points=points_, image_id=image_id, session_id=session_id)
 

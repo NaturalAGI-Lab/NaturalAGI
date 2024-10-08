@@ -15,7 +15,7 @@ def compare_vector_magnitude_and_create_nodes(tx, vector1_id: str, vector2_id: s
     label = result.single()[0]
 
     create_node_query = f"""
-      MATCH (v1:Vector {{vector_id: $vector1_id}})--(ap:AnglePoint)--(v2:Vector {{vector_id: $vector2_id}})
+      MATCH (v1:Vector {{vector_id: $vector1_id}})--(ap:IntersectionPoint)--(v2:Vector {{vector_id: $vector2_id}})
       MERGE (vect:{label}:Feature {{session_id: $session_id}})
       ON CREATE SET vect.samples = [$image_id]
       ON MATCH SET vect.samples = CASE WHEN $image_id IN vect.samples THEN vect.samples ELSE vect.samples + [$image_id] END
