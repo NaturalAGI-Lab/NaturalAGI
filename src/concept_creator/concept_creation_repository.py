@@ -151,7 +151,8 @@ class ConceptCreationRepository:
         create_concept_node_query = """
             CREATE (c:Concept {id: $concept_id, session_id: $session_id})
             WITH c
-            MATCH (n {concept_id: $concept_id})
+            MATCH (n {session_id: $session_id})
+            WHERE NOT n:Concept
             CREATE (c)-[:INCLUDES]->(n)
         """
         tx.run(create_concept_node_query, concept_id=concept_id, session_id=session_id)

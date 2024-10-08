@@ -1,6 +1,6 @@
 import math
 import uuid
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, Any
 
 def line_intersection(line1: Dict[str, int], line2: Dict[str, int]) -> Optional[Tuple[int, int]]:
     x1, y1, x2, y2 = line1['x1'], line1['y1'], line1['x2'], line1['y2']
@@ -58,21 +58,50 @@ def calculate_angle(line1: Dict[str, int], line2: Dict[str, int], intersection: 
 def round_to_nearest(number: int, n: int) -> int:
     return round(number / n) * n
 
-def calculate_angle_points(lines: List[Dict[str, int]]) -> List[Dict[str, any]]:
-    angle_points = []
-    for i in range(len(lines)):
+def calculate_points(lines: List[Dict[str, int]]) -> List[Dict[str, Any]]:
+    points = []
+    intersection_points = set()
+    
+    for i, line in enumerate(lines):
+        # Calculate angle points (intersections)
         for j in range(i + 1, len(lines)):
             line1 = lines[i]
             line2 = lines[j]
             intersection = line_intersection(line1, line2)
             if intersection:
                 angle = calculate_angle(line1, line2, intersection)
-                angle_points.append({
+                points.append({
                     'id': str(uuid.uuid4()),
                     'x': intersection[0],
                     'y': intersection[1],
                     'angle': round_to_nearest(angle, 5),
+                    'type': 'angle_point',
                     'line1': line1['id'],
                     'line2': line2['id'],
                 })
-    return angle_points
+                intersection_points.add(intersection)
+    
+    # Add endpoints that are not intersection points
+    for line in lines:
+        start_point = (line['x1'], line['y1'])
+        end_point = (line['x2'], line['y2'])
+        
+        if start_point not in intersection_points:
+            points.append({
+                'id': str(uuid.uuid4()),
+                'x': start_point[0],
+                'y': start_point[1],
+                'type': 'endpoint',
+                'line': line['id']
+            })
+        
+        if end_point not in intersection_points:
+            points.append({
+                'id': str(uuid.uuid4()),
+                'x': end_point[0],
+                'y': end_point[1],
+                'type': 'endpoint',
+                'line': line['id']
+            })
+    
+    return points

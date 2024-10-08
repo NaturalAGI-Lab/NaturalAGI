@@ -4,7 +4,7 @@ import numpy as np
 from neo4j import ManagedTransaction
 
 from logic.helpers import calculate_half_plane_and_quadrant
-from model.angle_point import AnglePoint
+from model.angle_point import Point
 from model.vector_details import VectorDetails
 
 
@@ -16,11 +16,11 @@ def get_attribute(obj, attr):
 
 
 def calculate_and_set_relative_params(
-        tx: ManagedTransaction,
-        vector: VectorDetails,
-        angle_point: AnglePoint,
-        image_id: str,
-        session_id: str
+    tx: ManagedTransaction,
+    vector: VectorDetails,
+    angle_point: Point,
+    image_id: str,
+    session_id: str,
 ) -> None:
     """
     Calculates and sets the relative parameters for a given image.
@@ -33,8 +33,8 @@ def calculate_and_set_relative_params(
         None
     """
     print(f"X:{get_attribute(angle_point, 'x')}")
-    starting_x: float = get_attribute(angle_point, 'x')
-    starting_y: float = get_attribute(angle_point, 'y')
+    starting_x: float = get_attribute(angle_point, "x")
+    starting_y: float = get_attribute(angle_point, "y")
 
     if vector.x1 == starting_x and vector.y1 == starting_y:
         ending_x = vector.x2
@@ -59,15 +59,20 @@ def calculate_and_set_relative_params(
         WITH vector, vValue
         MERGE (vector)-[:HAS_VECTOR_VALUE]->(vValue)
     """
-    tx.run(query, vector_id=vector.id, x_vect=x_vect, y_vect=y_vect, image_id=image_id, session_id=session_id)
+    tx.run(
+        query,
+        vector_id=vector.id,
+        x_vect=x_vect,
+        y_vect=y_vect,
+        image_id=image_id,
+        session_id=session_id,
+    )
     print("Vector value is created for the line")
 
     horizontal_plane, vertical_plane, quadrant = calculate_half_plane_and_quadrant(
         x_vect, y_vect
     )
-    print(
-        f"Half planes and quadrants: {horizontal_plane, vertical_plane, quadrant}"
-    )
+    print(f"Half planes and quadrants: {horizontal_plane, vertical_plane, quadrant}")
     query = """
         MATCH (vector:Vector {vector_id: $vector_id})
         
@@ -88,7 +93,7 @@ def calculate_and_set_relative_params(
         horizontal_plane=horizontal_plane,
         vertical_plane=vertical_plane,
         image_id=image_id,
-        session_id=session_id
+        session_id=session_id,
     )
 
     query = """
@@ -98,6 +103,14 @@ def calculate_and_set_relative_params(
         ON MATCH SET quadrant.samples = CASE WHEN $image_id IN quadrant.samples THEN quadrant.samples ELSE quadrant.samples + $image_id END
         MERGE (vector)-[:HAS_QUADRANT]->(quadrant)
     """
-    tx.run(query, vector_id=vector.id, quadrant=quadrant, image_id=image_id, session_id=session_id)
-    print(f"Half planes and quadrants are created for the vector: {vector.id} quadrant:{quadrant} ")
+    tx.run(
+        query,
+        vector_id=vector.id,
+        quadrant=quadrant,
+        image_id=image_id,
+        session_id=session_id,
+    )
+    print(
+        f"Half planes and quadrants are created for the vector: {vector.id} quadrant:{quadrant} "
+    )
     return

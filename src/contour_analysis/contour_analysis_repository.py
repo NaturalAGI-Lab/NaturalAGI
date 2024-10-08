@@ -37,7 +37,7 @@ class ContourAnalysisRepository:
         logging.info(
             f"Starting analyze_contour method for image {input_data['image_id']}"
         )
-        angle_points = input_data["angle_points"]
+        points = input_data["points"]
         lines = input_data["lines"]
     
         with self.driver.session() as session:
@@ -45,7 +45,7 @@ class ContourAnalysisRepository:
             result = session.write_transaction(
                 process_input_data,
                 input_data["image_id"],
-                angle_points,
+                points,
                 lines,
                 session_id
             )

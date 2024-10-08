@@ -1,22 +1,16 @@
 from typing import Dict, List, Any
 
-from model.angle_point import AnglePoint
+from model.angle_point import AnglePoint, EndPoint, Point
 
 
 # noinspection PyTypeChecker
 class AnglePointConverter:
     @staticmethod
-    def dict_to_angle_points(angle_point_dict: Dict[str, Any]) -> List[AnglePoint]:
-        angle_points: List[AnglePoint] = []
-        for angle_point in angle_point_dict:
-            angle_points.append(
-                AnglePoint(
-                    id=angle_point["id"],
-                    x=angle_point["x"],
-                    y=angle_point["y"],
-                    angle=angle_point["angle"],
-                    line1=angle_point["line1"],
-                    line2=angle_point["line2"]
-                )
-            )
-        return angle_points
+    def dict_to_points(point_dict: Dict[str, Any]) -> List[Point]:
+        points: List[Point] = []
+        for point in point_dict:
+            if point["type"] == "angle_point":
+                points.append(AnglePoint(**point))
+            elif point["type"] == "endpoint":
+                points.append(EndPoint(**point))
+        return points

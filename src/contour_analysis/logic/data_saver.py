@@ -4,7 +4,7 @@ from typing import List
 
 from neo4j import ManagedTransaction
 
-from model.angle_point import AnglePoint
+from model.angle_point import AnglePoint, EndPoint, Point
 from model.vector_details import VectorDetails
 
 
@@ -34,19 +34,26 @@ def save_vectors_data(tx, vectors: List[VectorDetails], image_id: str, session_i
             CREATE (v)-[:HAS_LENGTH]->(length)
             CREATE (v)-[:HAS_COORDINATES]->(coordinates)
             """,
-            image_id=image_id, vector_id=vector.id, length=vector.length, angle=angle, x1=vector.x1, y1=vector.y1,
-            x2=vector.x2, y2=vector.y2, session_id=session_id)
+            image_id=image_id,
+            vector_id=vector.id,
+            length=vector.length,
+            angle=angle,
+            x1=vector.x1,
+            y1=vector.y1,
+            x2=vector.x2,
+            y2=vector.y2,
+            session_id=session_id,
+        )
 
 
-def save_intersection_data(tx: ManagedTransaction,
-                           image_id: str,
-                           angle_points: List[AnglePoint],
-                           session_id: str):
+def save_intersection_data(
+    tx: ManagedTransaction, image_id: str, angle_points: List[AnglePoint], session_id: str
+):
     query: str = """
             UNWIND $angle_points AS data
             
-            // Create or match AnglePointCoordinates node
-            MERGE (apCoords:AnglePointCoordinates:Feature {x: data.x, y: data.y, session_id: $session_id})
+            // Create or match PointCoordinates node
+            MERGE (apCoords:PointCoordinates:Feature {x: data.x, y: data.y, session_id: $session_id})
             ON CREATE SET apCoords.samples = [$image_id]
             ON MATCH SET apCoords.samples = CASE WHEN $image_id IN apCoords.samples THEN apCoords.samples ELSE apCoords.samples + $image_id END
             
@@ -66,9 +73,27 @@ def save_intersection_data(tx: ManagedTransaction,
             MERGE (vector2)-[:HAS_ANGLE_POINT]->(ap)
         """
     points_ = [vars(angle_point) for angle_point in angle_points]
-    logging.info(f"Saving intersection data for image {image_id} with {points_} angle points")
+    logging.info(
+        f"Saving intersection data for image {image_id} with {points_} angle points"
+    )
     tx.run(query, angle_points=points_, image_id=image_id, session_id=session_id)
 
+def save_points_data(tx: ManagedTransaction, points: List[EndPoint], image_id: str, session_id: str):
+    for point in points:
+        tx.run(
+            """
+                CREATE (p:EndPoint {id: $id, session_id: $session_id, samples: [$image_id]})-[:HAS_COORDINATES]->(pCoords:PointCoordinates:Feature {x: $x, y: $y, session_id: $session_id, samples: [$image_id]})
+                WITH p
+                MATCH (vector1:Vector {vector_id: $line, session_id: $session_id})
+                MERGE (vector1)-[:HAS_POINT]->(p)
+            """,
+            id=point.id,
+            x=point.x,
+            y=point.y,
+            session_id=session_id,
+            line=point.line,
+            image_id=image_id,
+        )
 
 def calculate_abs_angle(x1, y1, x2, y2):
     angle_radians = math.atan2(y2 - y1, x2 - x1)

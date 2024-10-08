@@ -15,7 +15,7 @@ spec:
     commands:
       - 'apt-get update -y --fix-missing'
       - 'apt-get install -y libgl1-mesa-glx'
-      - 'pip install numpy requests opencv-python pydantic-settings kafka-python'
+      - 'pip install numpy requests opencv-python pydantic-settings kafka-python scikit-image'
   loggerSinks:
     - level: debug
   platform: 

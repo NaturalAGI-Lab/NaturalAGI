@@ -3,7 +3,7 @@
 import json
 from kafka import KafkaProducer
 import traceback
-from angle_points_repository import calculate_angle_points
+from angle_points_repository import calculate_points
 from pydantic_settings import BaseSettings
 from dlq_model import DLQModel
 
@@ -52,37 +52,22 @@ def kafka_handler(context, event):
         lines = line_detector_results["lines"]
         context.logger.info_with(f"Lines: {lines}", handler=HANDLER_NAME)
 
-        angle_points = calculate_angle_points(lines)
+        points = calculate_points(lines)
 
         context.logger.info_with(
-            f"Angle points: {angle_points}", handler=HANDLER_NAME
+            f"Points: {points}", handler=HANDLER_NAME
         )
 
-        # Merge angle points with line detector results
-        line_detector_results["angle_points"] = angle_points
+        # Merge points with line detector results
+        line_detector_results["points"] = points
 
-        if False: #len(angle_points) < 3:
-            context.logger.warn_with(
-                f"Detected {len(angle_points)} angle points, expected at least 3. Sending to DLQ.",
-                handler=HANDLER_NAME
-            )
-            dlq_model = DLQModel(
-                source=HANDLER_NAME,
-                message="Invalid number of angle points",
-                value=line_detector_results
-            )
-            context.user_data.kafka_producer.send(
-                context.user_data.dlq_topic,
-                value=dlq_model.model_dump()
-            )
-        else:
-            context.logger.info_with(
-                "Processed request successfully", handler=HANDLER_NAME
-            )
-            context.user_data.kafka_producer.send(
-                context.user_data.kafka_topic,
-                value=line_detector_results
-            )
+        context.logger.info_with(
+            "Processed request successfully", handler=HANDLER_NAME
+        )
+        context.user_data.kafka_producer.send(
+            context.user_data.kafka_topic,
+            value=line_detector_results
+        )
 
     except Exception as e:
         context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)
@@ -96,13 +81,6 @@ def kafka_handler(context, event):
         context.user_data.kafka_producer.send(
             context.user_data.dlq_topic,
             value=dlq_model.model_dump()
-        )
-
-        context.Response(
-            body=f"Error: {e}",
-            headers={},
-            content_type="text/plain",
-            status_code=500,
         )
 
 

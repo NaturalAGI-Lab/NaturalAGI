@@ -136,6 +136,11 @@ train_mnist_one:
 	@make send_to_connector OPERATION=train CONCEPT_NAME=mnist_one NUCLIO_STORAGE=$(NUCLIO_STORAGE)/mnist_ones
 	@echo -e "${GREEN}Training script completed.${NC}"
 
+train_mnist_four:
+	@echo -e "${BLUE}Running training script...${NC}"
+	@make send_to_connector OPERATION=train CONCEPT_NAME=mnist_four NUCLIO_STORAGE=$(NUCLIO_STORAGE)/mnist_fours
+	@echo -e "${GREEN}Training script completed.${NC}"
+
 
 send_to_connector:
 	@echo -e "${BLUE}Sending data to connector...${NC}"

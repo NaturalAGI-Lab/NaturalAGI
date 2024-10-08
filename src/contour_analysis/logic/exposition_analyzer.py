@@ -81,7 +81,7 @@ def _analyze_contour_type(tx: ManagedTransaction, image_id: str, session_id: str
     query = """
         MATCH (v:Vector {image_id: $image_id})
         CALL apoc.path.expand(v, '>', 'AnglePoint|Vector', 0, 100) YIELD path
-        WHERE last(nodes(path)) = v
+        WHERE last(nodes(path)) = v AND size(nodes(path)) > 2
         RETURN path
     """
     result: Result = tx.run(query, image_id=image_id)

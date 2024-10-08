@@ -43,11 +43,24 @@ class PostProcessingRepository:
                 WHERE n:Vector OR n:AnglePoint OR n:Feature
                 RETURN max(size(n.samples)) AS maxSamples
             }
-            WITH maxSamples
+            CALL {
+                MATCH (apc:AnglePointsCount:Feature {session_id: $session_id})
+                RETURN min(apc.count) AS minAnglePoints
+            }
+            CALL {
+                MATCH (vc:VectorsCount:Feature {session_id: $session_id})
+                RETURN min(vc.count) AS minVectors
+            }
+            WITH maxSamples, minAnglePoints, minVectors
             MATCH (n {session_id: $session_id})
-            WHERE (n:Vector OR n:AnglePoint OR n:Feature)
-                AND size(n.samples) < maxSamples
+            WHERE (n:Vector OR n:AnglePoint OR n:Feature OR n:EndPoint)
+                AND (
+                    (n:AnglePointsCount AND n.count > minAnglePoints)
+                    OR (n:VectorsCount AND n.count > minVectors)
+                    OR (NOT n:AnglePointsCount AND NOT n:VectorsCount AND size(n.samples) < maxSamples)
+                )
             DETACH DELETE n
+            RETURN maxSamples, minAnglePoints, minVectors
         """
         result = tx.run(query, session_id=session_id)
         return [dict(record) for record in result]
