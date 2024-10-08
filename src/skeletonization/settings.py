@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     kafka_group_id: str = "growing-neural-gas"
     # # Neural Gas Parameters
     N: int = 40
-    maxit: int = 50
+    maxit: int = 100
     L: int = 40
     epsilon_b: float = 0.2
     epsilon_n: float = 0.01

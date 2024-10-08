@@ -25,7 +25,7 @@ spec:
     commands:
       - 'apt-get update -y --fix-missing'
       - 'apt-get install -y libgl1-mesa-glx'
-      - 'pip install numpy opencv-python pydantic-settings neo4j scikit-learn kafka-python'
+      - 'pip install numpy opencv-python pydantic-settings neo4j scikit-learn kafka-python networkx'
   loggerSinks:
     - level: debug
   platform: 

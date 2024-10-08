@@ -1,6 +1,7 @@
 import logging
 
 from neo4j import GraphDatabase
+from networkx import Graph
 
 from converter.angle_point_converter import AnglePointConverter
 from converter.vector_details_converter import VectorDetailsConverter
@@ -31,23 +32,21 @@ class ContourAnalysisRepository:
             logging.error(f"Error closing database connection: {e}")
             raise
 
+    # TODO refactor this to just save the result of the graph operations
     def analyze_contour(self, input_data):
         logging.info(
             f"Starting analyze_contour method for image {input_data['image_id']}"
         )
-        angle_points = AnglePointConverter.dict_to_angle_points(
-            input_data["angle_points"]
-        )
-        vector_details = VectorDetailsConverter.dict_to_vector_details(
-            input_data["lines"]
-        )
+        angle_points = input_data["angle_points"]
+        lines = input_data["lines"]
+    
         with self.driver.session() as session:
             session_id = input_data["parameters"]["session_id"]
             result = session.write_transaction(
                 process_input_data,
                 input_data["image_id"],
                 angle_points,
-                vector_details,
+                lines,
                 session_id
             )
 

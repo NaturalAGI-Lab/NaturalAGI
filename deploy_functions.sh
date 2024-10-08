@@ -55,6 +55,8 @@ nuctl deploy --path src/contour_analysis \
     --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["'$SKELETONIZATION_KAFKA_TOPIC'"], "brokers": ["'$KAFKA_BROKERS'"], "consumerGroup": "contour-analysis-group"}}}' \
     -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
     -e NEO4J_USER=neo4j \
+    -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
+    -e DLQ_TOPIC="${DLQ_TOPIC}" \
     -e NEO4J_PASS=$NEO4J_PASS
 
 # nuctl deploy --path src/post_processing \

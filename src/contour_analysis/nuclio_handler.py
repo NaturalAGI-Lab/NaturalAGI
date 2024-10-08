@@ -1,9 +1,13 @@
 import json
 import traceback
 
+from kafka import KafkaProducer
 from pydantic_settings import BaseSettings
 
 from contour_analysis_repository import ContourAnalysisRepository
+from converter.graph_serializer import GraphDeserializer
+from model.dlq_model import DLQModel
+from contour_analysis_service import ContourAnalysisService
 
 HANDLER_NAME = "Contour analysis"
 
@@ -15,6 +19,8 @@ class Settings(BaseSettings):
     neo4j_user: str
     neo4j_pass: str
     next_nuclio: str = ""
+    dlq_topic: str
+    kafka_bootstrap_servers: str
 
 
 def init_context(context):
@@ -23,37 +29,43 @@ def init_context(context):
     Args:
         context ([type]): Nuclio context
     """
+    settings = Settings()
     context.logger.debug_with(
-        f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
+        f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
     )
 
+    producer = KafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
     contour_analysis_repository = ContourAnalysisRepository(
-        Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass
+        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
     )
-    setattr(
-        context.user_data, "contour_analysis_repository", contour_analysis_repository
-    )
-    setattr(context.user_data, "next_nuclio", Settings().next_nuclio)
+    contour_analysis_service = ContourAnalysisService(contour_analysis_repository)
+    setattr(context.user_data, "contour_analysis_service", contour_analysis_service)
+    setattr(context.user_data, "next_nuclio", settings.next_nuclio)
+    setattr(context.user_data, "dlq_topic", settings.dlq_topic)
+    setattr(context.user_data, "kafka_producer", producer)
 
 
 def kafka_handler(context, event):
     """Handles Kafka messages"""
     try:
-
+        context.logger.info_with(
+            f"New event received: {event.trigger.kind}", handler=HANDLER_NAME
+        )
         input_data = json.loads(event.body)
 
-        context.logger.debug_with(
-            f"Input data: {input_data}", handler=HANDLER_NAME
-        )
+        operation = input_data["operation"]
+        parameters = input_data["parameters"]
 
-        try:
-            context.user_data.contour_analysis_repository.analyze_contour(input_data)
-        except Exception as e:
-            context.logger.error_with(f"Error analyzing contour:\n {e}", handler=HANDLER_NAME)
-            traceback.print_exc()
+        context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
+        context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
 
+        network = GraphDeserializer.deserialize(input_data["skeleton"])
+        context.user_data.contour_analysis_service.analyze_contour(network, parameters["session_id"])
     except Exception as e:
-        context.logger.error_with(f"Error:\n {e}", handler=HANDLER_NAME)
+        send_to_dlq(context, input_data, str(e))
         traceback.print_exc()
 
 
@@ -74,3 +86,14 @@ def handler(context, event):
         context.logger.error_with(
             "Unknown trigger. Expected kafka or http", handler=HANDLER_NAME
         )
+
+
+def send_to_dlq(context, value, error):
+    """Sends to DLQ"""
+    context.logger.error_with(f"Error: {error}", handler=HANDLER_NAME)
+    traceback.print_exc()
+
+    dlq_model = DLQModel(source=HANDLER_NAME, message=error, value=value)
+    context.user_data.kafka_producer.send(
+        context.user_data.dlq_topic, value=dlq_model.model_dump()
+    )
