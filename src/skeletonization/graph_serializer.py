@@ -11,7 +11,7 @@ class GraphSerializer:
         :return: JSON string representation of the graph
         """
         # Convert node positions to strings (JSON keys must be strings)
-        graph = nx.relabel_nodes(graph, lambda x: tuple(x))
+        graph = nx.relabel_nodes(graph, {0: 'x', 1: 'y'})
         
         # Convert the graph to a dictionary
         graph_dict = nx.node_link_data(graph)

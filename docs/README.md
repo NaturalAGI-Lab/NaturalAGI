@@ -43,41 +43,7 @@ These parameters help in determining whether two lines should be grouped togethe
 
 The `HoughBundler` class is used to refine the output of the Hough Transform by grouping and merging line segments that are close to each other and have similar orientations. This is particularly useful in applications such as image analysis, where detecting and processing structural elements like lines is crucial.
 
-## 2. Angle Points Detector (NOT USED)
-
-The `AnglePointsDetector` module is designed to handle the detection and calculation of angle points formed by the intersection of lines. This module includes functions to find the intersection points of lines, calculate the angles between intersecting lines, and generate angle points with unique identifiers. Below is a detailed description of the implementation of this module.
-
-### Imports
-The module imports the following libraries:
-- `math`: Provides mathematical functions, including trigonometric functions.
-- `uuid`: Generates unique identifiers for angle points.
-
-### Functions
-
-1. **line_intersection(line1, line2)**
-   - This function calculates the intersection point of two lines, if it exists. The lines are represented as dictionaries with keys `'x1'`, `'y1'`, `'x2'`, and `'y2'` for the coordinates of their endpoints.
-   - The function computes the intersection point using the formula for the intersection of two lines. If the lines are parallel (denominator is zero), it returns `None`.
-   - A delta value is used to allow the intersection point to be up to 5 units outside the line bounds. The function checks if the intersection point lies within the extended boundaries of both lines and returns the intersection point as a list `[px, py]` if it does, otherwise it returns `None`.
-
-2. **calculate_angle(line1, line2)**
-   - This function calculates the angle between two intersecting lines. The lines are represented as dictionaries with keys `'x1'`, `'y1'`, `'x2'`, and `'y2'`.
-   - The function computes the differences in the x and y coordinates for both lines and calculates the angles of the lines using the `atan2` function.
-   - The absolute difference between the two angles is calculated, and if it exceeds π (180 degrees), it is adjusted to be the interior angle.
-   - The angle is converted from radians to degrees and rounded to the nearest multiple of 5 using the `round_to_nearest` function.
-
-3. **round_to_nearest(number, n)**
-   - This helper function rounds a given number to the nearest multiple of `n`.
-
-4. **calculate_angle_points(lines)**
-   - This function calculates the angle points formed by the intersection of a list of lines. Each line is represented as a dictionary with keys `'x1'`, `'y1'`, `'x2'`, `'y2'`, and `'id'`.
-   - The function iterates through all pairs of lines, calculates their intersection points using the `line_intersection` function, and if an intersection exists, calculates the angle between the lines using the `calculate_angle` function.
-   - For each valid intersection, an angle point is created with a unique identifier (UUID), the coordinates of the intersection point, the calculated angle, and the identifiers of the intersecting lines.
-   - The function returns a list of angle points.
-  
-### Usage
-The `AnglePointsDetector` module is used to detect and calculate angle points formed by the intersection of lines in various applications, such as image analysis and computer vision. By using this module, one can efficiently find intersection points, calculate angles, and generate unique angle points for further analysis or processing.
-
-## 3. Contour Analysis
+## 2. Contour Analysis
 
 The `contour_analysis` module is designed to analyze and process the structural elements of images, particularly focusing on lines and their intersections. This module is essential in computer vision tasks where understanding the geometric and topological properties of contours is crucial. Below is a detailed overview of the key components and their functionalities within the `contour_analysis` module.
 
@@ -89,28 +55,22 @@ The `contour_analysis` module is designed to analyze and process the structural 
 2. **Process Input Data**
    - This function processes the input data, which includes lines and angle points, and saves the relevant information to the database. It also handles the creation of critical points and the calculation of relative parameters.
 
-3. **Angle Points Strategy**
-   - This strategy class extracts and counts angle points for each image. It creates a new node named `AnglePointsCount` with the count as a property.
-
-4. **Data Saver**
+3. **Data Saver**
    - This module includes functions to save vector and intersection data to the database. It ensures that all relevant properties and relationships are correctly stored.
 
-5. **Magnitude and Direction Service**
+4. **Magnitude and Direction Service**
    - This service calculates the magnitude and direction of vectors and creates nodes to represent these properties. It also handles the creation of critical points when there is a change in direction.
 
-6. **Unwinder**
-   - The `Unwinder` class creates new angle points based on the `AnglePointCount` node and connects them with appropriate relationships.
-
-7. **Exposition Analyzer**
+5. **Exposition Analyzer**
    - This module analyzes the contour development for a given image, determining whether the development is monotonic or non-monotonic based on the directions of the vectors.
 
-8. **Angle Point and Vector Models**
+6. **Angle Point and Vector Models**
    - These models define the structure of angle points and vectors, including their properties and relationships.
 
-9. **Tertiary Features Service**
+7. **Tertiary Features Service**
    - This service executes various strategies to extract tertiary features from the contour data, such as angle points and quadrant changes.
 
-10. **Graph Reduction Merger**
+8.  **Graph Reduction Merger**
     - This module merges graphs of structural elements in the database by grouping similar elements and comparing their properties using Levenshtein distance.
 
 ### Usage

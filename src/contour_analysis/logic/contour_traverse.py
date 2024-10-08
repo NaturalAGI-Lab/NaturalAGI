@@ -4,7 +4,7 @@ import logging
 from typing import Union, List, Tuple
 import math
 
-from neo4j import ManagedTransaction, Record
+from neo4j import ManagedTransaction
 
 from logic.data_saver import save_points_data, save_vectors_data, save_intersection_data
 from logic.quadrant_checker import (
@@ -12,8 +12,8 @@ from logic.quadrant_checker import (
     mark_quadrant_change,
 )
 from logic.relative_params_service import calculate_and_set_relative_params
-from model.point import IntersectionPoint, EndPoint, Point, CornerPoint
-from model.vector_details import VectorDetails
+from model.point import IntersectionPoint, EndPoint, Point
+from src.contour_analysis.model.vector import Vector
 from logic.magnitude_and_direction_service import calculate_magnitude_and_direction
 
 logging.basicConfig(level=logging.DEBUG)
@@ -23,7 +23,7 @@ def process_input_data(
     tx: ManagedTransaction,
     image_id: str,
     points: List[Point],
-    lines: List[VectorDetails],
+    lines: List[Vector],
     session_id: str,
 ) -> None:
     intersection_points = [p for p in points if isinstance(p, IntersectionPoint)]
@@ -39,7 +39,7 @@ def traverse_contour(
     image_id: str,
     session_id: str,
     points: List[Point],
-    lines: List[VectorDetails],
+    lines: List[Vector],
 ) -> None:
     points_dict = {p.id: p for p in points}
     lines_dict = {l.id: l for l in lines}
@@ -50,7 +50,7 @@ def traverse_contour(
     visited_points = set()
     visited_lines = set()
 
-    def get_connected_lines(point: Point) -> List[VectorDetails]:
+    def get_connected_lines(point: Point) -> List[Vector]:
         connected = []
         if isinstance(point, IntersectionPoint):
             line_ids = [point.line1, point.line2]
@@ -58,13 +58,13 @@ def traverse_contour(
             line_ids = [point.line]
         else:
             line_ids = []
-        
+
         for line_id in line_ids:
             if line_id and line_id not in visited_lines:
                 connected.append(lines_dict[line_id])
         return connected
 
-    def get_next_point(line: VectorDetails, current_point: Point) -> Point:
+    def get_next_point(line: Vector, current_point: Point) -> Point:
         angle_points = [
             p
             for p in points_dict.values()
@@ -86,9 +86,9 @@ def traverse_contour(
                 )
 
     def sort_lines_clockwise(
-        current_point: Point, connected_lines: List[VectorDetails]
-    ) -> List[VectorDetails]:
-        def angle_with_x_axis(line: VectorDetails):
+        current_point: Point, connected_lines: List[Vector]
+    ) -> List[Vector]:
+        def angle_with_x_axis(line: Vector):
             dx = (
                 line.x2 - line.x1
                 if line.x1 == current_point.x and line.y1 == current_point.y
@@ -104,10 +104,10 @@ def traverse_contour(
 
         return sorted(connected_lines, key=angle_with_x_axis)
 
-    def get_coordinates(item: Union[Point, VectorDetails]) -> Tuple[float, float]:
+    def get_coordinates(item: Union[Point, Vector]) -> Tuple[float, float]:
         if isinstance(item, Point):
             return item.x, item.y
-        elif isinstance(item, VectorDetails):
+        elif isinstance(item, Vector):
             return item.x1, item.y1
         else:
             raise TypeError(f"Unexpected type: {type(item)}")
@@ -123,23 +123,35 @@ def traverse_contour(
             if line.id not in visited_lines:
                 visited_lines.add(line.id)
                 traversal.append(line)
-                
+
                 # Calculate and set relative parameters for the current line
-                calculate_and_set_relative_params(tx, line, current_point, image_id, session_id)
-                
+                calculate_and_set_relative_params(
+                    tx, line, current_point, image_id, session_id
+                )
+
                 if len(traversal) > 2:
-                    last_vector = traversal[-3] if isinstance(traversal[-3], VectorDetails) else traversal[-2]
-                    last_point = traversal[-3] if isinstance(traversal[-3], Point) else traversal[-4]
-                    
+                    last_vector = (
+                        traversal[-3]
+                        if isinstance(traversal[-3], Vector)
+                        else traversal[-2]
+                    )
+                    last_point = (
+                        traversal[-3]
+                        if isinstance(traversal[-3], Point)
+                        else traversal[-4]
+                    )
+
                     if check_quadrant_change(tx, last_vector.id, line.id):
-                        mark_quadrant_change(tx, last_vector.id, line.id, image_id, session_id)
-                    
+                        mark_quadrant_change(
+                            tx, last_vector.id, line.id, image_id, session_id
+                        )
+
                     last_vector_start = get_coordinates(last_vector)
                     last_vector_end = (last_vector.x2, last_vector.y2)
                     last_point_coords = get_coordinates(last_point)
                     current_vector_start = (line.x1, line.y1)
                     current_vector_end = (line.x2, line.y2)
-                    
+
                     calculate_magnitude_and_direction(
                         tx,
                         last_vector_start,
@@ -152,7 +164,7 @@ def traverse_contour(
                         image_id,
                         session_id,
                     )
-                
+
                 next_point = get_next_point(line, current_point)
                 if next_point.id not in visited_points:
                     dfs(next_point)

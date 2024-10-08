@@ -4,5 +4,6 @@
         "Fritzke",
         "gethostname",
         "guille"
-    ]
+    ],
+    "makefile.configureOnOpen": false
 }

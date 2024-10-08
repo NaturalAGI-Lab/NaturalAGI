@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     T: int = 50
     cnr_threshold: float = 0
     skeletonization_threshold: float = 160
+    simplification_epsilon: float = 1
     
 def gng_parameters(settings: Settings):
     

@@ -4,11 +4,11 @@ from typing import List
 
 from neo4j import ManagedTransaction
 
-from model.point import IntersectionPoint, EndPoint, Point
-from model.vector_details import VectorDetails
+from model.point import IntersectionPoint, EndPoint
+from src.contour_analysis.model.vector import Vector
 
 
-def save_vectors_data(tx, vectors: List[VectorDetails], image_id: str, session_id: str):
+def save_vectors_data(tx, vectors: List[Vector], image_id: str, session_id: str):
     for vector in vectors:
         angle = calculate_abs_angle(vector.x1, vector.y1, vector.x2, vector.y2)
         tx.run(
@@ -47,7 +47,10 @@ def save_vectors_data(tx, vectors: List[VectorDetails], image_id: str, session_i
 
 
 def save_intersection_data(
-    tx: ManagedTransaction, image_id: str, intersection_points: List[IntersectionPoint], session_id: str
+    tx: ManagedTransaction,
+    image_id: str,
+    intersection_points: List[IntersectionPoint],
+    session_id: str,
 ):
     query: str = """
             UNWIND $angle_points AS data
@@ -78,7 +81,10 @@ def save_intersection_data(
     )
     tx.run(query, angle_points=points_, image_id=image_id, session_id=session_id)
 
-def save_points_data(tx: ManagedTransaction, points: List[EndPoint], image_id: str, session_id: str):
+
+def save_points_data(
+    tx: ManagedTransaction, points: List[EndPoint], image_id: str, session_id: str
+):
     for point in points:
         tx.run(
             """
@@ -94,6 +100,7 @@ def save_points_data(tx: ManagedTransaction, points: List[EndPoint], image_id: s
             line=point.line,
             image_id=image_id,
         )
+
 
 def calculate_abs_angle(x1, y1, x2, y2):
     angle_radians = math.atan2(y2 - y1, x2 - x1)

@@ -1,4 +1,3 @@
-import json
 import networkx as nx
 from typing import Dict, Any
 
@@ -13,9 +12,4 @@ class GraphDeserializer:
         :return: Deserialized NetworkX graph
         """
         # Convert the dictionary back to a graph
-        graph = nx.node_link_graph(graph_dict)
-
-        # Convert node labels back to tuples of floats
-        graph = nx.relabel_nodes(graph, lambda x: tuple(x))
-
-        return graph
+        return nx.node_link_graph(graph_dict)

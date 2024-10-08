@@ -58,14 +58,16 @@ class ConceptCreationRepository:
             concept_id = session.execute_write(self._create_concept, session_id)
         return concept_id
 
+    # TODO angle points is deprecated, we should use different points types now
+    # For now Angle prefix is removed
     def _create_concept(self, tx: ManagedTransaction, session_id: str) -> str:
         """
         Internal method to create a concept within a database transaction.
 
         This method performs the following steps:
-        1. Fetch the AnglePointCount node
-        2. Create new AnglePoints based on the count
-        3. Connect all remaining nodes to the new AnglePoints
+        1. Fetch the PointCount node
+        2. Create new Points based on the count
+        3. Connect all remaining nodes to the new Points
         4. Generate a hash based on meaningful values of the elements
         5. Assign the concept_id to all related nodes
         6. Create a Concept node to represent the entire concept
@@ -78,35 +80,35 @@ class ConceptCreationRepository:
             str: The unique identifier (hash) of the created concept.
 
         Raises:
-            ValueError: If no AnglePointCount node is found in the database.
+            ValueError: If no PointCount node is found in the database.
         """
-        # Fetch the AnglePointCount node
+        # Fetch the PointCount node
         query = """
-            MATCH (apc:AnglePointsCount {session_id: $session_id})
+            MATCH (apc:PointsCount {session_id: $session_id})
             RETURN apc.count AS count
         """
         result = tx.run(query, session_id=session_id)
         count_data = result.single()
         if not count_data:
-            raise ValueError("No AnglePointCount node found")
+            raise ValueError("No PointCount node found")
         
         count = count_data["count"]
 
-        # Create new AnglePoints
+        # Create new Points
         create_query = """
             UNWIND range(1, $count) AS idx
-            CREATE (ap:AnglePoint {id: idx, session_id: $session_id})
+            CREATE (ap:Point {id: idx, session_id: $session_id})
             RETURN count(ap) AS angle_point_count
         """
         result = tx.run(create_query, count=count, session_id=session_id)
         angle_point_count = result.single()["angle_point_count"]
 
-        # Connect all remaining nodes to the new AnglePoints and collect their values
+        # Connect all remaining nodes to the new Points and collect their values
         connect_query = """
             MATCH (n {session_id: $session_id})
-            WHERE NOT n:AnglePoint AND NOT n:Concept
+            WHERE NOT n:Point AND NOT n:Concept
             WITH collect(n) AS nodes
-            MATCH (ap:AnglePoint {session_id: $session_id})
+            MATCH (ap:Point {session_id: $session_id})
             UNWIND nodes AS n
             CREATE (n)-[:CONNECTED_TO]->(ap)
             RETURN collect(DISTINCT n.value) AS node_values
@@ -139,10 +141,10 @@ class ConceptCreationRepository:
 
         # Assign concept_id to all related nodes
         assign_concept_id_query = """
-            MATCH (n {session_id: $session_id})-[:CONNECTED_TO]-(:AnglePoint {session_id: $session_id})
+            MATCH (n {session_id: $session_id})-[:CONNECTED_TO]-(:Point {session_id: $session_id})
             SET n.concept_id = $concept_id
             WITH n
-            MATCH (ap:AnglePoint {session_id: $session_id})
+            MATCH (ap:Point {session_id: $session_id})
             SET ap.concept_id = $concept_id
         """
         tx.run(assign_concept_id_query, concept_id=concept_id, session_id=session_id)
@@ -164,7 +166,7 @@ class ConceptCreationRepository:
         Generate a hash from the number of angle points and node values.
 
         Args:
-            angle_point_count (int): Number of AnglePoint nodes.
+            angle_point_count (int): Number of Point nodes.
             node_values (List[str]): List of 'value' properties from connected nodes.
 
         Returns:

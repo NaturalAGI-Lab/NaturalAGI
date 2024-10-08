@@ -1,3 +1,4 @@
+import uuid
 import numpy as np
 import networkx as nx
 from skimage.morphology import skeletonize
@@ -6,6 +7,7 @@ from ypstruct import structure
 import gng
 from rdp import rdp
 from settings import Settings
+from typing import List
 
 class SkeletonGNGMapper:
     def __init__(self, settings: Settings):
@@ -15,7 +17,7 @@ class SkeletonGNGMapper:
         skeleton = self._skeletonize(image)
         points = self._skeleton_to_points(skeleton)
         net = self._fit_gng(points)
-        simplified_network = self._simplify_network(net)
+        simplified_network = self._simplify_network(net, self.settings.simplification_epsilon)
         graph = self._to_networkx(simplified_network)
         return graph
 
@@ -69,9 +71,36 @@ class SkeletonGNGMapper:
         
         return simplified_segments
 
-    def _to_networkx(self, simplified_network):
+    def _to_networkx(self, simplified_network: List[List[np.ndarray]]) -> nx.Graph:
+        """
+        Convert the simplified network to a NetworkX graph with labeled nodes.
+
+        Args:
+            simplified_network (List[List[np.ndarray]]): The simplified network as a list of segments,
+                each segment is a list of points represented as numpy arrays.
+
+        Returns:
+            nx.Graph: A NetworkX graph with nodes labeled by coordinates and additional attributes.
+        """
         G = nx.Graph()
         for i, segment in enumerate(simplified_network):
             for j in range(len(segment) - 1):
-                G.add_edge(tuple(segment[j]), tuple(segment[j+1]), segment_id=i)
+                source_coord = tuple(segment[j])
+                target_coord = tuple(segment[j + 1])
+                
+                # Create unique identifiers for source and target nodes
+                source_id = hash(tuple(source_coord))
+                target_id = hash(tuple(target_coord))
+
+                # Add source node with attributes if not already present
+                if source_id not in G:
+                    G.add_node(source_id, x=source_coord[1], y=source_coord[0], uuid=str(uuid.uuid4()))
+
+                # Add target node with attributes if not already present
+                if target_id not in G:
+                    G.add_node(target_id, x=target_coord[1], y=target_coord[0], uuid=str(uuid.uuid4()))
+
+                # Add edge with segment ID
+                G.add_edge(source_id, target_id, segment_id=i, uuid=str(uuid.uuid4()))
+
         return G

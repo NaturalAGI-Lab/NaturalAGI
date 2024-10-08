@@ -1,13 +1,15 @@
 import json
 import traceback
+import uuid
 
 from kafka import KafkaProducer
 from pydantic_settings import BaseSettings
 
-from contour_analysis_repository import ContourAnalysisRepository
+from service.graph_persistance_service import GraphPersistenceService
 from converter.graph_serializer import GraphDeserializer
-from model.dlq_model import DLQModel
-from contour_analysis_service import ContourAnalysisService
+from dto.dlq_model import DLQModel
+from data_preprocessing_service import DataPreprocessingService
+from networkx_graph_analysis import NetworkxGraphAnalysis
 
 HANDLER_NAME = "Contour analysis"
 
@@ -38,11 +40,11 @@ def init_context(context):
         bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
         value_serializer=lambda v: json.dumps(v).encode("utf-8"),
     )
-    contour_analysis_repository = ContourAnalysisRepository(
+    graph_persistence_service = GraphPersistenceService(
         settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
     )
-    contour_analysis_service = ContourAnalysisService(contour_analysis_repository)
-    setattr(context.user_data, "contour_analysis_service", contour_analysis_service)
+    data_preprocessing_service = DataPreprocessingService(graph_persistence_service)
+    setattr(context.user_data, "data_preprocessing_service", data_preprocessing_service)
     setattr(context.user_data, "next_nuclio", settings.next_nuclio)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
     setattr(context.user_data, "kafka_producer", producer)
@@ -63,7 +65,10 @@ def kafka_handler(context, event):
         context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
 
         network = GraphDeserializer.deserialize(input_data["skeleton"])
-        context.user_data.contour_analysis_service.analyze_contour(network, parameters["session_id"])
+        context.user_data.data_preprocessing_service.persist_graph(
+            network, str(uuid.uuid4()), parameters["session_id"]
+        )
+        # NetworkxGraphAnalysis(network).analyze_graph()
     except Exception as e:
         send_to_dlq(context, input_data, str(e))
         traceback.print_exc()
