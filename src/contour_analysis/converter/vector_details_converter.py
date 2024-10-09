@@ -1,6 +1,6 @@
 from typing import List
 
-from src.contour_analysis.model.vector import Vector
+from model.vector import Vector
 
 
 class VectorDetailsConverter:

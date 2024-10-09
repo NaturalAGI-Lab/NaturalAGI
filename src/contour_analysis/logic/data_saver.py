@@ -5,7 +5,7 @@ from typing import List
 from neo4j import ManagedTransaction
 
 from model.point import IntersectionPoint, EndPoint
-from src.contour_analysis.model.vector import Vector
+from model.vector import Vector
 
 
 def save_vectors_data(tx, vectors: List[Vector], image_id: str, session_id: str):

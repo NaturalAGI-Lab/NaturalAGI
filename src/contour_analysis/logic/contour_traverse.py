@@ -13,7 +13,7 @@ from logic.quadrant_checker import (
 )
 from logic.relative_params_service import calculate_and_set_relative_params
 from model.point import IntersectionPoint, EndPoint, Point
-from src.contour_analysis.model.vector import Vector
+from model.vector import Vector
 from logic.magnitude_and_direction_service import calculate_magnitude_and_direction
 
 logging.basicConfig(level=logging.DEBUG)

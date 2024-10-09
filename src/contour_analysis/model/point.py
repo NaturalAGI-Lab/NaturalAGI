@@ -1,13 +1,18 @@
-from pydantic import BaseModel
+from dataclasses import dataclass
 from typing import List
 
 
-class Point(BaseModel):
+@dataclass
+class Point:
     x: float
     y: float
     id: str
 
+    def __hash__(self):
+        return hash(self.id)
 
+
+@dataclass
 class CornerPoint(Point):
     """
     A corner point represents a sharp change in direction of a contour.
@@ -19,10 +24,11 @@ class CornerPoint(Point):
     line2: str
 
 
+@dataclass
 class InflectionPoint(Point):
     """
     #TODO not used for now. Implement support for it later
-    
+
     An inflection point is where the curvature of a contour changes sign,
     i.e., where it transitions from being concave to convex or vice versa.
     """
@@ -31,6 +37,7 @@ class InflectionPoint(Point):
     curvature_after: float
 
 
+@dataclass
 class IntersectionPoint(Point):
     """
     An intersection point is where two or more line segments of the contour
@@ -40,6 +47,7 @@ class IntersectionPoint(Point):
     lines: List[str]  # IDs of the intersecting lines
 
 
+@dataclass
 class EndPoint(Point):
     """
     An end point is the termination of a line segment that is not connected

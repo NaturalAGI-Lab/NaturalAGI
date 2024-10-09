@@ -1,6 +1,7 @@
 from typing import Generator, Any
 import networkx as nx
 
+
 class GraphTraversal:
     def __init__(self, graph: nx.Graph):
         self.graph = graph
@@ -25,4 +26,3 @@ class GraphTraversal:
                     yield from _dfs(neighbor)
 
         yield from _dfs(start_node)
-    

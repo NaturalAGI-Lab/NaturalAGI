@@ -1,7 +1,10 @@
-from typing import Dict
+from typing import Any, Dict
+
+from neo4j import ManagedTransaction
 from visitors.visitor import Visitor
 from model.point import Point
 from model.vector import Vector
+
 
 class QuadrantVisitor(Visitor):
     def __init__(self):
@@ -9,13 +12,33 @@ class QuadrantVisitor(Visitor):
 
     def visit_point(self, point: Point) -> None:
         # Implementation for point-related operations
-        pass
+        return None
 
-    def visit_line(self, line: Vector) -> None:
+    def visit_line(self, line: Vector) -> Dict[str, Any]:
         dx = line.x2 - line.x1
         dy = line.y2 - line.y1
         quadrant = self.determine_quadrant(dx, dy)
         self.quadrants[line.id] = quadrant
+        return {"quadrant": quadrant, "line_id": line.id}
+
+    def save_result(
+        self,
+        tx: ManagedTransaction,
+        image_id: str,
+        session_id: str,
+        result: Dict[str, Any],
+    ) -> None:
+        query = """
+        MATCH (v:Vector {id: $id})
+        CREATE (v)-[:IS_IN_QUADRANT]->(q:Quadrant {quadrant: $quadrant, session_id: $session_id, image_id: $image_id})
+        """
+        tx.run(
+            query,
+            id=result["line_id"],
+            quadrant=result["quadrant"],
+            session_id=session_id,
+            image_id=image_id,
+        )
 
     @staticmethod
     def determine_quadrant(dx: float, dy: float) -> int:

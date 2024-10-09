@@ -5,7 +5,7 @@ from neo4j import ManagedTransaction
 
 from logic.helpers import calculate_half_plane_and_quadrant
 from model.point import Point
-from src.contour_analysis.model.vector import Vector
+from model.vector import Vector
 
 
 def get_attribute(obj, attr):

@@ -1,24 +1,35 @@
 import networkx as nx
 from neo4j import GraphDatabase
+from logic.point_extractor import PointExtractor
 
 
 class GraphPersistenceService:
     def __init__(self, uri: str, user: str, password: str):
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
+        self.point_extractor = None
 
-    def save_graph_to_neo4j(
-        self, graph: nx.Graph, image_id: str, session_id: str
-    ) -> None:
+    def save_graph_to_neo4j(self, graph: nx.Graph, image_id: str, session_id: str) -> None:
+        self.point_extractor = PointExtractor(graph)
         with self.driver.session() as session:
             session.write_transaction(self._save_graph, graph, image_id, session_id)
 
     def _save_graph(self, tx, graph: nx.Graph, image_id: str, session_id: str) -> None:
+        # Extract all points
+        all_points = self.point_extractor.extract_points()
+
+        # Create a dictionary to map node ids to their point types
+        point_types = {point.id: type(point).__name__ for point in all_points}
+
         # Create nodes
-        for node, data in graph.nodes(data=True):
+        for _, data in graph.nodes(data=True):
+            labels = ["Point"]
+            if data["uuid"] in point_types:
+                labels.append(point_types[data["uuid"]])
+            
             tx.run(
-                """
-                CREATE (n:Point {id: $id, x: $x, y: $y, image_id: $image_id, session_id: $session_id})
-            """,
+                f"""
+                CREATE (n:{':'.join(labels)} {{id: $id, x: $x, y: $y, image_id: $image_id, session_id: $session_id}})
+                """,
                 id=data["uuid"],
                 x=data["x"],
                 y=data["y"],

@@ -97,7 +97,8 @@ def send_to_kafka(context, image_path: str, operation: str, concept_name: str, s
         "parameters": {
             "concept_name": concept_name,
             "image_path": image_path,
-            "session_id": session_id
+            "session_id": session_id,
+            "image_id": str(uuid.uuid4())
         }
     }
     

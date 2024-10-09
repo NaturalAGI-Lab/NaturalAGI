@@ -4,6 +4,6 @@ from pydantic import BaseModel
 
 class DLQModel(BaseModel):
     source: str
-    message: str
+    error: dict
     value: dict
     
