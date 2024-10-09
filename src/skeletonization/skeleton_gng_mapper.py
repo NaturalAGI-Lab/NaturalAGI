@@ -3,7 +3,6 @@ import numpy as np
 import networkx as nx
 from skimage.morphology import skeletonize
 from skimage.util import img_as_ubyte
-from ypstruct import structure
 import gng
 from rdp import rdp
 from settings import Settings

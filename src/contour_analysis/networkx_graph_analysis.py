@@ -1,13 +1,10 @@
-import logging
 import math
 from typing import Optional, List, Tuple, Any
 import networkx as nx
 
-from model.point import Point
 from logic.graph_traversal import GraphTraversal
 from service.visitor_result_persistence_service import VisitorResultPersistenceService
 from visitors.visitor import Visitor
-from model.vector import Vector
 
 
 class NetworkxGraphAnalysis:
