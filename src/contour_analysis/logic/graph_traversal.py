@@ -26,7 +26,7 @@ class GraphTraversal:
             if node_id not in visited_nodes:
                 visited_nodes.add(node_id)
                 node_data = self.graph.nodes[node_id]
-                point = Point(id=node_id, x=node_data['x'], y=node_data['y'])
+                point = Point(id=node_data["uuid"], x=node_data['x'], y=node_data['y'])
                 yield point, incoming_vector
 
                 for neighbor_id in sorted(self.graph.neighbors(node_id)):

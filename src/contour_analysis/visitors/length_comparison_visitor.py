@@ -29,6 +29,9 @@ class LengthComparisonVisitor(Visitor):
         self.previous_length = line.length
         self.line_ids.append(line.id)
 
+        if len(self.line_ids) < 2:
+            return None
+
         return {
             "length_comparison": comparison,
             "line1_id": self.line_ids[-2],
@@ -37,9 +40,20 @@ class LengthComparisonVisitor(Visitor):
 
     def save_result(self, tx: ManagedTransaction, image_id: str, session_id: str, result: Dict[str, Any]) -> None:
         query = """
-        MATCH (v1:Vector {id: $line1_id}), (v2:Vector {id: $line2_id})
-        MERGE (v1)-[:COMPARES_TO]->(v2)
-        ON CREATE SET v1.length_comparison = $comparison, v1.session_id = $session_id, v1.image_id = $image_id
+            MATCH (v1:Vector {id: $line1_id})--(:Point)--(v2:Vector {id: $line2_id})
+            MERGE (vc:VectorComparison:Feature {
+                from_vector: $line1_id,
+                to_vector: $line2_id,
+                session_id: $session_id
+            })
+            ON CREATE SET vc.length_comparison = $comparison,
+                        vc.image_id = $image_id,
+                        vc.samples = [$image_id]
+            ON MATCH SET vc.samples = CASE
+                WHEN NOT $image_id IN vc.samples THEN vc.samples + $image_id
+                ELSE vc.samples
+            END
+            MERGE (v1)-[:HAS_COMPARISON]->(vc)-[:COMPARES_TO]->(v2)
         """
         tx.run(
             query,

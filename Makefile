@@ -44,6 +44,14 @@ SESSION_ID ?= default_session
 # Kafka-related targets
 .PHONY: create_kafka_topics list_kafka_topics
 
+lib:
+	@echo -e "${BLUE}Building common library...${NC}"
+	@python setup.py sdist bdist_wheel
+	@pip install twine
+	@twine upload dist/* --verbose
+	@rm -rf dist
+	@echo -e "${GREEN}Library built and uploaded.${NC}"
+
 start_services:
 	@echo -e "${BLUE}Starting Docker services...${NC}"
 	@HOST_IP=${HOST_IP} docker compose up -d

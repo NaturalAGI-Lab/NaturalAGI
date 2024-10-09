@@ -4,14 +4,16 @@ import traceback
 from kafka import KafkaProducer
 from pydantic_settings import BaseSettings
 
+from common import DLQModel
 from service.graph_persistance_service import GraphPersistenceService
 from converter.graph_serializer import GraphDeserializer
-from dto.dlq_model import DLQModel
 from data_preprocessing_service import DataPreprocessingService
 from networkx_graph_analysis import NetworkxGraphAnalysis
 from service.visitor_result_persistence_service import VisitorResultPersistenceService
+from visitors.angle_visitor import AngleVisitor
+from visitors.length_comparison_visitor import LengthComparisonVisitor
 from visitors.quadrant_visitor import QuadrantVisitor
-
+from visitors.half_plane_visitor import HalfPlaneVisitor
 HANDLER_NAME = "Contour analysis"
 
 
@@ -86,7 +88,11 @@ def kafka_handler(context, event):
             visitor_result_persistence_service=context.user_data.visitor_result_persistence_service,
         )
         
-        networkx_graph_analysis.add_visitor(QuadrantVisitor())
+        # networkx_graph_analysis.add_visitor(QuadrantVisitor())
+        # networkx_graph_analysis.add_visitor(LengthComparisonVisitor())
+        networkx_graph_analysis.add_visitor(AngleVisitor(network))
+        networkx_graph_analysis.add_visitor(HalfPlaneVisitor(network))
+        
         networkx_graph_analysis.analyze_graph(image_id, session_id)
         
     except Exception as error:

@@ -4,7 +4,7 @@ import json
 import cv2
 from kafka import KafkaProducer
 import traceback
-from dlq_model import DLQModel
+from common import DLQModel
 from settings import Settings
 from skeleton_gng_mapper import SkeletonGNGMapper
 from graph_serializer import GraphSerializer
@@ -71,7 +71,10 @@ def kafka_handler(context, event):
 
         dlq_model = DLQModel(
             source=HANDLER_NAME,
-            message=str(e),
+            error= {
+                "error": str(e),
+                "traceback": traceback.format_exc()
+            },
             value=json_net if 'json_net' in locals() else {}
         )
         context.user_data.kafka_producer.send(

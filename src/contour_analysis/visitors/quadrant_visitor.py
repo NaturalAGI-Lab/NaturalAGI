@@ -30,7 +30,13 @@ class QuadrantVisitor(Visitor):
     ) -> None:
         query = """
         MATCH (v:Vector {id: $id})
-        CREATE (v)-[:IS_IN_QUADRANT]->(q:Quadrant {quadrant: $quadrant, session_id: $session_id, image_id: $image_id})
+        MERGE (q:Quadrant:Feature {quadrant: $quadrant, session_id: $session_id})
+        ON CREATE SET q.samples = [$image_id]
+        ON MATCH SET q.samples = CASE
+            WHEN NOT $image_id IN q.samples THEN q.samples + $image_id
+            ELSE q.samples
+        END
+        MERGE (v)-[:IS_IN_QUADRANT]->(q)
         """
         tx.run(
             query,

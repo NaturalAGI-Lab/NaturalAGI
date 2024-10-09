@@ -1,11 +1,15 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict
 
+import networkx as nx
 from neo4j import ManagedTransaction
 from model.point import Point
 from model.vector import Vector
 
 class Visitor(ABC):
+    def __init__(self, graph: nx.Graph):
+        self.graph = graph
+
     @abstractmethod
     def visit_point(self, point: Point) -> Any:
         pass

@@ -9,7 +9,7 @@ class Point:
     id: str
 
     def __hash__(self):
-        return hash(self.id)
+        return hash(self.uuid)
 
 
 @dataclass

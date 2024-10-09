@@ -25,7 +25,7 @@ class PointExtractor:
                 angle = self._calculate_angle_between_lines(
                     node_data, [self.graph.nodes[n] for n in neighbors]
                 )
-                if angle < 150:  # Threshold for corner detection
+                if angle < 90:  # Threshold for corner detection
                     corner_points.append(
                         CornerPoint(
                             id=node_data["uuid"],
