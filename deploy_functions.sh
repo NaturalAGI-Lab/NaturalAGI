@@ -44,17 +44,17 @@ nuctl deploy --path src/contour_analysis \
     -e DLQ_TOPIC="${DLQ_TOPIC}" \
     -e NEO4J_PASS=$NEO4J_PASS
 
-# nuctl deploy --path src/post_processing \
-#    --platform local \
-#    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-#    -e NEO4J_USER=neo4j \
-#    -e NEO4J_PASS=$NEO4J_PASS
+nuctl deploy --path src/post_processing \
+   --platform local \
+   -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+   -e NEO4J_USER=neo4j \
+   -e NEO4J_PASS=$NEO4J_PASS
 
-# nuctl deploy --path src/concept_creator \
-#    --platform local \
-#    -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
-#    -e NEO4J_USER=neo4j \
-#    -e NEO4J_PASS=$NEO4J_PASS
+nuctl deploy --path src/concept_creator \
+   --platform local \
+   -e NEO4J_DSN=bolt://"$HOST_IP":7687 \
+   -e NEO4J_USER=neo4j \
+   -e NEO4J_PASS=$NEO4J_PASS
 
 # nuctl deploy --path src/classification \
 #    --platform local \

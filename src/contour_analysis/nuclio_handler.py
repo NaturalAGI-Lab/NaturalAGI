@@ -10,10 +10,10 @@ from converter.graph_serializer import GraphDeserializer
 from data_preprocessing_service import DataPreprocessingService
 from networkx_graph_analysis import NetworkxGraphAnalysis
 from service.visitor_result_persistence_service import VisitorResultPersistenceService
+from logic.tertiary_features.tertiary_features_service import TertiaryFeaturesService
 from visitors.angle_visitor import AngleVisitor
-from visitors.length_comparison_visitor import LengthComparisonVisitor
-from visitors.quadrant_visitor import QuadrantVisitor
 from visitors.half_plane_visitor import HalfPlaneVisitor
+
 HANDLER_NAME = "Contour analysis"
 
 
@@ -50,6 +50,10 @@ def init_context(context):
         settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
     )
     data_preprocessing_service = DataPreprocessingService(graph_persistence_service)
+    tertiary_features_service = TertiaryFeaturesService(
+        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
+    )
+    setattr(context.user_data, "tertiary_features_service", tertiary_features_service)
     setattr(context.user_data, "data_preprocessing_service", data_preprocessing_service)
     setattr(
         context.user_data,
@@ -78,35 +82,37 @@ def kafka_handler(context, event):
         context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
 
         network = GraphDeserializer.deserialize(input_data["skeleton"])
-        
+
         context.user_data.data_preprocessing_service.persist_graph(
             network, image_id, parameters["session_id"]
         )
-        
+
         networkx_graph_analysis = NetworkxGraphAnalysis(
             network,
             visitor_result_persistence_service=context.user_data.visitor_result_persistence_service,
         )
-        
+
         # networkx_graph_analysis.add_visitor(QuadrantVisitor())
         # networkx_graph_analysis.add_visitor(LengthComparisonVisitor())
         networkx_graph_analysis.add_visitor(AngleVisitor(network))
         networkx_graph_analysis.add_visitor(HalfPlaneVisitor(network))
-        
+
         networkx_graph_analysis.analyze_graph(image_id, session_id)
-        
+
+        context.user_data.tertiary_features_service.create_tertiary_features(image_id, session_id)
+
     except Exception as error:
         error_info = {
             "error_type": type(error).__name__,
             "error_message": str(error),
-            "traceback": traceback.format_exc()
+            "traceback": traceback.format_exc(),
         }
         error_json = json.dumps(error_info)
-        
+
         context.logger.error_with(
             "Error occurred during processing",
             handler=HANDLER_NAME,
-            error_details=error_json
+            error_details=error_json,
         )
         send_to_dlq(context, input_data, error_info)
 
