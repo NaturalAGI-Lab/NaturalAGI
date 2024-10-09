@@ -1,6 +1,5 @@
 import json
 import traceback
-import uuid
 
 from kafka import KafkaProducer
 from pydantic_settings import BaseSettings
@@ -11,6 +10,7 @@ from dto.dlq_model import DLQModel
 from data_preprocessing_service import DataPreprocessingService
 from networkx_graph_analysis import NetworkxGraphAnalysis
 from service.visitor_result_persistence_service import VisitorResultPersistenceService
+from visitors.quadrant_visitor import QuadrantVisitor
 
 HANDLER_NAME = "Contour analysis"
 
@@ -81,10 +81,13 @@ def kafka_handler(context, event):
             network, image_id, parameters["session_id"]
         )
         
-        NetworkxGraphAnalysis(
+        networkx_graph_analysis = NetworkxGraphAnalysis(
             network,
             visitor_result_persistence_service=context.user_data.visitor_result_persistence_service,
-        ).analyze_graph(image_id, session_id)
+        )
+        
+        networkx_graph_analysis.add_visitor(QuadrantVisitor())
+        networkx_graph_analysis.analyze_graph(image_id, session_id)
         
     except Exception as error:
         error_info = {

@@ -27,35 +27,22 @@ class NetworkxGraphAnalysis:
     def analyze_graph(self, image_id: str, session_id: str):
         top_leftmost_point = self.find_top_leftmost_point()
 
-        for node in self.graph_traversal.dfs_traversal(top_leftmost_point):
-            node_data = self.graph.nodes[node]
+        for point, vector in self.graph_traversal.dfs_traversal(top_leftmost_point):
+            print(f"Node: {point}, Edge: {vector}")
             for visitor in self.visitors:
-                visitor.visit_point(node_data)
-                self.visitor_result_persistence_service.save_visitor_result(
-                    visitor, node_data, image_id, session_id
-                )
-
-            for neighbor in self.graph.neighbors(node):
-                edge_data = self.graph[node][neighbor]
-                vector_id = edge_data["uuid"]
-
-                source_node = self.graph.nodes[node]
-                target_node = self.graph.nodes[neighbor]
-
-                x1 = source_node["x"]
-                y1 = source_node["y"]
-                x2 = target_node["x"]
-                y2 = target_node["y"]
-
-                length = self.calculate_length((x1, y1), (x2, y2))
-
-                vector = Vector(id=vector_id, x1=x1, y1=y1, x2=x2, y2=y2, length=length)
-
-                for visitor in self.visitors:
-                    visitor.visit_line(vector)
+                result = visitor.visit_point(point)
+                if result:
                     self.visitor_result_persistence_service.save_visitor_result(
-                        visitor, vector, image_id, session_id
+                        visitor, result, image_id, session_id
                     )
+
+            if vector:
+                for visitor in self.visitors:
+                    result = visitor.visit_line(vector)
+                    if result:
+                        self.visitor_result_persistence_service.save_visitor_result(
+                            visitor, result, image_id, session_id
+                        )
 
     def find_top_leftmost_point(self) -> Optional[Any]:
         """

@@ -3,14 +3,13 @@ import networkx as nx
 import uuid
 import math
 from model.point import Point, CornerPoint, InflectionPoint, IntersectionPoint, EndPoint
-import logging
+
 
 class PointExtractor:
     def __init__(self, graph: nx.Graph):
         self.graph = graph
 
     def extract_points(self) -> List[Point]:
-        print("Extracting points")
         points: List[Point] = []
         points.extend(self._extract_corner_points())
         # points.extend(self._extract_inflection_points())
@@ -67,18 +66,16 @@ class PointExtractor:
 
     def _extract_intersection_points(self) -> List[IntersectionPoint]:
         intersection_points = []
-        nodes_with_degree_gt_2 = [node for node in self.graph.nodes() if self.graph.degree(node) > 2]
-        print(f"Number of nodes with degree > 2: {len(nodes_with_degree_gt_2)}")
+        nodes_with_degree_gt_2 = [
+            node for node in self.graph.nodes() if self.graph.degree(node) > 2
+        ]
 
         for node in nodes_with_degree_gt_2:
-            print(f"Processing node: {node}")
             node_data = self.graph.nodes[node]
             lines = []
             for neighbor in self.graph.neighbors(node):
                 edge_data = self.graph.get_edge_data(node, neighbor)
                 lines.append(edge_data["uuid"])
-
-            print(f"Lines connected to the node: {lines}")
 
             if len(lines) >= 2:
                 intersection_point = IntersectionPoint(
@@ -88,11 +85,7 @@ class PointExtractor:
                     lines=lines,
                 )
                 intersection_points.append(intersection_point)
-                print(f"Added intersection point: {intersection_point}")
-            else:
-                print("Not enough lines connected to the node, skipping")
 
-        print(f"Number of intersection points found: {len(intersection_points)}")
         return intersection_points
 
     def _extract_end_points(self) -> List[EndPoint]:
