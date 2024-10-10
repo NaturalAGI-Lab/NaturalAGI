@@ -59,9 +59,34 @@ class ConceptCreationRepository:
 
     def _generate_concept_hash(self, nodes: List[dict]) -> str:
         hasher = hashlib.sha256()
-        for node in nodes:
-            node_str = str(sorted(node.items()))
+        
+        # Sort nodes by their labels to ensure consistent ordering
+        sorted_nodes = sorted(nodes, key=lambda n: ','.join(sorted(n.labels)))
+        
+        for node in sorted_nodes:
+            node_info = []
+            
+            # Add labels
+            node_info.append(','.join(sorted(node.labels)))
+            
+            # Add counts for specific features
+            if 'VectorsCount' in node.labels:
+                node_info.append(f"VectorsCount:{node['count']}")
+            if 'IntersectionPointsCount' in node.labels:
+                node_info.append(f"IntersectionPointsCount:{node['count']}")
+            if 'CornerPointsCount' in node.labels:
+                node_info.append(f"CornerPointsCount:{node['count']}")
+            if 'EndPointsCount' in node.labels:
+                node_info.append(f"EndPointsCount:{node['count']}")
+            
+            # Add specific feature values
+            if 'ContourType' in node.labels:
+                node_info.append(f"ContourType:{node['value']}")
+            
+            # Create a string representation of the node info and update the hasher
+            node_str = '|'.join(node_info)
             hasher.update(node_str.encode())
+        
         return hasher.hexdigest()
 
     def _concept_exists(self, tx: ManagedTransaction, concept_id: str) -> bool:
