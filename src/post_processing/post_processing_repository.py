@@ -38,29 +38,36 @@ class PostProcessingRepository:
 
     def find_stable_structures(self, tx: ManagedTransaction, session_id: str) -> List[Dict[str, Any]]:
         query = """
-            CALL {
-                MATCH (n {session_id: $session_id})
-                WHERE n:Vector OR n:Point OR n:Feature
-                RETURN max(size(n.samples)) AS maxSamples
-            }
-            CALL {
-                MATCH (apc:AnglePointsCount:Feature {session_id: $session_id})
-                RETURN min(apc.count) AS minAnglePoints
-            }
-            CALL {
-                MATCH (vc:VectorsCount:Feature {session_id: $session_id})
-                RETURN min(vc.count) AS minVectors
-            }
-            WITH maxSamples, minAnglePoints, minVectors
+        // Find max samples and min counts
+        MATCH (n {session_id: $session_id})
+        WHERE n:Vector OR n:Point OR n:Feature
+        WITH max(size(n.samples)) AS maxSamples,
+             min(CASE WHEN n:EndPointsCount THEN n.count ELSE null END) AS minEndPoints,
+             min(CASE WHEN n:IntersectionPointsCount THEN n.count ELSE null END) AS minIntersectionPoints,
+             min(CASE WHEN n:VectorsCount THEN n.count ELSE null END) AS minVectors
+
+        // Delete nodes that don't meet the criteria
+        CALL {
             MATCH (n {session_id: $session_id})
-            WHERE (n:Vector OR n:AnglePoint OR n:Feature OR n:EndPoint)
-                AND (
-                    (n:AnglePointsCount AND n.count > minAnglePoints)
-                    OR (n:VectorsCount AND n.count > minVectors)
-                    OR (NOT n:AnglePointsCount AND NOT n:VectorsCount AND size(n.samples) < maxSamples)
-                )
+            WHERE n:Vector OR n:Point
             DETACH DELETE n
-            RETURN maxSamples, minAnglePoints, minVectors
+        }
+        CALL {
+            WITH maxSamples
+            MATCH (n:Feature {session_id: $session_id})
+            WHERE size(n.samples) < maxSamples
+            DETACH DELETE n
+        }
+        CALL {
+            WITH minEndPoints, minVectors, minIntersectionPoints
+            MATCH (n {session_id: $session_id})
+            WHERE (n:EndPointsCount AND n.count > minEndPoints)
+               OR (n:VectorsCount AND n.count > minVectors)
+               OR (n:IntersectionPointsCount AND n.count > minIntersectionPoints)
+            DETACH DELETE n
+        }
+        RETURN maxSamples, minEndPoints, minVectors, minIntersectionPoints
         """
         result = tx.run(query, session_id=session_id)
+        logging.info(f"Result: {result}")
         return [dict(record) for record in result]

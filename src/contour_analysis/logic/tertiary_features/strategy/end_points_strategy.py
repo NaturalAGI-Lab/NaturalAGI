@@ -19,7 +19,7 @@ class EndPointsStrategy(TertiaryFeatureStrategy):
         query = """
            MATCH (end_point:EndPoint {image_id: $image_id})
            WITH COUNT(end_point) AS count
-           MERGE (end_points_count: EndPointsCount:Feature {session_id: $session_id})
+           MERGE (end_points_count:EndPointsCount:Feature {session_id: $session_id})
            ON CREATE SET end_points_count.count = count, end_points_count.samples = [$image_id]
            ON MATCH SET end_points_count.count = count, end_points_count.samples = CASE WHEN $image_id IN end_points_count.samples THEN end_points_count.samples ELSE end_points_count.samples + $image_id END
            RETURN end_points_count

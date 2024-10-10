@@ -1,9 +1,11 @@
 import math
-from typing import Optional, List, Tuple, Any
+from typing import Optional, List, Tuple, Any, Type
 import networkx as nx
 
 from logic.graph_traversal import GraphTraversal
 from service.visitor_result_persistence_service import VisitorResultPersistenceService
+from service.analysis_result_persistence_service import AnalysisResultPersistenceService
+from service.graph_analysis.analyzers.base_analyzer import BaseAnalyzer
 from visitors.visitor import Visitor
 
 
@@ -12,16 +14,34 @@ class NetworkxGraphAnalysis:
         self,
         graph: nx.Graph,
         visitor_result_persistence_service: VisitorResultPersistenceService,
+        analysis_result_persistence_service: AnalysisResultPersistenceService,
     ):
         self.graph = graph
         self.visitors: List[Visitor] = []
+        self.analyzers: List[BaseAnalyzer] = []
         self.graph_traversal = GraphTraversal(self.graph)
         self.visitor_result_persistence_service = visitor_result_persistence_service
+        self.analysis_result_persistence_service = analysis_result_persistence_service
 
     def add_visitor(self, visitor: Visitor):
         self.visitors.append(visitor)
 
+    def add_analyzer(self, analyzer_class: Type[BaseAnalyzer]):
+        analyzer = analyzer_class(self.graph)
+        self.analyzers.append(analyzer)
+
     def analyze_graph(self, image_id: str, session_id: str):
+        # Graph traversal
+        self.perform_graph_traversal(image_id, session_id)
+
+        # Graph exposition analysis
+        for analyzer in self.analyzers:
+            result = analyzer.analyze()
+            self.analysis_result_persistence_service.save_analysis_result(
+                analyzer, result, image_id, session_id
+            )
+
+    def perform_graph_traversal(self, image_id: str, session_id: str):
         top_leftmost_point = self.find_top_leftmost_point()
 
         for point, vector in self.graph_traversal.dfs_traversal(top_leftmost_point):
@@ -53,7 +73,7 @@ class NetworkxGraphAnalysis:
 
         top_leftmost_node = min(
             self.graph.nodes,
-            key=lambda n: (self.graph.nodes[n]["x"], self.graph.nodes[n]["y"])
+            key=lambda n: (self.graph.nodes[n]["x"], self.graph.nodes[n]["y"]),
         )
         return top_leftmost_node
 

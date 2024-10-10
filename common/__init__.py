@@ -1,3 +1,3 @@
-from .models import DLQModel
+from .models import DLQModel, ContourType, ContourDevelopment
 
-__all__ = ["DLQModel"]
+__all__ = ["DLQModel", "ContourType", "ContourDevelopment"]

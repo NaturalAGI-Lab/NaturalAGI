@@ -22,7 +22,7 @@ NC := \033[0m # No Color
 
 HOST_IP := $(shell ipconfig getifaddr en0)
 
-LOCAL_STORAGE=./tests/generated_samples/sk-test
+LOCAL_STORAGE=./tests/generated_samples/
 NUCLIO_STORAGE=/opt/nuclio/shared_storage
 
 DLQ_TOPIC = dlq-topic

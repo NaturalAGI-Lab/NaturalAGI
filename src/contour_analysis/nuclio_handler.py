@@ -11,6 +11,9 @@ from data_preprocessing_service import DataPreprocessingService
 from networkx_graph_analysis import NetworkxGraphAnalysis
 from service.visitor_result_persistence_service import VisitorResultPersistenceService
 from logic.tertiary_features.tertiary_features_service import TertiaryFeaturesService
+from service.analysis_result_persistence_service import AnalysisResultPersistenceService
+from service.graph_analysis.analyzers.contour_type_analyzer import ContourTypeAnalyzer
+from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
 from visitors.angle_visitor import AngleVisitor
 from visitors.half_plane_visitor import HalfPlaneVisitor
 
@@ -53,12 +56,20 @@ def init_context(context):
     tertiary_features_service = TertiaryFeaturesService(
         settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
     )
+    analysis_result_persistence_service = AnalysisResultPersistenceService(
+        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
+    )
     setattr(context.user_data, "tertiary_features_service", tertiary_features_service)
     setattr(context.user_data, "data_preprocessing_service", data_preprocessing_service)
     setattr(
         context.user_data,
         "visitor_result_persistence_service",
         visitor_result_persistence_service,
+    )
+    setattr(
+        context.user_data,
+        "analysis_result_persistence_service",
+        analysis_result_persistence_service,
     )
     setattr(context.user_data, "next_nuclio", settings.next_nuclio)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
@@ -90,6 +101,7 @@ def kafka_handler(context, event):
         networkx_graph_analysis = NetworkxGraphAnalysis(
             network,
             visitor_result_persistence_service=context.user_data.visitor_result_persistence_service,
+            analysis_result_persistence_service=context.user_data.analysis_result_persistence_service,
         )
 
         # networkx_graph_analysis.add_visitor(QuadrantVisitor())
@@ -97,9 +109,14 @@ def kafka_handler(context, event):
         networkx_graph_analysis.add_visitor(AngleVisitor(network))
         networkx_graph_analysis.add_visitor(HalfPlaneVisitor(network))
 
+        networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
+        networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
+
         networkx_graph_analysis.analyze_graph(image_id, session_id)
 
-        context.user_data.tertiary_features_service.create_tertiary_features(image_id, session_id)
+        context.user_data.tertiary_features_service.create_tertiary_features(
+            image_id, session_id
+        )
 
     except Exception as error:
         error_info = {
