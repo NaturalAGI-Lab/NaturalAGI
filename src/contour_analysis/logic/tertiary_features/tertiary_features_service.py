@@ -2,6 +2,7 @@ from neo4j import GraphDatabase, ManagedTransaction
 from logic.tertiary_features.strategy.vectors_strategy import VectorsStrategy
 from logic.tertiary_features.strategy.end_points_strategy import EndPointsStrategy
 from logic.tertiary_features.strategy.intersection_points_strategy import IntersectionPointsStrategy
+from logic.tertiary_features.strategy.corner_points_strategy import CornerPointsStrategy
 
 
 class TertiaryFeaturesService:
@@ -15,4 +16,5 @@ class TertiaryFeaturesService:
     def _create_tertiary_features(self, tx: ManagedTransaction, image_id: str, session_id: str):
         VectorsStrategy(session_id).execute(tx, image_id)
         IntersectionPointsStrategy(session_id).execute(tx, image_id)
+        CornerPointsStrategy(session_id).execute(tx, image_id)
         EndPointsStrategy(session_id).execute(tx, image_id)
