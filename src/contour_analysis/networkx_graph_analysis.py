@@ -31,6 +31,8 @@ class NetworkxGraphAnalysis:
         self.analyzers.append(analyzer)
 
     def analyze_graph(self, image_id: str, session_id: str):
+        print("Starting graph analysis with visitors: ", [type(visitor).__name__ for visitor in self.visitors])
+        print("Starting graph analysis with analyzers: ", [type(analyzer).__name__ for analyzer in self.analyzers])
         # Graph traversal
         self.perform_graph_traversal(image_id, session_id)
 

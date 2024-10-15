@@ -16,7 +16,7 @@ from service.graph_analysis.analyzers.contour_type_analyzer import ContourTypeAn
 from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
 from visitors.angle_visitor import AngleVisitor
 from visitors.half_plane_visitor import HalfPlaneVisitor
-
+from visitors.quadrant_visitor import QuadrantVisitor
 HANDLER_NAME = "Contour analysis"
 
 
@@ -104,7 +104,7 @@ def kafka_handler(context, event):
             analysis_result_persistence_service=context.user_data.analysis_result_persistence_service,
         )
 
-        # networkx_graph_analysis.add_visitor(QuadrantVisitor())
+        networkx_graph_analysis.add_visitor(QuadrantVisitor())
         # networkx_graph_analysis.add_visitor(LengthComparisonVisitor())
         networkx_graph_analysis.add_visitor(AngleVisitor(network))
         networkx_graph_analysis.add_visitor(HalfPlaneVisitor(network))

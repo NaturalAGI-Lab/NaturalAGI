@@ -88,9 +88,9 @@ deploy:
 		exit 1; \
 	fi
 
-post_process:
+post_process_%:
 	@echo -e "${BLUE}Running post-processing...${NC}"
-	@if sh $(POST_PROCESSING_SCRIPT) $(SESSION_ID); then \
+	@if sh $(POST_PROCESSING_SCRIPT) $*; then \
 		echo -e "${GREEN}Post-processing completed successfully.${NC}"; \
 	else \
 		echo -e "${RED}Post-processing failed.${NC}"; \
@@ -139,14 +139,9 @@ train_triangle:
 	@make send_to_connector OPERATION=train CONCEPT_NAME=$(CONCEPT_NAME) NUCLIO_STORAGE=$(NUCLIO_STORAGE)/triangle
 	@echo -e "${GREEN}Training script completed.${NC}"
 
-train_mnist_one:
+train_mnist_%:
 	@echo -e "${BLUE}Running training script...${NC}"
-	@make send_to_connector OPERATION=train CONCEPT_NAME=mnist_one NUCLIO_STORAGE=$(NUCLIO_STORAGE)/mnist_ones
-	@echo -e "${GREEN}Training script completed.${NC}"
-
-train_mnist_four:
-	@echo -e "${BLUE}Running training script...${NC}"
-	@make send_to_connector OPERATION=train CONCEPT_NAME=mnist_four NUCLIO_STORAGE=$(NUCLIO_STORAGE)/mnist_fours
+	@make send_to_connector OPERATION=train CONCEPT_NAME=mnist_$* NUCLIO_STORAGE=$(NUCLIO_STORAGE)/mnist_$*
 	@echo -e "${GREEN}Training script completed.${NC}"
 
 
