@@ -74,7 +74,7 @@ class NetworkxGraphAnalysis:
             return None
 
         top_leftmost_node = min(
-            self.graph.nodes,
+            [node for node in self.graph.nodes if self.graph.degree[node] == 1],
             key=lambda n: (self.graph.nodes[n]["x"], self.graph.nodes[n]["y"]),
         )
         return top_leftmost_node

@@ -18,7 +18,11 @@ class SkeletonGNGMapper:
         net = self._fit_gng(points)
         simplified_network = self._simplify_network(net, self.settings.simplification_epsilon)
         graph = self._to_networkx(simplified_network)
-        return graph
+        
+        if (nx.is_connected(graph)):
+            return graph
+        else:
+            raise Exception("Not connected graph is not supported")
 
     def _skeletonize(self, image):
         binary = image > self.settings.skeletonization_threshold
@@ -93,11 +97,11 @@ class SkeletonGNGMapper:
 
                 # Add source node with attributes if not already present
                 if source_id not in G:
-                    G.add_node(source_id, x=source_coord[1], y=source_coord[0], uuid=str(uuid.uuid4()))
+                    G.add_node(source_id, x=source_coord[0], y=source_coord[1], uuid=str(uuid.uuid4()))
 
                 # Add target node with attributes if not already present
                 if target_id not in G:
-                    G.add_node(target_id, x=target_coord[1], y=target_coord[0], uuid=str(uuid.uuid4()))
+                    G.add_node(target_id, x=target_coord[0], y=target_coord[1], uuid=str(uuid.uuid4()))
 
                 # Calculate edge length
                 length = np.linalg.norm(np.array(target_coord) - np.array(source_coord))
@@ -106,10 +110,10 @@ class SkeletonGNGMapper:
                 G.add_edge(source_id, target_id, 
                            segment_id=i, 
                            uuid=str(uuid.uuid4()),
-                           x1=source_coord[1],
-                           y1=source_coord[0],
-                           x2=target_coord[1],
-                           y2=target_coord[0],
+                           x1=source_coord[0],
+                           y1=source_coord[1],
+                           x2=target_coord[0],
+                           y2=target_coord[1],
                            length=length)
 
         return G

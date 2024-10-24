@@ -77,6 +77,23 @@ def http_handler(context, event):
                 content_type="text/plain",
                 status_code=200,
             )
+        elif operation == 'classify':
+            image_path = parameters.get('image_path')
+            
+            if not image_path:
+                raise ValueError("image_path is required for classification")
+            
+            if not os.path.isfile(image_path):
+                raise ValueError(f"Invalid image_path: {image_path}")
+            
+            send_to_kafka(context, image_path, operation, None, session_id)
+            
+            return context.Response(
+                body="Image sent for classification",
+                headers={},
+                content_type="text/plain",
+                status_code=200,
+            )
         else:
             raise ValueError(f"Unsupported operation: {operation}")
 

@@ -9,39 +9,41 @@ class GraphTraversal:
     def __init__(self, graph: nx.Graph):
         self.graph = graph
 
-    def dfs_traversal(self, start_node: Any) -> Generator[Tuple[Any, Optional[dict]], None, None]:
-        """
-        Generator for DFS traversal.
-        
-        Args:
-            start_node (Any): The starting node for DFS.
-        
-        Yields:
-            Tuple[Any, Optional[dict]]: A tuple containing the current node and its incoming edge (or None for the start node).
-        """
-        visited_nodes = set()
+    def dfs_traversal(self, start_node: Any) -> Generator[Tuple[Point, Optional[Vector]], None, None]:
         visited_edges = set()
 
-        def _dfs(node_id: str, incoming_vector: Optional[Vector] = None):
-            if node_id not in visited_nodes:
-                visited_nodes.add(node_id)
-                node_data = self.graph.nodes[node_id]
-                point = Point(id=node_data["uuid"], x=node_data['x'], y=node_data['y'])
-                yield point, incoming_vector
+        def find_edge(x1: float, y1: float, x2: float, y2: float) -> Optional[dict]:
+            for _, _, edge_data in self.graph.edges(data=True):
+                if ((edge_data['x1'] == x1 and edge_data['y1'] == y1 and edge_data['x2'] == x2 and edge_data['y2'] == y2) or
+                    (edge_data['x1'] == x2 and edge_data['y1'] == y2 and edge_data['x2'] == x1 and edge_data['y2'] == y1)):
+                    return edge_data
+            return None
 
-                for neighbor_id in sorted(self.graph.neighbors(node_id)):
-                    edge = tuple(sorted([node_id, neighbor_id]))
-                    if edge not in visited_edges:
-                        visited_edges.add(edge)
-                        edge_data = self.graph.edges[edge]
-                        vector = Vector(
-                            id=edge_data['uuid'],
-                            x1=edge_data['x1'],
-                            y1=edge_data['y1'],
-                            x2=edge_data['x2'],
-                            y2=edge_data['y2'],
-                            length=edge_data['length']
-                        )
-                        yield from _dfs(neighbor_id, vector)
+        def _dfs(node_id: str, prev_x: Optional[float] = None, prev_y: Optional[float] = None):
+            node_data = self.graph.nodes[node_id]
+            point = Point(id=node_data["uuid"], x=node_data['x'], y=node_data['y'])
+            
+            incoming_vector = None
+            if prev_x is not None and prev_y is not None:
+                edge_data = find_edge(prev_x, prev_y, point.x, point.y)
+                if edge_data:
+                    incoming_vector = Vector(
+                        id=edge_data['uuid'],
+                        x1=prev_x,
+                        y1=prev_y,
+                        x2=point.x,
+                        y2=point.y,
+                        length=edge_data['length']
+                    )
+                else:
+                    raise ValueError(f"Edge not found between {prev_x}, {prev_y} and {point.x}, {point.y}")
+                
+            yield point, incoming_vector
+
+            for neighbor_id in self.graph.neighbors(node_id):
+                edge = tuple(sorted([node_id, neighbor_id]))
+                if edge not in visited_edges:
+                    visited_edges.add(edge)
+                    yield from _dfs(neighbor_id, point.x, point.y)
 
         yield from _dfs(start_node)

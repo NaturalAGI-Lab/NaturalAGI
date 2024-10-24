@@ -7,7 +7,6 @@ export
 
 # Variables
 SHELL := /bin/bash
-DEPLOY_SCRIPT := deploy_functions.sh
 POST_PROCESSING_SCRIPT := run_post_processing.sh
 
 # Default values for classification
@@ -21,6 +20,8 @@ RED := \033[0;31m
 NC := \033[0m # No Color
 
 HOST_IP := $(shell ipconfig getifaddr en0)
+KAFKA_BROKERS := ${HOST_IP}:29092
+NEO4J_PASS=111122223333
 
 LOCAL_STORAGE=./tests/generated_samples/
 NUCLIO_STORAGE=/opt/nuclio/shared_storage
@@ -30,8 +31,10 @@ CONNECTOR_KAFKA_TOPIC = connector-output-topic
 LINE_DETECTOR_TOPIC = line-detector-output-topic
 ANGLE_POINT_DETECTOR_KAFKA_TOPIC = angle-point-detector-output-topic
 SKELETONIZATION_KAFKA_TOPIC = skeletonization-output-topic
+CONTOUR_ANALYSIS_KAFKA_TOPIC = contour-analysis-output-topic
+CLASSIFICATION_KAFKA_TOPIC = classification-output-topic
 
-TOPICS = $(CONNECTOR_KAFKA_TOPIC) $(LINE_DETECTOR_TOPIC) $(ANGLE_POINT_DETECTOR_KAFKA_TOPIC) $(DLQ_TOPIC) $(SKELETONIZATION_KAFKA_TOPIC)
+TOPICS = $(CONNECTOR_KAFKA_TOPIC) $(LINE_DETECTOR_TOPIC) $(ANGLE_POINT_DETECTOR_KAFKA_TOPIC) $(DLQ_TOPIC) $(SKELETONIZATION_KAFKA_TOPIC) $(CONTOUR_ANALYSIS_KAFKA_TOPIC) $(CLASSIFICATION_KAFKA_TOPIC)
 
 # Add these variables near the top of the Makefile, after other variable definitions
 OPERATION ?= train
@@ -77,33 +80,31 @@ list_kafka_topics:
 	@cat $(TOPICS)
 
 # Main targets
-all: start_services create_kafka_topics deploy train send_to_connector post_process
+all: start_services create_kafka_topics deploy train
 
-deploy:
-	@echo -e "${BLUE}Deploying functions...${NC}"
-	@if sh $(DEPLOY_SCRIPT) $(LINE_DETECTOR_TOPIC) $(DLQ_TOPIC) $(ANGLE_POINT_DETECTOR_KAFKA_TOPIC); then \
-		echo -e "${GREEN}Deployment successful.${NC}"; \
-	else \
-		echo -e "${RED}Deployment failed.${NC}"; \
-		exit 1; \
-	fi
-
-post_process_%:
+# Post-process target: Runs the post-processing script with provided arguments
+# Usage: make post_process <arg1> <arg2> ...
+# Example: make post_process 2b8ffbca-5dd1-419a-b689-0bb27fbbaa42 mnist-1
+post_process:
 	@echo -e "${BLUE}Running post-processing...${NC}"
-	@if sh $(POST_PROCESSING_SCRIPT) $*; then \
+	@if sh $(POST_PROCESSING_SCRIPT) $(filter-out $@,$(MAKECMDGOALS)); then \
 		echo -e "${GREEN}Post-processing completed successfully.${NC}"; \
 	else \
 		echo -e "${RED}Post-processing failed.${NC}"; \
 		exit 1; \
 	fi
 
+# Special target to allow passing arguments to other targets
+%:
+	@:
+
 classify:
-	@echo -e "${BLUE}Classifying with concept_id: $(CONCEPT_ID) and image_id: $(IMAGE_ID)${NC}"
-	@nuctl invoke classification --platform local --method POST \
-		--content-type "application/json" \
-		-b '{"concept_id": "$(CONCEPT_ID)", "image_id": "$(IMAGE_ID)"}' || \
-		(echo -e "${RED}Classification failed.${NC}" && exit 1); \
-	echo -e "${GREEN}Classification completed.${NC}"
+	@echo -e "${BLUE}Classifying image: $(filter-out $@,$(MAKECMDGOALS))${NC}"
+	@curl -X POST http://localhost:5002 \
+		-H "Content-Type: application/json" \
+		-d '{"operation": "classify", "parameters": {"image_path": "$(filter-out $@,$(MAKECMDGOALS))"}}' || \
+		(echo -e "${RED}Classification failed.${NC}" && exit 1)
+	@echo -e "${GREEN}Classification request sent to connector.${NC}"
 
 clean:
 	@echo -e "${BLUE}Cleaning up...${NC}"
@@ -126,7 +127,7 @@ help:
 
 train:
 	@echo -e "${BLUE}Running training script...${NC}"
-	@make send_to_connector OPERATION=train CONCEPT_NAME=$(CONCEPT_NAME)
+	@make send_to_connector OPERATION=train CONCEPT_NAME=$(CONCEPT_NAME) NUCLIO_STORAGE=$(NUCLIO_STORAGE)/sk-test
 	@echo -e "${GREEN}Training script completed.${NC}"
 
 train_square:
@@ -152,3 +153,84 @@ send_to_connector:
 		-d '{"operation": "$(OPERATION)", "parameters": {"dataset_path": "$(NUCLIO_STORAGE)", "concept_name": "$(CONCEPT_NAME)"}}' || \
 		(echo -e "${RED}Failed to send data to connector.${NC}" && exit 1)
 	@echo -e "\n${GREEN}Data sent to connector successfully.${NC}"
+
+# Function deployment targets
+.PHONY: dep_conn dep_skel dep_contour dep_post dep_concept dep_all
+
+dep_conn:
+	@echo -e "${BLUE}Deploying connector...${NC}"
+	@nuctl deploy --path src/connector \
+		--platform local \
+		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
+		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
+		-e DLQ_TOPIC="${DLQ_TOPIC}" \
+		-e KAFKA_TOPIC="${CONNECTOR_KAFKA_TOPIC}"
+	@echo -e "${GREEN}Connector deployed.${NC}"
+
+dep_skel:
+	@echo -e "${BLUE}Deploying skeletonization...${NC}"
+	@nuctl deploy --path src/skeletonization \
+		--platform local \
+		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
+		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
+		-e DLQ_TOPIC="${DLQ_TOPIC}" \
+		-e SIMPLIFICATION_EPSILON=2.5 \
+		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}' \
+		-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}"
+	@echo -e "${GREEN}Skeletonization deployed.${NC}"
+
+dep_contour:
+	@echo -e "${BLUE}Deploying contour analysis...${NC}"
+	@nuctl deploy --path src/contour_analysis \
+		--platform local \
+		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${SKELETONIZATION_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "contour-analysis-group"}}}' \
+		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
+		-e NEO4J_USER=neo4j \
+		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
+		-e DLQ_TOPIC="${DLQ_TOPIC}" \
+		-e KAFKA_TOPIC="${CONTOUR_ANALYSIS_KAFKA_TOPIC}" \
+		-e NEO4J_PASS=${NEO4J_PASS}
+	@echo -e "${GREEN}Contour analysis deployed.${NC}"
+
+dep_post:
+	@echo -e "${BLUE}Deploying post processing...${NC}"
+	@nuctl deploy --path src/post_processing \
+		--platform local \
+		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
+		-e NEO4J_USER=neo4j \
+		-e NEO4J_PASS=${NEO4J_PASS}
+	@echo -e "${GREEN}Post processing deployed.${NC}"
+
+dep_concept:
+	@echo -e "${BLUE}Deploying concept creator...${NC}"
+	@nuctl deploy --path src/concept_creator \
+		--platform local \
+		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
+		-e NEO4J_USER=neo4j \
+		-e NEO4J_PASS=${NEO4J_PASS}
+	@echo -e "${GREEN}Concept creator deployed.${NC}"
+
+dep_classification:
+	@echo -e "${BLUE}Deploying classification...${NC}"
+	@nuctl deploy --path src/classification \
+		--platform local \
+		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONTOUR_ANALYSIS_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "classification-group"}}}' \
+		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
+		-e DLQ_TOPIC="${DLQ_TOPIC}" \
+		-e KAFKA_TOPIC="${CLASSIFICATION_KAFKA_TOPIC}" \
+		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
+		-e NEO4J_USER=neo4j \
+		-e NEO4J_PASS=${NEO4J_PASS}
+	@echo -e "${GREEN}Classification deployed.${NC}"
+
+dep_all: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification
+	@echo -e "${GREEN}All functions deployed.${NC}"
+
+# Update the existing deploy target to use dep_all
+deploy: clean_results dep_all
+
+# Rename clean_training_results to clean_results
+clean_results:
+	@echo -e "${BLUE}Cleaning previous results...${NC}"
+	@rm -rf ./training_results/*
+	@echo -e "${GREEN}Results cleaned.${NC}"

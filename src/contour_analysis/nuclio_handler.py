@@ -17,6 +17,7 @@ from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
 from visitors.angle_visitor import AngleVisitor
 from visitors.half_plane_visitor import HalfPlaneVisitor
 from visitors.quadrant_visitor import QuadrantVisitor
+
 HANDLER_NAME = "Contour analysis"
 
 
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     neo4j_pass: str
     next_nuclio: str = ""
     dlq_topic: str
+    kafka_topic: str
     kafka_bootstrap_servers: str
 
 
@@ -74,7 +76,7 @@ def init_context(context):
     setattr(context.user_data, "next_nuclio", settings.next_nuclio)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
     setattr(context.user_data, "kafka_producer", producer)
-
+    setattr(context.user_data, "kafka_topic", settings.kafka_topic)
 
 def kafka_handler(context, event):
     """Handles Kafka messages"""
@@ -117,6 +119,19 @@ def kafka_handler(context, event):
         context.user_data.tertiary_features_service.create_tertiary_features(
             image_id, session_id
         )
+        
+        context.user_data.kafka_producer.send(
+            context.user_data.kafka_topic,
+            value={
+                "operation": "classify",
+                "parameters": {
+                    "image_id": image_id,
+                    "session_id": session_id
+                }
+            }
+        )
+        
+        context.logger.info_with(f"Analysis complete for image_id: {image_id}", handler=HANDLER_NAME)
 
     except Exception as error:
         error_info = {
