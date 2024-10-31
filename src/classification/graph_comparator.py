@@ -33,8 +33,8 @@ class GraphComparator:
         raw_feature_scores = []
         
         for concept in concepts:
-            structural_score = StructuralComparator.compare_graphs(
-                tx, image_id, concept["concept_id"]
+            structural_score = StructuralComparator.compare_graphs_wl(
+                tx, image_id, concept["concept_id"], concept["concept_name"]
             )
             feature_score = FeatureComparisonService().compare_features(
                 tx, image_id, concept["concept_id"]
@@ -56,7 +56,7 @@ class GraphComparator:
             results, raw_structural_scores, raw_feature_scores
         ):  
             # Calculate preliminary combined score (weighted average)
-            preliminary_score = norm_structural + norm_feature
+            preliminary_score = 0.7 * norm_structural + 0.3 * norm_feature
             preliminary_combined_scores.append(preliminary_score)
             
         # Apply final softmax normalization to all combined scores

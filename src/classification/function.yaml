@@ -16,7 +16,7 @@ spec:
     commands:
       - 'apt-get update -y --fix-missing'
       - 'apt-get install -y libgl1-mesa-glx'
-      - 'pip install numpy requests pydantic-settings neo4j kafka-python networkx scipy'
+      - 'pip install numpy==1.26.4 requests pydantic-settings neo4j kafka-python networkx scipy grakel'
   triggers:
     default-http:
       kind: "http"

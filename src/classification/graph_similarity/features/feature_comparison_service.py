@@ -1,3 +1,4 @@
+import logging
 from typing import Dict
 
 from neo4j import Session
@@ -37,11 +38,16 @@ class FeatureComparisonService:
             feature_type = record["type"]
             if feature_type in self.comparators:
                 comparator = self.comparators[feature_type]
+                logging.info(f"Comparing {feature_type} for image {image_id} and concept {concept_id}")
+                logging.info(f"Image feature: {record['image_feature']}")
+                logging.info(f"Concept feature: {record['concept_feature']}")
                 score = comparator.compare(
                     record["image_feature"], 
                     record["concept_feature"]
                 )
+                logging.info(f"Score: {score}")
                 total_score += score
+                logging.info(f"Total score: {total_score}")
                 feature_count += 1
         
         return total_score / feature_count if feature_count > 0 else 0.0

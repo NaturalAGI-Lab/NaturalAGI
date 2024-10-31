@@ -44,6 +44,14 @@ class PostProcessingRepository:
         WITH n.image_id AS image_id, COUNT(n) AS node_count
         ORDER BY node_count ASC
         LIMIT 1
+        
+        // TODO: think how to utilize the link between Features and Structural Nodes
+        // Remove relations from Features to Structural Nodes
+        CALL {
+            WITH image_id
+            MATCH (n {session_id: $session_id})-[r]-(m:Feature)
+            DELETE r
+        }
 
         // Keep structural nodes from the sample with the least nodes
         MATCH (structural_node {session_id: $session_id, image_id: image_id})

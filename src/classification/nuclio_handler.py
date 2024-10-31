@@ -56,8 +56,11 @@ def kafka_handler(context, event):
     else:
         data = json.loads(event.body.decode("utf-8"))
 
+    if data["operation"] != "classify":
+        return
+
     image_id = data["parameters"]["image_id"]
-    
+
     try:
         if not image_id:
             raise ValueError("image_id must be provided in the request body")
@@ -68,7 +71,7 @@ def kafka_handler(context, event):
         context.logger.info_with(
             f"Classification results: {comparison_results}", handler=HANDLER_NAME
         )
-        
+
         # Responding to the HTTP request
         context.user_data.kafka_producer.send(
             context.user_data.kafka_topic,
@@ -86,7 +89,7 @@ def kafka_handler(context, event):
             context.user_data.dlq_topic,
             value={"error": str(e)},
         )
-        
+
     finally:
         context.user_data.graph_comparator.remove_image_nodes(image_id)
 

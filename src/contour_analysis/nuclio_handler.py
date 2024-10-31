@@ -123,7 +123,7 @@ def kafka_handler(context, event):
         context.user_data.kafka_producer.send(
             context.user_data.kafka_topic,
             value={
-                "operation": "classify",
+                "operation": operation,
                 "parameters": {
                     "image_id": image_id,
                     "session_id": session_id
