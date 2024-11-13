@@ -36,9 +36,10 @@ def init_context(context):
 
 def kafka_handler(context, event):
     """Handles Kafka messages"""
+    
+    # Get JSON from the event.body
+    data = json.loads(event.body)
     try:
-        # Get JSON from the event.body
-        data = json.loads(event.body)
 
         context.logger.info_with(
             f"Received request: {data}", handler=HANDLER_NAME
@@ -66,7 +67,7 @@ def kafka_handler(context, event):
         )
 
     except Exception as e:
-        context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)
+        context.logger.warn_with(f"Error: {e}", handler=HANDLER_NAME)
         traceback.print_exc()
 
         dlq_model = DLQModel(
@@ -75,18 +76,11 @@ def kafka_handler(context, event):
                 "error": str(e),
                 "traceback": traceback.format_exc()
             },
-            value=json_net if 'json_net' in locals() else {}
+            value=data
         )
         context.user_data.kafka_producer.send(
             context.user_data.dlq_topic,
             value=dlq_model.model_dump()
-        )
-
-        context.Response(
-            body=f"Error: {e}",
-            headers={},
-            content_type="text/plain",
-            status_code=500,
         )
 
 

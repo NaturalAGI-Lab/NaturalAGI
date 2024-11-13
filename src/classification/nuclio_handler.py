@@ -78,6 +78,7 @@ def kafka_handler(context, event):
             value={
                 "classification_results": comparison_results,
                 "image_id": image_id,
+                "image_path": data["parameters"]["image_path"]
             },
         )
 

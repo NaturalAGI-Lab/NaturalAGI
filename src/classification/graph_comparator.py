@@ -49,14 +49,21 @@ class GraphComparator:
             raw_structural_scores.append(structural_score)
             raw_feature_scores.append(feature_score)
 
+        # Apply softmax normalization to structural scores
+        normalized_structural_scores = ScoreCombiner.combine(raw_structural_scores)
+        normalized_feature_scores = ScoreCombiner.combine(raw_feature_scores)
+        
+        logging.info(f"Normalized structural scores: {normalized_structural_scores}")
+        logging.info(f"Normalized feature scores: {normalized_feature_scores}")
+
         # First, calculate preliminary combined scores
         preliminary_combined_scores = []
         
         for result, norm_structural, norm_feature in zip(
-            results, raw_structural_scores, raw_feature_scores
+            results, normalized_structural_scores, normalized_feature_scores
         ):  
             # Calculate preliminary combined score (weighted average)
-            preliminary_score = 0.7 * norm_structural + 0.3 * norm_feature
+            preliminary_score = norm_structural + norm_feature
             preliminary_combined_scores.append(preliminary_score)
             
         # Apply final softmax normalization to all combined scores

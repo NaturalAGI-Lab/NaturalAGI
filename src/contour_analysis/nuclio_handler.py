@@ -126,7 +126,8 @@ def kafka_handler(context, event):
                 "operation": operation,
                 "parameters": {
                     "image_id": image_id,
-                    "session_id": session_id
+                    "session_id": session_id,
+                    "image_path": parameters["image_path"]
                 }
             }
         )

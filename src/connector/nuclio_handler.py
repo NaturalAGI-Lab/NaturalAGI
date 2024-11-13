@@ -45,7 +45,7 @@ def http_handler(context, event):
         # Extract operation and parameters
         operation = data.get('operation')
         parameters = data.get('parameters', {})
-        session_id = str(uuid.uuid4())
+        session_id = parameters.get('session_id', str(uuid.uuid4()))
         
         context.logger.info_with(f"Received request: {event.trigger.kind}", handler=HANDLER_NAME)
         context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)

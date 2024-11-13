@@ -98,6 +98,10 @@ post_process:
 %:
 	@:
 
+# Usage: make classify <image_path>
+# Example: make classify /path/to/image.jpg
+# This target sends an image to the connector for classification.
+# The image path should be absolute or relative to the current directory.
 classify:
 	@echo -e "${BLUE}Classifying image: $(filter-out $@,$(MAKECMDGOALS))${NC}"
 	@curl -X POST http://localhost:5002 \
@@ -142,7 +146,7 @@ train_triangle:
 
 train_mnist_%:
 	@echo -e "${BLUE}Running training script...${NC}"
-	@make send_to_connector OPERATION=train CONCEPT_NAME=mnist_$* NUCLIO_STORAGE=$(NUCLIO_STORAGE)/mnist_$*
+	@make send_to_connector OPERATION=train CONCEPT_NAME=mnist_$* NUCLIO_STORAGE=$(NUCLIO_STORAGE)/mnist_$*/train SESSION_ID=$*
 	@echo -e "${GREEN}Training script completed.${NC}"
 
 
@@ -150,7 +154,7 @@ send_to_connector:
 	@echo -e "${BLUE}Sending data to connector...${NC}"
 	@curl -X POST http://localhost:5002 \
 		-H "Content-Type: application/json" \
-		-d '{"operation": "$(OPERATION)", "parameters": {"dataset_path": "$(NUCLIO_STORAGE)", "concept_name": "$(CONCEPT_NAME)"}}' || \
+		-d '{"operation": "$(OPERATION)", "parameters": {"dataset_path": "$(NUCLIO_STORAGE)", "concept_name": "$(CONCEPT_NAME)", "session_id": "$(SESSION_ID)"}}' || \
 		(echo -e "${RED}Failed to send data to connector.${NC}" && exit 1)
 	@echo -e "\n${GREEN}Data sent to connector successfully.${NC}"
 
