@@ -166,3 +166,4 @@ training_data/
 training_results/
 tests/generated_samples/
 tests/test-data/
+MNIST/
