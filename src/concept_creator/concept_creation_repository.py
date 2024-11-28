@@ -3,6 +3,8 @@ import hashlib
 from typing import List
 from neo4j import GraphDatabase, ManagedTransaction
 
+from feature_weight_service import FeatureWeightService
+
 
 class ConceptCreationRepository:
     def __init__(self, uri: str, user: str, password: str):
@@ -28,6 +30,8 @@ class ConceptCreationRepository:
             concept_id = session.execute_write(
                 self._create_concept, session_id, concept_name
             )
+            logging.info(f"Concept created with id: {concept_id}")
+            session.execute_write(FeatureWeightService().calculate_feature_weights)
         return concept_id
 
     def _create_concept(

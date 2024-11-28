@@ -22,3 +22,4 @@ spec:
       kind: "http"
       attributes:
         port: 5001
+  replicas: 3

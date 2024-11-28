@@ -6,6 +6,7 @@ from pydantic_settings import BaseSettings
 import json
 
 from concept_creation_repository import ConceptCreationRepository
+from subgraph_mining_service import SubgraphMiningService
 
 HANDLER_NAME = "concept_creator"
 
@@ -37,6 +38,11 @@ def init_context(context):
             Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass
         ),
     )
+    setattr(
+        context.user_data,
+        "subgraph_mining_service",
+        SubgraphMiningService(Settings().neo4j_dsn, Settings().neo4j_user, Settings().neo4j_pass),
+    )
 
     # Initialize and set context variables
     # Example: setattr(context.user_data, "example_variable", value)
@@ -51,6 +57,9 @@ def http_handler(context, event):
         repo = context.user_data.concept_creation_repository
         concept_id = repo.create_concept(session_id, concept_name)
         repo.close()
+
+        # subgraph_mining_service = context.user_data.subgraph_mining_service
+        # subgraph_mining_service.calculate_weights()
 
         context.logger.info_with(
             f"Processed request successfully, concept_id: {concept_id} for session_id: {session_id}", handler=HANDLER_NAME

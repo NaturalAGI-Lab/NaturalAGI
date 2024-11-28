@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     kafka_topic: str
     kafka_bootstrap_servers: str
     dlq_topic: str
+    ged_timeout: float = 0.25
+    feature_weight: float = 0.5
+    structural_weight: float = 0.5
 
 
 def init_context(context):
@@ -34,7 +37,14 @@ def init_context(context):
     setattr(
         context.user_data,
         "graph_comparator",
-        GraphComparator(settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass),
+        GraphComparator(
+            settings.neo4j_dsn,
+            settings.neo4j_user,
+            settings.neo4j_pass,
+            feature_weight=settings.feature_weight,
+            structural_weight=settings.structural_weight,
+            ged_timeout=settings.ged_timeout,
+        ),
     )
     setattr(
         context.user_data,
@@ -78,7 +88,7 @@ def kafka_handler(context, event):
             value={
                 "classification_results": comparison_results,
                 "image_id": image_id,
-                "image_path": data["parameters"]["image_path"]
+                "image_path": data["parameters"]["image_path"],
             },
         )
 

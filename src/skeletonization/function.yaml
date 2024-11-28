@@ -8,6 +8,9 @@ spec:
   httpTimeout: 1000
   handler: "nuclio_handler:handler"
   runtime: "python:3.8"
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPU: 75
   build:
     baseImage: "python:3.9"
     commands:

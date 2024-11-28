@@ -23,7 +23,7 @@ HOST_IP := $(shell ipconfig getifaddr en0)
 KAFKA_BROKERS := ${HOST_IP}:29092
 NEO4J_PASS=111122223333
 
-LOCAL_STORAGE=./tests/generated_samples/
+LOCAL_STORAGE=./tests/
 NUCLIO_STORAGE=/opt/nuclio/shared_storage
 
 DLQ_TOPIC = dlq-topic
@@ -40,6 +40,7 @@ TOPICS = $(CONNECTOR_KAFKA_TOPIC) $(LINE_DETECTOR_TOPIC) $(ANGLE_POINT_DETECTOR_
 OPERATION ?= train
 CONCEPT_NAME ?= default_concept
 SESSION_ID ?= default_session
+SUBCLASS ?= default_subclass
 
 # Phony targets
 .PHONY: all deploy train post_process classify send_random_image clean help start_services create_kafka_topics list_kafka_topics send_to_connector
@@ -129,9 +130,10 @@ help:
 	@echo "  help               - Show this help message"
 	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
 
-train:
-	@echo -e "${BLUE}Running training script...${NC}"
-	@make send_to_connector OPERATION=train CONCEPT_NAME=$(CONCEPT_NAME) NUCLIO_STORAGE=$(NUCLIO_STORAGE)/sk-test
+train_prepared_samples_%:
+	@echo -e "${BLUE}Running training script for prepared samples class $* subclass $*...${NC}"
+	$(eval subclass := $(filter-out $@,$(MAKECMDGOALS)))
+	@make send_to_connector OPERATION=train CONCEPT_NAME=mnist_$* SUBCLASS=$(subclass) NUCLIO_STORAGE=$(NUCLIO_STORAGE)/prepared_samples/$*_$(subclass) SESSION_ID=$*_$(subclass)
 	@echo -e "${GREEN}Training script completed.${NC}"
 
 train_square:
@@ -154,7 +156,7 @@ send_to_connector:
 	@echo -e "${BLUE}Sending data to connector...${NC}"
 	@curl -X POST http://localhost:5002 \
 		-H "Content-Type: application/json" \
-		-d '{"operation": "$(OPERATION)", "parameters": {"dataset_path": "$(NUCLIO_STORAGE)", "concept_name": "$(CONCEPT_NAME)", "session_id": "$(SESSION_ID)"}}' || \
+		-d '{"operation": "$(OPERATION)", "parameters": {"dataset_path": "$(NUCLIO_STORAGE)", "concept_name": "$(CONCEPT_NAME)", "session_id": "$(SESSION_ID)", "subclass": "$(SUBCLASS)"}}' || \
 		(echo -e "${RED}Failed to send data to connector.${NC}" && exit 1)
 	@echo -e "\n${GREEN}Data sent to connector successfully.${NC}"
 
@@ -178,7 +180,8 @@ dep_skel:
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 		-e DLQ_TOPIC="${DLQ_TOPIC}" \
-		-e SIMPLIFICATION_EPSILON=2.5 \
+		-e SIMPLIFICATION_EPSILON=6 \
+		-e SKELETONIZATION_THRESHOLD=50 \
 		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}' \
 		-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}"
 	@echo -e "${GREEN}Skeletonization deployed.${NC}"
@@ -216,15 +219,21 @@ dep_concept:
 
 dep_classification:
 	@echo -e "${BLUE}Deploying classification...${NC}"
+	@export NUCLIO_TEST_MODE=true
 	@nuctl deploy --path src/classification \
 		--platform local \
+		--replicas 3 \
+		--platform-config '{"attributes": {"platformConfig": {"kind": "local", "attributes": {"enableReplicasOnLocal": true}}}}' \
 		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONTOUR_ANALYSIS_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "classification-group"}}}' \
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 		-e DLQ_TOPIC="${DLQ_TOPIC}" \
 		-e KAFKA_TOPIC="${CLASSIFICATION_KAFKA_TOPIC}" \
 		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 		-e NEO4J_USER=neo4j \
-		-e NEO4J_PASS=${NEO4J_PASS}
+		-e NEO4J_PASS=${NEO4J_PASS} \
+		-e GED_TIMEOUT=0.1 \
+		-e FEATURE_WEIGHT=0.6 \
+		-e STRUCTURAL_WEIGHT=0.4
 	@echo -e "${GREEN}Classification deployed.${NC}"
 
 dep_all: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification

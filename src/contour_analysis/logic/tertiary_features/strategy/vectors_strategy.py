@@ -18,7 +18,7 @@ class VectorsStrategy(TertiaryFeatureStrategy):
         query = """
            MATCH (vector:Vector {image_id: $image_id})
            WITH COUNT(vector) AS count
-           MERGE (vectors_count:VectorsCount:Feature {session_id: $session_id, count: count})
+           MERGE (vectors_count:VectorsCount:Feature {session_id: $session_id, value: count})
            ON CREATE SET vectors_count.samples = [$image_id]
            ON MATCH SET vectors_count.samples = CASE WHEN $image_id IN vectors_count.samples THEN vectors_count.samples ELSE vectors_count.samples + $image_id END
            RETURN vectors_count

@@ -12,7 +12,7 @@ class TertiaryFeaturesService:
         
     def create_tertiary_features(self, image_id: str, session_id: str):
         with self.driver.session() as session:
-            session.write_transaction(self._create_tertiary_features, image_id, session_id)
+            session.execute_write(self._create_tertiary_features, image_id, session_id)
         
     def _create_tertiary_features(self, tx: ManagedTransaction, image_id: str, session_id: str):
         VectorsStrategy(session_id).execute(tx, image_id)

@@ -8,11 +8,11 @@ class CountFeatureComparator(FeatureComparator):
         self.tolerance = tolerance
     
     def compare(self, feature1: dict, feature2: dict) -> float:
-        if 'count' not in feature1 or 'count' not in feature2:
+        if 'value' not in feature1 or 'value' not in feature2:
             return 0.0
             
-        count1 = feature1['count']
-        count2 = feature2['count']
+        count1 = feature1['value']
+        count2 = feature2['value']
         
         # If counts are equal, perfect match
         if count1 == count2:

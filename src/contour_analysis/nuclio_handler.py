@@ -14,6 +14,8 @@ from logic.tertiary_features.tertiary_features_service import TertiaryFeaturesSe
 from service.analysis_result_persistence_service import AnalysisResultPersistenceService
 from service.graph_analysis.analyzers.contour_type_analyzer import ContourTypeAnalyzer
 from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
+from service.graph_analysis.analyzers.cycle_count_analyzer import CycleCountAnalyzer
+from service.graph_analysis.analyzers.graph_metrics_analyzer import GraphMetricsAnalyzer
 from visitors.angle_visitor import AngleVisitor
 from visitors.half_plane_visitor import HalfPlaneVisitor
 from visitors.quadrant_visitor import QuadrantVisitor
@@ -113,7 +115,8 @@ def kafka_handler(context, event):
 
         networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
         networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
-
+        networkx_graph_analysis.add_analyzer(CycleCountAnalyzer)
+        networkx_graph_analysis.add_analyzer(GraphMetricsAnalyzer)
         networkx_graph_analysis.analyze_graph(image_id, session_id)
 
         context.user_data.tertiary_features_service.create_tertiary_features(

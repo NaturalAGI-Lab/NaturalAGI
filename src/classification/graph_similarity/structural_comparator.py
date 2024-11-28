@@ -124,6 +124,8 @@ class StructuralComparator:
         """Get a label for a node based on its type."""
         if "IntersectionPoint" in labels:
             return "IntersectionPoint"
+        if "EndPoint" in labels:
+            return "EndPoint"
         elif "CornerPoint" in labels:
             return "CornerPoint"
         elif "Point" in labels:

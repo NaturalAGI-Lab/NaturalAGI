@@ -23,7 +23,7 @@ class QuadrantChangeStrategy(TertiaryFeatureStrategy):
             WHERE EXISTS {
                 MATCH (point)--(v1:Vector {image_id: $image_id})--(q1:Quadrant)
                 MATCH (point)--(v2:Vector {image_id: $image_id})--(q2:Quadrant)
-                WHERE q1.quadrant <> q2.quadrant
+                WHERE q1.value <> q2.value
             }
             CREATE (point)-[:HAS_QUADRANT_CHANGE]->(qc:QuadrantChange {image_id: $image_id})
         """
@@ -33,7 +33,7 @@ class QuadrantChangeStrategy(TertiaryFeatureStrategy):
         query = """
             MATCH (quad_change:QuadrantChange {image_id: $image_id})
             WITH COUNT(quad_change) AS count, collect(quad_change) AS quad_changes
-            MERGE (quadrant_change_count:QuadrantChangeCount:Feature {session_id: $session_id, count: count})
+            MERGE (quadrant_change_count:QuadrantChangeCount:Feature {session_id: $session_id, value: count})
             ON CREATE SET quadrant_change_count.samples = [$image_id]
             ON MATCH SET quadrant_change_count.samples = CASE WHEN $image_id IN quadrant_change_count.samples THEN quadrant_change_count.samples ELSE quadrant_change_count.samples + $image_id END
             RETURN count, [quad_change IN quad_changes | id(quad_change)] AS quad_change_ids

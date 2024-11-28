@@ -46,7 +46,7 @@ class LengthComparisonVisitor(Visitor):
                 to_vector: $line2_id,
                 session_id: $session_id
             })
-            ON CREATE SET vc.length_comparison = $comparison,
+            ON CREATE SET vc.value = $comparison,
                         vc.image_id = $image_id,
                         vc.samples = [$image_id]
             ON MATCH SET vc.samples = CASE

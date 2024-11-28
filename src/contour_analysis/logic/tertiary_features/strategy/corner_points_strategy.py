@@ -19,7 +19,7 @@ class CornerPointsStrategy(TertiaryFeatureStrategy):
         query = """
            MATCH (corner_point:CornerPoint {image_id: $image_id})
            WITH COUNT(corner_point) AS count
-           MERGE (corner_points_count:CornerPointsCount:Feature {session_id: $session_id, count: count})
+           MERGE (corner_points_count:CornerPointsCount:Feature {session_id: $session_id, value: count})
            ON CREATE SET corner_points_count.samples = [$image_id]
            ON MATCH SET corner_points_count.samples = CASE WHEN $image_id IN corner_points_count.samples THEN corner_points_count.samples ELSE corner_points_count.samples + $image_id END
            RETURN corner_points_count
