@@ -3,7 +3,7 @@ from .features_comparator import FeatureComparator
 class CountFeatureComparator(FeatureComparator):
     """Comparator for features that have a count field (CornerPointsCount, IntersectionPointsCount, etc)"""
     
-    def __init__(self, feature_type: str, tolerance: float = 0.1):
+    def __init__(self, feature_type: str, tolerance: float = 1):
         self.feature_type = feature_type
         self.tolerance = tolerance
     

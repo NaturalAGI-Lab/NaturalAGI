@@ -25,7 +25,7 @@ class PointExtractor:
                 angle = self._calculate_angle_between_lines(
                     node_data, [self.graph.nodes[n] for n in neighbors]
                 )
-                if angle < 90:  # Threshold for corner detection
+                if angle < 110:  # Threshold for corner detection
                     corner_points.append(
                         CornerPoint(
                             id=node_data["uuid"],
@@ -34,6 +34,7 @@ class PointExtractor:
                             angle=angle,
                             line1=self.graph[node][neighbors[0]].get("uuid"),
                             line2=self.graph[node][neighbors[1]].get("uuid"),
+                            nx_id=node,
                         )
                     )
         return corner_points
@@ -60,6 +61,7 @@ class PointExtractor:
                             y=float(node_data["y"]),
                             curvature_before=curvature_before,
                             curvature_after=curvature_after,
+                            nx_id=node,
                         )
                     )
         return inflection_points
@@ -83,6 +85,7 @@ class PointExtractor:
                     x=float(node_data["x"]),
                     y=float(node_data["y"]),
                     lines=lines,
+                    nx_id=node,
                 )
                 intersection_points.append(intersection_point)
 
@@ -99,6 +102,7 @@ class PointExtractor:
                         x=float(node_data["x"]),
                         y=float(node_data["y"]),
                         line=self.graph[node][neighbor].get("uuid"),
+                        nx_id=node,
                     )
                 )
         return end_points

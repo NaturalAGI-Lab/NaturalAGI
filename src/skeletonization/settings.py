@@ -1,10 +1,12 @@
 from pydantic_settings import BaseSettings
 from ypstruct import structure
 
+
 class Settings(BaseSettings):
     """Settings"""
+
     kafka_topic: str
-    dlq_topic: str 
+    dlq_topic: str
     kafka_bootstrap_servers: str
     kafka_group_id: str = "growing-neural-gas"
     # # Neural Gas Parameters
@@ -19,9 +21,10 @@ class Settings(BaseSettings):
     cnr_threshold: float = 0
     skeletonization_threshold: float = 110
     simplification_epsilon: float = 6
-    
+
+
 def gng_parameters(settings: Settings):
-    
+
     # # Neural Gas Parameters
     params = structure()
     params.N = settings.N
@@ -32,5 +35,5 @@ def gng_parameters(settings: Settings):
     params.alpha = settings.alpha
     params.delta = settings.delta
     params.T = settings.T
-    
+
     return params

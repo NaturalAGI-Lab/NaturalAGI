@@ -99,15 +99,13 @@ post_process:
 %:
 	@:
 
-# Usage: make classify <image_path>
-# Example: make classify /path/to/image.jpg
-# This target sends an image to the connector for classification.
-# The image path should be absolute or relative to the current directory.
+# Usage: make classify IMAGE_PATH=/path/to/image.jpg [PARAMS='{"param1": "value1", "param2": "value2"}']
+# Example: make classify IMAGE_PATH=/path/to/image.jpg PARAMS='{"feature_weight": 0.7, "structural_weight": 0.3}'
 classify:
-	@echo -e "${BLUE}Classifying image: $(filter-out $@,$(MAKECMDGOALS))${NC}"
+	@echo -e "${BLUE}Classifying image: $(IMAGE_PATH)${NC}"
 	@curl -X POST http://localhost:5002 \
 		-H "Content-Type: application/json" \
-		-d '{"operation": "classify", "parameters": {"image_path": "$(filter-out $@,$(MAKECMDGOALS))"}}' || \
+		-d "{\"operation\": \"classify\", \"parameters\": $(PARAMS)}" || \
 		(echo -e "${RED}Classification failed.${NC}" && exit 1)
 	@echo -e "${GREEN}Classification request sent to connector.${NC}"
 
@@ -180,8 +178,8 @@ dep_skel:
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 		-e DLQ_TOPIC="${DLQ_TOPIC}" \
-		-e SIMPLIFICATION_EPSILON=6 \
-		-e SKELETONIZATION_THRESHOLD=50 \
+		-e SIMPLIFICATION_EPSILON=5 \
+		-e SKELETONIZATION_THRESHOLD=170 \
 		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}' \
 		-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}"
 	@echo -e "${GREEN}Skeletonization deployed.${NC}"
@@ -231,7 +229,7 @@ dep_classification:
 		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 		-e NEO4J_USER=neo4j \
 		-e NEO4J_PASS=${NEO4J_PASS} \
-		-e GED_TIMEOUT=0.1 \
+		-e GED_TIMEOUT=5 \
 		-e FEATURE_WEIGHT=0.6 \
 		-e STRUCTURAL_WEIGHT=0.4
 	@echo -e "${GREEN}Classification deployed.${NC}"

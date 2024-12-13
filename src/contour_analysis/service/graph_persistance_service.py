@@ -1,6 +1,8 @@
 import networkx as nx
 from neo4j import GraphDatabase
 from logic.point_extractor import PointExtractor
+from typing import List
+from model.curve import Curve, CurveType
 
 
 class GraphPersistenceService:
@@ -8,7 +10,9 @@ class GraphPersistenceService:
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
         self.point_extractor = None
 
-    def save_graph_to_neo4j(self, graph: nx.Graph, image_id: str, session_id: str) -> None:
+    def save_graph_to_neo4j(
+        self, graph: nx.Graph, image_id: str, session_id: str
+    ) -> None:
         self.point_extractor = PointExtractor(graph)
         with self.driver.session() as session:
             session.write_transaction(self._save_graph, graph, image_id, session_id)
@@ -25,7 +29,7 @@ class GraphPersistenceService:
             labels = ["Point"]
             if data["uuid"] in point_types:
                 labels.append(point_types[data["uuid"]])
-            
+
             tx.run(
                 f"""
                 CREATE (n:{':'.join(labels)} {{id: $id, x: $x, y: $y, image_id: $image_id, session_id: $session_id}})
@@ -59,8 +63,8 @@ class GraphPersistenceService:
                     image_id: $image_id,
                     session_id: $session_id
                 })
-                CREATE (a)-[:CONNECTED_TO]->(v)
-                CREATE (v)<-[:CONNECTED_TO]-(b)            
+                MERGE (a)-[:CONNECTED_TO]->(v)
+                MERGE (v)<-[:CONNECTED_TO]-(b)            
                 """,
                 u=u_data["uuid"],
                 v=v_data["uuid"],
@@ -69,6 +73,40 @@ class GraphPersistenceService:
                 session_id=session_id,
                 length=length,
             )
+
+    def _save_curves(
+        self, tx, curves: List[Curve], image_id: str, session_id: str
+    ) -> None:
+        query = """
+            UNWIND $curves as curve
+            MATCH (start:Point {id: curve.start_point, image_id: $image_id})
+            MATCH (end:Point {id: curve.end_point, image_id: $image_id})
+            CREATE (c:Curve:%s {
+                id: curve.id,
+                image_id: $image_id,
+                session_id: $session_id
+            })
+            CREATE (start)-[:STARTS]->(c)
+            CREATE (c)-[:ENDS]->(end)
+            WITH c, curve
+            UNWIND curve.vectors as vector_id
+            MATCH (v:Vector {id: vector_id, image_id: $image_id})
+            CREATE (c)-[:CONTAINS]->(v)
+        """
+        for curve_type in CurveType:
+            type_curves = [c for c in curves if c.type == curve_type]
+            if type_curves:
+                tx.run(
+                    query % curve_type.value.capitalize(),  # Creates labels like :Curve:Convex or :Curve:Concave
+                    curves=[{
+                        "id": c.id,
+                        "start_point": c.start_point,
+                        "end_point": c.end_point,
+                        "vectors": c.vectors
+                    } for c in type_curves],
+                    image_id=image_id,
+                    session_id=session_id
+                )
 
     def close(self):
         self.driver.close()

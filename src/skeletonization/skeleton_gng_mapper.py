@@ -1,3 +1,4 @@
+import logging
 import uuid
 import numpy as np
 import networkx as nx
@@ -10,55 +11,91 @@ from typing import List
 
 
 class SkeletonGNGMapper:
-    def __init__(self, settings: Settings):
+    def __init__(
+        self,
+        context,
+        settings: Settings,
+        skeletonization_threshold: int = None,
+        simplification_epsilon: float = None,
+    ):
+        self.context = context
         self.settings = settings
         self.min_threshold = 20  # Minimum threshold value
         self.threshold_step = 10  # Step to decrease threshold
+        self.skeletonization_threshold = (
+            skeletonization_threshold or self.settings.skeletonization_threshold
+        )
+        self.simplification_epsilon = (
+            simplification_epsilon or self.settings.simplification_epsilon
+        )
 
     def process_image(self, image):
-        current_threshold = self.settings.skeletonization_threshold
-        
-        while current_threshold >= self.min_threshold:
-            try:
-                skeleton = self._skeletonize(image, threshold=current_threshold)
-                points = self._skeleton_to_points(skeleton)
-                net = self._fit_gng(points)
-                simplified_network = self._simplify_network(
-                    net, self.settings.simplification_epsilon
-                )
-                graph = self._to_networkx(simplified_network)
+        try:
+            self.context.logger.info(
+                f"Processing image with skeletonization threshold: {self.skeletonization_threshold} "
+                f"and simplification epsilon: {self.simplification_epsilon}"
+            )
+            current_threshold = self.skeletonization_threshold
 
-                if nx.is_connected(graph):
-                    return graph
-                
-                current_threshold -= self.threshold_step
-                
-            except Exception as e:
-                current_threshold -= self.threshold_step
-                continue
-        
-        raise Exception("Could not create connected graph with any threshold")
+            while current_threshold >= self.min_threshold:
+                try:
+                    skeleton = self._skeletonize(image, threshold=current_threshold)
+                    self.context.logger.debug(f"Skeleton created with threshold {current_threshold}")
+                    
+                    points = self._skeleton_to_points(skeleton)
+                    self.context.logger.debug(f"Extracted {len(points)} points from skeleton")
+                    
+                    net = self._fit_gng(points)
+                    self.context.logger.debug("GNG network fitted")
+                    
+                    simplified_network = self._simplify_network(net, self.simplification_epsilon)
+                    self.context.logger.debug(f"Network simplified into {len(simplified_network)} segments")
+                    
+                    graph = self._to_networkx(simplified_network)
+                    self.context.logger.debug(f"Created graph with {graph.number_of_nodes()} nodes and {graph.number_of_edges()} edges")
+
+                    if nx.is_connected(graph):
+                        return graph
+
+                    current_threshold -= self.threshold_step
+
+                except Exception as e:
+                    self.context.logger.error(f"Error processing with threshold {current_threshold}: {str(e)}")
+                    current_threshold -= self.threshold_step
+                    continue
+
+            raise Exception("Could not create connected graph with any threshold")
+            
+        except Exception as e:
+            self.context.logger.error(f"Failed to process image: {str(e)}")
+            raise
 
     def _skeletonize(self, image, threshold: int):
         binary = image > threshold
         skeleton = skeletonize(binary)
-        return img_as_ubyte(skeleton)
+        return skeleton
 
-    def _skeleton_to_points(self, skeleton):
-        return np.array(np.where(skeleton > 0)).T
+    def _skeleton_to_points(self, skeleton: np.ndarray):
+        points = []
+        h, w = skeleton.shape
+        for y in range(h):
+            for x in range(w):
+                if skeleton[y, x] > 0:
+                    points.append([x, y])
+        return np.array(points)
 
     def _fit_gng(self, points):
         return gng.fit(points, self.settings)
 
-    def _simplify_network(self, net, epsilon=1.0):
+    def _simplify_network(self, net, epsilon: float = 1.0) -> List[np.ndarray]:
         # Find endpoints and intersections
         degree = np.sum(net.C, axis=0)
         endpoints = set(np.where(degree == 1)[0])
         intersections = set(np.where(degree > 2)[0])
-
+        
         simplified_segments = []
         visited_edges = set()
-
+        
         def traverse_segment(start: int, current: int) -> tuple[List[np.ndarray], int]:
             segment = [net.w[start]]
             while current not in endpoints and current not in intersections:
@@ -73,18 +110,14 @@ class SkeletonGNGMapper:
         def process_node(node: int) -> None:
             neighbors = set(np.where(net.C[node] == 1)[0])
             for neighbor in neighbors:
-                edge = tuple(
-                    sorted([node, neighbor])
-                )  # Sort to ensure consistent edge representation
+                edge = tuple(sorted([node, neighbor]))  # Sort to ensure consistent edge representation
                 if edge not in visited_edges:
                     visited_edges.add(edge)
                     segment, end = traverse_segment(node, neighbor)
                     if len(segment) > 2:
                         simplified_segment = rdp(np.array(segment), epsilon)
                         # Only add if endpoints are preserved
-                        if np.array_equal(
-                            simplified_segment[0], segment[0]
-                        ) and np.array_equal(simplified_segment[-1], segment[-1]):
+                        if np.array_equal(simplified_segment[0], segment[0]) and np.array_equal(simplified_segment[-1], segment[-1]):
                             simplified_segments.append(simplified_segment)
                     else:
                         # Always keep segments of length 2 to maintain connectivity
@@ -95,7 +128,7 @@ class SkeletonGNGMapper:
         # Process all endpoints and intersections
         for node in endpoints.union(intersections):
             process_node(node)
-
+        
         return simplified_segments
 
     def _to_networkx(self, simplified_network: List[List[np.ndarray]]) -> nx.Graph:

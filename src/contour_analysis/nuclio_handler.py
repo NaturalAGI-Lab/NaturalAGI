@@ -16,6 +16,7 @@ from service.graph_analysis.analyzers.contour_type_analyzer import ContourTypeAn
 from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
 from service.graph_analysis.analyzers.cycle_count_analyzer import CycleCountAnalyzer
 from service.graph_analysis.analyzers.graph_metrics_analyzer import GraphMetricsAnalyzer
+from service.graph_analysis.analyzers.curve_analyzer import CurveAnalyzer
 from visitors.angle_visitor import AngleVisitor
 from visitors.half_plane_visitor import HalfPlaneVisitor
 from visitors.quadrant_visitor import QuadrantVisitor
@@ -117,6 +118,7 @@ def kafka_handler(context, event):
         networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
         networkx_graph_analysis.add_analyzer(CycleCountAnalyzer)
         networkx_graph_analysis.add_analyzer(GraphMetricsAnalyzer)
+        networkx_graph_analysis.add_analyzer(CurveAnalyzer)
         networkx_graph_analysis.analyze_graph(image_id, session_id)
 
         context.user_data.tertiary_features_service.create_tertiary_features(
@@ -127,11 +129,7 @@ def kafka_handler(context, event):
             context.user_data.kafka_topic,
             value={
                 "operation": operation,
-                "parameters": {
-                    "image_id": image_id,
-                    "session_id": session_id,
-                    "image_path": parameters["image_path"]
-                }
+                "parameters": parameters
             }
         )
         

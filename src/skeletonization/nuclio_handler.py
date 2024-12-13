@@ -52,8 +52,13 @@ def kafka_handler(context, event):
         context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
         context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
 
-        image = cv2.imread(parameters["image_path"])
-        net = SkeletonGNGMapper(Settings()).process_image(image)
+        image = cv2.imread(parameters["image_path"], 0)
+        
+        settings = Settings()
+        skeletonization_threshold = parameters.get("skeletonization_threshold", settings.skeletonization_threshold)
+        simplification_epsilon = parameters.get("simplification_epsilon", settings.simplification_epsilon)
+        net = SkeletonGNGMapper(context, settings, skeletonization_threshold, simplification_epsilon).process_image(image)
+        
         json_net = GraphSerializer.serialize(net)
         context.logger.info_with(f"Net: {json_net}", handler=HANDLER_NAME)
 

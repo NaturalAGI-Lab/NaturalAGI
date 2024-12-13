@@ -5,6 +5,7 @@ from kafka import KafkaProducer
 import json
 from pydantic_settings import BaseSettings
 from graph_comparator import GraphComparator
+from common import ClassificationParams
 
 HANDLER_NAME = "classification"
 
@@ -18,9 +19,9 @@ class Settings(BaseSettings):
     kafka_topic: str
     kafka_bootstrap_servers: str
     dlq_topic: str
-    ged_timeout: float = 0.25
-    feature_weight: float = 0.5
-    structural_weight: float = 0.5
+    ged_timeout: float
+    feature_weight: float
+    structural_weight: float
 
 
 def init_context(context):
@@ -37,14 +38,7 @@ def init_context(context):
     setattr(
         context.user_data,
         "graph_comparator",
-        GraphComparator(
-            settings.neo4j_dsn,
-            settings.neo4j_user,
-            settings.neo4j_pass,
-            feature_weight=settings.feature_weight,
-            structural_weight=settings.structural_weight,
-            ged_timeout=settings.ged_timeout,
-        ),
+        GraphComparator(settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass, max_workers=10),
     )
     setattr(
         context.user_data,
@@ -70,13 +64,38 @@ def kafka_handler(context, event):
         return
 
     image_id = data["parameters"]["image_id"]
+    settings = Settings()
+    
+    # Filter only the parameters that ClassificationParams expects
+    classification_params_fields = {
+        "feature_weight",
+        "structural_weight",
+        "ged_timeout",
+        # Add any other fields that ClassificationParams expects
+    }
+    
+    # Create params dict with only the relevant fields
+    params = {
+        key: value 
+        for key, value in {
+            **settings.model_dump(),  # Get all settings as defaults
+            **data["parameters"],     # Override with any provided parameters
+        }.items()
+        if key in classification_params_fields
+    }
+    
+    classification_params = ClassificationParams(**params)
+    
+    context.logger.info_with(f"Classification params: {classification_params}", handler=HANDLER_NAME)
 
     try:
         if not image_id:
             raise ValueError("image_id must be provided in the request body")
 
         # Perform graph comparison
-        comparison_results = context.user_data.graph_comparator.compare_graphs(image_id)
+        comparison_results = context.user_data.graph_comparator.compare_graphs(
+            image_id, classification_params
+        )
 
         context.logger.info_with(
             f"Classification results: {comparison_results}", handler=HANDLER_NAME
@@ -101,8 +120,8 @@ def kafka_handler(context, event):
             value={"error": str(e)},
         )
 
-    finally:
-        context.user_data.graph_comparator.remove_image_nodes(image_id)
+    # finally:
+        # context.user_data.graph_comparator.remove_image_nodes(image_id)
 
 
 def handler(context, event):

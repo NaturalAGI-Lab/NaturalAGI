@@ -14,12 +14,41 @@ class QuadrantVisitor(Visitor):
         # Implementation for point-related operations
         return None
 
+    def determine_vector_type(self, dx: float, dy: float) -> str:
+        """Determine vector type based on relative dimensions.
+
+        Args:
+            dx (float): Change in x coordinate
+            dy (float): Change in y coordinate
+
+        Returns:
+            str: Vector type label ("HorizontalVector", "VerticalVector", or "DiagonalVector")
+        """
+        # Swap x and y
+        abs_dx = abs(dx)
+        abs_dy = abs(dy)
+
+        if abs_dx == abs_dy:
+            return "DiagonalVector"
+        elif abs_dx > abs_dy:
+            return "HorizontalVector"
+        else:
+            return "VerticalVector"
+
     def visit_line(self, line: Vector) -> Dict[str, Any]:
         dx = line.x2 - line.x1
         dy = line.y2 - line.y1
         quadrant = self.determine_quadrant(dx, dy)
+        vector_type = self.determine_vector_type(dx, dy)
+
         self.quadrants[line.id] = quadrant
-        return {"quadrant": quadrant, "line_id": line.id}
+        return {
+            "quadrant": quadrant,
+            "line_id": line.id,
+            "vector_type": vector_type,
+            "dx": dx,
+            "dy": dy,
+        }
 
     def save_result(
         self,
@@ -28,7 +57,14 @@ class QuadrantVisitor(Visitor):
         session_id: str,
         result: Dict[str, Any],
     ) -> None:
-        query = """
+        # First query to set the vector type label
+        set_type_query = f"""
+        MATCH (v:Vector {{id: $id}})
+        SET v:{result['vector_type']}
+        """
+        
+        # Second query to handle quadrant relationship
+        quadrant_query = """
         MATCH (v:Vector {id: $id})
         MERGE (q:Quadrant:Feature {value: $quadrant, session_id: $session_id})
         ON CREATE SET q.samples = [$image_id]
@@ -38,8 +74,11 @@ class QuadrantVisitor(Visitor):
         END
         MERGE (v)-[:IS_IN_QUADRANT]->(q)
         """
+        
+        # Execute both queries
+        tx.run(set_type_query, id=result["line_id"])
         tx.run(
-            query,
+            quadrant_query,
             id=result["line_id"],
             quadrant=result["quadrant"],
             session_id=session_id,

@@ -144,8 +144,8 @@ class AngleVisitor(Visitor):
         angle1 = math.degrees(math.acos(max(-1.0, min(1.0, cos_angle))))
         angle2 = 360 - angle1
         
-        angle1 = round(angle1 / 5) * 5
-        angle2 = round(angle2 / 5) * 5
+        angle1 = round(angle1 / 10) * 10
+        angle2 = round(angle2 / 10) * 10
         return [angle1, angle2]
 
     def _calculate_angle_with_ox(self, line: Vector) -> float:

@@ -7,6 +7,7 @@ class Point:
     x: float
     y: float
     id: str
+    nx_id: str  # id used in networkx
 
     def __hash__(self):
         return hash(self.uuid)
