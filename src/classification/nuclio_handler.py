@@ -38,7 +38,7 @@ def init_context(context):
     setattr(
         context.user_data,
         "graph_comparator",
-        GraphComparator(settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass, max_workers=10),
+        GraphComparator(settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass, max_workers=5),
     )
     setattr(
         context.user_data,

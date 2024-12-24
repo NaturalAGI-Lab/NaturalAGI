@@ -54,6 +54,12 @@ def kafka_handler(context, event):
 
         image = cv2.imread(parameters["image_path"], 0)
         
+        image_width = image.shape[1]
+        image_height = image.shape[0]
+        
+        parameters["image_width"] = image_width
+        parameters["image_height"] = image_height
+        
         settings = Settings()
         skeletonization_threshold = parameters.get("skeletonization_threshold", settings.skeletonization_threshold)
         simplification_epsilon = parameters.get("simplification_epsilon", settings.simplification_epsilon)

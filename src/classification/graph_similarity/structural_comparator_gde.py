@@ -1,38 +1,56 @@
+import enum
 import logging
-from neo4j import Session
+from typing import Dict, Any, Set, List, Optional, FrozenSet
 import networkx as nx
-from typing import Dict, Any, Set, List, Tuple
+from neo4j import Session
 
 from .neo4j_to_networkx import Neo4jToNetworkX
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
 
+class ChangesCost(enum.Enum):
+    NO_COST = 0.0
+    MINOR = 0.5
+    GENERAL = 1.0
+    SEVERE = 5.0
+    CRITICAL = 15.0
+    IMPOSSIBLE = float("inf")
 
 class StructuralComparator:
+    # Region change costs lookup table
+    REGION_CHANGE_COSTS: Dict[FrozenSet[str], float] = {
+        # Vertical changes
+        frozenset(["top", "center_horizontal"]): ChangesCost.MINOR.value,
+        frozenset(["bottom", "center_horizontal"]): ChangesCost.MINOR.value,
+        frozenset(["top", "bottom"]): ChangesCost.CRITICAL.value,
+        # Horizontal changes
+        frozenset(["left", "center_vertical"]): ChangesCost.MINOR.value,
+        frozenset(["right", "center_vertical"]): ChangesCost.MINOR.value,
+        frozenset(["left", "right"]): ChangesCost.CRITICAL.value,
+        # Diagonal changes
+        frozenset(["top", "left"]): ChangesCost.SEVERE.value,
+        frozenset(["top", "right"]): ChangesCost.SEVERE.value,
+        frozenset(["bottom", "left"]): ChangesCost.SEVERE.value,
+        frozenset(["bottom", "right"]): ChangesCost.SEVERE.value,
+    }
 
     @staticmethod
     def compare_graphs_ged(
-        session: Session,
-        image_id: str,
-        concept_id: str,
+        image_graph: nx.Graph,
+        concept_graph: nx.Graph,
         concept_name: str,
         ged_timeout: float,
     ) -> float:
         logging.info(
-            f"Comparing graph for image {image_id} with concept {concept_name} ({concept_id}) using Graph Edit Distance"
+            f"Comparing graph with concept {concept_name} using Graph Edit Distance"
         )
-
-        # Get original graphs
-        image_graph = Neo4jToNetworkX.extract_image_graph(session, image_id)
-        concept_graph = Neo4jToNetworkX.extract_concept_graph(session, concept_id)
 
         score = StructuralComparator._compare_at_level(
             image_graph, concept_graph, ged_timeout=ged_timeout
         )
 
         logging.info(f"Original score: {score}")
-
         return score
 
     @staticmethod
@@ -41,111 +59,145 @@ class StructuralComparator:
     ) -> float:
         """Compare graphs at a specific abstraction level using Graph Edit Distance"""
 
-        # Define node substitution cost
+        def _calculate_region_change_cost(
+            segments1: List[str], segments2: List[str]
+        ) -> float:
+            """Calculate cost of region changes"""
+            seg_set1 = set(segments1)
+            seg_set2 = set(segments2)
+
+            # If segments are identical, no cost
+            if seg_set1 == seg_set2:
+                return ChangesCost.NO_COST.value
+
+            # Calculate total cost of region changes
+            total_cost = ChangesCost.NO_COST.value
+
+            # Compare vertical components
+            vertical1 = seg_set1 & {"top", "bottom", "center_horizontal"}
+            vertical2 = seg_set2 & {"top", "bottom", "center_horizontal"}
+            if vertical1 != vertical2:
+                change_key = frozenset(vertical1 | vertical2)
+                total_cost += StructuralComparator.REGION_CHANGE_COSTS.get(
+                    change_key, ChangesCost.CRITICAL.value
+                )
+
+            # Compare horizontal components
+            horizontal1 = seg_set1 & {"left", "right", "center_vertical"}
+            horizontal2 = seg_set2 & {"left", "right", "center_vertical"}
+            if horizontal1 != horizontal2:
+                change_key = frozenset(horizontal1 | horizontal2)
+                total_cost += StructuralComparator.REGION_CHANGE_COSTS.get(
+                    change_key, ChangesCost.CRITICAL.value
+                )
+
+            return total_cost
+
         def node_subst_cost(node1_data: Dict, node2_data: Dict) -> float:
-            """Calculate substitution cost between two nodes based on their labels.
-            
-            Args:
-                node1_data: Dictionary containing first node's data with labels
-                node2_data: Dictionary containing second node's data with labels
-                
-            Returns:
-                float: Cost of substituting node1 with node2
-            """
+            """Calculate substitution cost between two nodes based on their labels and regions"""
             labels1 = node1_data.get("labels", set())
             labels2 = node2_data.get("labels", set())
-            
+
             logging.info(f"Comparing node labels: {labels1} vs {labels2}")
 
-            # If labels are identical, no cost
+            # Avoid vector-to-point comparisons
+            is_vector1 = any("Vector" in label for label in labels1)
+            is_vector2 = any("Vector" in label for label in labels2)
+            if is_vector1 != is_vector2:
+                return float("inf")
+
+            # If labels are identical, check only regions
             if labels1 == labels2:
-                logging.info("No substitution cost: 0.0")
-                return 0.0
-            
+                region_cost = _calculate_region_change_cost(
+                    node1_data.get("relative_segments", []),
+                    node2_data.get("relative_segments", []),
+                )
+                logging.info(f"Same labels, region cost: {region_cost}")
+                return region_cost
+
             is_simple_point1 = labels1 == {"Point"}
             is_simple_point2 = labels2 == {"Point"}
-            
-            # Complex point to/from simple point conversions
-            if "IntersectionPoint" in labels1 and is_simple_point2:
-                logging.info("Intersection Point to Point substitution cost: 20.0")
-                return 20.0
-            if is_simple_point1 and "IntersectionPoint" in labels2:
-                logging.info("Point to Intersection Point substitution cost: 20.0")
-                return 20.0
-            
-            if "EndPoint" in labels1 and is_simple_point2:
-                logging.info("End Point to Point substitution cost: 5.0")
-                return 5.0
-            if is_simple_point1 and "EndPoint" in labels2:
-                logging.info("Point to End Point substitution cost: 5.0")
-                return 5.0
-            
-            if "CornerPoint" in labels1 and is_simple_point2:
-                logging.info("Corner Point to Point substitution cost: 1.0")
-                return 0.5
-            if is_simple_point1 and "CornerPoint" in labels2:
-                logging.info("Point to Corner Point substitution cost: 1.0")
-                return 0.5
-            
-            # Complex point to complex point conversions
-            if any(label in labels1 for label in ["IntersectionPoint", "EndPoint", "CornerPoint"]) and \
-               any(label in labels2 for label in ["IntersectionPoint", "EndPoint", "CornerPoint"]):
-                logging.info("Complex point to different complex point substitution cost: 5.0")
-                return 5.0
-            
-            # Vector type substitutions
-            if "VerticalVector" in labels1 and "HorizontalVector" in labels2:
-                logging.info("Vertical to Horizontal Vector substitution cost: 5.0")
-                return 5.0
-            if "HorizontalVector" in labels1 and "VerticalVector" in labels2:
-                logging.info("Horizontal to Vertical Vector substitution cost: 5.0")
-                return 5.0
-            
-            # Diagonal vector substitutions
-            if "VerticalVector" in labels1 and "DiagonalVector" in labels2:
-                logging.info("Vertical to Diagonal Vector substitution cost: 1.0")
-                return 1.0
-            if "DiagonalVector" in labels1 and "VerticalVector" in labels2:
-                logging.info("Diagonal to Vertical Vector substitution cost: 1.0")
-                return 1.0
-            
-            if "HorizontalVector" in labels1 and "DiagonalVector" in labels2:
-                logging.info("Horizontal to Diagonal Vector substitution cost: 1.0")
-                return 1.0
-            if "DiagonalVector" in labels1 and "HorizontalVector" in labels2:
-                logging.info("Diagonal to Horizontal Vector substitution cost: 1.0")
-                return 1.0
 
-            # Default case for unhandled substitutions (high cost to penalize unexpected matches)
-            logging.warning(f"Unhandled substitution case between {labels1} and {labels2}")
-            return 10.0
+            # Complex point to/from simple point conversions with region costs
+            base_cost = ChangesCost.NO_COST.value
+
+            if "IntersectionPoint" in labels1 and is_simple_point2:
+                base_cost = ChangesCost.CRITICAL.value
+            elif is_simple_point1 and "IntersectionPoint" in labels2:
+                base_cost = ChangesCost.CRITICAL.value
+            elif "EndPoint" in labels1 and is_simple_point2:
+                base_cost = ChangesCost.SEVERE.value
+            elif is_simple_point1 and "EndPoint" in labels2:
+                base_cost = ChangesCost.SEVERE.value
+            elif "CornerPoint" in labels1 and is_simple_point2:
+                base_cost = ChangesCost.MINOR.value
+            elif is_simple_point1 and "CornerPoint" in labels2:
+                base_cost = ChangesCost.MINOR.value
+            # Complex point to complex point conversions
+            elif any(
+                label in labels1
+                for label in ["IntersectionPoint", "EndPoint", "CornerPoint"]
+            ) and any(
+                label in labels2
+                for label in ["IntersectionPoint", "EndPoint", "CornerPoint"]
+            ):
+                base_cost = ChangesCost.GENERAL.value
+            # Vector type substitutions
+            elif "VerticalVector" in labels1 and "HorizontalVector" in labels2:
+                base_cost = ChangesCost.GENERAL.value
+            elif "HorizontalVector" in labels1 and "VerticalVector" in labels2:
+                base_cost = ChangesCost.GENERAL.value
+            elif "VerticalVector" in labels1 and "DiagonalVector" in labels2:
+                base_cost = ChangesCost.MINOR.value
+            elif "DiagonalVector" in labels1 and "VerticalVector" in labels2:
+                base_cost = ChangesCost.MINOR.value
+            elif "HorizontalVector" in labels1 and "DiagonalVector" in labels2:
+                base_cost = ChangesCost.MINOR.value
+            elif "DiagonalVector" in labels1 and "HorizontalVector" in labels2:
+                base_cost = ChangesCost.MINOR.value
+            else:
+                base_cost = ChangesCost.GENERAL.value
+                logging.warning(
+                    f"Unhandled substitution case between {labels1} and {labels2}"
+                )
+
+            # Add region change cost
+            region_cost = _calculate_region_change_cost(
+                node1_data.get("relative_segments", []),
+                node2_data.get("relative_segments", []),
+            )
+
+            total_cost = base_cost + region_cost
+            logging.info(
+                f"Base cost: {base_cost}, Region cost: {region_cost}, Total: {total_cost}"
+            )
+            return total_cost
 
         def node_del_cost(node_data: Dict) -> float:
             labels = node_data.get("labels", set())
             logging.info(f"Calculating deletion cost for node with labels: {labels}")
 
             if "IntersectionPoint" in labels:
-                logging.info("Intersection Point deletion cost: 20.0")
-                return 20.0
+                return ChangesCost.CRITICAL.value
             elif "EndPoint" in labels:
-                logging.info("End Point deletion cost: 5.0")
-                return 5.0
+                return ChangesCost.GENERAL.value
             elif "CornerPoint" in labels:
-                logging.info("Corner Point deletion cost: 1.0")
-                return 1.0
+                return ChangesCost.MINOR.value
             else:  # Point or Vector
-                logging.info("Default deletion cost: 0.1")
-                return 0.1
+                return ChangesCost.NO_COST.value
 
         def node_ins_cost(node_data: Dict) -> float:
-            logging.info(f"Calculating insertion cost for node with labels: {node_data.get('labels', set())}")
-            
+            logging.info(
+                f"Calculating insertion cost for node with labels: {node_data.get('labels', set())}"
+            )
+
             labels = node_data.get("labels", set())
-            
-            if any(label in labels for label in ["VerticalVector", "HorizontalVector", "DiagonalVector"]):
-                logging.info("Vector insertion cost: 5.0")
-                return 5.0
-            
+            if any(
+                label in labels
+                for label in ["VerticalVector", "HorizontalVector", "DiagonalVector"]
+            ):
+                return ChangesCost.SEVERE.value
+
             return node_del_cost(node_data) * 2
 
         try:
@@ -156,7 +208,7 @@ class StructuralComparator:
                 node_subst_cost=node_subst_cost,
                 node_del_cost=node_del_cost,
                 node_ins_cost=node_ins_cost,
-                timeout=ged_timeout,  # Add timeout to prevent long computations
+                timeout=ged_timeout,
             )
 
             logger.info(f"GED: {ged}")
@@ -165,9 +217,7 @@ class StructuralComparator:
                 return 0.0
 
             # Convert GED to similarity score (inverse and normalize)
-            max_possible_ged = max(
-                len(image_graph) + len(concept_graph), 1
-            )  # Avoid division by zero
+            max_possible_ged = max(len(image_graph) + len(concept_graph), 1)
             similarity = 1.0 - (ged / max_possible_ged)
 
             return max(0.0, min(1.0, similarity))  # Ensure score is between 0 and 1
