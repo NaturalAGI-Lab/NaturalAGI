@@ -23,6 +23,9 @@ class GraphComparator:
         self.driver = GraphDatabase.driver(neo4j_dsn, auth=(neo4j_user, neo4j_pass))
         self.max_workers = max_workers
 
+    def close(self):
+        self.driver.close()
+
     def _get_all_concepts(self, tx: Any) -> List[Dict[str, Any]]:
         concept_query = """
         MATCH (c:Concept)
@@ -39,9 +42,22 @@ class GraphComparator:
         classification_params: ClassificationParams,
     ) -> Dict[str, Any]:
         concept_graph = Neo4jToNetworkX.extract_concept_graph(tx, concept["concept_id"])
+        # Filter out segment nodes from both graphs
+        image_nodes = [
+            n
+            for n, d in image_graph.nodes(data=True)
+            if "Segment" not in d.get("labels", set())
+        ]
+        concept_nodes = [
+            n
+            for n, d in concept_graph.nodes(data=True)
+            if "Segment" not in d.get("labels", set())
+        ]
+        filtered_image_graph = image_graph.subgraph(image_nodes)
+        filtered_concept_graph = concept_graph.subgraph(concept_nodes)
 
-        # Check if concept_graph is a minor of image_graph using our custom implementation
-        if not is_minor(image_graph, concept_graph):
+        # Check if filtered concept graph is a minor of filtered image graph
+        if not is_minor(filtered_image_graph, filtered_concept_graph, timeout=40):
             message = (
                 f"Concept {concept['concept_name']} is not a minor of the image graph"
             )
@@ -119,7 +135,12 @@ class GraphComparator:
 
             for future in future_to_concept:
                 try:
-                    result = future.result()
+                    result = future.result(timeout=30)
+                    if not (
+                        result["raw_structural_score"] > 0.0
+                        or result["raw_feature_score"] > 0.0
+                    ):
+                        continue
                     results.append(result)
                     raw_structural_scores.append(result["raw_structural_score"])
                     raw_feature_scores.append(result["raw_feature_score"])

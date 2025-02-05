@@ -11,30 +11,13 @@ logger.setLevel(logging.DEBUG)
 
 class ChangesCost(enum.Enum):
     NO_COST = 0.0
-    MINOR = 0.5
+    MINOR = 0.1
     GENERAL = 1.0
-    SEVERE = 5.0
-    CRITICAL = 15.0
+    SEVERE = 3.0
+    CRITICAL = 10.0
     IMPOSSIBLE = float("inf")
 
 class StructuralComparator:
-    # Region change costs lookup table
-    REGION_CHANGE_COSTS: Dict[FrozenSet[str], float] = {
-        # Vertical changes
-        frozenset(["top", "center_horizontal"]): ChangesCost.MINOR.value,
-        frozenset(["bottom", "center_horizontal"]): ChangesCost.MINOR.value,
-        frozenset(["top", "bottom"]): ChangesCost.CRITICAL.value,
-        # Horizontal changes
-        frozenset(["left", "center_vertical"]): ChangesCost.MINOR.value,
-        frozenset(["right", "center_vertical"]): ChangesCost.MINOR.value,
-        frozenset(["left", "right"]): ChangesCost.CRITICAL.value,
-        # Diagonal changes
-        frozenset(["top", "left"]): ChangesCost.SEVERE.value,
-        frozenset(["top", "right"]): ChangesCost.SEVERE.value,
-        frozenset(["bottom", "left"]): ChangesCost.SEVERE.value,
-        frozenset(["bottom", "right"]): ChangesCost.SEVERE.value,
-    }
-
     @staticmethod
     def compare_graphs_ged(
         image_graph: nx.Graph,
@@ -59,61 +42,34 @@ class StructuralComparator:
     ) -> float:
         """Compare graphs at a specific abstraction level using Graph Edit Distance"""
 
-        def _calculate_region_change_cost(
-            segments1: List[str], segments2: List[str]
-        ) -> float:
-            """Calculate cost of region changes"""
-            seg_set1 = set(segments1)
-            seg_set2 = set(segments2)
-
-            # If segments are identical, no cost
-            if seg_set1 == seg_set2:
-                return ChangesCost.NO_COST.value
-
-            # Calculate total cost of region changes
-            total_cost = ChangesCost.NO_COST.value
-
-            # Compare vertical components
-            vertical1 = seg_set1 & {"top", "bottom", "center_horizontal"}
-            vertical2 = seg_set2 & {"top", "bottom", "center_horizontal"}
-            if vertical1 != vertical2:
-                change_key = frozenset(vertical1 | vertical2)
-                total_cost += StructuralComparator.REGION_CHANGE_COSTS.get(
-                    change_key, ChangesCost.CRITICAL.value
-                )
-
-            # Compare horizontal components
-            horizontal1 = seg_set1 & {"left", "right", "center_vertical"}
-            horizontal2 = seg_set2 & {"left", "right", "center_vertical"}
-            if horizontal1 != horizontal2:
-                change_key = frozenset(horizontal1 | horizontal2)
-                total_cost += StructuralComparator.REGION_CHANGE_COSTS.get(
-                    change_key, ChangesCost.CRITICAL.value
-                )
-
-            return total_cost
-
         def node_subst_cost(node1_data: Dict, node2_data: Dict) -> float:
             """Calculate substitution cost between two nodes based on their labels and regions"""
             labels1 = node1_data.get("labels", set())
             labels2 = node2_data.get("labels", set())
+            
+            if labels1 == labels2:
+                return ChangesCost.NO_COST.value
 
-            logging.info(f"Comparing node labels: {labels1} vs {labels2}")
-
-            # Avoid vector-to-point comparisons
+            # Only allow point-to-point, vector-to-vector and segment-to-segment comparisons
             is_vector1 = any("Vector" in label for label in labels1)
             is_vector2 = any("Vector" in label for label in labels2)
-            if is_vector1 != is_vector2:
-                return float("inf")
-
-            # If labels are identical, check only regions
-            if labels1 == labels2:
-                region_cost = _calculate_region_change_cost(
-                    node1_data.get("relative_segments", []),
-                    node2_data.get("relative_segments", []),
-                )
-                logging.info(f"Same labels, region cost: {region_cost}")
-                return region_cost
+            is_point1 = any("Point" in label for label in labels1)
+            is_point2 = any("Point" in label for label in labels2)
+            is_segment1 = any("Segment" in label for label in labels1)
+            is_segment2 = any("Segment" in label for label in labels2)
+            
+            if (is_vector1 and not is_vector2) or (not is_vector1 and is_vector2):
+                return ChangesCost.IMPOSSIBLE.value
+            if (is_point1 and not is_point2) or (not is_point1 and is_point2):
+                return ChangesCost.IMPOSSIBLE.value
+            if (is_segment1 and not is_segment2) or (not is_segment1 and is_segment2):
+                return ChangesCost.IMPOSSIBLE.value
+            
+            # Handle Segment nodes - require exact match
+            if "Segment" in labels1 or "Segment" in labels2:
+                if labels1 != labels2:
+                    return ChangesCost.SEVERE.value
+                return ChangesCost.NO_COST.value
 
             is_simple_point1 = labels1 == {"Point"}
             is_simple_point2 = labels2 == {"Point"}
@@ -161,23 +117,15 @@ class StructuralComparator:
                     f"Unhandled substitution case between {labels1} and {labels2}"
                 )
 
-            # Add region change cost
-            region_cost = _calculate_region_change_cost(
-                node1_data.get("relative_segments", []),
-                node2_data.get("relative_segments", []),
-            )
 
-            total_cost = base_cost + region_cost
-            logging.info(
-                f"Base cost: {base_cost}, Region cost: {region_cost}, Total: {total_cost}"
-            )
-            return total_cost
+            return base_cost
 
         def node_del_cost(node_data: Dict) -> float:
             labels = node_data.get("labels", set())
-            logging.info(f"Calculating deletion cost for node with labels: {labels}")
 
-            if "IntersectionPoint" in labels:
+            if "Segment" in labels:
+                return ChangesCost.MINOR.value
+            elif "IntersectionPoint" in labels:
                 return ChangesCost.CRITICAL.value
             elif "EndPoint" in labels:
                 return ChangesCost.GENERAL.value
@@ -187,12 +135,10 @@ class StructuralComparator:
                 return ChangesCost.NO_COST.value
 
         def node_ins_cost(node_data: Dict) -> float:
-            logging.info(
-                f"Calculating insertion cost for node with labels: {node_data.get('labels', set())}"
-            )
-
             labels = node_data.get("labels", set())
-            if any(
+            if "Segment" in labels:
+                return ChangesCost.SEVERE.value
+            elif any(
                 label in labels
                 for label in ["VerticalVector", "HorizontalVector", "DiagonalVector"]
             ):
@@ -219,7 +165,7 @@ class StructuralComparator:
             # Convert GED to similarity score (inverse and normalize)
             max_possible_ged = max(len(image_graph) + len(concept_graph), 1)
             similarity = 1.0 - (ged / max_possible_ged)
-
+            logging.info(f"GED: {ged}, max_possible_ged: {max_possible_ged}, similarity: {similarity}")
             return max(0.0, min(1.0, similarity))  # Ensure score is between 0 and 1
 
         except Exception as e:

@@ -5,9 +5,17 @@ metadata:
   labels:
     nuclio.io/project-name: "default"
 spec:
+  maxWorkers: 10
   httpTimeout: 1000
   handler: "nuclio_handler:handler"
   runtime: "python:3.9"
+  resources:
+    limits:
+      cpu: "4"
+      memory: "4Gi"
+    requests:
+      cpu: "2"
+      memory: "2Gi"
   env:
     - name: EXAMPLE_ENV_VAR
       value: "some-value"

@@ -35,7 +35,7 @@ class RelativePositionVisitor(Visitor):
         self.center_x = image_width / 2
         self.center_y = image_height / 2
         self.max_distance = math.sqrt(self.center_x**2 + self.center_y**2)
-        self.segment_threshold = 0.05  # 10% threshold for center segments
+        self.segment_threshold = 0.02  # 2% threshold for center segments
         self.point_positions: Dict[str, RelativePosition] = {}
         self.vector_positions: Dict[str, RelativePosition] = {}
 
@@ -124,8 +124,14 @@ class RelativePositionVisitor(Visitor):
         MATCH (p:Point {id: $point_id})
         SET p.relative_distance = $distance,
             p.normalized_x = $normalized_x,
-            p.normalized_y = $normalized_y,
-            p.relative_segments = $segments
+            p.normalized_y = $normalized_y
+        WITH p
+        UNWIND $segments as segment
+        CREATE (p)-[:HAS_RELATIVE_POSITION]->(s:Segment)
+        SET s:Segment
+        WITH s, segment
+        CALL apoc.create.addLabels(s, [segment]) YIELD node
+        RETURN node
         """
         tx.run(
             query,
@@ -145,8 +151,14 @@ class RelativePositionVisitor(Visitor):
         MATCH (v:Vector {id: $line_id})
         SET v.relative_distance = $distance,
             v.normalized_x = $normalized_x,
-            v.normalized_y = $normalized_y,
-            v.relative_segments = $segments
+            v.normalized_y = $normalized_y
+        WITH v
+        UNWIND $segments as segment
+        CREATE (v)-[:HAS_RELATIVE_POSITION]->(s:Segment)
+        SET s:Segment
+        WITH s, segment
+        CALL apoc.create.addLabels(s, [segment]) YIELD node
+        RETURN node
         """
         tx.run(
             query,

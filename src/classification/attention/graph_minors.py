@@ -1,56 +1,47 @@
 import networkx as nx
 from itertools import combinations
 from typing import Set
+import time
 
+def is_minor(graph: nx.Graph, concept: nx.Graph, timeout: float = 30.0) -> bool:
+    start_time = time.time()
 
-def is_minor(graph: nx.Graph, concept: nx.Graph) -> bool:
-    """
-    Check if concept is a minor of graph, considering node labels and edge types.
-
-    Parameters:
-    graph (nx.Graph): The original geometric structure graph
-    concept (nx.Graph): The concept graph to check as a minor
-
-    Returns:
-    bool: True if concept is a minor of graph, False otherwise
-    """
     if concept.number_of_nodes() > graph.number_of_nodes():
         return False
 
     def node_match(n1: dict, n2: dict) -> bool:
-        """Compare node labels for compatibility"""
         labels1 = set(n1.get("labels", set()))
         labels2 = set(n2.get("labels", set()))
         if not labels1 or not labels2:
             return True
         return bool(labels1 & labels2)
 
-    for nodes_to_delete in combinations(
-        graph.nodes, graph.number_of_nodes() - concept.number_of_nodes()
-    ):
-        G_sub = graph.copy()
-        G_sub.remove_nodes_from(nodes_to_delete)
+    for nodes_to_delete in combinations(graph.nodes, graph.number_of_nodes() - concept.number_of_nodes()):
+        if time.time() - start_time > timeout:
+            return False
 
-        if G_sub.number_of_edges() >= concept.number_of_edges():
-            for edges_to_contract in combinations(
-                G_sub.edges, G_sub.number_of_edges() - concept.number_of_edges()
-            ):
-                G_contracted = G_sub.copy()
-                for u, v in edges_to_contract:
-                    if G_contracted.has_edge(u, v):
-                        # Merge node labels during contraction
-                        u_labels = set(G_contracted.nodes[u].get("labels", set()))
-                        v_labels = set(G_contracted.nodes[v].get("labels", set()))
-                        merged_labels = u_labels | v_labels
+        nodes_to_keep = list(set(graph.nodes) - set(nodes_to_delete))
+        G_sub = graph.subgraph(nodes_to_keep)  # Use subgraph view!
 
-                        G_contracted = nx.contracted_nodes(
-                            G_contracted, u, v, self_loops=False, copy=False
-                        )
-                        # Update labels of the contracted node
-                        G_contracted.nodes[u]["labels"] = merged_labels
+        if G_sub.number_of_edges() < concept.number_of_edges():  # Early edge count check
+            continue
 
-                if nx.is_isomorphic(G_contracted, concept, node_match=node_match):
-                    return True
+        for edges_to_contract in combinations(G_sub.edges, G_sub.number_of_edges() - concept.number_of_edges()):
+            if time.time() - start_time > timeout:
+                return False
+
+            G_contracted = G_sub.copy() #Copy is still needed here, but G_sub is now a view
+            for u, v in edges_to_contract:
+                if G_contracted.has_edge(u, v):
+                    u_labels = set(G_contracted.nodes[u].get("labels", set()))
+                    v_labels = set(G_contracted.nodes[v].get("labels", set()))
+                    merged_labels = u_labels | v_labels
+
+                    G_contracted = nx.contracted_nodes(G_contracted, u, v, self_loops=False, copy=False)
+                    G_contracted.nodes[u]["labels"] = merged_labels
+
+            if nx.is_isomorphic(G_contracted, concept, node_match=node_match):
+                return True
     return False
 
 if __name__ == "__main__":

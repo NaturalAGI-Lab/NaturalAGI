@@ -38,14 +38,16 @@ class PostProcessingRepository:
 
     def find_stable_structures(self, tx: ManagedTransaction, session_id: str):
         query = """
-        // Find the most common structure by counting occurrences of similar node counts
+        // Find the most common structure by counting occurrences of similar node and segment counts
         MATCH (n {session_id: $session_id})
         WHERE n:Vector OR n:Point
-        WITH n.image_id AS image_id, COUNT(n) AS node_count
-        WITH node_count, COUNT(*) as frequency, COLLECT(image_id) as image_ids
+        WITH n.image_id AS image_id, n
+        OPTIONAL MATCH (n)-[:HAS_RELATIVE_POSITION]->(s:Segment)
+        WITH image_id, COUNT(DISTINCT n) AS node_count, COUNT(DISTINCT s) AS segment_count
+        WITH node_count, segment_count, COUNT(*) as frequency, COLLECT(image_id) as image_ids
         ORDER BY frequency DESC
         LIMIT 1
-        WITH image_ids[0] as image_id, node_count
+        WITH image_ids[0] as image_id, node_count, segment_count
 
         // Find max samples and min counts for all features before any deletions
         MATCH (count_node {session_id: $session_id})
@@ -56,7 +58,7 @@ class PostProcessingRepository:
            OR count_node:AveragePathLength OR count_node:GraphDiameter
            OR count_node:GraphRadius OR count_node:AverageDegree
            OR count_node:AverageBetweenness OR count_node:AverageCloseness
-        WITH image_id, node_count,
+        WITH image_id, node_count, segment_count,
              max(size(count_node.samples)) AS maxSamples,
              min(CASE WHEN count_node:EndPointsCount THEN count_node.value ELSE null END) AS minEndPoints,
              min(CASE WHEN count_node:IntersectionPointsCount THEN count_node.value ELSE null END) AS minIntersectionPoints,
@@ -73,19 +75,20 @@ class PostProcessingRepository:
              min(CASE WHEN count_node:AverageBetweenness THEN count_node.value ELSE null END) AS minAvgBetweenness,
              min(CASE WHEN count_node:AverageCloseness THEN count_node.value ELSE null END) AS minAvgCloseness
 
-        // First, remove relationships
+        // First, remove relationships except HAS_RELATIVE_POSITION
         CALL {
             WITH image_id
             MATCH (n {session_id: $session_id})-[r]-(m:Feature)
             DELETE r
         }
 
-        // Then delete structural nodes that are not from the sample with the least nodes
+        // Then delete structural nodes and their segments that are not from the sample with the most common structure
         CALL {
             WITH image_id
             MATCH (n {session_id: $session_id})
             WHERE (n:Vector OR n:Point) AND n.image_id <> image_id
-            DETACH DELETE n
+            OPTIONAL MATCH (n)-[:HAS_RELATIVE_POSITION]->(s:Segment)
+            DETACH DELETE n, s
         }
 
         // Finally delete feature nodes that don't meet criteria
@@ -116,6 +119,7 @@ class PostProcessingRepository:
                         OR n:GraphDiameter OR n:GraphRadius OR n:AverageDegree 
                         OR n:AverageBetweenness OR n:AverageCloseness) 
                    AND size(n.samples) < maxSamples)
+                AND NOT n:Segment  // Explicitly prevent deletion of Segment nodes
             DETACH DELETE n
         }
         """

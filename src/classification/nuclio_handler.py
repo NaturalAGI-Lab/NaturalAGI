@@ -37,11 +37,6 @@ def init_context(context):
     settings = Settings()
     setattr(
         context.user_data,
-        "graph_comparator",
-        GraphComparator(settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass, max_workers=5),
-    )
-    setattr(
-        context.user_data,
         "kafka_producer",
         KafkaProducer(
             bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
@@ -87,13 +82,14 @@ def kafka_handler(context, event):
     classification_params = ClassificationParams(**params)
     
     context.logger.info_with(f"Classification params: {classification_params}", handler=HANDLER_NAME)
+    comparator = GraphComparator(settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass, max_workers=10)
 
     try:
         if not image_id:
             raise ValueError("image_id must be provided in the request body")
 
         # Perform graph comparison
-        comparison_results = context.user_data.graph_comparator.compare_graphs(
+        comparison_results = comparator.compare_graphs(
             image_id, classification_params
         )
 
@@ -120,8 +116,9 @@ def kafka_handler(context, event):
             value={"error": str(e)},
         )
 
-    # finally:
-        # context.user_data.graph_comparator.remove_image_nodes(image_id)
+    finally:
+        # comparator.remove_image_nodes(image_id)
+        comparator.close()
 
 
 def handler(context, event):
