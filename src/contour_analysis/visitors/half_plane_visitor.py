@@ -33,11 +33,11 @@ class HalfPlaneVisitor(Visitor):
         query = """
         MATCH (v:Vector {id: $id})
         MERGE (hp:HalfPlane:Feature {value: $half_plane, session_id: $session_id})
-        ON CREATE SET hp.samples = [$image_id]
+        ON CREATE SET hp.samples = [$image_id], v.half_plane = $half_plane
         ON MATCH SET hp.samples = CASE
             WHEN NOT $image_id IN hp.samples THEN hp.samples + $image_id
             ELSE hp.samples
-        END
+        END, v.half_plane = $half_plane
         MERGE (v)-[:IS_IN_HALF_PLANE]->(hp)
         """
         tx.run(

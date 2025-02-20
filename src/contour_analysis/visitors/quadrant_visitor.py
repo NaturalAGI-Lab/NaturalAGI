@@ -67,11 +67,11 @@ class QuadrantVisitor(Visitor):
         quadrant_query = """
         MATCH (v:Vector {id: $id})
         MERGE (q:Quadrant:Feature {value: $quadrant, session_id: $session_id})
-        ON CREATE SET q.samples = [$image_id]
+        ON CREATE SET q.samples = [$image_id], v.quadrant = $quadrant
         ON MATCH SET q.samples = CASE
             WHEN NOT $image_id IN q.samples THEN q.samples + $image_id
             ELSE q.samples
-        END
+        END, v.quadrant = $quadrant
         MERGE (v)-[:IS_IN_QUADRANT]->(q)
         """
         

@@ -101,6 +101,7 @@ def kafka_handler(context, event):
         context.user_data.kafka_producer.send(
             context.user_data.kafka_topic,
             value={
+                "status": "success",
                 "classification_results": comparison_results,
                 "image_id": image_id,
                 "image_path": data["parameters"]["image_path"],

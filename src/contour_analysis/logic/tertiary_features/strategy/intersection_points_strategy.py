@@ -19,10 +19,15 @@ class IntersectionPointsStrategy(TertiaryFeatureStrategy):
         query = """
            MATCH (intersection_point:IntersectionPoint {image_id: $image_id})
            WITH COUNT(intersection_point) AS count
-           MERGE (intersection_points_count:IntersectionPointsCount:Feature {session_id: $session_id, value: count})
-           ON CREATE SET intersection_points_count.samples = [$image_id]
-           ON MATCH SET intersection_points_count.samples = CASE WHEN $image_id IN intersection_points_count.samples THEN intersection_points_count.samples ELSE intersection_points_count.samples + $image_id END
-           RETURN intersection_points_count
+           MATCH (n)
+           WHERE n.image_id = $image_id
+           SET n.intersection_points_count = count
+           /*
+            MERGE (intersection_points_count:IntersectionPointsCount:Feature {session_id: $session_id, value: count})
+            ON CREATE SET intersection_points_count.samples = [$image_id]
+            ON MATCH SET intersection_points_count.samples = CASE WHEN $image_id IN intersection_points_count.samples THEN intersection_points_count.samples ELSE intersection_points_count.samples + $image_id END
+            RETURN intersection_points_count
+           */
         """
         result = tx.run(query, image_id=image_id, session_id=self.session_id)
         result_data = result.data()

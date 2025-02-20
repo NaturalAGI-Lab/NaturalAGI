@@ -56,11 +56,11 @@ class AngleVisitor(Visitor):
             MATCH (p:Point {id: $point_id})
             UNWIND $angles as angle
             MERGE (a:PointAngle:Feature {value: angle, session_id: $session_id})
-            ON CREATE SET a.samples = [$image_id]
+            ON CREATE SET a.samples = [$image_id], p.angle = angle
             ON MATCH SET a.samples = CASE
                 WHEN NOT $image_id IN a.samples THEN a.samples + $image_id
                 ELSE a.samples
-            END
+            END, p.angle = angle
             MERGE (p)-[:HAS_ANGLE]->(a)
         """
         tx.run(
@@ -81,12 +81,12 @@ class AngleVisitor(Visitor):
         query = """
         MATCH (l:Vector {id: $line_id})
         MERGE (a:LineAngle:Feature {line_id: $line_id, session_id: $session_id})
-        ON CREATE SET a.angle_with_ox = $angle_with_ox, a.samples = [$image_id]
+        ON CREATE SET a.angle_with_ox = $angle_with_ox, a.samples = [$image_id], l.angle_with_ox = $angle_with_ox
         ON MATCH SET a.angle_with_ox = $angle_with_ox, 
                      a.samples = CASE
                          WHEN NOT $image_id IN a.samples THEN a.samples + $image_id
                          ELSE a.samples
-                     END
+                     END, l.angle_with_ox = $angle_with_ox
         MERGE (l)-[:HAS_ANGLE]->(a)
         """
         tx.run(

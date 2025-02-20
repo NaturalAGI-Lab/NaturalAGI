@@ -48,11 +48,15 @@ class LengthComparisonVisitor(Visitor):
             })
             ON CREATE SET vc.value = $comparison,
                         vc.image_id = $image_id,
-                        vc.samples = [$image_id]
+                        vc.samples = [$image_id],
+                        v1.length = $length1,
+                        v2.length = $length2
             ON MATCH SET vc.samples = CASE
                 WHEN NOT $image_id IN vc.samples THEN vc.samples + $image_id
                 ELSE vc.samples
-            END
+            END,
+            v1.length = $length1,
+            v2.length = $length2
             MERGE (v1)-[:HAS_COMPARISON]->(vc)-[:COMPARES_TO]->(v2)
         """
         tx.run(

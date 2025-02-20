@@ -26,6 +26,7 @@ class QuadrantChangeStrategy(TertiaryFeatureStrategy):
                 WHERE q1.value <> q2.value
             }
             CREATE (point)-[:HAS_QUADRANT_CHANGE]->(qc:QuadrantChange {image_id: $image_id})
+            SET point.is_quadrant_change = 1
         """
         tx.run(create_quadrant_change_query, image_id=image_id)
 
@@ -33,9 +34,20 @@ class QuadrantChangeStrategy(TertiaryFeatureStrategy):
         query = """
             MATCH (quad_change:QuadrantChange {image_id: $image_id})
             WITH COUNT(quad_change) AS count, collect(quad_change) AS quad_changes
-            MERGE (quadrant_change_count:QuadrantChangeCount:Feature {session_id: $session_id, value: count})
+            MERGE (quadrant_change_count:QuadrantChangeCount:Feature {
+                session_id: $session_id,
+                value: count
+            })
             ON CREATE SET quadrant_change_count.samples = [$image_id]
-            ON MATCH SET quadrant_change_count.samples = CASE WHEN $image_id IN quadrant_change_count.samples THEN quadrant_change_count.samples ELSE quadrant_change_count.samples + $image_id END
+            ON MATCH SET quadrant_change_count.samples = CASE
+                WHEN NOT $image_id IN quadrant_change_count.samples
+                THEN quadrant_change_count.samples + $image_id
+                ELSE quadrant_change_count.samples
+            END
+            WITH count, quad_changes
+            MATCH (n)
+            WHERE n.image_id = $image_id
+            SET n.quadrant_change_count = count
             RETURN count, [quad_change IN quad_changes | id(quad_change)] AS quad_change_ids
         """
         result = tx.run(query, image_id=image_id, session_id=self.session_id)

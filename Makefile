@@ -23,7 +23,7 @@ HOST_IP := $(shell ipconfig getifaddr en0)
 KAFKA_BROKERS := ${HOST_IP}:29092
 NEO4J_PASS=111122223333
 
-LOCAL_STORAGE=./tests/
+LOCAL_STORAGE=./tests/generated_samples
 NUCLIO_STORAGE=/opt/nuclio/shared_storage
 
 DLQ_TOPIC = dlq-topic
@@ -178,8 +178,8 @@ dep_skel:
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 		-e DLQ_TOPIC="${DLQ_TOPIC}" \
-		-e SIMPLIFICATION_EPSILON=10 \
-		-e SKELETONIZATION_THRESHOLD=200 \
+		-e SIMPLIFICATION_EPSILON=0 \
+		-e SKELETONIZATION_THRESHOLD=170 \
 		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}' \
 		-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}"
 	@echo -e "${GREEN}Skeletonization deployed.${NC}"

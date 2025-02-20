@@ -98,19 +98,25 @@ class SkeletonGNGMapper:
         
         def traverse_segment(start: int, current: int) -> tuple[List[np.ndarray], int]:
             segment = [net.w[start]]
+            initial_start = start
             while current not in endpoints and current not in intersections:
                 segment.append(net.w[current])
                 neighbors = set(np.where(net.C[current] == 1)[0]) - {start}
                 if not neighbors:
                     break
-                start, current = current, neighbors.pop()
+                # Check for cycle - if we're back at the start
+                next_node = neighbors.pop()
+                if next_node == initial_start and len(segment) > 2:
+                    segment.append(net.w[current])  # Close the loop
+                    return segment, current
+                start, current = current, next_node
             segment.append(net.w[current])
             return segment, current
 
         def process_node(node: int) -> None:
             neighbors = set(np.where(net.C[node] == 1)[0])
             for neighbor in neighbors:
-                edge = tuple(sorted([node, neighbor]))  # Sort to ensure consistent edge representation
+                edge = tuple(sorted([node, neighbor]))
                 if edge not in visited_edges:
                     visited_edges.add(edge)
                     segment, end = traverse_segment(node, neighbor)
@@ -125,8 +131,15 @@ class SkeletonGNGMapper:
                     if end != neighbor:
                         process_node(end)
 
-        # Process all endpoints and intersections
-        for node in endpoints.union(intersections):
+        # Start with endpoints and intersections if they exist
+        start_nodes = endpoints.union(intersections)
+        
+        # If no endpoints or intersections (e.g., perfect circle),
+        # start with any node
+        if not start_nodes:
+            start_nodes = {0}  # Start with first node
+            
+        for node in start_nodes:
             process_node(node)
         
         return simplified_segments
