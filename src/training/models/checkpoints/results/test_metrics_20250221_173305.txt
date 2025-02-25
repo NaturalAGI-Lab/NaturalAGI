@@ -1,0 +1,64 @@
+Test Results (20250221_173305)
+==================================================
+
+Train size:  200
+Val size:  320
+Test size:  1080
+Trainset label distribution:  Counter({7: 26, 8: 23, 9: 22, 3: 21, 6: 20, 0: 19, 5: 19, 4: 17, 1: 17, 2: 16})
+Valset label distribution:  Counter({5: 39, 1: 38, 9: 37, 0: 35, 2: 35, 8: 31, 3: 27, 4: 27, 6: 26, 7: 25})
+Testset label distribution:  Counter({4: 116, 6: 114, 3: 112, 2: 109, 7: 109, 8: 106, 0: 106, 1: 105, 5: 102, 9: 101})
+
+Overall Accuracy: 0.6028
+
+Per-class Metrics:
+------------------------------
+
+Class 0:
+Precision: 1.0000
+Recall: 0.0094
+F1-score: 0.0187
+
+Class 1:
+Precision: 1.0000
+Recall: 0.8571
+F1-score: 0.9231
+
+Class 2:
+Precision: 1.0000
+Recall: 0.0734
+F1-score: 0.1368
+
+Class 3:
+Precision: 0.5000
+Recall: 0.5268
+F1-score: 0.5130
+
+Class 4:
+Precision: 0.7982
+Recall: 0.7845
+F1-score: 0.7913
+
+Class 5:
+Precision: 0.8475
+Recall: 0.4902
+F1-score: 0.6211
+
+Class 6:
+Precision: 0.4073
+Recall: 0.8860
+F1-score: 0.5580
+
+Class 7:
+Precision: 0.7000
+Recall: 0.8349
+F1-score: 0.7615
+
+Class 8:
+Precision: 0.5963
+Recall: 0.6132
+F1-score: 0.6047
+
+Class 9:
+Precision: 0.4680
+Recall: 0.9406
+F1-score: 0.6250

@@ -47,13 +47,13 @@ class MNISTGraphDataset(Dataset):
         features = []
         
         for node_id, node_data in graph.nodes(data=True):
-            # Spatial features (normalized)
-            # x = node_data.get('x', 0) / 100.0  # Normalize to [0, 1]
-            # y = node_data.get('y', 0) / 100.0
-            # x1 = node_data.get('x1', 0) / 100.0
-            # y1 = node_data.get('y1', 0) / 100.0
-            # x2 = node_data.get('x2', 0) / 100.0
-            # y2 = node_data.get('y2', 0) / 100.0
+            print("Node data: ", node_data)
+            x = node_data.get('x', 0)
+            y = node_data.get('y', 0)
+            x1 = node_data.get('x1', 0)
+            x2 = node_data.get('x2', 0)
+            y1 = node_data.get('y1', 0)
+            y2 = node_data.get('y2', 0)
             normalized_x = node_data.get('normalized_x', 0)
             normalized_y = node_data.get('normalized_y', 0)
             relative_distance = node_data.get('relative_distance', 0)
@@ -78,7 +78,7 @@ class MNISTGraphDataset(Dataset):
             is_horizontal_vector = 1.0 if "HorizontalVector" in node_data.get('labels', []) else 0.0
             angle = node_data.get('angle', 0)
             angle_with_ox = node_data.get('angle_with_ox', 0)
-            half_plane = node_data.get('half_plane', 0)
+            half_plane = 0 # TODO: add this
             quadrant = node_data.get('quadrant', 0)
             length = node_data.get('length', 0)
             length1 = node_data.get('length1', 0)
@@ -92,19 +92,28 @@ class MNISTGraphDataset(Dataset):
             
             is_quadrant_change = node_data.get('is_quadrant_change', 0)
             
+            monotony_result = node_data.get('monotony', 0)
+            is_monotony = 1.0 if monotony_result == 'MONOTONIC' else 0.0
+            
+            contour_type_result = node_data.get('contour_type', 0)
+            is_closed = 1.0 if contour_type_result == 'Closed' else 0.0
+            
+            num_cycles = node_data.get('cycle_count', 0)
+            
             # Structural features
             degree = graph.degree(node_id) / 10.0  # Normalize degree
             
             # Combine features
             node_features = [
-                # x, y, x1, y1, x2, y2,
+                x, y, x1, y1, x2, y2,
                 quadrant,
                 normalized_x, normalized_y, relative_distance,
                 is_point, is_vector,
                 is_endpoint, is_intersection_point, is_corner_point,
                 is_vertical_vector, is_horizontal_vector,
                 degree, angle, angle_with_ox, half_plane, quadrant, length, length1, length2,
-                corner_points_count, endpoints_count, intersection_points_count, quadrant_change_count, is_quadrant_change, vectors_count
+                corner_points_count, endpoints_count, intersection_points_count, quadrant_change_count, is_quadrant_change, vectors_count,
+                is_monotony, is_closed, num_cycles
             ]
             features.append(node_features)
         

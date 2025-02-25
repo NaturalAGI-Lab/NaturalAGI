@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-#TODO add to the skel function
+# TODO add to the skel function
 # @dataclass
 # class SkeletonizationParams:
 #     min_skeleton_threshold: int
@@ -16,6 +16,7 @@ from dataclasses import dataclass
 #     delta: float = 0.995
 #     T: int = 50
 #     cnr_threshold: float = 0
+
 
 @dataclass
 class ClassificationParams:

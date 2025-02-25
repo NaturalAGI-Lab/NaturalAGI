@@ -25,6 +25,7 @@ NEO4J_PASS=111122223333
 
 LOCAL_STORAGE=./tests/generated_samples
 NUCLIO_STORAGE=/opt/nuclio/shared_storage
+LOCAL_MODEL_PATH=./src/training/latest_model
 
 DLQ_TOPIC = dlq-topic
 CONNECTOR_KAFKA_TOPIC = connector-output-topic
@@ -221,6 +222,7 @@ dep_classification:
 	@nuctl deploy --path src/classification \
 		--platform local \
 		--replicas 3 \
+		--volume "${LOCAL_MODEL_PATH}:${NUCLIO_STORAGE}" \
 		--platform-config '{"attributes": {"platformConfig": {"kind": "local", "attributes": {"enableReplicasOnLocal": true}}}}' \
 		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONTOUR_ANALYSIS_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "classification-group"}}}' \
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \

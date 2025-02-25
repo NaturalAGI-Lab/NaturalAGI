@@ -17,13 +17,14 @@ class Neo4jToNetworkX:
         query = """
         MATCH (n {image_id: $image_id})
         WHERE n:Point OR n:Vector
-        WITH n, labels(n) AS node_labels
+        WITH n, labels(n) as node_labels, properties(n) as node_props
         OPTIONAL MATCH (n)-[r]-(m {image_id: $image_id})
-        WITH n, node_labels, r, m
-        RETURN id(n) AS node_id, 
+        WITH n, node_labels, r, m, node_props
+        RETURN elementId(n) AS node_id, 
                node_labels,
+               node_props,
                type(r) AS rel_type, 
-               id(m) AS target_id
+               elementId(m) AS target_id
         """
         result = session.run(query, image_id=image_id)
         return Neo4jToNetworkX._build_networkx_graph_without_segments(result)
@@ -34,14 +35,15 @@ class Neo4jToNetworkX:
         query = """
         MATCH (n {concept_id: $concept_id})
         WHERE n:Point OR n:Vector
-        WITH n, labels(n) AS node_labels
+        WITH n, labels(n) AS node_labels, properties(n) as node_props
         OPTIONAL MATCH (n)-[r]-(m {concept_id: $concept_id})
-        WITH n, node_labels, r, m
+        WITH n, node_labels, r, m, node_props
         OPTIONAL MATCH (n)-[:HAS_RELATIVE_POSITION]->(s:Segment)
-        WITH n, node_labels, r, m, s, 
+        WITH n, node_labels, r, m, s, node_props,
              CASE WHEN s IS NOT NULL THEN labels(s) ELSE [] END AS segment_labels
         RETURN id(n) AS node_id, 
                node_labels,
+               node_props,
                type(r) AS rel_type, 
                id(m) AS target_id,
                id(s) AS segment_id,
@@ -64,7 +66,12 @@ class Neo4jToNetworkX:
         for record in records:
             node_id = record["node_id"]
             if node_id not in nodes:
-                nodes[node_id] = {"labels": set(record["node_labels"])}
+                node_data = {
+                    "labels": set(record["node_labels"]),
+                    **record["node_props"]
+                }
+                print("Adding node with props: ", node_data)
+                nodes[node_id] = node_data
         
         # Add nodes to graph
         for node_id, node_data in nodes.items():

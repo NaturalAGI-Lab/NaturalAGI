@@ -60,7 +60,7 @@ def kafka_handler(context, event):
 
     image_id = data["parameters"]["image_id"]
     settings = Settings()
-    
+
     # Filter only the parameters that ClassificationParams expects
     classification_params_fields = {
         "feature_weight",
@@ -68,30 +68,32 @@ def kafka_handler(context, event):
         "ged_timeout",
         # Add any other fields that ClassificationParams expects
     }
-    
+
     # Create params dict with only the relevant fields
     params = {
-        key: value 
+        key: value
         for key, value in {
             **settings.model_dump(),  # Get all settings as defaults
-            **data["parameters"],     # Override with any provided parameters
+            **data["parameters"],  # Override with any provided parameters
         }.items()
         if key in classification_params_fields
     }
-    
+
     classification_params = ClassificationParams(**params)
-    
-    context.logger.info_with(f"Classification params: {classification_params}", handler=HANDLER_NAME)
-    comparator = GraphComparator(settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass, max_workers=10)
+
+    context.logger.info_with(
+        f"Classification params: {classification_params}", handler=HANDLER_NAME
+    )
+    comparator = GraphComparator(
+        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass, max_workers=10
+    )
 
     try:
         if not image_id:
             raise ValueError("image_id must be provided in the request body")
 
         # Perform graph comparison
-        comparison_results = comparator.compare_graphs(
-            image_id, classification_params
-        )
+        comparison_results = comparator.compare_graphs(image_id, classification_params)
 
         context.logger.info_with(
             f"Classification results: {comparison_results}", handler=HANDLER_NAME

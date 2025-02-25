@@ -1,10 +1,11 @@
 import logging
+from pathlib import Path
 import numpy as np
 from neo4j import GraphDatabase
 from typing import List, Dict, Any
 import networkx as nx
 from graph_similarity.neo4j_to_networkx import Neo4jToNetworkX
-from graph_similarity.gat_classification import predict_for_image
+from graph_similarity.gat_classification import GATClassification
 
 logging.basicConfig(level=logging.INFO)
 
@@ -29,7 +30,9 @@ class GraphComparator:
                 Neo4jToNetworkX.extract_image_graph, image_id
             )
 
-        activated_class = predict_for_image(image_graph)
+        model_path = next(Path("/opt/nuclio/shared_storage").glob("*.pth"))
+        gat_classifier = GATClassification(model_path=str(model_path))
+        activated_class = gat_classifier.predict_for_image(image_graph)
         logging.info(f"Activated class: {activated_class}")
 
         return {"activated_class": str(activated_class)}

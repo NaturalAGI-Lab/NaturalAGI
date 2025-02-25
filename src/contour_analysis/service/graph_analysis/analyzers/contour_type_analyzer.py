@@ -31,3 +31,9 @@ class ContourTypeAnalyzer(BaseAnalyzer):
             END
         """
         mx.run(query, session_id=session_id, result=result.name, image_id=image_id)
+        query = """
+            MATCH (n {session_id: $session_id})
+            WHERE n:Point or n:Vector
+            SET n.contour_type = $result
+        """
+        mx.run(query, session_id=session_id, result=result.name)
