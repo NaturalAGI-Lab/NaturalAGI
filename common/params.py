@@ -23,3 +23,4 @@ class ClassificationParams:
     feature_weight: float
     structural_weight: float
     ged_timeout: float
+    min_structural_similarity: float = 0.3

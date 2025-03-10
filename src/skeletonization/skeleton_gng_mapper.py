@@ -21,7 +21,7 @@ class SkeletonGNGMapper:
         self.context = context
         self.settings = settings
         self.min_threshold = 20  # Minimum threshold value
-        self.threshold_step = 10  # Step to decrease threshold
+        self.threshold_step = 5  # Step to decrease threshold
         self.skeletonization_threshold = (
             skeletonization_threshold or self.settings.skeletonization_threshold
         )
@@ -55,7 +55,7 @@ class SkeletonGNGMapper:
                     self.context.logger.debug(f"Created graph with {graph.number_of_nodes()} nodes and {graph.number_of_edges()} edges")
 
                     if nx.is_connected(graph):
-                        return graph
+                        return graph, current_threshold
 
                     current_threshold -= self.threshold_step
 

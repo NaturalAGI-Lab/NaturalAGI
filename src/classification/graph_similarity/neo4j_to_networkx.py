@@ -5,6 +5,7 @@ from neo4j import Session
 
 logging.basicConfig(level=logging.INFO)
 
+
 class Neo4jToNetworkX:
     """Responsible for converting Neo4j graphs to NetworkX format"""
 
@@ -38,16 +39,11 @@ class Neo4jToNetworkX:
         WITH n, labels(n) AS node_labels, properties(n) as node_props
         OPTIONAL MATCH (n)-[r]-(m {concept_id: $concept_id})
         WITH n, node_labels, r, m, node_props
-        OPTIONAL MATCH (n)-[:HAS_RELATIVE_POSITION]->(s:Segment)
-        WITH n, node_labels, r, m, s, node_props,
-             CASE WHEN s IS NOT NULL THEN labels(s) ELSE [] END AS segment_labels
         RETURN id(n) AS node_id, 
                node_labels,
                node_props,
                type(r) AS rel_type, 
-               id(m) AS target_id,
-               id(s) AS segment_id,
-               segment_labels
+               id(m) AS target_id
         """
         result = session.run(query, concept_id=concept_id)
         return Neo4jToNetworkX._build_networkx_graph(result)
@@ -60,7 +56,7 @@ class Neo4jToNetworkX:
         """
         G = nx.Graph()
         nodes: Dict[int, Dict] = {}
-        
+
         records = list(result)
         # First pass: collect nodes
         for record in records:
@@ -68,22 +64,20 @@ class Neo4jToNetworkX:
             if node_id not in nodes:
                 node_data = {
                     "labels": set(record["node_labels"]),
-                    **record["node_props"]
+                    **record["node_props"],
                 }
                 print("Adding node with props: ", node_data)
                 nodes[node_id] = node_data
-        
+
         # Add nodes to graph
         for node_id, node_data in nodes.items():
             G.add_node(node_id, **node_data)
-        
+
         # Add edges (only regular edges, no segment edges)
         for record in records:
             if record["target_id"] is not None:
                 G.add_edge(
-                    record["node_id"],
-                    record["target_id"],
-                    type=record["rel_type"]
+                    record["node_id"], record["target_id"], type=record["rel_type"]
                 )
         return G
 
@@ -101,12 +95,6 @@ class Neo4jToNetworkX:
             node_id = record["node_id"]
             if node_id not in nodes:
                 nodes[node_id] = {"labels": set(record["node_labels"])}
-            # Add segment nodes if they exist
-            segment_id = record["segment_id"]
-            if segment_id is not None and segment_id not in nodes:
-                segment_labels = set(record["segment_labels"])
-                segment_labels.add("Segment")  # Ensure the Segment label is present
-                nodes[segment_id] = {"labels": segment_labels}
 
         for node_id, node_data in nodes.items():
             G.add_node(node_id, **node_data)
@@ -115,15 +103,6 @@ class Neo4jToNetworkX:
             # Add regular edges
             if record["target_id"] is not None:
                 G.add_edge(
-                    record["node_id"],
-                    record["target_id"],
-                    type=record["rel_type"]
-                )
-            # Add segment edges
-            if record["segment_id"] is not None:
-                G.add_edge(
-                    record["node_id"],
-                    record["segment_id"],
-                    type="HAS_RELATIVE_POSITION"
+                    record["node_id"], record["target_id"], type=record["rel_type"]
                 )
         return G

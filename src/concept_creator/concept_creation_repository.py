@@ -1,9 +1,10 @@
 import logging
 import hashlib
 from typing import List
-from neo4j import GraphDatabase, ManagedTransaction
-
+from neo4j import GraphDatabase, ManagedTransaction, Session
+import networkx as nx
 from feature_weight_service import FeatureWeightService
+from neo4j_to_networkx import Neo4jToNetworkx
 
 
 class ConceptCreationRepository:
@@ -33,6 +34,10 @@ class ConceptCreationRepository:
             logging.info(f"Concept created with id: {concept_id}")
             session.execute_write(FeatureWeightService().calculate_feature_weights)
         return concept_id
+
+    def get_image_graph(self, image_id: str) -> nx.Graph:
+        with self.driver.session() as session:
+            return Neo4jToNetworkx.extract_image_graph(session, image_id)
 
     def _create_concept(
         self, tx: ManagedTransaction, session_id: str, concept_name: str
@@ -148,3 +153,162 @@ class ConceptCreationRepository:
             concept_name=concept_name,
         )
         return result.single()["c"]
+
+    def get_image_ids_for_session(self, session_id: str) -> List[str]:
+        """
+        Get all image IDs for a session.
+
+        Args:
+            session_id: The session ID to look up
+
+        Returns:
+            List of image IDs for the session
+        """
+        logging.info(f"Getting image IDs for session {session_id}")
+        with self.driver.session() as session:
+            return session.execute_read(self._get_image_ids_for_session, session_id)
+
+    def get_nodes_and_edges_for_image(self, image_id: str) -> List[dict]:
+        """
+        Get all nodes and edges for an image.
+
+        Args:
+            image_id: The image ID to look up
+
+        Returns:
+            List of dictionaries representing nodes and edges for the image
+        """
+        logging.info(f"Getting nodes and edges for image {image_id}")
+        with self.driver.session() as session:
+            return session.execute_read(self._get_nodes_and_edges_for_image, image_id)
+
+    def save_concept(self, concept_id: str, neo4j_data: List[dict]) -> None:
+        """
+        Save a concept to the database.
+
+        Args:
+            concept_id: The concept ID to save
+            neo4j_data: List of dictionaries representing nodes and relationships
+        """
+        logging.info(f"Saving concept {concept_id}")
+        with self.driver.session() as session:
+            session.execute_write(self._save_concept, concept_id, neo4j_data)
+
+    def remove_image_data(self, image_id: str) -> None:
+        """
+        Remove all data for an image.
+
+        Args:
+            image_id: The image ID to remove
+        """
+        logging.info(f"Removing data for image {image_id}")
+        with self.driver.session() as session:
+            session.execute_write(self._remove_image_data, image_id)
+
+    def _get_image_ids_for_session(
+        self, tx: ManagedTransaction, session_id: str
+    ) -> List[str]:
+        """Get all image IDs for a session."""
+        query = """
+            MATCH (n {session_id: $session_id})
+            RETURN DISTINCT n.image_id AS image_id
+        """
+        result = tx.run(query, session_id=session_id)
+        return [
+            record["image_id"] for record in result if record["image_id"] is not None
+        ]
+
+    def _get_nodes_and_edges_for_image(
+        self, tx: ManagedTransaction, image_id: str
+    ) -> List[dict]:
+        """Get all nodes and edges for an image."""
+        query = """
+        MATCH (n {image_id: $image_id})
+        WHERE n:Point OR n:Vector
+        WITH n, labels(n) as node_labels, properties(n) as node_properties
+        OPTIONAL MATCH (n)-[r]-(m {image_id: $image_id})
+        WITH n, node_labels, node_properties, r, m
+        RETURN id(n) as node_id, 
+               node_labels, 
+               type(r) as rel_type, 
+               id(m) as target_id,
+               node_properties
+        """
+        result = tx.run(query, image_id=image_id)
+        return [record.data() for record in result]
+
+    def _save_concept(
+        self, tx: ManagedTransaction, concept_id: str, neo4j_data: List[dict]
+    ) -> None:
+        """Save a concept to the database."""
+        # First create all nodes
+        for item in neo4j_data:
+            if item["type"] == "node":
+                # Create node properties
+                props = item["properties"]
+                props["concept_id"] = concept_id
+                props["uuid"] = item["uuid"]
+
+                # Convert any set values to lists as Neo4j doesn't support sets
+                props = self._convert_sets_to_lists(props)
+
+                # Create node with all its labels
+                labels_str = ":".join(item["labels"])
+                query = f"""
+                    CREATE (n:{labels_str} $props)
+                    RETURN n
+                """
+                tx.run(query, props=props)
+
+        # Then create all relationships
+        for item in neo4j_data:
+            if item["type"] == "relationship":
+                source_id = item["source"]
+                target_id = item["target"]
+                rel_type = item["relationship_type"]
+                props = item["properties"]
+                props["concept_id"] = concept_id
+
+                # Convert any set values to lists for relationship properties too
+                props = self._convert_sets_to_lists(props)
+
+                query = f"""
+                MATCH (a {{uuid: $source_id, concept_id: $concept_id}}), (b {{uuid: $target_id, concept_id: $concept_id}})
+                CREATE (a)-[r:{rel_type}]->(b)
+                SET r += $props
+                """
+                tx.run(
+                    query,
+                    source_id=source_id,
+                    target_id=target_id,
+                    props=props,
+                    concept_id=concept_id,
+                )
+
+    def _convert_sets_to_lists(self, props: dict) -> dict:
+        """Convert any set values in a dictionary to lists."""
+        for key, value in props.items():
+            if isinstance(value, set):
+                props[key] = list(value)
+            elif isinstance(value, dict):
+                props[key] = self._convert_sets_to_lists(value)
+            elif isinstance(value, list):
+                props[key] = [
+                    (
+                        self._convert_sets_to_lists(item)
+                        if isinstance(item, dict)
+                        else list(item) if isinstance(item, set) else item
+                    )
+                    for item in value
+                ]
+        return props
+
+    def _remove_image_data(self, tx: ManagedTransaction, image_id: str) -> None:
+        """Remove all data for an image."""
+        # First remove relationships
+        query = """
+        MATCH (n)
+        WHERE n.image_id = $image_id OR $image_id IN n.samples
+        DETACH DELETE n
+        """
+        tx.run(query, image_id=image_id)

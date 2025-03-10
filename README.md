@@ -1,6 +1,6 @@
 # NaturalAGI
 
-NaturalAGI is a research project focused on developing a natural approach to Artificial General Intelligence through image processing, pattern recognition, and concept formation. The project implements a pipeline for processing visual data, extracting structural features, and forming abstract concepts through statistical reduction. **The core goal is to build a classification algorithm that learns from training data without using backpropagation or traditional neural network approaches.**
+NaturalAGI is a research project focused on developing a natural approach to Artificial General Intelligence through image processing, pattern recognition, and concept formation. The project implements a pipeline for processing visual data, extracting structural features, and forming abstract concepts through defined reduction rules. **The core goal is to build a classification algorithm that learns from training data without using backpropagation or traditional neural network approaches.**
 
 ## Project Overview
 
@@ -8,10 +8,12 @@ NaturalAGI implements a cognitive architecture that processes visual input throu
 
 1. **Pre-detection** - Initial processing of images to extract structural features
 2. **Contour Analysis** - Analysis of structural elements and their relationships
-3. **Concept Formation** - Statistical reduction to form abstract concepts
+3. **Concept Formation** - Reduction to form abstract concepts
 4. **Classification** - Matching new inputs against formed concepts
 
 Unlike traditional machine learning approaches that rely on backpropagation and gradient descent, NaturalAGI uses structural analysis and statistical reduction to form concepts. This approach is inspired by natural cognitive processes, where learning occurs through exposure to examples and statistical pattern recognition rather than explicit error correction.
+
+The project is implemented as a set of microservices orchestrated through a Makefile-based workflow. Each component runs as a Nuclio serverless function, communicating through Kafka topics and storing structural representations in a Neo4j graph database.
 
 ![Architecture](AGI%20Arch.jpg)
 
@@ -37,7 +39,6 @@ The contour analysis process involves:
 - Extracting points from the skeletonized image
 - Identifying special points (endpoints, intersections)
 - Creating vectors between connected points
-- Analyzing curves (convex, concave)
 - Calculating geometric properties (length, direction)
 - Identifying critical features (angle points, quadrant changes)
 
@@ -57,18 +58,12 @@ The structural elements are represented as a graph where:
   - Points are connected to vectors via `:CONNECTED_TO` relationships
   - This creates a bipartite graph structure where points connect to vectors and vectors connect to points
 
-- **Curves** are represented as nodes that:
-  - Have a specific type (convex, concave)
-  - Connect to start/end points via `:STARTS` and `:ENDS` relationships
-  - Connect to contained vectors via `:CONTAINS` relationships
-
 #### Graph Persistence
 
 The graph representation is persisted in a Neo4j database using the `GraphPersistenceService`:
-- Points are stored as nodes with labels indicating their type (`:Point`, `:Endpoint`, `:Intersection`, etc.)
-- Vectors are stored as nodes (not edges) with properties for coordinates and length
+- Points are stored as nodes with labels indicating their type (`:Point`, `:EndPoint`, `:IntersectionPoint`, etc.)
+- Vectors are stored as nodes (not edges) with properties for coordinates and length, etc.
 - Relationships connect points to vectors (`:CONNECTED_TO`)
-- Curves are stored with relationships to their start/end points (`:STARTS`, `:ENDS`) and contained vectors (`:CONTAINS`)
 - All elements are tagged with `image_id` and `session_id` for tracking
 
 This graph-based representation enables:
@@ -80,15 +75,12 @@ This graph-based representation enables:
 ### 3. Classification
 
 The classification function compares input images with formed concepts using:
-- Feature similarity (Jaccard similarity between features)
-- Structure similarity (Neo4J graph projection comparison)
+- Structural similarity with Maximum Common Minor Graph (MCMG) as for now
 
 The classification process:
 1. Creates a graph representation of the input image
-2. Extracts features from the graph
-3. Compares features with stored concepts
-4. Calculates similarity scores
-5. Returns the most similar concept
+2. Calculates similarity scores
+3. Returns the most similar concept
 
 Unlike traditional neural network classifiers, this approach doesn't require backpropagation or gradient descent. Instead, it relies on structural similarity and feature matching between the input and learned concepts.
 
@@ -97,10 +89,8 @@ Unlike traditional neural network classifiers, this approach doesn't require bac
 The concept creation process extracts stable structures and features across multiple images of the same type, forming abstract representations.
 
 The process involves:
-1. Analyzing multiple images of the same type
-2. Identifying common structural elements and features
-3. Creating a statistical model of the concept
-4. Storing the concept in the graph database
+1. Running training script that create multiple graphs for each sample in the training set for that particular class
+2. Running post processing script that extract the most common graph across all the graphs for that class
 
 This statistical approach to concept formation is fundamentally different from supervised learning with backpropagation. Instead of adjusting weights to minimize error, the system identifies stable patterns across multiple examples through statistical analysis.
 
@@ -133,24 +123,18 @@ The system is deployed as a set of microservices using:
    poetry install
    ```
 
-### Running the Simulation
+### Running the System
 
-The simulation runs in three stages:
+The system can be run by executing the following command:
 
-1. Deploy the Nuclio functions and Neo4j database:
-   ```bash
-   sh deploy_functions.sh
-   ```
+```bash
+make
+```
 
-2. Run the training script:
-   ```bash
-   sh run_training.sh
-   ```
-
-3. Run the statistical reduction:
-   ```bash
-   sh run_post_processing.sh
-   ```
+For help with available commands:
+```bash
+make help
+```
 
 ## Project Structure
 
@@ -166,6 +150,7 @@ NaturalAGI/
 │   ├── concept_creator/      # Concept formation
 │   ├── connector/            # Communication between components
 │   ├── post_processing/      # Statistical reduction
+│   ├── training/             # Training models
 │   └── samples_generator/    # Training data generation
 ├── common/                   # Shared utilities
 ├── docs/                     # Documentation
@@ -175,7 +160,12 @@ NaturalAGI/
 │   └── TRAINING.md           # Training process documentation
 ├── scripts/                  # Utility scripts
 ├── tests/                    # Test suite
-└── training_data/            # Training datasets
+│   └── generated_samples/    # Storage for test samples
+├── training_data/            # Training datasets
+├── Makefile                  # Build automation for deployment and execution
+├── docker-compose.yaml       # Docker services configuration
+├── pyproject.toml            # Poetry dependency management
+└── .env                      # Environment variables
 ```
 
 ## Documentation
@@ -184,24 +174,6 @@ NaturalAGI/
 - [Feature Extraction](/docs/FEATURES.md) - Documentation on feature extraction
 - [Simulation](/docs/SIMULATION.md) - Instructions for running the simulation
 - [Training Process](/docs/TRAINING.md) - Documentation on the training process
-
-## Experimental Results
-
-The project has been tested with different numbers of training images:
-
-1. **Low number of images (12)** - Resulted in concepts with features like:
-   - 3 angle points
-   - Closed contour
-   - 3rd quadrant
-   - Lower Half Plane
-   - Left Half Plane
-
-2. **High number of images (117)** - Resulted in more generalized concepts with:
-   - 3 angle points
-   - Closed contour
-   - Left Half Plane
-
-These results demonstrate that the size of the training set affects concept formation, with larger sets leading to more generalized concepts. Importantly, this concept formation occurs through statistical analysis rather than backpropagation, showing that effective classification can be achieved without traditional neural network training methods.
 
 ## Technologies Used
 
@@ -213,7 +185,3 @@ These results demonstrate that the size of the training set affects concept form
 - **Nuclio** - Serverless functions for processing
 - **Kafka** - Message broker for component communication
 - **Docker** - Containerization for deployment
-
-## License
-
-This project is licensed under the [LICENSE] - see the LICENSE file for details.

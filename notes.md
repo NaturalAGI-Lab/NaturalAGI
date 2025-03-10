@@ -1,0 +1,1 @@
+1. Don't use 4_1 in the training - too much noise

@@ -13,6 +13,11 @@ POST_PROCESSING_SCRIPT := run_post_processing.sh
 CONCEPT_ID ?= default_concept
 IMAGE_ID ?= default_image
 
+# Number of replicas for each service
+REPLICAS_SKEL ?= 3
+REPLICAS_CONTOUR ?= 3
+REPLICAS_CLASSIFICATION ?= 3
+
 # Colors for output
 BLUE := \033[0;34m
 GREEN := \033[0;32m
@@ -23,8 +28,8 @@ HOST_IP := $(shell ipconfig getifaddr en0)
 KAFKA_BROKERS := ${HOST_IP}:29092
 NEO4J_PASS=111122223333
 
-LOCAL_STORAGE=./tests/generated_samples
-NUCLIO_STORAGE=/opt/nuclio/shared_storage
+LOCAL_STORAGE=./tests/
+NUCLIO_STORAGE=/opt/nuclio/shared_storage/
 LOCAL_MODEL_PATH=./src/training/latest_model
 
 DLQ_TOPIC = dlq-topic
@@ -42,6 +47,9 @@ OPERATION ?= train
 CONCEPT_NAME ?= default_concept
 SESSION_ID ?= default_session
 SUBCLASS ?= default_subclass
+
+# Energy minimization option (default: true)
+USE_ENERGY_MINIMIZATION ?= true
 
 # Phony targets
 .PHONY: all deploy train post_process classify send_random_image clean help start_services create_kafka_topics list_kafka_topics send_to_connector
@@ -128,10 +136,18 @@ help:
 	@echo "  clean              - Clean up training results"
 	@echo "  help               - Show this help message"
 	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
+	@echo ""
+	@echo "Configuration options:"
+	@echo "  REPLICAS_SKEL      - Number of replicas for skeletonization service (default: 3)"
+	@echo "  REPLICAS_CONTOUR   - Number of replicas for contour analysis service (default: 3)"
+	@echo "  REPLICAS_CLASSIFICATION - Number of replicas for classification service (default: 3)"
+	@echo "  USE_ENERGY_MINIMIZATION - Use energy minimization for concept formation (default: false)"
+	@echo ""
+	@echo "Example: make deploy REPLICAS_SKEL=5 REPLICAS_CONTOUR=3 REPLICAS_CLASSIFICATION=2 USE_ENERGY_MINIMIZATION=true"
 
 train_prepared_samples_%:
-	@echo -e "${BLUE}Running training script for prepared samples class $* subclass $*...${NC}"
 	$(eval subclass := $(filter-out $@,$(MAKECMDGOALS)))
+	@echo -e "${BLUE}Running training script for prepared samples class $* subclass $(subclass)...${NC}"
 	@make send_to_connector OPERATION=train CONCEPT_NAME=mnist_$* SUBCLASS=$(subclass) NUCLIO_STORAGE=$(NUCLIO_STORAGE)/prepared_samples/$*_$(subclass) SESSION_ID=$*_$(subclass)
 	@echo -e "${GREEN}Training script completed.${NC}"
 
@@ -176,10 +192,12 @@ dep_skel:
 	@echo -e "${BLUE}Deploying skeletonization...${NC}"
 	@nuctl deploy --path src/skeletonization \
 		--platform local \
+		--replicas $(REPLICAS_SKEL) \
+		--platform-config '{"attributes": {"platformConfig": {"kind": "local", "attributes": {"enableReplicasOnLocal": true}}}}' \
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 		-e DLQ_TOPIC="${DLQ_TOPIC}" \
-		-e SIMPLIFICATION_EPSILON=0 \
+		-e SIMPLIFICATION_EPSILON=4 \
 		-e SKELETONIZATION_THRESHOLD=170 \
 		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}' \
 		-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}"
@@ -189,6 +207,8 @@ dep_contour:
 	@echo -e "${BLUE}Deploying contour analysis...${NC}"
 	@nuctl deploy --path src/contour_analysis \
 		--platform local \
+		--replicas $(REPLICAS_CONTOUR) \
+		--platform-config '{"attributes": {"platformConfig": {"kind": "local", "attributes": {"enableReplicasOnLocal": true}}}}' \
 		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${SKELETONIZATION_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "contour-analysis-group"}}}' \
 		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 		-e NEO4J_USER=neo4j \
@@ -213,7 +233,8 @@ dep_concept:
 		--platform local \
 		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 		-e NEO4J_USER=neo4j \
-		-e NEO4J_PASS=${NEO4J_PASS}
+		-e NEO4J_PASS=${NEO4J_PASS} \
+		-e USE_ENERGY_MINIMIZATION=${USE_ENERGY_MINIMIZATION}
 	@echo -e "${GREEN}Concept creator deployed.${NC}"
 
 dep_classification:
@@ -221,7 +242,7 @@ dep_classification:
 	@export NUCLIO_TEST_MODE=true
 	@nuctl deploy --path src/classification \
 		--platform local \
-		--replicas 3 \
+		--replicas $(REPLICAS_CLASSIFICATION) \
 		--volume "${LOCAL_MODEL_PATH}:${NUCLIO_STORAGE}" \
 		--platform-config '{"attributes": {"platformConfig": {"kind": "local", "attributes": {"enableReplicasOnLocal": true}}}}' \
 		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONTOUR_ANALYSIS_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "classification-group"}}}' \
@@ -233,7 +254,8 @@ dep_classification:
 		-e NEO4J_PASS=${NEO4J_PASS} \
 		-e GED_TIMEOUT=5 \
 		-e FEATURE_WEIGHT=0.6 \
-		-e STRUCTURAL_WEIGHT=0.4
+		-e STRUCTURAL_WEIGHT=0.4 \
+		-e USE_ENERGY_MINIMIZATION=${USE_ENERGY_MINIMIZATION}
 	@echo -e "${GREEN}Classification deployed.${NC}"
 
 dep_all: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification
@@ -247,3 +269,15 @@ clean_results:
 	@echo -e "${BLUE}Cleaning previous results...${NC}"
 	@rm -rf ./training_results/*
 	@echo -e "${GREEN}Results cleaned.${NC}"
+
+# Add a target to deploy with energy minimization
+deploy_energy_minimization:
+	@echo -e "${BLUE}Deploying with energy minimization concept formation...${NC}"
+	@make deploy USE_ENERGY_MINIMIZATION=true
+	@echo -e "${GREEN}Deployed with energy minimization concept formation.${NC}"
+
+# Add a target to train with energy minimization
+train_energy_minimization:
+	@echo -e "${BLUE}Training with energy minimization concept formation...${NC}"
+	@make train USE_ENERGY_MINIMIZATION=true
+	@echo -e "${GREEN}Training with energy minimization concept formation completed.${NC}"

@@ -1,12 +1,12 @@
 import logging
-from typing import Dict
+from typing import Dict, List, Any
 import networkx as nx
 from neo4j import Session
 
 logging.basicConfig(level=logging.INFO)
 
 
-class Neo4jToNetworkX:
+class Neo4jToNetworkx:
     """Responsible for converting Neo4j graphs to NetworkX format"""
 
     @staticmethod
@@ -24,7 +24,7 @@ class Neo4jToNetworkX:
                id(m) as target_id
         """
         result = session.run(query, image_id=image_id)
-        return Neo4jToNetworkX._build_networkx_graph(result)
+        return Neo4jToNetworkx._build_networkx_graph(result)
 
     @staticmethod
     def extract_concept_graph(session: Session, concept_id: str) -> nx.Graph:
@@ -41,7 +41,43 @@ class Neo4jToNetworkX:
                id(m) as target_id
         """
         result = session.run(query, concept_id=concept_id)
-        return Neo4jToNetworkX._build_networkx_graph(result)
+        return Neo4jToNetworkx._build_networkx_graph(result)
+
+    @staticmethod
+    def convert(nodes_and_edges: List[Dict[str, Any]]) -> nx.Graph:
+        """
+        Convert a list of nodes and edges from Neo4j format to a NetworkX graph.
+
+        Args:
+            nodes_and_edges: List of dictionaries containing node_id, node_labels, rel_type, and target_id
+
+        Returns:
+            NetworkX graph representation
+        """
+        G = nx.Graph()
+        nodes: Dict[int, Dict] = {}  # Store node data including degree
+
+        # First pass: collect all nodes and their degrees
+        for record in nodes_and_edges:
+            node_id = record["node_id"]
+            if node_id not in nodes:
+                nodes[node_id] = {
+                    "labels": set(record["node_labels"]),
+                    **record["node_properties"],
+                }
+
+        # Add nodes to graph
+        for node_id, node_data in nodes.items():
+            G.add_node(node_id, **node_data)
+
+        # Add edges
+        for record in nodes_and_edges:
+            if record["target_id"] is not None:
+                G.add_edge(
+                    record["node_id"], record["target_id"], type=record["rel_type"]
+                )
+
+        return G
 
     @staticmethod
     def _build_networkx_graph(result) -> nx.Graph:

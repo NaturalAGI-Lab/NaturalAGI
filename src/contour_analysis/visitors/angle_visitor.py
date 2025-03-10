@@ -154,4 +154,4 @@ class AngleVisitor(Visitor):
         magnitude = math.sqrt(vector[0]**2 + vector[1]**2)
         cos_angle = dot_product / magnitude
         angle = math.degrees(math.acos(max(-1.0, min(1.0, cos_angle))))
-        return round(angle, 2)
+        return round(angle / 10) * 10

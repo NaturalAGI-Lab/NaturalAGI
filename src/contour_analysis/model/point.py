@@ -57,3 +57,13 @@ class EndPoint(Point):
     """
 
     line: str
+
+
+@dataclass
+class StartPoint(Point):
+    """
+    A start point represents the beginning of a depth-first search traversal.
+    It is typically the top-leftmost point in the contour.
+    """
+
+    line: str

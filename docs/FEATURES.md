@@ -12,28 +12,34 @@ There are list of prefixes in the system for different structures:
 - **Vector** (line that has been truncated to the angle points)
 - **Line** (result of line detector activation)
 - **CriticalPoint** (point of the exposition that is critical for the recognized structure)
+- **CurveSegment** (a sequence of points forming a curve with specific characteristics)
 
 ## Set of features
 
 ### Primary features
 
-| Feature name    | Category    | Description                                                                                                                                                              |
-| --------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Absolute        | Length      | Absolute value of the length of the structure in pixels                                                                                                                  |
-| Magnitude       | Length      | The size of the vector                                                                                                                                                   |
-| Angle           | Orientation | The direction of the structure is represented as an angle relative to a reference axis or plane                                                                          |
-| Coordinates     | Location    | Coordinates of the structure. Might be (x, y) in case of a point and pair of coordinates [(x1, y1), (x2, y2)] in case of line/vector                                     |
-| HalfPlane       | Location    | The half-plane in which the vector lies, determined by its orientation and position.                                                                                     |
-| **Vector**Value | Location    | The numerical representation of the vector in terms of its components, particularly when the coordinate system is translated to the vector's starting point              |
-| Quadrant        | Location    | The specific quadrant of the coordinate system in which the vector/line is located, particularly when the coordinate system is translated to the vector's starting point |
+| Feature name     | Category    | Description                                                                                                                                                              |
+| ---------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Absolute         | Length      | Absolute value of the length of the structure in pixels                                                                                                                  |
+| Magnitude        | Length      | The size of the vector                                                                                                                                                   |
+| Angle            | Orientation | The direction of the structure is represented as an angle relative to a reference axis or plane                                                                          |
+| Coordinates      | Location    | Coordinates of the structure. Might be (x, y) in case of a point and pair of coordinates [(x1, y1), (x2, y2)] in case of line/vector                                     |
+| HalfPlane        | Location    | The half-plane in which the vector lies, determined by its orientation and position.                                                                                     |
+| **Vector**Value  | Location    | The numerical representation of the vector in terms of its components, particularly when the coordinate system is translated to the vector's starting point              |
+| Quadrant         | Location    | The specific quadrant of the coordinate system in which the vector/line is located, particularly when the coordinate system is translated to the vector's starting point |
+| RelativePosition | Location    | The position of a point or vector relative to the center of the image, including normalized coordinates and segment information                                          |
 
 ### Secondary features
 
-| Feature name             | Category | Description                                                                                          |
-| ------------------------ | -------- | ---------------------------------------------------------------------------------------------------- |
-| **Vector**Direction      | Location | Determining whether a vector moves clockwise or counterclockwise                                     |
-| **Vector**Comparison     | Location | Compares the magnitudes of vectors that intersect to assess their relative influence or significance |
-| **Vector**QuadrantChange | Location | Determining whether a vector changed a direction of development to the new quadrant                  |
+| Feature name             | Category  | Description                                                                                          |
+| ------------------------ | --------- | ---------------------------------------------------------------------------------------------------- |
+| **Vector**Direction      | Location  | Determining whether a vector moves clockwise or counterclockwise                                     |
+| **Vector**Comparison     | Location  | Compares the magnitudes of vectors that intersect to assess their relative influence or significance |
+| **Vector**QuadrantChange | Location  | Determining whether a vector changed a direction of development to the new quadrant                  |
+| **Length**Comparison     | Relation  | Compares the lengths of consecutive vectors (LONGER, SHORTER, EQUAL, N_A)                            |
+| **Contour**Development   | Structure | Describes how a contour develops through the image space                                             |
+| **Points**Count          | Structure | Count features for different point types (CornerPointsCount, IntersectionPointsCount, etc.)          |
+| **Vectors**Count         | Structure | The number of vectors in an image                                                                    |
 
 # Features calculation
 
@@ -136,8 +142,26 @@ $$
 \begin{cases}
 \text{RIGHT} & \text{if } dx > 0 \\
 \text{LEFT} & \text{if } dx \leq 0 \\
+\text{ORIGIN} & \text{if } dx = 0 \text{ and } dy = 0 \\
 \end{cases}
 $$
+
+### RelativePosition
+
+The position of a point or vector relative to the center of the image, including normalized coordinates and segment information. Calculated as:
+
+1. Normalized coordinates (-1 to 1):
+   ```
+   normalized_x = (x - center_x) / center_x
+   normalized_y = (y - center_y) / center_y
+   ```
+
+2. Distance from center (normalized to 0-1):
+   ```
+   distance = sqrt((x - center_x)² + (y - center_y)²) / max_distance
+   ```
+
+3. Segments (TOP, BOTTOM, LEFT, RIGHT, CENTER_HORIZONTAL, CENTER_VERTICAL)
 
 ## Secondary features
 
@@ -235,3 +259,27 @@ graph TD
     q1 -- CHANGE --> quadrantChange((QuadrantChange))
     quadrantChange -- CHANGE --> q2
 ```
+
+### LengthComparison
+
+Compares the lengths of consecutive vectors:
+
+$$
+\begin{cases}
+\text{LONGER} & \text{if } \text{length(current)} > \text{length(previous)} \\
+\text{SHORTER} & \text{if } \text{length(current)} < \text{length(previous)} \\
+\text{EQUAL} & \text{if } \text{length(current)} = \text{length(previous)} \\
+\text{N_A} & \text{if there is no previous vector for comparison} \\
+\end{cases}
+$$
+
+### PointsCount and VectorsCount
+
+These features represent the count of different structural elements in an image:
+
+- **CornerPointsCount**: Number of corner points in the image
+- **IntersectionPointsCount**: Number of intersection points in the image 
+- **EndPointsCount**: Number of end points in the image
+- **VectorsCount**: Number of vectors in the image
+
+These count features are used in similarity comparisons with tolerance for slight numerical differences.

@@ -41,7 +41,7 @@ def http_handler(context, event):
     """Handles HTTP requests"""
     try:
         session_id = json.loads(event.body).get("session_id")
-        context.user_data.post_processing_service.process(session_id)
+        # context.user_data.post_processing_service.process(session_id)
 
         context.logger.info_with(f"Processed request successfully for session_id: {session_id}", handler=HANDLER_NAME)
 

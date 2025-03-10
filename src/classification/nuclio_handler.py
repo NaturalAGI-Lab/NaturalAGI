@@ -4,8 +4,8 @@ import logging
 from kafka import KafkaProducer
 import json
 from pydantic_settings import BaseSettings
-from graph_comparator import GraphComparator
 from common import ClassificationParams
+from concept_minor_classifier import ConceptMinorClassifier
 
 HANDLER_NAME = "classification"
 
@@ -59,6 +59,7 @@ def kafka_handler(context, event):
         return
 
     image_id = data["parameters"]["image_id"]
+    delete_image_nodes = data["parameters"].get("delete_image_nodes", True)
     settings = Settings()
 
     # Filter only the parameters that ClassificationParams expects
@@ -84,8 +85,12 @@ def kafka_handler(context, event):
     context.logger.info_with(
         f"Classification params: {classification_params}", handler=HANDLER_NAME
     )
-    comparator = GraphComparator(
-        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass, max_workers=10
+    comparator = ConceptMinorClassifier(
+        settings.neo4j_dsn,
+        settings.neo4j_user,
+        settings.neo4j_pass,
+        max_workers=10,
+        use_multithreading=True,
     )
 
     try:
@@ -93,7 +98,7 @@ def kafka_handler(context, event):
             raise ValueError("image_id must be provided in the request body")
 
         # Perform graph comparison
-        comparison_results = comparator.compare_graphs(image_id, classification_params)
+        comparison_results = comparator.classify(image_id)
 
         context.logger.info_with(
             f"Classification results: {comparison_results}", handler=HANDLER_NAME
@@ -107,6 +112,7 @@ def kafka_handler(context, event):
                 "classification_results": comparison_results,
                 "image_id": image_id,
                 "image_path": data["parameters"]["image_path"],
+                "parameters": {**params, **data["parameters"]},
             },
         )
 
@@ -116,11 +122,12 @@ def kafka_handler(context, event):
 
         context.user_data.kafka_producer.send(
             context.user_data.dlq_topic,
-            value={"error": str(e)},
+            value={"error": str(e), "source": HANDLER_NAME, "value": data},
         )
 
     finally:
-        # comparator.remove_image_nodes(image_id)
+        if delete_image_nodes:
+            comparator.remove_image_nodes(image_id)
         comparator.close()
 
 

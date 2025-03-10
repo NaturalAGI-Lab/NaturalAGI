@@ -35,7 +35,7 @@ class RelativePositionVisitor(Visitor):
         self.center_x = image_width / 2
         self.center_y = image_height / 2
         self.max_distance = math.sqrt(self.center_x**2 + self.center_y**2)
-        self.segment_threshold = 0.02  # 2% threshold for center segments
+        self.segment_threshold = 0.2  # 25% threshold for center segments
         self.point_positions: Dict[str, RelativePosition] = {}
         self.vector_positions: Dict[str, RelativePosition] = {}
 
@@ -97,10 +97,10 @@ class RelativePositionVisitor(Visitor):
             segments.append(RelativeSegment.RIGHT)
 
         return RelativePosition(
-            distance_from_center=distance,
+            distance_from_center=round(distance, 1),
             segments=segments,
-            normalized_x=normalized_x,
-            normalized_y=normalized_y,
+            normalized_x=round(normalized_x, 1),
+            normalized_y=round(normalized_y, 1),
         )
 
     def save_result(
@@ -124,14 +124,9 @@ class RelativePositionVisitor(Visitor):
         MATCH (p:Point {id: $point_id})
         SET p.relative_distance = $distance,
             p.normalized_x = $normalized_x,
-            p.normalized_y = $normalized_y
-        WITH p
-        UNWIND $segments as segment
-        CREATE (p)-[:HAS_RELATIVE_POSITION]->(s:Segment)
-        SET s:Segment
-        WITH s, segment
-        CALL apoc.create.addLabels(s, [segment]) YIELD node
-        RETURN node
+            p.normalized_y = $normalized_y,
+            p.segments = $segments
+        RETURN p
         """
         tx.run(
             query,
@@ -151,14 +146,8 @@ class RelativePositionVisitor(Visitor):
         MATCH (v:Vector {id: $line_id})
         SET v.relative_distance = $distance,
             v.normalized_x = $normalized_x,
-            v.normalized_y = $normalized_y
-        WITH v
-        UNWIND $segments as segment
-        CREATE (v)-[:HAS_RELATIVE_POSITION]->(s:Segment)
-        SET s:Segment
-        WITH s, segment
-        CALL apoc.create.addLabels(s, [segment]) YIELD node
-        RETURN node
+            v.normalized_y = $normalized_y,
+            v.segments = $segments
         """
         tx.run(
             query,
