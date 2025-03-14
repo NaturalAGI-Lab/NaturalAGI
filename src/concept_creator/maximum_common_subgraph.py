@@ -1,11 +1,14 @@
 import networkx as nx
 import logging
-from typing import Dict, List, Set, Tuple, Optional, Any, Callable
+from typing import Dict, List, Tuple, Any
+
+from property_handlers import PropertyHandlerManager
 
 
 class MaximumCommonSubgraph:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
+        self.property_manager = PropertyHandlerManager()
 
     def find_max_common_subgraph(
         self, G: nx.Graph, H: nx.Graph
@@ -123,20 +126,29 @@ class MaximumCommonSubgraph:
             mcs_node = i  # Use index as node ID in MCS
             mcs.add_node(mcs_node)
 
-            # Merge properties from both nodes, keeping only matching properties
+            # Merge properties from both nodes using PropertyHandlerManager
             g_props = G.nodes[g_node]
             h_props = H.nodes[h_node]
 
-            # Special handling for labels - intersection
+            # First handle labels specially
+            initial_props = {}
             if "labels" in g_props and "labels" in h_props:
                 labels1 = set(g_props["labels"])
                 labels2 = set(h_props["labels"])
-                mcs.nodes[mcs_node]["labels"] = list(labels1.intersection(labels2))
+                initial_props["labels"] = list(labels1.intersection(labels2))
 
-            # Copy other matching properties
-            for key in set(g_props.keys()).intersection(set(h_props.keys())):
-                if key != "labels" and g_props[key] == h_props[key]:
-                    mcs.nodes[mcs_node][key] = g_props[key]
+            # Use property manager to process all properties if available
+            if hasattr(self, "property_manager"):
+                processed_props = self.property_manager.process_node_properties(
+                    initial_props, g_props, h_props
+                )
+                mcs.nodes[mcs_node].update(processed_props)
+            else:
+                # Fall back to simple property matching if property_manager not available
+                mcs.nodes[mcs_node].update(initial_props)
+                for key in set(g_props.keys()).intersection(set(h_props.keys())):
+                    if key != "labels" and g_props[key] == h_props[key]:
+                        mcs.nodes[mcs_node][key] = g_props[key]
 
             # Store mappings
             G_to_mcs[g_node] = mcs_node
@@ -146,15 +158,24 @@ class MaximumCommonSubgraph:
         for i, (g1, h1) in enumerate(clique):
             for j, (g2, h2) in enumerate(clique):
                 if i < j and G.has_edge(g1, g2) and H.has_edge(h1, h2):
+                    # Add the edge
                     mcs.add_edge(G_to_mcs[g1], G_to_mcs[g2])
 
-                    # Merge edge properties, keeping only matching ones
+                    # Get edge properties
                     g_edge = G[g1][g2]
                     h_edge = H[h1][h2]
 
-                    for key in set(g_edge.keys()).intersection(set(h_edge.keys())):
-                        if g_edge[key] == h_edge[key]:
-                            mcs[G_to_mcs[g1]][G_to_mcs[g2]][key] = g_edge[key]
+                    # Process edge properties using PropertyHandlerManager if available
+                    if hasattr(self, "property_manager"):
+                        edge_props = self.property_manager.process_node_properties(
+                            {}, g_edge, h_edge
+                        )
+                        mcs[G_to_mcs[g1]][G_to_mcs[g2]].update(edge_props)
+                    else:
+                        # Fall back to simple property matching
+                        for key in set(g_edge.keys()).intersection(set(h_edge.keys())):
+                            if g_edge[key] == h_edge[key]:
+                                mcs[G_to_mcs[g1]][G_to_mcs[g2]][key] = g_edge[key]
 
         return mcs, G_to_mcs, H_to_mcs
 
@@ -163,12 +184,12 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
     def __init__(self):
         super().__init__()
         self.logger = logging.getLogger(__name__)
+        self.property_manager = PropertyHandlerManager()
 
     def find_max_common_minor(
         self,
         G: nx.Graph,
         H: nx.Graph,
-        visualization_callback: Optional[Callable] = None,
     ) -> Tuple[nx.Graph, Dict, Dict, List]:
         """
         Find the maximum common minor graph between two input graphs.
@@ -176,9 +197,6 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
         Args:
             G: First input graph
             H: Second input graph
-            visualization_callback: Optional callback for visualization during the process
-                Expected signature: callback(step_name, G, H, mcm, G_to_mcm, H_to_mcm, contractions, property_changes)
-                where property_changes is a list of dicts with node property changes
 
         Returns:
             Tuple containing:
@@ -190,12 +208,6 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
         # First find maximum common subgraph
         mcs, G_to_mcs, H_to_mcs = self.find_max_common_subgraph(G, H)
 
-        if visualization_callback:
-            # For initial MCS, there are no property changes yet
-            visualization_callback(
-                "Initial MCS", G, H, mcs, G_to_mcs, H_to_mcs, [], None
-            )
-
         # Find potential contractions to expand the common graph
         potential_contractions = self._find_potential_contractions(
             G, H, G_to_mcs, H_to_mcs
@@ -205,54 +217,6 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
         mcm, G_to_mcm, H_to_mcm, applied_contractions = self._apply_contractions(
             mcs, G, H, G_to_mcs, H_to_mcs, potential_contractions
         )
-
-        # Generate property changes information for visualization
-        property_changes = []
-        if applied_contractions:
-            # Compare properties before and after contractions
-            for g_node, g_neighbor, h_node, h_neighbor in applied_contractions:
-                # Check if these nodes are now represented in the MCM
-                if g_node in G_to_mcm and h_node in H_to_mcm:
-                    mcm_node = G_to_mcm[
-                        g_node
-                    ]  # or H_to_mcm[h_node], should be the same
-
-                    # Get original properties
-                    g_props = G.nodes[g_node]
-                    h_props = H.nodes[h_node]
-                    mcm_props = mcm.nodes[mcm_node]
-
-                    for prop in set(g_props.keys()) | set(h_props.keys()):
-                        if prop in g_props and prop in h_props and prop in mcm_props:
-                            if (
-                                g_props[prop] != mcm_props[prop]
-                                or h_props[prop] != mcm_props[prop]
-                            ):
-                                property_changes.append(
-                                    {
-                                        "G Node": g_node,
-                                        "H Node": h_node,
-                                        "MCM Node": mcm_node,
-                                        "Property": prop,
-                                        "G Value": g_props.get(prop, "(not present)"),
-                                        "H Value": h_props.get(prop, "(not present)"),
-                                        "MCM Value": mcm_props.get(
-                                            prop, "(not present)"
-                                        ),
-                                    }
-                                )
-
-        if visualization_callback and applied_contractions:
-            visualization_callback(
-                "After Contractions",
-                G,
-                H,
-                mcm,
-                G_to_mcm,
-                H_to_mcm,
-                applied_contractions,
-                property_changes,
-            )
 
         return mcm, G_to_mcm, H_to_mcm, applied_contractions
 
@@ -381,41 +345,37 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
     ) -> None:
         """
         Update properties of a node in the minor graph after contraction.
-        Only keep properties that match in both G and H and are consistent with existing properties.
+        Uses the PropertyHandlerManager to process different property types:
+        - For labels: uses intersection
+        - For numeric properties: creates range representations (min/max)
+        - For numeric arrays: creates element-wise ranges
+        - For other properties: keeps only matching properties
         """
+        # Get the properties for each node
+        mcm_props = mcm.nodes[mcm_node]
         g_props = G.nodes[g_node]
         h_props = H.nodes[h_node]
 
-        # Special handling for labels - intersection
-        if "labels" in g_props and "labels" in h_props:
-            current_labels = set(mcm.nodes[mcm_node].get("labels", []))
-            new_labels = current_labels.intersection(
-                set(g_props["labels"]).intersection(set(h_props["labels"]))
-            )
-            mcm.nodes[mcm_node]["labels"] = list(new_labels)
+        self.logger.debug(f"Updating node properties for MCM node {mcm_node}")
+        self.logger.debug(f"  MCM props before: {mcm_props}")
+        self.logger.debug(f"  G props: {g_props}")
+        self.logger.debug(f"  H props: {h_props}")
 
-        # Keep only properties that are in all nodes mapped to mcm_node
-        for key in list(mcm.nodes[mcm_node].keys()):
-            if key != "labels":
-                # Remove property if it's not in both g_node and h_node or values don't match
-                if not (
-                    key in g_props
-                    and key in h_props
-                    and g_props[key] == h_props[key] == mcm.nodes[mcm_node][key]
-                ):
-                    del mcm.nodes[mcm_node][key]
+        # Use the property manager to update properties
+        updated_props = self.property_manager.process_node_properties(
+            mcm_props, g_props, h_props
+        )
 
-        # Add new properties from g_node and h_node that match, if not already present
-        for key in set(g_props.keys()).intersection(set(h_props.keys())):
-            if key != "labels" and g_props[key] == h_props[key]:
-                if key not in mcm.nodes[mcm_node]:
-                    mcm.nodes[mcm_node][key] = g_props[key]
+        self.logger.debug(f"  Updated props after merging: {updated_props}")
+
+        # Update the node properties in the graph
+        mcm.nodes[mcm_node].clear()
+        mcm.nodes[mcm_node].update(updated_props)
 
     def find_max_common_minor_with_start_points(
         self,
         G: nx.Graph,
         H: nx.Graph,
-        visualization_callback: Optional[Callable] = None,
     ) -> Tuple[nx.Graph, Dict, Dict, List]:
         """
         Find the maximum common minor graph with special handling for StartPoint nodes.
@@ -424,8 +384,6 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
         Args:
             G: First input graph
             H: Second input graph
-            visualization_callback: Optional callback for visualization during the process
-                Expected signature: callback(step_name, G, H, mcm, G_to_mcm, H_to_mcm, contractions, property_changes)
 
         Returns:
             Tuple containing:
@@ -451,25 +409,6 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
             if "labels" in attrs and "StartPoint" in attrs["labels"]
         ]
 
-        if visualization_callback:
-            temp_G = G.copy()
-            temp_H = H.copy()
-            # Highlight start points for visualization
-            for n in G_start_points:
-                if "visualization" not in temp_G.nodes[n]:
-                    temp_G.nodes[n]["visualization"] = {}
-                temp_G.nodes[n]["visualization"]["highlight"] = True
-            for n in H_start_points:
-                if "visualization" not in temp_H.nodes[n]:
-                    temp_H.nodes[n]["visualization"] = {}
-                temp_H.nodes[n]["visualization"]["highlight"] = True
-            visualization_callback(
-                "Start Points", temp_G, temp_H, initial_mcm, {}, {}, [], None
-            )
-
-        # Property change tracking for visualization
-        property_changes = []
-
         # If both graphs have start points, match them first
         if G_start_points and H_start_points:
             # Match start points (assuming all start points are compatible)
@@ -488,53 +427,39 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
                 g_props = G.nodes[g_start]
                 h_props = H.nodes[h_start]
 
-                # Track property differences
-                for prop in set(g_props.keys()) | set(h_props.keys()):
-                    if prop in g_props and prop in h_props:
-                        if g_props[prop] != h_props[prop]:
-                            # Remember we'll use G's value in the MCM node
-                            property_changes.append(
-                                {
-                                    "G Node": g_start,
-                                    "H Node": h_start,
-                                    "MCM Node": mcm_node,
-                                    "Property": prop,
-                                    "G Value": g_props.get(prop, "(not present)"),
-                                    "H Value": h_props.get(prop, "(not present)"),
-                                    "MCM Value": g_props.get(
-                                        prop, "(not present)"
-                                    ),  # Using G's value
-                                }
-                            )
-
             # Set properties to the intersection of g_props and h_props
             if "labels" in g_props and "labels" in h_props:
                 labels1 = set(g_props["labels"])
                 labels2 = set(h_props["labels"])
-                initial_mcm.nodes[mcm_node]["labels"] = list(labels1.intersection(labels2))
+                initial_mcm.nodes[mcm_node]["labels"] = list(
+                    labels1.intersection(labels2)
+                )
 
-            for key in set(g_props.keys()).intersection(set(h_props.keys())):
-                if key != "labels" and g_props[key] == h_props[key]:
-                    initial_mcm.nodes[mcm_node][key] = g_props[key]
+            # Instead of only copying exact matching properties,
+            # use the PropertyHandlerManager to properly process all properties
+            # including numeric ones that should be converted to ranges
+            initial_props = {}
+            if "labels" in initial_mcm.nodes[mcm_node]:
+                initial_props["labels"] = initial_mcm.nodes[mcm_node]["labels"]
+
+            # Process properties using the property manager
+            processed_props = self.property_manager.process_node_properties(
+                initial_props, g_props, h_props
+            )
+
+            # Update the node properties
+            initial_mcm.nodes[mcm_node].update(processed_props)
+
+            self.logger.debug(
+                f"StartPoint properties after processing: {initial_mcm.nodes[mcm_node]}"
+            )
 
             G_to_mcm[g_start] = mcm_node
             H_to_mcm[h_start] = mcm_node
 
-            if visualization_callback:
-                visualization_callback(
-                    "Initial Anchoring",
-                    G,
-                    H,
-                    initial_mcm,
-                    G_to_mcm,
-                    H_to_mcm,
-                    [],
-                    property_changes,
-                )
-
         # If we couldn't match any start points, fall back to the regular approach
         if not initial_mcm.nodes():
-            return self.find_max_common_minor(G, H, visualization_callback)
+            return self.find_max_common_minor(G, H)
 
         # Grow the common minor from the matched start points
         mcm, G_to_mcm, H_to_mcm, contractions = self._grow_common_minor(
@@ -573,18 +498,6 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
                                         ),
                                     }
                                 )
-
-        if visualization_callback:
-            visualization_callback(
-                "Final MCM",
-                G,
-                H,
-                mcm,
-                G_to_mcm,
-                H_to_mcm,
-                contractions,
-                final_property_changes,
-            )
 
         return mcm, G_to_mcm, H_to_mcm, contractions
 
@@ -705,16 +618,25 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
                 g_props = G.nodes[g_node]
                 h_props = H.nodes[h_node]
 
-                # Special handling for labels
+                # Instead of manually handling properties, use PropertyHandlerManager
+                # First, handle labels specially
+                initial_props = {}
                 if "labels" in g_props and "labels" in h_props:
                     labels1 = set(g_props["labels"])
                     labels2 = set(h_props["labels"])
-                    mcm.nodes[mcm_node]["labels"] = list(labels1.intersection(labels2))
+                    initial_props["labels"] = list(labels1.intersection(labels2))
 
-                # Copy other matching properties
-                for key in set(g_props.keys()).intersection(set(h_props.keys())):
-                    if key != "labels" and g_props[key] == h_props[key]:
-                        mcm.nodes[mcm_node][key] = g_props[key]
+                # Use the property manager to process all properties
+                processed_props = self.property_manager.process_node_properties(
+                    initial_props, g_props, h_props
+                )
+
+                # Update the node properties
+                mcm.nodes[mcm_node].update(processed_props)
+
+                self.logger.debug(
+                    f"Regular node properties after processing: {mcm.nodes[mcm_node]}"
+                )
 
                 # Update mappings
                 G_to_mcm[g_node] = mcm_node
@@ -723,7 +645,29 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
                 # Add edges to already matched nodes
                 for g_neighbor in G.neighbors(g_node):
                     if g_neighbor in G_to_mcm:
-                        mcm.add_edge(mcm_node, G_to_mcm[g_neighbor])
+                        mcm_neighbor = G_to_mcm[g_neighbor]
+
+                        # Add the edge
+                        mcm.add_edge(mcm_node, mcm_neighbor)
+
+                        # Merge edge properties if they exist in both graphs
+                        if G.has_edge(g_node, g_neighbor) and H.has_edge(
+                            h_node, H_to_mcm.get(g_neighbor)
+                        ):
+                            g_edge = G[g_node][g_neighbor]
+                            h_edge = H[h_node][H_to_mcm.get(g_neighbor)]
+
+                            # Process edge properties
+                            edge_props = self.property_manager.process_node_properties(
+                                {}, g_edge, h_edge
+                            )
+
+                            # Update edge properties
+                            mcm[mcm_node][mcm_neighbor].update(edge_props)
+
+                            self.logger.debug(
+                                f"Edge properties after processing: {mcm[mcm_node][mcm_neighbor]}"
+                            )
 
                 # Update frontier
                 g_frontier = set(

@@ -11,11 +11,6 @@ from pydantic_settings import BaseSettings
 
 from concept_creation_repository import ConceptCreationRepository
 from energy_minimization_concept_service import EnergyMinimizationConceptService
-from graph_intersection_concept_service import GraphIntersectionConceptService
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("concept_creator")
 
 HANDLER_NAME = "concept_creator"
 
@@ -23,14 +18,10 @@ HANDLER_NAME = "concept_creator"
 class Settings(BaseSettings):
     """Settings for the concept creator service"""
 
-    neo4j_uri: str = os.getenv("NEO4J_URI", "bolt://neo4j:7687")
-    neo4j_user: str = os.getenv("NEO4J_USER", "neo4j")
-    neo4j_password: str = os.getenv("NEO4J_PASSWORD", "password")
+    neo4j_dsn: str
+    neo4j_user: str
+    neo4j_pass: str
     next_nuclio: str = ""
-    default_algorithm: str = (
-        "graph_intersection"  # Can be 'energy_minimization' or 'graph_intersection'
-    )
-
 
 def init_context(context):
     """
@@ -38,24 +29,14 @@ def init_context(context):
     """
     settings = Settings()
 
-    # Set up logger
-    context.logger.setLevel(logging.INFO)
-
     # Initialize services
     context.energy_minimization_service = EnergyMinimizationConceptService(
-        settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password
-    )
-    context.graph_intersection_service = GraphIntersectionConceptService(
-        settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password
+        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
     )
     context.repository = ConceptCreationRepository(
-        settings.neo4j_uri, settings.neo4j_user, settings.neo4j_password
+        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
     )
     context.settings = settings
-
-    context.logger.info(
-        f"Concept creator initialized with default algorithm: {settings.default_algorithm}"
-    )
 
     return context
 
@@ -70,9 +51,9 @@ def handler(context, event):
 
         # Parse the event body
         body = json.loads(event.body.decode("utf-8"))
+        context.logger.info(f"Body: {body}")
         session_id = body.get("session_id")
         concept_id = body.get("concept_id")
-        algorithm = body.get("algorithm", context.settings.default_algorithm)
 
         if not session_id:
             return context.Response(
@@ -83,35 +64,20 @@ def handler(context, event):
 
         # Log input parameters
         context.logger.info(
-            f"Creating concept for session {session_id} using algorithm: {algorithm}"
+            f"Creating concept for session {session_id}"
         )
 
-        # Create the concept based on the specified algorithm
-        if algorithm == "energy_minimization":
-            concept_id, concept_graph = (
-                context.energy_minimization_service.create_concept_incrementally(
-                    session_id, concept_id
-                )
+        concept_id, concept_graph = (
+            context.energy_minimization_service.create_concept_incrementally(
+                session_id, concept_id
             )
-        elif algorithm == "graph_intersection":
-            concept_id, concept_graph = (
-                context.graph_intersection_service.create_concept(
-                    session_id, concept_id
-                )
-            )
-        else:
-            return context.Response(
-                body=json.dumps({"error": f"Unknown algorithm: {algorithm}"}),
-                status_code=400,
-                content_type="application/json",
-            )
+        )
 
         # Create response with execution details
         execution_time = time.time() - start_time
         response = {
             "concept_id": concept_id,
             "session_id": session_id,
-            "algorithm": algorithm,
             "nodes_count": len(concept_graph.nodes()),
             "edges_count": len(concept_graph.edges()),
             "execution_time_seconds": execution_time,

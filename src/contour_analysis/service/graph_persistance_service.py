@@ -97,15 +97,19 @@ class GraphPersistenceService:
             type_curves = [c for c in curves if c.type == curve_type]
             if type_curves:
                 tx.run(
-                    query % curve_type.value.capitalize(),  # Creates labels like :Curve:Convex or :Curve:Concave
-                    curves=[{
-                        "id": c.id,
-                        "start_point": c.start_point,
-                        "end_point": c.end_point,
-                        "vectors": c.vectors
-                    } for c in type_curves],
+                    query
+                    % curve_type.value.capitalize(),  # Creates labels like :Curve:Convex or :Curve:Concave
+                    curves=[
+                        {
+                            "id": c.id,
+                            "start_point": c.start_point,
+                            "end_point": c.end_point,
+                            "vectors": c.vectors,
+                        }
+                        for c in type_curves
+                    ],
                     image_id=image_id,
-                    session_id=session_id
+                    session_id=session_id,
                 )
 
     def close(self):

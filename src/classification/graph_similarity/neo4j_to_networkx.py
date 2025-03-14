@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Dict
 import networkx as nx
@@ -28,7 +29,7 @@ class Neo4jToNetworkX:
                elementId(m) AS target_id
         """
         result = session.run(query, image_id=image_id)
-        return Neo4jToNetworkX._build_networkx_graph_without_segments(result)
+        return Neo4jToNetworkX._build_networkx_graph(result)
 
     @staticmethod
     def extract_concept_graph(session: Session, concept_id: str) -> nx.Graph:
@@ -49,39 +50,6 @@ class Neo4jToNetworkX:
         return Neo4jToNetworkX._build_networkx_graph(result)
 
     @staticmethod
-    def _build_networkx_graph_without_segments(result) -> nx.Graph:
-        """
-        Builds a NetworkX graph from a Neo4j result that does not include segment embeddings.
-        Only nodes of type Point or Vector and their interconnections are added.
-        """
-        G = nx.Graph()
-        nodes: Dict[int, Dict] = {}
-
-        records = list(result)
-        # First pass: collect nodes
-        for record in records:
-            node_id = record["node_id"]
-            if node_id not in nodes:
-                node_data = {
-                    "labels": set(record["node_labels"]),
-                    **record["node_props"],
-                }
-                print("Adding node with props: ", node_data)
-                nodes[node_id] = node_data
-
-        # Add nodes to graph
-        for node_id, node_data in nodes.items():
-            G.add_node(node_id, **node_data)
-
-        # Add edges (only regular edges, no segment edges)
-        for record in records:
-            if record["target_id"] is not None:
-                G.add_edge(
-                    record["node_id"], record["target_id"], type=record["rel_type"]
-                )
-        return G
-
-    @staticmethod
     def _build_networkx_graph(result) -> nx.Graph:
         """
         Builds a NetworkX graph from a Neo4j result that includes segments.
@@ -93,8 +61,25 @@ class Neo4jToNetworkX:
 
         for record in records:
             node_id = record["node_id"]
-            if node_id not in nodes:
-                nodes[node_id] = {"labels": set(record["node_labels"])}
+            properties = record["node_props"]
+            # Parse properties: try to parse string values as JSON
+            parsed_properties = {}
+            for key, value in properties.items():
+                if isinstance(value, str):
+                    try:
+                        parsed_value = json.loads(value)
+                        parsed_properties[key] = parsed_value
+                    except json.JSONDecodeError:
+                        parsed_properties[key] = value
+                else:
+                    parsed_properties[key] = value
+            # Set 'labels' property
+            parsed_properties['labels'] = record["node_labels"]
+            node_data = {
+                "labels": set(record["node_labels"]),
+                **parsed_properties,
+            }
+            nodes[node_id] = node_data
 
         for node_id, node_data in nodes.items():
             G.add_node(node_id, **node_data)

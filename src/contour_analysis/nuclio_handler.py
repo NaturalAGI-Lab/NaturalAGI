@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     dlq_topic: str
     kafka_topic: str
     kafka_bootstrap_servers: str
+    merge_threshold: float = (
+        10.0  # Default threshold for merging close intersection points
+    )
 
 
 def init_context(context):
@@ -80,7 +83,9 @@ def init_context(context):
     setattr(context.user_data, "next_nuclio", settings.next_nuclio)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
     setattr(context.user_data, "kafka_producer", producer)
+    setattr(context.user_data, "settings", settings)
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
+
 
 def kafka_handler(context, event):
     """Handles Kafka messages"""
@@ -100,21 +105,32 @@ def kafka_handler(context, event):
 
         network = GraphDeserializer.deserialize(input_data["skeleton"])
 
-        context.user_data.data_preprocessing_service.persist_graph(
-            network, image_id, parameters["session_id"]
-        )
-
+        # Create NetworkxGraphAnalysis instance
         networkx_graph_analysis = NetworkxGraphAnalysis(
             network,
             visitor_result_persistence_service=context.user_data.visitor_result_persistence_service,
             analysis_result_persistence_service=context.user_data.analysis_result_persistence_service,
+            merge_threshold=context.user_data.settings.merge_threshold,
         )
 
+        # Apply reduction rules first
+        networkx_graph_analysis.merge_close_intersection_points()
+
+        # Now persist the graph AFTER merging operations
+        context.user_data.data_preprocessing_service.persist_graph(
+            network, image_id, parameters["session_id"]
+        )
+
+        # Continue with the rest of the analysis
         networkx_graph_analysis.add_visitor(QuadrantVisitor())
         # networkx_graph_analysis.add_visitor(LengthComparisonVisitor())
         networkx_graph_analysis.add_visitor(AngleVisitor(network))
         networkx_graph_analysis.add_visitor(HalfPlaneVisitor(network))
-        networkx_graph_analysis.add_visitor(RelativePositionVisitor(network, parameters["image_width"], parameters["image_height"]))
+        networkx_graph_analysis.add_visitor(
+            RelativePositionVisitor(
+                network, parameters["image_width"], parameters["image_height"]
+            )
+        )
 
         networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
         networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
@@ -126,16 +142,15 @@ def kafka_handler(context, event):
         context.user_data.tertiary_features_service.create_tertiary_features(
             image_id, session_id
         )
-        
+
         context.user_data.kafka_producer.send(
             context.user_data.kafka_topic,
-            value={
-                "operation": operation,
-                "parameters": parameters
-            }
+            value={"operation": operation, "parameters": parameters},
         )
-        
-        context.logger.info_with(f"Analysis complete for image_id: {image_id}", handler=HANDLER_NAME)
+
+        context.logger.info_with(
+            f"Analysis complete for image_id: {image_id}", handler=HANDLER_NAME
+        )
 
     except Exception as error:
         error_info = {

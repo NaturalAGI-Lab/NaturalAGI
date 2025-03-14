@@ -197,7 +197,7 @@ dep_skel:
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 		-e DLQ_TOPIC="${DLQ_TOPIC}" \
-		-e SIMPLIFICATION_EPSILON=4 \
+		-e SIMPLIFICATION_EPSILON=5 \
 		-e SKELETONIZATION_THRESHOLD=170 \
 		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}' \
 		-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}"

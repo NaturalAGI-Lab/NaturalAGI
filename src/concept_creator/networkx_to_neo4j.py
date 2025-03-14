@@ -57,10 +57,23 @@ class NetworkxToNeo4j:
 
         # First add all nodes
         for node, data in graph.nodes(data=True):
+            # Process properties to handle range dictionaries
+            processed_props = {}
+            for k, v in data.items():
+                if k != "labels":
+                    # Convert range dictionaries to strings
+                    if isinstance(v, dict) and v.get("type") == "range":
+                        # Format: "range(min=0.2,max=0.3,center=0.25)"
+                        processed_props[k] = (
+                            f"range(min={v['min']},max={v['max']},center={v['center']})"
+                        )
+                    else:
+                        processed_props[k] = v
+
             node_data = {
                 "uuid": str(node),
                 "type": "node",
-                "properties": {k: v for k, v in data.items()},
+                "properties": processed_props,
             }
 
             # Handle labels separately
@@ -76,12 +89,24 @@ class NetworkxToNeo4j:
 
         # Then add all edges
         for u, v, data in graph.edges(data=True):
+            # Process edge properties the same way
+            processed_edge_props = {}
+            for k, v in data.items():
+                if k != "type":
+                    # Convert range dictionaries to strings
+                    if isinstance(v, dict) and v.get("type") == "range":
+                        processed_edge_props[k] = (
+                            f"range(min={v['min']},max={v['max']},center={v['center']})"
+                        )
+                    else:
+                        processed_edge_props[k] = v
+
             edge_data = {
                 "source": str(u),
                 "target": str(v),
                 "type": "relationship",
                 "relationship_type": data.get("type", "CONNECTS"),
-                "properties": {k: v for k, v in data.items() if k != "type"},
+                "properties": processed_edge_props,
             }
             result.append(edge_data)
 
