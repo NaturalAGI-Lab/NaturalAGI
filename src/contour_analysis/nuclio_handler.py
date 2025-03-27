@@ -21,6 +21,7 @@ from visitors.relative_position_visitor import RelativePositionVisitor
 from visitors.angle_visitor import AngleVisitor
 from visitors.half_plane_visitor import HalfPlaneVisitor
 from visitors.quadrant_visitor import QuadrantVisitor
+from visitors.direction_visitor import DirectionVisitor
 
 HANDLER_NAME = "Contour analysis"
 
@@ -131,6 +132,7 @@ def kafka_handler(context, event):
                 network, parameters["image_width"], parameters["image_height"]
             )
         )
+        networkx_graph_analysis.add_visitor(DirectionVisitor())
 
         networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
         networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)

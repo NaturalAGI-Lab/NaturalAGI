@@ -22,7 +22,7 @@ class RangePropertyMatcher(PropertyMatcher):
     - String-serialized range dictionaries from Neo4j
     """
 
-    def __init__(self, numeric_tolerance: float = 0.1):
+    def __init__(self, numeric_tolerance: float = 0.2):
         """
         Initialize the RangePropertyMatcher.
 
@@ -125,7 +125,7 @@ class RangePropertyMatcher(PropertyMatcher):
         ):
             # For small values, use absolute tolerance
             if abs(concept_value) < 1.0 or abs(instance_value) < 1.0:
-                result = abs(concept_value - instance_value) <= self.ABSOLUTE_TOLERANCE
+                result = round(abs(concept_value - instance_value), 1) <= self.ABSOLUTE_TOLERANCE
                 self.logger.debug(
                     f"Absolute tolerance match: {concept_value} vs {instance_value}, result: {result}"
                 )

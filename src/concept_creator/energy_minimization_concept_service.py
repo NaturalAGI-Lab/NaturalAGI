@@ -92,7 +92,7 @@ class EnergyMinimizationConceptService:
         self.repository.save_concept(concept_id, concept_graph)
 
         # Clean up processing data
-        # self._cleanup_processed_images(image_ids)
+        self._cleanup_processed_images(image_ids)
 
         self.logger.info(
             f"Created concept with ID {concept_id} using traversal-based MCMG approach. "

@@ -225,9 +225,12 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
     ) -> List:
         """
         Find potential edge contractions that could extend the match.
+        This enhanced version looks for both direct neighbors and paths through
+        unmatched nodes.
 
         Returns a list of potential contractions in format:
-        [(g_node1, g_node2, h_node1, h_node2), ...]
+        [(g_node1, g_node2, h_node1, h_node2, g_path, h_path), ...]
+        where g_path and h_path are the paths (if any) through unmatched nodes.
         """
         potential_contractions = []
 
@@ -237,32 +240,88 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
         # Nodes in H not in the common subgraph
         H_unmatched = set(H.nodes()) - set(H_to_mcs.keys())
 
+        # Create inverse mappings
+        mcs_to_G = {v: k for k, v in G_to_mcs.items()}
+        mcs_to_H = {v: k for k, v in H_to_mcs.items()}
+
         # For each unmatched node in G
         for g_node in G_unmatched:
-            # Find its neighbors that are in the common subgraph
-            g_matched_neighbors = [n for n in G.neighbors(g_node) if n in G_to_mcs]
+            # Find paths to matched nodes (direct neighbors first)
+            g_paths_to_matched = self._find_paths_to_matched(G, g_node, G_to_mcs)
 
             # For each unmatched node in H
             for h_node in H_unmatched:
-                # Find its neighbors that are in the common subgraph
-                h_matched_neighbors = [n for n in H.neighbors(h_node) if n in H_to_mcs]
+                # Find paths to matched nodes (direct neighbors first)
+                h_paths_to_matched = self._find_paths_to_matched(H, h_node, H_to_mcs)
 
-                # Check if there's potential for contraction
-                for g_neighbor in g_matched_neighbors:
-                    for h_neighbor in h_matched_neighbors:
-                        # If both neighbors map to the same node in the MCS
-                        if G_to_mcs[g_neighbor] == H_to_mcs[h_neighbor]:
+                # For each path from g_node to a matched node
+                for g_matched, g_path in g_paths_to_matched.items():
+                    # For each path from h_node to a matched node
+                    for h_matched, h_path in h_paths_to_matched.items():
+                        # If both matched nodes map to the same node in the MCS
+                        if G_to_mcs[g_matched] == H_to_mcs[h_matched]:
                             potential_contractions.append(
-                                (g_node, g_neighbor, h_node, h_neighbor)
+                                (g_node, g_matched, h_node, h_matched, g_path, h_path)
                             )
 
-        # Sort by the number of common neighbors to prioritize better contractions
+        # Sort by the quality metric to prioritize better contractions
         potential_contractions.sort(
-            key=lambda c: self._contraction_quality(G, H, c[0], c[1], c[2], c[3]),
+            key=lambda c: self._contraction_quality(
+                G, H, c[0], c[1], c[2], c[3], c[4], c[5]
+            ),
             reverse=True,
         )
 
         return potential_contractions
+
+    def _find_paths_to_matched(
+        self, graph: nx.Graph, start_node: Any, node_to_mcs: Dict
+    ) -> Dict[Any, List[Any]]:
+        """
+        Find paths from start_node to all reachable matched nodes in the graph.
+
+        Args:
+            graph: The graph to search in
+            start_node: The unmatched node to start from
+            node_to_mcs: Mapping from graph nodes to MCS nodes
+
+        Returns:
+            Dict mapping matched destination nodes to paths from start_node
+        """
+        # First, check direct neighbors (most common case)
+        direct_paths = {}
+        for neighbor in graph.neighbors(start_node):
+            if neighbor in node_to_mcs:
+                direct_paths[neighbor] = [start_node, neighbor]
+
+        # If we found direct neighbors, no need for full BFS
+        if direct_paths:
+            return direct_paths
+
+        # Otherwise, do BFS to find paths to any matched node
+        paths = {}  # matched node -> path from start_node
+        queue = [(start_node, [start_node])]  # (node, path to this node)
+        visited = {start_node}
+
+        while queue:
+            current, path = queue.pop(0)
+
+            for neighbor in graph.neighbors(current):
+                if neighbor in visited:
+                    continue
+
+                new_path = path + [neighbor]
+
+                # If this is a matched node, record the path
+                if neighbor in node_to_mcs:
+                    paths[neighbor] = new_path
+                    continue  # Don't extend beyond matched nodes
+
+                # Otherwise, continue BFS
+                queue.append((neighbor, new_path))
+                visited.add(neighbor)
+
+        return paths
 
     def _contraction_quality(
         self,
@@ -272,21 +331,32 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
         g_neighbor: Any,
         h_node: Any,
         h_neighbor: Any,
-    ) -> int:
+        g_path: List[Any] = None,
+        h_path: List[Any] = None,
+    ) -> float:
         """
         Calculate a quality score for a potential contraction.
-        Higher is better.
+        Higher is better. Takes into account path length when paths are used.
         """
-        # Count common neighbors - higher means better structural similarity
+        # Base quality from the original method
         g_neighbors = set(G.neighbors(g_node)) & set(G.neighbors(g_neighbor))
         h_neighbors = set(H.neighbors(h_node)) & set(H.neighbors(h_neighbor))
 
         # Node similarity score based on properties
         node_similarity = (
-            1 if self._nodes_match(G.nodes[g_node], H.nodes[h_node]) else 0
+            5 if self._nodes_match(G.nodes[g_node], H.nodes[h_node]) else 0
         )
 
-        return len(g_neighbors) + len(h_neighbors) + 10 * node_similarity
+        base_score = len(g_neighbors) + len(h_neighbors) + node_similarity
+
+        # Apply penalty for longer paths
+        path_penalty = 0
+        if g_path and len(g_path) > 2:  # direct edge is length 2
+            path_penalty += 0.5 * (len(g_path) - 2)
+        if h_path and len(h_path) > 2:  # direct edge is length 2
+            path_penalty += 0.5 * (len(h_path) - 2)
+
+        return base_score - path_penalty
 
     def _apply_contractions(
         self,
@@ -299,6 +369,7 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
     ) -> Tuple[nx.Graph, Dict, Dict, List]:
         """
         Apply valid contractions to grow the common structure.
+        Updated to handle path-based contractions.
 
         Returns:
             - The maximum common minor graph
@@ -313,7 +384,17 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
         applied_contractions = []
 
         # For each potential contraction
-        for g_node, g_neighbor, h_node, h_neighbor in contractions:
+        for contraction in contractions:
+            # Unpack the contraction data
+            if (
+                len(contraction) == 4
+            ):  # Old format: (g_node, g_neighbor, h_node, h_neighbor)
+                g_node, g_neighbor, h_node, h_neighbor = contraction
+                g_path = [g_node, g_neighbor]
+                h_path = [h_node, h_neighbor]
+            else:  # New format with paths
+                g_node, g_neighbor, h_node, h_neighbor, g_path, h_path = contraction
+
             # Skip if already processed
             if g_node in G_to_mcm or h_node in H_to_mcm:
                 continue
@@ -326,11 +407,23 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
             H_to_mcm[h_node] = common_node
 
             # Update properties of the node in the minor graph
-            # (only keeping properties that match both G and H)
             self._update_node_properties(mcm, common_node, G, g_node, H, h_node)
 
-            # Track the contraction
-            applied_contractions.append((g_node, g_neighbor, h_node, h_neighbor))
+            # Also add any intermediate nodes in the paths to the mapping
+            if g_path and len(g_path) > 2:
+                for intermediate in g_path[1:-1]:  # Skip start and end nodes
+                    if intermediate not in G_to_mcm:
+                        G_to_mcm[intermediate] = common_node
+
+            if h_path and len(h_path) > 2:
+                for intermediate in h_path[1:-1]:  # Skip start and end nodes
+                    if intermediate not in H_to_mcm:
+                        H_to_mcm[intermediate] = common_node
+
+            # Track the contraction with path information
+            applied_contractions.append(
+                (g_node, g_neighbor, h_node, h_neighbor, g_path, h_path)
+            )
 
         return mcm, G_to_mcm, H_to_mcm, applied_contractions
 
@@ -511,6 +604,7 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
     ) -> Tuple[nx.Graph, Dict, Dict, List]:
         """
         Grow the common minor graph from the initial match.
+        Now enhanced to support path-based contractions.
 
         Args:
             initial_mcm: Initial common graph
@@ -568,14 +662,22 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
 
             # If no good match found, try contractions
             if best_match is None:
-                # Find potential contractions
+                # Find potential contractions (now including path-based contractions)
                 contractions = self._find_potential_contractions(
                     G, H, G_to_mcm, H_to_mcm
                 )
 
                 # Apply first valid contraction
                 if contractions:
-                    g_node, g_neighbor, h_node, h_neighbor = contractions[0]
+                    # Unpack the contraction data
+                    if len(contractions[0]) == 4:  # Old format
+                        g_node, g_neighbor, h_node, h_neighbor = contractions[0]
+                        g_path = [g_node, g_neighbor]
+                        h_path = [h_node, h_neighbor]
+                    else:  # New format with paths
+                        g_node, g_neighbor, h_node, h_neighbor, g_path, h_path = (
+                            contractions[0]
+                        )
 
                     # Get the common node in the minor
                     common_node = G_to_mcm[g_neighbor]
@@ -587,9 +689,20 @@ class MaximumCommonMinorGraph(MaximumCommonSubgraph):
                     # Update properties
                     self._update_node_properties(mcm, common_node, G, g_node, H, h_node)
 
-                    # Track contraction
+                    # Add intermediate nodes in paths to the mapping
+                    if g_path and len(g_path) > 2:
+                        for intermediate in g_path[1:-1]:  # Skip start and end nodes
+                            if intermediate not in G_to_mcm:
+                                G_to_mcm[intermediate] = common_node
+
+                    if h_path and len(h_path) > 2:
+                        for intermediate in h_path[1:-1]:  # Skip start and end nodes
+                            if intermediate not in H_to_mcm:
+                                H_to_mcm[intermediate] = common_node
+
+                    # Track contraction with path information
                     applied_contractions.append(
-                        (g_node, g_neighbor, h_node, h_neighbor)
+                        (g_node, g_neighbor, h_node, h_neighbor, g_path, h_path)
                     )
 
                     # Update frontier

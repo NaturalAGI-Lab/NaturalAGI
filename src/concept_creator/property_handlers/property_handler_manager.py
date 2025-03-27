@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Set, Tuple, Union
 from .property_handler import PropertyHandler
 from .range_property_handler import RangePropertyHandler
 from .list_property_handler import ListPropertyHandler
+from .enum_property_handler import EnumPropertyHandler
 
 
 class PropertyHandlerManager:
@@ -19,6 +20,7 @@ class PropertyHandlerManager:
         self.handlers: List[PropertyHandler] = [
             RangePropertyHandler(),
             ListPropertyHandler(),
+            EnumPropertyHandler(),
         ]
 
     def add_handler(self, handler: PropertyHandler) -> None:
