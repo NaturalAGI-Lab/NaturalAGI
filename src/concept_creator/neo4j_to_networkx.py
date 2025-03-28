@@ -56,7 +56,7 @@ class Neo4jToNetworkx:
             node_id = record["node_id"]
             if node_id not in nodes:
                 nodes[node_id] = {
-                    "labels": set(record["node_labels"]),
+                    "labels": record["node_labels"],
                     **record["node_properties"],
                 }
 

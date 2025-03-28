@@ -132,11 +132,7 @@ class PropertyHandlerManager:
 
         # Special handling for labels - intersection
         if "labels" in g_node_props and "labels" in h_node_props:
-            current_labels = set(result.get("labels", []))
-            new_labels = current_labels.intersection(
-                set(g_node_props["labels"]).intersection(set(h_node_props["labels"]))
-            )
-            result["labels"] = list(new_labels)
+            result["labels"] = self._merge_node_types(g_node_props["labels"], h_node_props["labels"])
 
         # Process existing properties
         for key in list(result.keys()):
@@ -214,3 +210,37 @@ class PropertyHandlerManager:
 
         self.logger.debug(f"Final processed properties: {result}")
         return result
+    
+    def _merge_node_types(self, types1: List[str], types2: List[str]) -> List[str]:
+        """
+        Merge node types from two nodes.
+        Special handling for IntersectionPoint and CornerPoint transformation.
+
+        Args:
+            types1: Types from first node
+            types2: Types from second node
+
+        Returns:
+            Merged list of types
+        """
+        # Check for the special case of IntersectionPoint and CornerPoint
+        has_intersection1 = "IntersectionPoint" in types1
+        has_corner1 = "CornerPoint" in types1
+        has_intersection2 = "IntersectionPoint" in types2
+        has_corner2 = "CornerPoint" in types2
+
+        # Handle the transformation case
+        if has_intersection1 and has_corner2:
+            # When merging, prefer CornerPoint when transforming from IntersectionPoint
+            return ["CornerPoint", "Point"]
+        elif has_corner1 and has_intersection2:
+            # When merging, prefer CornerPoint when transforming from IntersectionPoint
+            return ["CornerPoint", "Point"]
+
+        # Standard case: intersection of types
+        common_types = set(types1) & set(types2)
+        if common_types:
+            return list(common_types)
+
+        # If no common types, return an empty list
+        return []
