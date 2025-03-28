@@ -2,19 +2,23 @@ import logging
 
 from neo4j import ManagedTransaction
 
-from logic.tertiary_features.strategy.tertiary_feature_extraction_strategy import TertiaryFeatureStrategy
+from logic.tertiary_features.strategy.tertiary_feature_extraction_strategy import (
+    TertiaryFeatureStrategy,
+)
 
 
 class IntersectionPointsStrategy(TertiaryFeatureStrategy):
     """Strategy for extracting intersection points.
     This class counts number of intersection points per sample (image) and creates a new node
     named IntersectionPointsCount:Feature. With the count as a property.
+
+    Note: The intersection points are also added to corner_points_count in the CornerPointsStrategy,
+    since intersection points can functionally replace corner points.
     """
-    
+
     def __init__(self, session_id: str):
         self.session_id = session_id
-    
-    
+
     def execute(self, tx: ManagedTransaction, image_id: str):
         query = """
            MATCH (intersection_point:IntersectionPoint {image_id: $image_id})
