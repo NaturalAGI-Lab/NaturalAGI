@@ -8,7 +8,6 @@ from property_handlers.property_handler_manager import PropertyHandlerManager
 from node_similarity_calculator import NodeSimilarityCalculator
 from graph_minor_finder import GraphMinorFinder
 
-
 class CriticalPointConceptService:
     def __init__(self, neo4j_uri: str, neo4j_user: str, neo4j_password: str):
         self.repository = ConceptCreationRepository(
@@ -18,6 +17,7 @@ class CriticalPointConceptService:
         self.similarity_calculator = NodeSimilarityCalculator()
         self.graph_minor_finder = GraphMinorFinder()
         self.logger = logging.getLogger(__name__)
+        self.logger.setLevel(logging.DEBUG)
         self.logger.info("CriticalPointConceptService initialized.")
 
     def create_concept_incrementally(
