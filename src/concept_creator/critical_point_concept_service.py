@@ -6,7 +6,8 @@ import uuid
 from concept_creation_repository import ConceptCreationRepository
 from property_handlers.property_handler_manager import PropertyHandlerManager
 from node_similarity_calculator import NodeSimilarityCalculator
-from graph_minor_finder import GraphMinorFinder
+from concept_creator.graph_minor_finder import GraphMinorFinder
+
 
 class CriticalPointConceptService:
     def __init__(self, neo4j_uri: str, neo4j_user: str, neo4j_password: str):

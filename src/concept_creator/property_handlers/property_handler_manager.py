@@ -132,7 +132,9 @@ class PropertyHandlerManager:
 
         # Special handling for labels - intersection
         if "labels" in g_node_props and "labels" in h_node_props:
-            result["labels"] = self._merge_node_types(g_node_props["labels"], h_node_props["labels"])
+            result["labels"] = self._merge_node_types(
+                g_node_props["labels"], h_node_props["labels"]
+            )
 
         # Process existing properties
         for key in list(result.keys()):
@@ -210,7 +212,7 @@ class PropertyHandlerManager:
 
         self.logger.debug(f"Final processed properties: {result}")
         return result
-    
+
     def _merge_node_types(self, types1: List[str], types2: List[str]) -> List[str]:
         """
         Merge node types from two nodes.
