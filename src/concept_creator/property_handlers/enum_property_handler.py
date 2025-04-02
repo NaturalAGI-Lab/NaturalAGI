@@ -39,7 +39,7 @@ class EnumPropertyHandler(PropertyHandler):
         direction_values = {"LEFT", "RIGHT", "NONE", "TOP", "BOTTOM"}
         return value1 in direction_values or value2 in direction_values
 
-    def merge_values(self, *values: Any) -> Set[str]:
+    def merge_values(self, *values: Any) -> list[str]:
         """
         Merge multiple enum values into a set of possible values.
 
@@ -59,7 +59,7 @@ class EnumPropertyHandler(PropertyHandler):
             return {"NONE"}
 
         # Create a set of all unique values
-        result = set(filtered_values)
+        result = list(filtered_values)
 
         self.logger.debug(f"Merged enum values: {filtered_values} → {result}")
         return result
@@ -78,6 +78,8 @@ class EnumPropertyHandler(PropertyHandler):
         # If concept value is a string, convert to set for consistent handling
         if isinstance(concept_value, str):
             concept_set = {concept_value}
+        elif isinstance(concept_value, list):
+            concept_set = set(concept_value)
         elif isinstance(concept_value, set):
             concept_set = concept_value
         else:
