@@ -40,11 +40,11 @@ class Neo4jToNetworkX:
         WITH n, labels(n) AS node_labels, properties(n) as node_props
         OPTIONAL MATCH (n)-[r]-(m {concept_id: $concept_id})
         WITH n, node_labels, r, m, node_props
-        RETURN id(n) AS node_id, 
+        RETURN elementId(n) AS node_id, 
                node_labels,
                node_props,
                type(r) AS rel_type, 
-               id(m) AS target_id
+               elementId(m) AS target_id
         """
         result = session.run(query, concept_id=concept_id)
         return Neo4jToNetworkX._build_networkx_graph(result)
@@ -74,7 +74,7 @@ class Neo4jToNetworkX:
                 else:
                     parsed_properties[key] = value
             # Set 'labels' property
-            parsed_properties['labels'] = record["node_labels"]
+            parsed_properties["labels"] = record["node_labels"]
             node_data = {
                 "labels": set(record["node_labels"]),
                 **parsed_properties,

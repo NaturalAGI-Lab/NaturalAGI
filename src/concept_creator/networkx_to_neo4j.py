@@ -1,25 +1,35 @@
+import json
 import networkx as nx
-from typing import Dict, List, Any
 from neo4j import ManagedTransaction
+import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class NetworkxToNeo4j:
     @staticmethod
     def create_structure(
-        tx: ManagedTransaction, graph: nx.Graph, session_id: str, image_id: str
+        tx: ManagedTransaction, graph: nx.Graph, concept_id: str
     ) -> None:
         """Creates structural nodes and relationships in Neo4j from a NetworkX graph"""
-
+        logger.info(f"Creating structure for concept {concept_id}")
         # First create all nodes
+        node_uuids = {}
         for node, data in graph.nodes(data=True):
             labels = list(data.get("labels", set()))
             if not labels:
                 continue
 
             # Create node properties
-            props = {"session_id": session_id, "image_id": image_id}
+            uu_id = str(uuid.uuid4())
+            node_uuids[node] = uu_id
+            props = {
+                "concept_id": concept_id,
+                "uuid": uu_id,
+            }
             # Add all other properties except labels
-            props.update({k: v for k, v in data.items() if k != "labels"})
+            props.update({k: NetworkxToNeo4j.serialize_value(v) for k, v in data.items() if k != "labels"})
 
             # Create node with all its labels
             labels_str = ":".join(labels)
@@ -31,83 +41,41 @@ class NetworkxToNeo4j:
 
         # Then create all edges
         for u, v in graph.edges():
+            u_uuid = node_uuids[u]
+            v_uuid = node_uuids[v]
             query = """
             MATCH (u), (v)
-            WHERE u.session_id = $session_id 
-              AND v.session_id = $session_id
-              AND id(u) = $u_id 
-              AND id(v) = $v_id
-            CREATE (u)-[:CONNECTS]->(v)
+            WHERE u.concept_id = $concept_id 
+              AND v.concept_id = $concept_id
+              AND u.uuid = $u_uuid 
+              AND v.uuid = $v_uuid
+            CREATE (u)-[:CONNECTED_TO]->(v)
             """
-            tx.run(query, session_id=session_id, u_id=u, v_id=v)
+            tx.run(query, concept_id=concept_id, u_uuid=u_uuid, v_uuid=v_uuid)
+        logger.info(f"Created structure for concept {concept_id}")
+        logger.info(f"Created {len(graph.nodes())} nodes and {len(graph.edges())} edges")
+        
+    # Helper functions for serialization
+    @staticmethod
+    def is_primitive(value):
+        return isinstance(value, (int, float, str, bool, type(None)))
 
     @staticmethod
-    def convert(graph: nx.Graph) -> List[Dict[str, Any]]:
-        """
-        Convert a NetworkX graph to a format that can be used to create nodes and
-        relationships in Neo4j.
+    def is_list_of_primitives(value):
+        return isinstance(value, list) and all(NetworkxToNeo4j.is_primitive(item) for item in value)
 
-        Args:
-            graph: NetworkX graph to convert
+    @staticmethod
+    def needs_serialization(value):
+        if NetworkxToNeo4j.is_primitive(value):
+            return False
+        elif isinstance(value, list):
+            return not NetworkxToNeo4j.is_list_of_primitives(value)
+        else:
+            return True
 
-        Returns:
-            List of dictionaries representing nodes and relationships
-        """
-        result = []
-
-        # First add all nodes
-        for node, data in graph.nodes(data=True):
-            # Process properties to handle range dictionaries
-            processed_props = {}
-            for k, v in data.items():
-                if k != "labels":
-                    # Convert range dictionaries to strings
-                    if isinstance(v, dict) and v.get("type") == "range":
-                        # Format: "range(min=0.2,max=0.3,center=0.25)"
-                        processed_props[k] = (
-                            f"range(min={v['min']},max={v['max']},center={v['center']})"
-                        )
-                    else:
-                        processed_props[k] = v
-
-            node_data = {
-                "uuid": str(node),
-                "type": "node",
-                "properties": processed_props,
-            }
-
-            # Handle labels separately
-            if "labels" in data:
-                if isinstance(data["labels"], (list, set)):
-                    node_data["labels"] = list(data["labels"])
-                else:
-                    node_data["labels"] = [str(data["labels"])]
-            else:
-                node_data["labels"] = []
-
-            result.append(node_data)
-
-        # Then add all edges
-        for u, v, data in graph.edges(data=True):
-            # Process edge properties the same way
-            processed_edge_props = {}
-            for k, v in data.items():
-                if k != "type":
-                    # Convert range dictionaries to strings
-                    if isinstance(v, dict) and v.get("type") == "range":
-                        processed_edge_props[k] = (
-                            f"range(min={v['min']},max={v['max']},center={v['center']})"
-                        )
-                    else:
-                        processed_edge_props[k] = v
-
-            edge_data = {
-                "source": str(u),
-                "target": str(v),
-                "type": "relationship",
-                "relationship_type": data.get("type", "CONNECTS"),
-                "properties": processed_edge_props,
-            }
-            result.append(edge_data)
-
-        return result
+    @staticmethod
+    def serialize_value(value):
+        if NetworkxToNeo4j.needs_serialization(value):
+            return json.dumps(value)
+        else:
+            return value

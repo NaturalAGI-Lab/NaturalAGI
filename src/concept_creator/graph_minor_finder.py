@@ -1,10 +1,11 @@
 import logging
 import networkx as nx
+import collections
 from typing import Dict, List, Tuple, Any, Optional, Set
 
-from concept_creator.node_similarity_calculator import NodeSimilarityCalculator
+from node_similarity_calculator import NodeSimilarityCalculator
 from property_handlers.property_handler_manager import PropertyHandlerManager
-from concept_creator.critical_point_preprocessor import CriticalPointPreprocessor
+from critical_point_preprocessor import CriticalPointPreprocessor
 
 
 class GraphMinorFinder:
@@ -319,63 +320,10 @@ class GraphMinorFinder:
         if not self._check_node_type_compatibility(graph1, graph2, node1, node2):
             return 0.0
 
-        # Extract node data
-        node1_data = graph1.nodes[node1]
-        node2_data = graph2.nodes[node2]
-
-        # Compare spatial properties
-        position_similarity = 0.0
-        if "normalized_x" in node1_data and "normalized_x" in node2_data:
-            x1, y1 = node1_data.get("normalized_x", 0), node1_data.get(
-                "normalized_y", 0
-            )
-            x2, y2 = node2_data.get("normalized_x", 0), node2_data.get(
-                "normalized_y", 0
-            )
-
-            # Euclidean distance, converted to similarity (1.0 when identical, decreasing as distance increases)
-            distance = ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
-            position_similarity = max(0, 1.0 - min(distance, 1.0))
-
-        # Compare angle if available
-        angle_similarity = 0.0
-        if "angle" in node1_data and "angle" in node2_data:
-            angle1 = node1_data["angle"]
-            angle2 = node2_data["angle"]
-
-            # Angular distance, normalized to similarity
-            angle_diff = abs(angle1 - angle2)
-            angle_diff = min(angle_diff, 360 - angle_diff)  # Consider the shorter arc
-            angle_similarity = max(0, 1.0 - angle_diff / 180.0)
-
-        # Compare segments if available
-        segment_similarity = 0.0
-        if "segments" in node1_data and "segments" in node2_data:
-            segments1 = set(node1_data["segments"])
-            segments2 = set(node2_data["segments"])
-
-            # Jaccard similarity of segments
-            if segments1 or segments2:
-                segment_similarity = len(segments1.intersection(segments2)) / len(
-                    segments1.union(segments2)
-                )
-
-        # Combine similarities with weights
-        # Position is most important, then segments, then angle
-        if angle_similarity and segment_similarity:
-            combined_similarity = (
-                0.5 * position_similarity
-                + 0.3 * segment_similarity
-                + 0.2 * angle_similarity
-            )
-        elif segment_similarity:
-            combined_similarity = 0.7 * position_similarity + 0.3 * segment_similarity
-        elif angle_similarity:
-            combined_similarity = 0.8 * position_similarity + 0.2 * angle_similarity
-        else:
-            combined_similarity = position_similarity
-
-        return combined_similarity
+        # Use NodeSimilarityCalculator to compute node similarity
+        return self.similarity_calculator.calculate_node_similarity(
+            graph1, graph2, node1, node2
+        )
 
     def _build_reduced_intersection(
         self,
@@ -549,118 +497,117 @@ class GraphMinorFinder:
     ) -> List[Tuple[Tuple[Any, List[Any]], Tuple[Any, List[Any]]]]:
         """
         Finds optimal matches between paths using pre-computed critical point mapping.
-        Prioritizes paths connecting mapped critical points.
+        Prioritizes paths connecting mapped critical points and allows multiple paths
+        between the same pair if distinct.
 
         Args:
             concept_graph: The concept graph
             image_graph: The image graph
             paths_c: List of (end_point, path) tuples from concept graph
             paths_i: List of (end_point, path) tuples from image graph
-            matched_nodes_c: Set of already matched concept graph nodes
-            matched_nodes_i: Set of already matched image graph nodes
+            matched_nodes_c: Set of already matched concept graph nodes (non-critical)
+            matched_nodes_i: Set of already matched image graph nodes (non-critical)
             critical_point_mapping: Mapping of concept critical points to image critical points
 
         Returns:
             List of ((end_c, path_c), (end_i, path_i)) pairs representing matched paths
         """
-        # First use the critical point mapping to create matched pairs
         matched_pairs = []
-        used_ends_c = set()
-        used_ends_i = set()
+        # Keep track of used *paths* (represented as tuples), not just endpoints
+        used_paths_c = set()  # Set of tuple(path_c)
+        used_paths_i = set()  # Set of tuple(path_i)
 
-        # Priority 1: Match paths where both endpoints are already mapped to each other
-        for end_c, path_c in paths_c:
+        # Priority 1: Match paths where endpoints are mapped
+        potential_mapped_matches = []
+        # Use enumerate to track original indices if needed, though path tuples are keys now
+        for idx_c, (end_c, path_c) in enumerate(paths_c):
+            # Ensure the start node of the path is also considered for mapping if needed
+            # Assuming paths_c originate from a single mapped start_c for this call context
             if end_c in critical_point_mapping:
                 mapped_end_i = critical_point_mapping[end_c]
-
-                # Find the corresponding path in image_graph
-                matching_path_i = None
-                for end_i, path_i in paths_i:
+                for idx_i, (end_i, path_i) in enumerate(paths_i):
+                    # Check if the end points match according to the mapping
                     if end_i == mapped_end_i:
-                        matching_path_i = (end_i, path_i)
-                        break
-
-                if matching_path_i:
-                    end_i, path_i = matching_path_i
-
-                    # Calculate path similarity score to ensure they're structurally similar
-                    path_similarity = self._calculate_path_similarity(
-                        concept_graph, image_graph, path_c, path_i
-                    )
-
-                    conflict_c = sum(1 for n in path_c[1:-1] if n in matched_nodes_c)
-                    conflict_i = sum(1 for n in path_i[1:-1] if n in matched_nodes_i)
-
-                    # Add conflict penalty but with a lower weight for mapped critical points
-                    conflict_penalty = (conflict_c + conflict_i) * 0.3
-                    adjusted_similarity = path_similarity - conflict_penalty
-
-                    # Use a lower threshold for critical point mapped paths
-                    if adjusted_similarity > 0.2:  # Lower threshold for mapped paths
-                        matched_pairs.append(((end_c, path_c), (end_i, path_i)))
-                        used_ends_c.add(end_c)
-                        used_ends_i.add(end_i)
-
-                        self.logger.debug(
-                            f"Matched path {end_c}-{end_i} from critical point mapping with similarity {adjusted_similarity:.2f}"
+                        # Calculate similarity score
+                        path_similarity = self._calculate_path_similarity(
+                            concept_graph, image_graph, path_c, path_i
                         )
+                        # Optional: Add conflict penalty based on *non-critical* node reuse
+                        # For simplicity, let's rely primarily on path similarity for now.
+                        # conflict_c = sum(1 for n in path_c[1:-1] if n in matched_nodes_c and n not in critical_point_mapping)
+                        # conflict_i = sum(1 for n in path_i[1:-1] if n in matched_nodes_i and n not in critical_point_mapping.values())
+                        # conflict_penalty = (conflict_c + conflict_i) * 0.3
+                        # adjusted_similarity = path_similarity - conflict_penalty
+                        adjusted_similarity = path_similarity
 
-        # For remaining paths, use the similarity-based approach
-        remaining_paths_c = [
-            (end_c, path_c) for end_c, path_c in paths_c if end_c not in used_ends_c
-        ]
-        remaining_paths_i = [
-            (end_i, path_i) for end_i, path_i in paths_i if end_i not in used_ends_i
-        ]
+                        # Store potential match with score, using path tuples as identifiers
+                        if adjusted_similarity > 0.2:  # Threshold for mapped paths
+                            potential_mapped_matches.append(
+                                (tuple(path_c), tuple(path_i), adjusted_similarity)
+                            )
 
-        # Priority 2: Match the rest based on node compatibility and path similarity
+        # Sort potential mapped matches by score (descending)
+        potential_mapped_matches.sort(key=lambda x: x[2], reverse=True)
+
+        # Greedily select best mapped matches, ensuring paths aren't reused
+        path_dict_c = {
+            tuple(p[1]): p for p in paths_c
+        }  # Map path tuple back to original (end, path)
+        path_dict_i = {tuple(p[1]): p for p in paths_i}
+
+        for path_c_tuple, path_i_tuple, score in potential_mapped_matches:
+            if path_c_tuple not in used_paths_c and path_i_tuple not in used_paths_i:
+                end_c, path_c = path_dict_c[path_c_tuple]
+                end_i, path_i = path_dict_i[path_i_tuple]
+                matched_pairs.append(((end_c, path_c), (end_i, path_i)))
+                used_paths_c.add(path_c_tuple)
+                used_paths_i.add(path_i_tuple)
+                self.logger.debug(
+                    f"Matched path (Mapped Endpoints) {end_c}-{end_i} with score {score:.2f}"
+                )
+
+        # Priority 2: Match remaining paths based on similarity (if needed)
+        # This phase handles paths where endpoints might not be in the critical_point_mapping,
+        # or remaining paths between mapped points that weren't the highest score pair.
+        remaining_paths_c_tuples = set(path_dict_c.keys()) - used_paths_c
+        remaining_paths_i_tuples = set(path_dict_i.keys()) - used_paths_i
+
         compatible_ends = []
-        for end_c, path_c in remaining_paths_c:
-            for end_i, path_i in remaining_paths_i:
-                # Check if endpoints are compatible
+        for path_c_tuple in remaining_paths_c_tuples:
+            for path_i_tuple in remaining_paths_i_tuples:
+                end_c, path_c = path_dict_c[path_c_tuple]
+                end_i, path_i = path_dict_i[path_i_tuple]
+
+                # Check if endpoints are type compatible (essential for any match)
                 if self._check_node_type_compatibility(
                     concept_graph, image_graph, end_c, end_i
                 ):
-                    # Calculate path similarity score
                     path_similarity = self._calculate_path_similarity(
                         concept_graph, image_graph, path_c, path_i
                     )
+                    # Skipping conflict check for simplicity
+                    adjusted_similarity = path_similarity
 
-                    # Check for conflicts with already matched nodes
-                    conflict_c = sum(1 for n in path_c[1:-1] if n in matched_nodes_c)
-                    conflict_i = sum(1 for n in path_i[1:-1] if n in matched_nodes_i)
-
-                    # Penalize paths with conflicts
-                    conflict_penalty = (conflict_c + conflict_i) * 0.5
-                    adjusted_similarity = path_similarity - conflict_penalty
-
-                    # Only consider paths with reasonable similarity
                     if (
                         adjusted_similarity > 0.3
-                    ):  # Threshold for non-mapped path similarity
+                    ):  # Threshold for non-mapped/similarity match
                         compatible_ends.append(
-                            ((end_c, path_c), (end_i, path_i), adjusted_similarity)
+                            (path_c_tuple, path_i_tuple, adjusted_similarity)
                         )
 
-        # Sort by similarity score, highest first
         compatible_ends.sort(key=lambda x: x[2], reverse=True)
 
-        # Greedy algorithm for remaining paths
-        for (end_c, path_c), (end_i, path_i), score in compatible_ends:
-            # Skip if either endpoint is already used
-            if end_c in used_ends_c or end_i in used_ends_i:
-                continue
-
-            self.logger.debug(
-                f"Matched path {end_c}-{end_i} with similarity score {score:.2f}"
-            )
-
-            # Mark these endpoints as used
-            used_ends_c.add(end_c)
-            used_ends_i.add(end_i)
-
-            # Add to matched pairs
-            matched_pairs.append(((end_c, path_c), (end_i, path_i)))
+        # Greedy selection for remaining paths
+        for path_c_tuple, path_i_tuple, score in compatible_ends:
+            if path_c_tuple not in used_paths_c and path_i_tuple not in used_paths_i:
+                end_c, path_c = path_dict_c[path_c_tuple]
+                end_i, path_i = path_dict_i[path_i_tuple]
+                matched_pairs.append(((end_c, path_c), (end_i, path_i)))
+                used_paths_c.add(path_c_tuple)
+                used_paths_i.add(path_i_tuple)
+                self.logger.debug(
+                    f"Matched remaining path {end_c}-{end_i} with similarity score {score:.2f}"
+                )
 
         return matched_pairs
 
@@ -734,7 +681,8 @@ class GraphMinorFinder:
         critical_points: Dict[str, List[Any]],
     ) -> List[Tuple[Any, List[Any]]]:
         """
-        Finds all distinct simple paths from a start node to the *nearest* subsequent critical points.
+        Finds all simple paths from start_node to any other critical point,
+        such that the path does not contain any *other* critical points as intermediate nodes.
 
         Args:
             graph: The graph to search within.
@@ -743,62 +691,63 @@ class GraphMinorFinder:
 
         Returns:
             A list of tuples, where each tuple contains (next_critical_point_id, path_nodes_list).
+            Returns all such valid paths found.
         """
         self.logger.debug(f"Finding paths from critical node {start_node}")
-        all_critical = set(
-            node for points in critical_points.values() for node in points
+        all_critical = {node for points in critical_points.values() for node in points}
+        target_critical = all_critical - {start_node}
+
+        found_paths = []
+
+        # Use DFS approach to find all paths
+        stack = collections.deque(
+            [(start_node, [start_node])]
+        )  # (current_node, path_list)
+
+        while stack:
+            current_node, path = stack.pop()  # DFS uses pop()
+
+            # Explore neighbors
+            for neighbor in graph.neighbors(current_node):
+                # Avoid cycles by checking if neighbor is already in the current path
+                if neighbor not in path:
+                    new_path = path + [neighbor]
+
+                    # Check if neighbor is a target critical point
+                    if neighbor in target_critical:
+                        # Found a valid path ending at a critical point
+                        self.logger.debug(
+                            f"Found path to critical point {neighbor}: {new_path}"
+                        )
+                        found_paths.append((neighbor, new_path))
+                        # Do not continue exploring further along this path branch from the target
+                    else:
+                        # Neighbor is not a critical point, continue DFS
+                        # Check implicit: it cannot be start_node if neighbor not in path
+                        stack.append((neighbor, new_path))
+                # If neighbor is in path, it's a cycle, do nothing.
+
+        # Post-processing: Filter paths that contain intermediate critical points
+        valid_paths = []
+        for end_node, path in found_paths:
+            is_valid = True
+            # Check intermediate nodes (excluding start and end)
+            for node in path[1:-1]:
+                if node in all_critical:  # Found an intermediate critical point
+                    is_valid = False
+                    self.logger.debug(
+                        f"Filtering out path {path} due to intermediate critical point {node}"
+                    )
+                    break
+            if is_valid:
+                valid_paths.append((end_node, path))
+
+        # Return all valid paths found without shortest path filtering,
+        # allowing multiple paths between the same pair of critical points
+        self.logger.debug(
+            f"Found {len(valid_paths)} valid simple paths from {start_node} to other critical points"
         )
-        paths_found = []
-        visited_globally = {
-            start_node
-        }  # Keep track of nodes visited across all path searches from this start_node
-
-        for neighbor in graph.neighbors(start_node):
-            if neighbor == start_node:  # Avoid self-loops immediately
-                continue
-
-            queue = [(neighbor, [start_node, neighbor])]  # (current_node, path_list)
-            visited_in_path = {
-                start_node,
-                neighbor,
-            }  # Nodes visited in the current specific path search
-
-            while queue:
-                current, path = queue.pop(0)
-
-                # Check if current node is a critical point (and not the start node)
-                if current in all_critical:
-                    self.logger.debug(f"Found path to critical point {current}: {path}")
-                    paths_found.append((current, path))
-                    # Mark nodes in this successful path as visited globally
-                    # to prevent finding longer paths to the same critical point via these nodes
-                    visited_globally.update(path)
-                    continue  # Stop searching along this path once a critical point is found
-
-                # Explore neighbors
-                for next_node in graph.neighbors(current):
-                    # Avoid cycles within the current path and globally visited nodes
-                    if (
-                        next_node not in visited_in_path
-                        and next_node not in visited_globally
-                    ):
-                        visited_in_path.add(next_node)
-                        new_path = path + [next_node]
-                        queue.append((next_node, new_path))
-
-        # Filter results: Ensure paths are simple (no node repeats within a path) - though the BFS approach helps
-        # The logic above tries to find the shortest paths first implicitly.
-        # We might need more robust filtering if multiple paths to the same critical point are found.
-        # For now, we assume the BFS finds the relevant shortest paths.
-        unique_paths = {}
-        for end_node, path in paths_found:
-            if end_node not in unique_paths or len(path) < len(
-                unique_paths[end_node][1]
-            ):
-                unique_paths[end_node] = (end_node, path)
-
-        self.logger.debug(f"Found {len(unique_paths)} unique paths from {start_node}")
-        return list(unique_paths.values())
+        return valid_paths
 
     def _check_node_type_compatibility(
         self, graph1: nx.Graph, graph2: nx.Graph, node1: Any, node2: Any
@@ -1046,9 +995,7 @@ class GraphMinorFinder:
 
         for i, template_node_id in enumerate(template_path):
             # Find the best matching node from the other path
-            best_match_idx = self._find_best_matching_node(
-                similarity_matrix, i, template_path, other_path
-            )
+            best_match_idx = self._find_best_matching_node(similarity_matrix, i)
 
             if best_match_idx is not None and best_match_idx < len(other_path):
                 other_node_id = other_path[best_match_idx]
@@ -1139,8 +1086,6 @@ class GraphMinorFinder:
         self,
         similarity_matrix: List[List[float]],
         current_idx: int,
-        path1: List[Any],
-        path2: List[Any],
     ) -> Optional[int]:
         """
         Find the best matching node in path2 for the node at current_idx in path1.
@@ -1173,32 +1118,4 @@ class GraphMinorFinder:
             f"Best match is node at index {best_idx} with score {best_score:.2f}"
         )
 
-        # Only return a match if similarity is above threshold
-        if best_score > 0.5:  # Threshold for considering a good match
-            self.logger.debug(
-                f"Match score {best_score:.2f} exceeds threshold, using property-based match"
-            )
-            return best_idx
-
-        # Fallback to position-based matching if no good property-based match or paths are dissimilar
-        # This ensures we always have a corresponding node for merging structure.
-        self.logger.debug(
-            f"Property match score {best_score:.2f} below threshold or no similarity matrix provided."
-        )
-
-        if not path1 or not path2:  # Cannot do position matching if a path is empty
-            self.logger.debug("Cannot perform position matching with empty path(s).")
-            return None
-
-        # Calculate relative position and find corresponding position in other path
-        relative_position = current_idx / (len(path1) - 1) if len(path1) > 1 else 0.5
-        position_idx = round(
-            relative_position * (len(path2) - 1)
-        )  # Round to nearest index
-        # Ensure index is within bounds
-        position_idx = max(0, min(position_idx, len(path2) - 1))
-
-        self.logger.debug(
-            f"Falling back to position-based match: path1[{current_idx}] -> path2[{position_idx}]"
-        )
-        return position_idx
+        return best_idx

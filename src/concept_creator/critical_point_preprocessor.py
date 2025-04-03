@@ -1,7 +1,7 @@
 import logging
 import networkx as nx
 from typing import Dict, List, Tuple, Any, Set
-from concept_creator.node_similarity_calculator import NodeSimilarityCalculator
+from node_similarity_calculator import NodeSimilarityCalculator
 
 
 class CriticalPointPreprocessor:

@@ -1,9 +1,12 @@
 import logging
 from typing import List
-from neo4j import GraphDatabase, ManagedTransaction, Session
+from neo4j import GraphDatabase, ManagedTransaction
 import networkx as nx
 from neo4j_to_networkx import Neo4jToNetworkx
 import json
+
+from networkx_to_neo4j import NetworkxToNeo4j
+
 
 class ConceptCreationRepository:
     def __init__(self, uri: str, user: str, password: str):
@@ -96,71 +99,15 @@ class ConceptCreationRepository:
         result = tx.run(query, image_id=image_id)
         return [record.data() for record in result]
 
-    def _save_concept(self, tx: ManagedTransaction, concept_id: str, graph: nx.Graph) -> None:
-        """Save a NetworkX graph to the Neo4j database.
+    def _save_concept(
+        self, tx: ManagedTransaction, concept_id: str, graph: nx.Graph
+    ) -> None:
+        """Save a NetworkX graph to the Neo4j database in a single transaction.
 
         Args:
             graph: A NetworkX graph object (Graph, DiGraph, MultiGraph, or MultiDiGraph).
-
-        Raises:
-            ValueError: If an edge is missing a 'label' attribute.
         """
-    
-        # Helper functions for serialization
-        def is_primitive(value):
-            return isinstance(value, (int, float, str, bool, type(None)))
-
-        def is_list_of_primitives(value):
-            return isinstance(value, list) and all(is_primitive(item) for item in value)
-
-        def needs_serialization(value):
-            if is_primitive(value):
-                return False
-            elif isinstance(value, list):
-                return not is_list_of_primitives(value)
-            else:
-                return True
-
-        def serialize_value(value):
-            if needs_serialization(value):
-                return json.dumps(value)
-            else:
-                return value
-
-        # Step 1: Create nodes and map NetworkX node IDs to Neo4j node IDs
-        node_mapping = {}
-        for node in graph.nodes:
-            # Get node data (attributes)
-            node_data = graph.nodes[node]
-            # Extract labels from the 'labels' property, defaulting to an empty list
-            labels = node_data.get('labels', [])
-            # Ensure labels is a list (convert single label to list if needed)
-            if not isinstance(labels, list):
-                labels = [labels]
-            # Build the labels string for Cypher (e.g., ":Label1:Label2")
-            labels_str = ':' + ':'.join(labels) if labels else ''
-            # Collect other properties, excluding 'labels', and serialize non-primitive values
-            properties = {k: serialize_value(v) for k, v in node_data.items() if k != 'labels'}
-            properties["concept_id"] = concept_id
-            # Create the node in Neo4j and retrieve its internal ID
-            query = f"CREATE (n{labels_str} $properties) RETURN id(n) as node_id"
-            result = tx.run(query, properties=properties)
-            record = result.single()
-            neo4j_id = record["node_id"]
-            node_mapping[node] = neo4j_id
-
-        # Step 2: Create relationships based on edge labels
-        for u, v, data in graph.edges(data=True):
-            # Get the Neo4j node IDs for the start and end nodes
-            start_id = node_mapping[u]
-            end_id = node_mapping[v]
-            # Create a directed relationship with the edge label as the type
-            query = (
-                "MATCH (a), (b) "
-                "WHERE id(a) = $start_id AND id(b) = $end_id "
-                "CREATE (a)-[:CONNECTED_TO]->(b)"
-            )
-            tx.run(query, start_id=start_id, end_id=end_id)
+        NetworkxToNeo4j.create_structure(tx, graph, concept_id)
 
     def _remove_image_data(self, tx: ManagedTransaction, image_id: str) -> None:
         """Remove all data for an image."""

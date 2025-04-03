@@ -6,7 +6,7 @@ import uuid
 from concept_creation_repository import ConceptCreationRepository
 from property_handlers.property_handler_manager import PropertyHandlerManager
 from node_similarity_calculator import NodeSimilarityCalculator
-from concept_creator.graph_minor_finder import GraphMinorFinder
+from graph_minor_finder import GraphMinorFinder
 
 
 class CriticalPointConceptService:
@@ -22,7 +22,7 @@ class CriticalPointConceptService:
         self.logger.info("CriticalPointConceptService initialized.")
 
     def create_concept_incrementally(
-        self, session_id: str, concept_id: Optional[str] = None
+        self, session_id: str, concept_id: Optional[str] = None, steps: Optional[int] = None
     ) -> Tuple[str, nx.Graph]:
         """
         Create a concept incrementally by finding the intersection graph of all training samples.
@@ -59,6 +59,8 @@ class CriticalPointConceptService:
 
         # Process each additional image
         for i, image_id in enumerate(image_ids[1:], 2):
+            if steps and i > steps:
+                break
             self.logger.info(f"Processing image {i}/{len(image_ids)}: {image_id}")
             image_graph = self.repository.get_image_graph(image_id)
 
@@ -71,7 +73,7 @@ class CriticalPointConceptService:
                 f"Updated concept after image {image_id}. Nodes: {len(concept_graph.nodes)}"
             )
 
-        # Save the final concept
+        # # Save the final concept
         # self.repository.save_concept(concept_id, concept_graph)
 
         # for image_id in image_ids:

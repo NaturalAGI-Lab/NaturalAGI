@@ -54,7 +54,6 @@ def handler(context, event):
         context.logger.info(f"Body: {body}")
         session_id = body.get("session_id")
         concept_id = body.get("concept_id")
-        method = body.get("method", context.settings.concept_formation_method)
 
         if not session_id:
             return context.Response(
@@ -65,7 +64,7 @@ def handler(context, event):
 
         # Log input parameters
         context.logger.info(
-            f"Creating concept for session {session_id} using method {method}"
+            f"Creating concept for session {session_id}"
         )
 
         concept_id, concept_graph = (
@@ -79,7 +78,6 @@ def handler(context, event):
         response = {
             "concept_id": concept_id,
             "session_id": session_id,
-            "method": method,
             "nodes_count": len(concept_graph.nodes()),
             "edges_count": len(concept_graph.edges()),
             "execution_time_seconds": execution_time,
@@ -88,7 +86,7 @@ def handler(context, event):
         context.logger.info(
             f"Concept creation completed in {execution_time:.2f}s. "
             f"Created concept {concept_id} with {len(concept_graph.nodes())} nodes and "
-            f"{len(concept_graph.edges())} edges using method {method}"
+            f"{len(concept_graph.edges())} edges"
         )
 
         # Call next functions in the chain if specified

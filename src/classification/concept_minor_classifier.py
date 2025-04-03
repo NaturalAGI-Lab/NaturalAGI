@@ -75,7 +75,8 @@ class ConceptMinorClassifier:
         concept_graph = Neo4jToNetworkX.extract_concept_graph(tx, concept_id)
 
         # Quick size-based early rejection
-        if len(concept_graph.nodes) > len(image_graph.nodes) * 1.5:
+        if len(concept_graph.nodes) > len(image_graph.nodes):
+            logging.info(f"Concept {concept_id} is too large to be a minor of the image")
             return self._create_no_match_result(
                 concept_id, len(concept_graph.nodes) + len(concept_graph.edges)
             )
@@ -105,6 +106,9 @@ class ConceptMinorClassifier:
         if not self._check_label_distribution_compatible(
             concept_label_counts, image_label_counts
         ):
+            logging.info(
+                f"Concept {concept_id} has incompatible node label distribution with image"
+            )
             result["comparison_message"] = (
                 f"Concept {concept_id} has incompatible node label distribution with image"
             )
@@ -128,14 +132,15 @@ class ConceptMinorClassifier:
                 if not mapping:
                     continue
 
-                mapping_size = len(mapping)
+                # Count actual concept node mappings, excluding the "contractions" key
+                mapping_size = sum(1 for k in mapping if k != "contractions")
                 concept_size = len(concept_graph.nodes)
 
                 # Count contractions if any
                 contractions_count = 0
-                if hasattr(mapping, "contractions"):
+                if "contractions" in mapping:
                     contractions_count = sum(
-                        len(nodes) for nodes in mapping.contractions.values()
+                        len(nodes) for nodes in mapping["contractions"].values()
                     )
 
                 # Update result if we found a complete or better partial match
@@ -330,7 +335,7 @@ class ConceptMinorClassifier:
 
         # Store contractions in the mapping object
         if contractions:
-            mapping.contractions = contractions
+            mapping["contractions"] = contractions
 
         return mapping
 
