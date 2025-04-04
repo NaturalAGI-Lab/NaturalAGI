@@ -6,8 +6,8 @@ import uuid
 from concept_creation_repository import ConceptCreationRepository
 from property_handlers.property_handler_manager import PropertyHandlerManager
 from node_similarity_calculator import NodeSimilarityCalculator
-from graph_minor_finder import GraphMinorFinder
-
+from synced_graph_algorythm import SyncedGraphMinorFinder
+from critical_point_preprocessor import CriticalPointPreprocessor
 
 class CriticalPointConceptService:
     def __init__(self, neo4j_uri: str, neo4j_user: str, neo4j_password: str):
@@ -16,9 +16,15 @@ class CriticalPointConceptService:
         )
         self.prop_manager = PropertyHandlerManager()
         self.similarity_calculator = NodeSimilarityCalculator()
-        self.graph_minor_finder = GraphMinorFinder()
+        self.critical_point_preprocessor = CriticalPointPreprocessor()
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
+        self.graph_minor_finder = SyncedGraphMinorFinder(
+            prop_manager=self.prop_manager,
+            similarity_calculator=self.similarity_calculator,
+            critical_point_preprocessor=self.critical_point_preprocessor,
+            logger=self.logger,
+        )
         self.logger.info("CriticalPointConceptService initialized.")
 
     def create_concept_incrementally(

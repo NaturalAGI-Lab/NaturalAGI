@@ -35,7 +35,7 @@ class CriticalPointPreprocessor:
         Returns:
             Tuple of (preprocessed_graph1, preprocessed_graph2)
         """
-        self.logger.info(f"Preprocessing graphs for critical point compatibility")
+        self.logger.info("Preprocessing graphs for critical point compatibility")
 
         # Create copies to avoid modifying original graphs
         preprocessed_graph1 = graph1.copy()
