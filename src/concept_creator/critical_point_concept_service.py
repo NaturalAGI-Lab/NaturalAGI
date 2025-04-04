@@ -22,7 +22,11 @@ class CriticalPointConceptService:
         self.logger.info("CriticalPointConceptService initialized.")
 
     def create_concept_incrementally(
-        self, session_id: str, concept_id: Optional[str] = None, steps: Optional[int] = None
+        self,
+        session_id: str,
+        concept_id: Optional[str] = None,
+        steps: Optional[int] = None,
+        debug_mode: bool = False,
     ) -> Tuple[str, nx.Graph]:
         """
         Create a concept incrementally by finding the intersection graph of all training samples.
@@ -73,10 +77,10 @@ class CriticalPointConceptService:
                 f"Updated concept after image {image_id}. Nodes: {len(concept_graph.nodes)}"
             )
 
-        # # Save the final concept
-        # self.repository.save_concept(concept_id, concept_graph)
-
-        # for image_id in image_ids:
-        #     self.repository.remove_image_data(image_id)
+        # Save the final concept
+        if not debug_mode:
+            self.repository.save_concept(concept_id, concept_graph)
+            for image_id in image_ids:
+                self.repository.remove_image_data(image_id)
 
         return concept_id, concept_graph

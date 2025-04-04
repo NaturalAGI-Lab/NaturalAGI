@@ -54,6 +54,9 @@ class GraphMinorFinder:
             f"Finding maximum common minor between graphs: concept ({len(concept_graph.nodes)} nodes) and image ({len(image_graph.nodes)} nodes)"
         )
 
+        # Initialize a set to track processed connections between critical points
+        self._processed_critical_connections = set()
+
         # 1. Preprocess graphs to ensure critical point compatibility
         preprocessed_concept, preprocessed_image = self.preprocessor.preprocess_graphs(
             concept_graph, image_graph
@@ -447,6 +450,17 @@ class GraphMinorFinder:
                     f"Found optimal path pair: ({current_c} -> {next_c}) and ({current_i} -> {next_i})"
                 )
 
+                # Check if this connection has already been processed
+                connection_key = frozenset({(current_c, current_i), (next_c, next_i)})
+                if connection_key in self._processed_critical_connections:
+                    self.logger.debug(
+                        f"Skipping already processed connection: {connection_key}"
+                    )
+                    continue  # Skip to the next path pair
+
+                # Mark connection as processed
+                self._processed_critical_connections.add(connection_key)
+
                 # Create the reduced path in the result graph
                 intermediate_c_nodes = set(
                     path_c[1:-1]
@@ -517,96 +531,62 @@ class GraphMinorFinder:
         used_paths_c = set()  # Set of tuple(path_c)
         used_paths_i = set()  # Set of tuple(path_i)
 
-        # Priority 1: Match paths where endpoints are mapped
-        potential_mapped_matches = []
-        # Use enumerate to track original indices if needed, though path tuples are keys now
+        # Collect all potential matches with scoring
+        potential_matches = []
+
         for idx_c, (end_c, path_c) in enumerate(paths_c):
-            # Ensure the start node of the path is also considered for mapping if needed
-            # Assuming paths_c originate from a single mapped start_c for this call context
-            if end_c in critical_point_mapping:
-                mapped_end_i = critical_point_mapping[end_c]
-                for idx_i, (end_i, path_i) in enumerate(paths_i):
-                    # Check if the end points match according to the mapping
-                    if end_i == mapped_end_i:
-                        # Calculate similarity score
-                        path_similarity = self._calculate_path_similarity(
-                            concept_graph, image_graph, path_c, path_i
-                        )
-                        # Optional: Add conflict penalty based on *non-critical* node reuse
-                        # For simplicity, let's rely primarily on path similarity for now.
-                        # conflict_c = sum(1 for n in path_c[1:-1] if n in matched_nodes_c and n not in critical_point_mapping)
-                        # conflict_i = sum(1 for n in path_i[1:-1] if n in matched_nodes_i and n not in critical_point_mapping.values())
-                        # conflict_penalty = (conflict_c + conflict_i) * 0.3
-                        # adjusted_similarity = path_similarity - conflict_penalty
-                        adjusted_similarity = path_similarity
-
-                        # Store potential match with score, using path tuples as identifiers
-                        if adjusted_similarity > 0.2:  # Threshold for mapped paths
-                            potential_mapped_matches.append(
-                                (tuple(path_c), tuple(path_i), adjusted_similarity)
-                            )
-
-        # Sort potential mapped matches by score (descending)
-        potential_mapped_matches.sort(key=lambda x: x[2], reverse=True)
-
-        # Greedily select best mapped matches, ensuring paths aren't reused
-        path_dict_c = {
-            tuple(p[1]): p for p in paths_c
-        }  # Map path tuple back to original (end, path)
-        path_dict_i = {tuple(p[1]): p for p in paths_i}
-
-        for path_c_tuple, path_i_tuple, score in potential_mapped_matches:
-            if path_c_tuple not in used_paths_c and path_i_tuple not in used_paths_i:
-                end_c, path_c = path_dict_c[path_c_tuple]
-                end_i, path_i = path_dict_i[path_i_tuple]
-                matched_pairs.append(((end_c, path_c), (end_i, path_i)))
-                used_paths_c.add(path_c_tuple)
-                used_paths_i.add(path_i_tuple)
-                self.logger.debug(
-                    f"Matched path (Mapped Endpoints) {end_c}-{end_i} with score {score:.2f}"
-                )
-
-        # Priority 2: Match remaining paths based on similarity (if needed)
-        # This phase handles paths where endpoints might not be in the critical_point_mapping,
-        # or remaining paths between mapped points that weren't the highest score pair.
-        remaining_paths_c_tuples = set(path_dict_c.keys()) - used_paths_c
-        remaining_paths_i_tuples = set(path_dict_i.keys()) - used_paths_i
-
-        compatible_ends = []
-        for path_c_tuple in remaining_paths_c_tuples:
-            for path_i_tuple in remaining_paths_i_tuples:
-                end_c, path_c = path_dict_c[path_c_tuple]
-                end_i, path_i = path_dict_i[path_i_tuple]
-
-                # Check if endpoints are type compatible (essential for any match)
+            for idx_i, (end_i, path_i) in enumerate(paths_i):
+                # Check if the endpoint types are compatible (critical for maintaining type integrity)
                 if self._check_node_type_compatibility(
                     concept_graph, image_graph, end_c, end_i
                 ):
+                    # Calculate path similarity
                     path_similarity = self._calculate_path_similarity(
                         concept_graph, image_graph, path_c, path_i
                     )
-                    # Skipping conflict check for simplicity
-                    adjusted_similarity = path_similarity
 
-                    if (
-                        adjusted_similarity > 0.3
-                    ):  # Threshold for non-mapped/similarity match
-                        compatible_ends.append(
-                            (path_c_tuple, path_i_tuple, adjusted_similarity)
+                    # Bonus for paths ending at nodes that were mapped to each other in critical_point_mapping
+                    # This maintains preference for the initially mapped pairs
+                    mapped_bonus = (
+                        0.3
+                        if end_c in critical_point_mapping
+                        and critical_point_mapping[end_c] == end_i
+                        else 0
+                    )
+
+                    # The final score combines similarity and the mapping bonus
+                    adjusted_score = path_similarity + mapped_bonus
+
+                    # Only consider matches with reasonable similarity
+                    if adjusted_score > 0.2:
+                        potential_matches.append(
+                            (
+                                tuple(path_c),
+                                tuple(path_i),
+                                adjusted_score,
+                                mapped_bonus > 0,  # Flag if this was a mapped pair
+                            )
                         )
 
-        compatible_ends.sort(key=lambda x: x[2], reverse=True)
+        # Sort by score (descending) with mapped pairs first
+        potential_matches.sort(key=lambda x: (x[3], x[2]), reverse=True)
 
-        # Greedy selection for remaining paths
-        for path_c_tuple, path_i_tuple, score in compatible_ends:
+        # Map path tuples back to original (end, path) pairs
+        path_dict_c = {tuple(p[1]): p for p in paths_c}
+        path_dict_i = {tuple(p[1]): p for p in paths_i}
+
+        # Greedily select best matches
+        for path_c_tuple, path_i_tuple, score, was_mapped in potential_matches:
             if path_c_tuple not in used_paths_c and path_i_tuple not in used_paths_i:
                 end_c, path_c = path_dict_c[path_c_tuple]
                 end_i, path_i = path_dict_i[path_i_tuple]
                 matched_pairs.append(((end_c, path_c), (end_i, path_i)))
                 used_paths_c.add(path_c_tuple)
                 used_paths_i.add(path_i_tuple)
+
+                match_type = "Mapped Endpoints" if was_mapped else "Compatible Types"
                 self.logger.debug(
-                    f"Matched remaining path {end_c}-{end_i} with similarity score {score:.2f}"
+                    f"Matched path ({match_type}) {end_c}-{end_i} with score {score:.2f}"
                 )
 
         return matched_pairs

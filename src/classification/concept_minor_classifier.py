@@ -6,6 +6,8 @@ from concurrent.futures import ThreadPoolExecutor
 
 from graph_similarity.neo4j_to_networkx import Neo4jToNetworkX
 from property_handlers import PropertyMatcherManager
+from critical_point_preprocessor import CriticalPointPreprocessor
+from node_similarity_calculator import NodeSimilarityCalculator
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -50,6 +52,10 @@ class ConceptMinorClassifier:
         self.early_stopping_threshold = early_stopping_threshold
         self.property_matcher = PropertyMatcherManager()
 
+        # Add preprocessor and similarity calculator for alignment with GraphMinorFinder
+        self.preprocessor = CriticalPointPreprocessor()
+        self.similarity_calculator = NodeSimilarityCalculator()
+
     def close(self):
         self.driver.close()
 
@@ -71,125 +77,131 @@ class ConceptMinorClassifier:
         image_graph: nx.Graph,
         concept_id: str,
     ) -> Dict[str, Any]:
+        logging.info(f"Checking concept {concept_id} for minor of image")
         # Get concept graph
         concept_graph = Neo4jToNetworkX.extract_concept_graph(tx, concept_id)
 
         # Quick size-based early rejection
         if len(concept_graph.nodes) > len(image_graph.nodes):
-            logging.info(f"Concept {concept_id} is too large to be a minor of the image")
+            logging.info(
+                f"Concept {concept_id} is too large to be a minor of the image"
+            )
             return self._create_no_match_result(
                 concept_id, len(concept_graph.nodes) + len(concept_graph.edges)
             )
 
         concept_complexity = len(concept_graph.nodes) + len(concept_graph.edges)
 
-        # Get start points
-        concept_start_points = self._get_nodes_with_label(concept_graph, "StartPoint")
-        image_start_points = self._get_nodes_with_label(image_graph, "StartPoint")
-
-        # Initialize result with no match
-        result = self._create_no_match_result(concept_id, concept_complexity)
-
-        # Handle early return cases
-        if not concept_start_points or not image_start_points:
-            result["comparison_message"] = (
-                f"Cannot match concept {concept_id}: "
-                f"Concept has {len(concept_start_points)} StartPoints, "
-                f"Image has {len(image_start_points)} StartPoints"
-            )
-            return result
-
-        # Early structural check - validate node labels distribution
-        concept_label_counts = self._count_node_labels(concept_graph)
-        image_label_counts = self._count_node_labels(image_graph)
-
-        if not self._check_label_distribution_compatible(
-            concept_label_counts, image_label_counts
-        ):
+        # Apply asymmetric preprocessing - concept is treated as template, image can be reduced
+        try:
             logging.info(
-                f"Concept {concept_id} has incompatible node label distribution with image"
+                f"Asymmetrically preprocessing concept and image graphs (only image can be reduced)"
             )
-            result["comparison_message"] = (
-                f"Concept {concept_id} has incompatible node label distribution with image"
+            preprocessed_concept, preprocessed_image = (
+                self.preprocessor.preprocess_graphs_asymmetric(
+                    concept_graph, image_graph
+                )
             )
-            return result
 
-        # Try all possible StartPoint matchings
-        for concept_start in concept_start_points:
-            for image_start in image_start_points:
-                if not self._check_node_properties_match(
-                    concept_graph.nodes[concept_start], image_graph.nodes[image_start]
-                ):
-                    continue
-
-                # Try to find a complete matching starting from these points
-                mapping = self._find_concept_minor_mapping(
-                    concept_graph,
-                    image_graph,
-                    {concept_start: image_start},
+            # Check if preprocessing failed (asymmetric constraint violated)
+            if preprocessed_concept is None or preprocessed_image is None:
+                logging.warning(
+                    f"Asymmetric preprocessing failed - concept requires more critical points than image provides"
+                )
+                return self._create_no_match_result(
+                    concept_id,
+                    concept_complexity,
+                    comparison_message=f"Concept requires more critical points of higher types than image provides",
                 )
 
-                if not mapping:
-                    continue
+            logging.info(
+                f"Asymmetric preprocessing complete. Concept: {len(preprocessed_concept.nodes)} nodes, Image: {len(preprocessed_image.nodes)} nodes"
+            )
+        except Exception as e:
+            logging.warning(f"Preprocessing failed for concept {concept_id}: {str(e)}")
+            return self._create_no_match_result(
+                concept_id,
+                concept_complexity,
+                comparison_message=f"Preprocessing failed: {str(e)}",
+            )
 
-                # Count actual concept node mappings, excluding the "contractions" key
-                mapping_size = sum(1 for k in mapping if k != "contractions")
-                concept_size = len(concept_graph.nodes)
+        # Continue with the preprocessed graphs for all subsequent operations
+        concept_graph = preprocessed_concept
+        image_graph = preprocessed_image
 
-                # Count contractions if any
-                contractions_count = 0
-                if "contractions" in mapping:
-                    contractions_count = sum(
-                        len(nodes) for nodes in mapping["contractions"].values()
-                    )
+        # Calculate similarity using critical point-based approach
+        similarity_results = self._calculate_critical_point_similarity(
+            concept_graph, image_graph
+        )
 
-                # Update result if we found a complete or better partial match
-                if mapping_size == concept_size:
-                    return self._create_complete_match_result(
-                        concept_id,
-                        concept_complexity,
-                        mapping_size,
-                        concept_size,
-                        len(image_graph.nodes),
-                        contractions_count,
-                    )
-                elif mapping_size > 0:
-                    partial_similarity = mapping_size / concept_size
+        # Create appropriate result based on similarity calculation
+        match_type = similarity_results["match_type"]
+        overall_similarity = similarity_results["overall_similarity"]
 
-                    # Early stopping if we found a good enough match
-                    if partial_similarity >= self.early_stopping_threshold:
-                        return self._create_partial_match_result(
-                            concept_id,
-                            concept_complexity,
-                            partial_similarity,
-                            mapping_size,
-                            concept_size,
-                            len(image_graph.nodes),
-                            contractions_count,
-                        )
-
-                    if partial_similarity > result.get("raw_structural_score", 0):
-                        result = self._create_partial_match_result(
-                            concept_id,
-                            concept_complexity,
-                            partial_similarity,
-                            mapping_size,
-                            concept_size,
-                            len(image_graph.nodes),
-                            contractions_count,
-                        )
-
-        return result
-
-    def _get_nodes_with_label(self, graph: nx.Graph, label: str) -> List[Any]:
-        return [
-            node
-            for node, attrs in graph.nodes(data=True)
-            if "labels" in attrs and label in attrs["labels"]
-        ]
+        # Create appropriate result based on match type
+        if match_type == "complete_match":
+            return self._create_complete_match_result(
+                concept_id,
+                concept_complexity,
+                similarity_results[
+                    "mapped_cps"
+                ],  # Use mapped critical points as mapping size
+                len(concept_graph.nodes),
+                len(image_graph.nodes),
+                0,  # No contractions in this approach
+                comparison_message=(
+                    f"Complete match for concept {concept_id} with similarity {overall_similarity:.2f}. "
+                    f"Matched {similarity_results['mapped_cps']}/{similarity_results['total_cps']} critical points and "
+                    f"{similarity_results['mapped_paths']}/{similarity_results['total_paths']} paths. "
+                    f"Quality score: {similarity_results['quality_score']:.2f}"
+                ),
+                similarity_details=similarity_results,
+            )
+        elif match_type == "good_match":
+            return self._create_good_match_result(
+                concept_id,
+                concept_complexity,
+                similarity_results["overall_similarity"],
+                similarity_results["mapped_cps"],
+                len(concept_graph.nodes),
+                len(image_graph.nodes),
+                comparison_message=(
+                    f"Good match for concept {concept_id} with similarity {overall_similarity:.2f}. "
+                    f"Matched {similarity_results['mapped_cps']}/{similarity_results['total_cps']} critical points and "
+                    f"{similarity_results['mapped_paths']}/{similarity_results['total_paths']} paths. "
+                    f"Quality score: {similarity_results['quality_score']:.2f}"
+                ),
+                similarity_details=similarity_results,
+            )
+        elif match_type == "partial_match":
+            return self._create_partial_match_result(
+                concept_id,
+                concept_complexity,
+                overall_similarity,
+                similarity_results["mapped_cps"],
+                len(concept_graph.nodes),
+                len(image_graph.nodes),
+                0,  # No contractions in this approach
+                comparison_message=(
+                    f"Partial match for concept {concept_id} with similarity {overall_similarity:.2f}. "
+                    f"Matched {similarity_results['mapped_cps']}/{similarity_results['total_cps']} critical points and "
+                    f"{similarity_results['mapped_paths']}/{similarity_results['total_paths']} paths. "
+                    f"Quality score: {similarity_results['quality_score']:.2f}"
+                ),
+                similarity_details=similarity_results,
+            )
+        else:
+            return self._create_no_match_result(
+                concept_id,
+                concept_complexity,
+                comparison_message=(
+                    f"No significant match for concept {concept_id}. Similarity score: {overall_similarity:.2f}, "
+                    f"Quality score: {similarity_results.get('quality_score', 0):.2f}"
+                ),
+            )
 
     def _create_no_match_result(
-        self, concept_id: str, concept_complexity: int
+        self, concept_id: str, concept_complexity: int, comparison_message: str = None
     ) -> Dict[str, Any]:
         return {
             "concept_id": concept_id,
@@ -198,7 +210,8 @@ class ConceptMinorClassifier:
             "raw_structural_score": 0.0,
             "is_minor": False,
             "concept_complexity": concept_complexity,
-            "comparison_message": f"No match found for concept {concept_id}",
+            "comparison_message": comparison_message
+            or f"No match found for concept {concept_id}",
         }
 
     def _create_complete_match_result(
@@ -209,6 +222,8 @@ class ConceptMinorClassifier:
         concept_size: int,
         image_size: int,
         contractions_count: int = 0,
+        comparison_message: str = None,
+        similarity_details: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         return {
             "concept_id": concept_id,
@@ -220,16 +235,9 @@ class ConceptMinorClassifier:
             "concept_size": concept_size,
             "image_size": image_size,
             "contractions_count": contractions_count,
-            "comparison_message": (
-                f"Concept {concept_id} is a minor of the image graph "
-                f"with a complete matching of {mapping_size} nodes"
-                + (
-                    f" using {contractions_count} node contractions"
-                    if contractions_count > 0
-                    else ""
-                )
-            ),
+            "comparison_message": comparison_message,
             "concept_complexity": concept_complexity,
+            "similarity_details": similarity_details,
         }
 
     def _create_partial_match_result(
@@ -241,6 +249,8 @@ class ConceptMinorClassifier:
         concept_size: int,
         image_size: int,
         contractions_count: int = 0,
+        comparison_message: str = None,
+        similarity_details: Dict[str, Any] = None,
     ) -> Dict[str, Any]:
         return {
             "concept_id": concept_id,
@@ -252,366 +262,36 @@ class ConceptMinorClassifier:
             "concept_size": concept_size,
             "image_size": image_size,
             "contractions_count": contractions_count,
-            "comparison_message": (
-                f"Partial matching for concept {concept_id} with "
-                f"{mapping_size}/{concept_size} nodes matched "
-                f"({partial_similarity:.2%})"
-                + (
-                    f" using {contractions_count} node contractions"
-                    if contractions_count > 0
-                    else ""
-                )
-            ),
+            "comparison_message": comparison_message,
             "concept_complexity": concept_complexity,
+            "similarity_details": similarity_details,
         }
 
-    def _check_node_properties_match(
-        self, concept_node_data: Dict[str, Any], image_node_data: Dict[str, Any]
-    ) -> bool:
-        """
-        Check if all required properties of a concept node match an image node.
-        Uses the PropertyMatcherManager to handle different property types.
-
-        Args:
-            concept_node_data: Properties of the concept node
-            image_node_data: Properties of the image node
-
-        Returns:
-            True if all concept properties match the image, False otherwise
-        """
-        return self.property_matcher.check_node_properties_match(
-            concept_node_data, image_node_data
-        )
-
-    def _property_values_match(self, concept_value: Any, image_value: Any) -> bool:
-        """
-        Check if a concept property value matches an image property value.
-        Uses the PropertyMatcherManager to handle different property types.
-
-        Args:
-            concept_value: Value from the concept
-            image_value: Value from the image
-
-        Returns:
-            True if values match, False otherwise
-        """
-        return self.property_matcher.is_property_match(concept_value, image_value)
-
-    def _find_concept_minor_mapping(
+    def _create_good_match_result(
         self,
-        concept_graph: nx.Graph,
-        image_graph: nx.Graph,
-        initial_mapping: Dict[Any, Any],
-    ) -> Dict[Any, Any]:
-        mapping = initial_mapping.copy()
-        inverse_mapping = {v: k for k, v in mapping.items()}
-        contractions = {}  # Store node contractions (paths)
-
-        # Initialize frontier with neighbors of mapped nodes
-        concept_frontier = self._get_initial_frontier(concept_graph, mapping)
-
-        # Iteratively grow the mapping
-        while concept_frontier:
-            concept_node, image_node, contraction_path = self._find_next_match(
-                concept_graph, image_graph, mapping, concept_frontier
-            )
-
-            if concept_node is None:  # No match found
-                break
-
-            # Update mappings and frontier
-            mapping[concept_node] = image_node
-            inverse_mapping[image_node] = concept_node
-            concept_frontier.remove(concept_node)
-
-            # Store contraction path if it exists
-            if contraction_path:
-                contractions[concept_node] = contraction_path
-
-            # Add new frontier nodes
-            for new_neighbor in concept_graph.neighbors(concept_node):
-                if new_neighbor not in mapping and new_neighbor not in concept_frontier:
-                    concept_frontier.add(new_neighbor)
-
-        # Store contractions in the mapping object
-        if contractions:
-            mapping["contractions"] = contractions
-
-        return mapping
-
-    def _get_initial_frontier(
-        self, concept_graph: nx.Graph, mapping: Dict[Any, Any]
-    ) -> set:
-        frontier = set()
-        for concept_node in mapping:
-            frontier.update(concept_graph.neighbors(concept_node))
-
-        # Remove already mapped nodes
-        return frontier - set(mapping.keys())
-
-    def _find_next_match(
-        self,
-        concept_graph: nx.Graph,
-        image_graph: nx.Graph,
-        mapping: Dict[Any, Any],
-        concept_frontier: set,
-    ) -> Tuple[Any, Any, List[Any]]:  # Now returns contraction path as third element
-        # Sort frontier nodes by connectivity - prioritize nodes with more mapped neighbors
-        concept_nodes_with_priority = []
-        for concept_node in concept_frontier:
-            mapped_neighbors = [
-                n for n in concept_graph.neighbors(concept_node) if n in mapping
-            ]
-            if mapped_neighbors:
-                concept_nodes_with_priority.append(
-                    (concept_node, len(mapped_neighbors))
-                )
-
-        # Sort by number of mapped neighbors (descending)
-        concept_nodes_with_priority.sort(key=lambda x: x[1], reverse=True)
-
-        # Try to match nodes with more constraints first (more mapped neighbors)
-        for concept_node, _ in concept_nodes_with_priority:
-            mapped_neighbors = [
-                n for n in concept_graph.neighbors(concept_node) if n in mapping
-            ]
-
-            # Get corresponding image nodes - now includes nodes reachable via paths
-            image_candidates, path_data = self._get_image_candidates_with_paths(
-                image_graph, mapped_neighbors, mapping
-            )
-
-            # Sort image candidates by how well they match the concept node
-            scored_candidates = []
-            for image_node in image_candidates:
-                if self._check_node_properties_match(
-                    concept_graph.nodes[concept_node], image_graph.nodes[image_node]
-                ):
-                    score = self._calculate_candidate_score(
-                        concept_graph,
-                        image_graph,
-                        concept_node,
-                        image_node,
-                        mapped_neighbors,
-                        mapping,
-                        path_data.get(image_node, {}),
-                    )
-                    scored_candidates.append((image_node, score))
-
-            # Sort candidates by score (descending)
-            scored_candidates.sort(key=lambda x: x[1], reverse=True)
-
-            # Try candidates in order of score
-            for image_node, _ in scored_candidates:
-                is_compatible, contraction_paths = self._is_compatible_match(
-                    concept_graph,
-                    image_graph,
-                    concept_node,
-                    image_node,
-                    mapped_neighbors,
-                    mapping,
-                    path_data.get(image_node, {}),
-                )
-
-                if is_compatible:
-                    # Flatten contraction paths into a single list of all intermediate nodes
-                    all_contraction_nodes = []
-                    for path in contraction_paths.values():
-                        if (
-                            path and len(path) > 2
-                        ):  # Only include paths with intermediate nodes
-                            all_contraction_nodes.extend(
-                                path[1:-1]
-                            )  # Skip first and last nodes
-
-                    return concept_node, image_node, all_contraction_nodes
-
-        return None, None, []  # No match found
-
-    def _calculate_candidate_score(
-        self,
-        concept_graph: nx.Graph,
-        image_graph: nx.Graph,
-        concept_node: Any,
-        image_node: Any,
-        mapped_neighbors: List[Any],
-        mapping: Dict[Any, Any],
-        path_data: Dict[Any, List[Any]] = None,
-    ) -> float:
-        # Base score from property matches
-        property_score = 0
-        concept_props = concept_graph.nodes[concept_node]
-        image_props = image_graph.nodes[image_node]
-
-        # Count matching properties
-        matching_props = 0
-        total_props = 0
-        for key, value in concept_props.items():
-            if key not in PropertyMatcherManager.LIST_IGNORE_KEYS:
-                total_props += 1
-                if key in image_props and self._property_values_match(
-                    value, image_props[key]
-                ):
-                    matching_props += 1
-
-        property_score = matching_props / max(1, total_props)
-
-        # Structural score based on how many mapped neighbors are connected (directly or via path)
-        structural_score = 0
-        connected_neighbors = 0
-        for concept_neighbor in mapped_neighbors:
-            image_neighbor = mapping[concept_neighbor]
-            # Check direct edge or path
-            if image_graph.has_edge(image_node, image_neighbor) or (
-                path_data and image_neighbor in path_data
-            ):
-                connected_neighbors += 1
-
-                # Penalize slightly for longer paths
-                if path_data and image_neighbor in path_data:
-                    path_length = len(path_data[image_neighbor])
-                    if path_length > 2:  # Direct edge is length 2 (start and end)
-                        structural_score -= 0.05 * (
-                            path_length - 2
-                        )  # Small penalty for each intermediate node
-
-        structural_score += connected_neighbors / max(1, len(mapped_neighbors))
-
-        # Future connectivity score - how many unmapped neighbors this node has
-        # that could potentially extend the mapping
-        future_connectivity = 0
-        unmapped_concept_neighbors = [
-            n
-            for n in concept_graph.neighbors(concept_node)
-            if n not in mapping and n not in mapped_neighbors
-        ]
-
-        if unmapped_concept_neighbors:
-            future_connectivity = len(unmapped_concept_neighbors) / len(
-                concept_graph.nodes
-            )
-
-        # Combined score with weights
-        return 0.4 * property_score + 0.5 * structural_score + 0.1 * future_connectivity
-
-    def _get_image_candidates_with_paths(
-        self,
-        image_graph: nx.Graph,
-        mapped_neighbors: List[Any],
-        mapping: Dict[Any, Any],
-    ) -> Tuple[set, Dict[Any, Dict[Any, List[Any]]]]:
-        """
-        Get all candidate image nodes that could match a concept node, including nodes
-        reachable via paths from mapped neighbors.
-
-        Returns:
-            - Set of candidate image nodes
-            - Dict mapping each candidate to its paths from mapped neighbors
-        """
-        # Get all neighboring image nodes (direct neighbors first)
-        inverse_mapping = {v: k for k, v in mapping.items()}
-        image_neighbors = set()
-        path_data = {}  # Track paths from mapped neighbors to candidates
-
-        # First, collect direct neighbors
-        for concept_neighbor in mapped_neighbors:
-            image_neighbor = mapping[concept_neighbor]
-            direct_neighbors = set(image_graph.neighbors(image_neighbor))
-
-            # Store direct paths
-            for direct_node in direct_neighbors:
-                if direct_node not in path_data:
-                    path_data[direct_node] = {}
-                path_data[direct_node][image_neighbor] = [image_neighbor, direct_node]
-
-            image_neighbors.update(direct_neighbors)
-
-        # Now find paths of any length
-        for concept_neighbor in mapped_neighbors:
-            image_neighbor = mapping[concept_neighbor]
-
-            # Use BFS to find all reachable nodes
-            for target_node, path in self._find_paths_bfs(
-                image_graph, image_neighbor, inverse_mapping.keys()
-            ).items():
-                if (
-                    target_node not in inverse_mapping
-                ):  # Don't map to already mapped nodes
-                    image_neighbors.add(target_node)
-                    if target_node not in path_data:
-                        path_data[target_node] = {}
-                    path_data[target_node][image_neighbor] = path
-
-        # Remove already mapped nodes
-        return image_neighbors - set(inverse_mapping.keys()), path_data
-
-    def _find_paths_bfs(
-        self, graph: nx.Graph, start_node: Any, exclude_nodes: set
-    ) -> Dict[Any, List[Any]]:
-        """
-        Find paths from start_node to all reachable nodes.
-        Exclude paths through nodes in exclude_nodes.
-
-        Returns dict mapping target nodes to their paths from start_node.
-        """
-        paths = {}  # Target node -> path from start_node
-        queue = [(start_node, [start_node])]  # (node, path to this node)
-        visited = {start_node}
-
-        while queue:
-            current, path = queue.pop(0)
-
-            for neighbor in graph.neighbors(current):
-                if neighbor in visited or neighbor in exclude_nodes:
-                    continue
-
-                new_path = path + [neighbor]
-                paths[neighbor] = new_path
-
-                queue.append((neighbor, new_path))
-                visited.add(neighbor)
-
-        return paths
-
-    def _is_compatible_match(
-        self,
-        concept_graph: nx.Graph,
-        image_graph: nx.Graph,
-        concept_node: Any,
-        image_node: Any,
-        mapped_neighbors: List[Any],
-        mapping: Dict[Any, Any],
-        path_data: Dict[Any, List[Any]] = None,
-    ) -> Tuple[bool, Dict[Any, List[Any]]]:
-        """
-        Check if a concept node can be matched with an image node.
-        Now returns both a boolean indicating compatibility and the paths used for contractions.
-        """
-        # Check property compatibility
-        if not self._check_node_properties_match(
-            concept_graph.nodes[concept_node], image_graph.nodes[image_node]
-        ):
-            return False, {}
-
-        # Check structural compatibility - now allows paths instead of just direct edges
-        compatible_paths = {}
-        for concept_neighbor in mapped_neighbors:
-            image_neighbor = mapping[concept_neighbor]
-
-            # Case 1: Direct edge exists
-            if image_graph.has_edge(image_node, image_neighbor):
-                compatible_paths[image_neighbor] = [image_node, image_neighbor]
-                continue
-
-            # Case 2: Path exists in path_data
-            if path_data and image_neighbor in path_data:
-                compatible_paths[image_neighbor] = path_data[image_neighbor]
-                continue
-
-            # No connection found, not compatible
-            return False, {}
-
-        return True, compatible_paths
+        concept_id: str,
+        concept_complexity: int,
+        overall_similarity: float,
+        mapping_size: int,
+        concept_size: int,
+        image_size: int,
+        comparison_message: str = None,
+        similarity_details: Dict[str, Any] = None,
+    ) -> Dict[str, Any]:
+        return {
+            "concept_id": concept_id,
+            "concept_name": concept_id,
+            "session_id": concept_id,
+            "raw_structural_score": 0.75,
+            "is_minor": False,
+            "mapping_size": mapping_size,
+            "concept_size": concept_size,
+            "image_size": image_size,
+            "contractions_count": 0,
+            "comparison_message": comparison_message,
+            "concept_complexity": concept_complexity,
+            "similarity_details": similarity_details,
+        }
 
     def _check_single_concept(
         self,
@@ -628,7 +308,6 @@ class ConceptMinorClassifier:
     def classify(
         self,
         image_id: str,
-        apply_post_processing: bool = True,
     ) -> List[Dict[str, Any]]:
         logging.info(f"Classifying image {image_id} using concept minor approach")
 
@@ -646,13 +325,7 @@ class ConceptMinorClassifier:
             results = self._classify_sequentially(image_graph, concepts)
 
         # Process and sort results
-        processed_results = self._process_and_sort_results(results, image_id)
-
-        # Apply simple post-processing if requested
-        if apply_post_processing and processed_results:
-            return self._post_process_results(processed_results)
-
-        return processed_results
+        return self._process_and_sort_results(results, image_id)
 
     def _classify_with_multithreading(
         self,
@@ -703,14 +376,21 @@ class ConceptMinorClassifier:
         if not results:
             return []
 
-        # Pre-filter results that don't meet our structural threshold for partial matches
+        # Pre-filter results that don't meet our structural threshold
         filtered_results = []
         for result in results:
-            # Full matches (is_minor=True) are always included
-            # if True:  # result.get("is_minor", False):
-            #     filtered_results.append(result)
+            # Complete matches are always included
+            if result.get("is_minor", False):
+                filtered_results.append(result)
+            # Good matches are similar to complete matches but not exact minors
+            elif result.get("similarity_details", {}).get("match_type") == "good_match":
+                filtered_results.append(result)
             # For partial matches, apply structural score threshold
-            if result.get("raw_structural_score", 0) >= self.min_structural_score:
+            elif (
+                result.get("raw_structural_score", 0) >= self.min_structural_score
+                or result.get("similarity_details", {}).get("overall_similarity", 0)
+                >= self.min_structural_score
+            ):
                 filtered_results.append(result)
 
         if not filtered_results:
@@ -732,15 +412,7 @@ class ConceptMinorClassifier:
         min_specificity = min(r.get("specificity", 0) for r in filtered_results)
         specificity_range = max(0.01, max_specificity - min_specificity)
 
-        # Group results by structural score to implement the new approach
-        structural_score_groups = {}
-        for result in filtered_results:
-            score = result.get("raw_structural_score", 0)
-            if score not in structural_score_groups:
-                structural_score_groups[score] = []
-            structural_score_groups[score].append(result)
-
-        # Calculate additional metrics for each result
+        # Calculate combined scores based on the refined similarity metrics
         for result in filtered_results:
             # Normalize complexity
             normalized_complexity = (
@@ -756,38 +428,80 @@ class ConceptMinorClassifier:
             result["normalized_complexity"] = normalized_complexity
             result["normalized_specificity"] = normalized_specificity
 
-        # Process each group to implement the new scoring approach
-        for score, group in structural_score_groups.items():
-            if len(group) == 1:
-                # Only one concept with this structural score, just use the raw score
-                group[0]["combined_score"] = score
-                group[0]["activation_level"] = score
-            else:
-                # Multiple concepts with the same structural score
-                # Use complexity as a tiebreaker
-                for result in group:
-                    # Add a tiny weight to complexity as a tiebreaker
-                    # The 0.0001 factor ensures it doesn't override the structural score
-                    result["combined_score"] = score + (
-                        0.0001 * result["normalized_complexity"]
-                    )
-                    result["activation_level"] = result["combined_score"]
+            # Use the detailed similarity metrics if available
+            similarity_details = result.get("similarity_details", {})
 
-            # Log scores for debugging
-            for result in group:
-                logging.info(
-                    f"Scores for concept {result['concept_id']} and image {image_id}:\n"
-                    f"Structural: {score:.4f}, "
-                    f"Complexity: {result['normalized_complexity']:.4f}, "
-                    f"Specificity: {result['normalized_specificity']:.4f}, "
-                    f"Combined: {result['combined_score']:.4f}"
+            if similarity_details:
+                # Get key metrics from similarity details
+                match_type = similarity_details.get("match_type", "no_match")
+                overall_similarity = similarity_details.get("overall_similarity", 0.0)
+                quality_score = similarity_details.get("quality_score", 0.0)
+                coverage_score = similarity_details.get("coverage_score", 0.0)
+
+                # Create a more sophisticated combined score that balances:
+                # - overall_similarity (coverage + quality weighted)
+                # - complexity (as a tiebreaker)
+                # - specificity (to prioritize more specific concepts)
+
+                # Adjust match type multiplier - boost complete matches
+                match_type_multiplier = 1.0
+                if match_type == "complete_match":
+                    match_type_multiplier = 1.1  # 10% boost
+                elif match_type == "good_match":
+                    match_type_multiplier = 1.05  # 5% boost
+
+                # Build combined score from multiple factors
+                base_score = overall_similarity
+                specificity_boost = (
+                    0.02 * normalized_specificity
+                )  # Small specificity boost
+                complexity_boost = (
+                    0.01 * normalized_complexity
+                )  # Tiny complexity tiebreaker
+
+                # Calculate final combined score
+                result["combined_score"] = match_type_multiplier * (
+                    base_score + specificity_boost + complexity_boost
                 )
 
-        # Sort by combined score (which now prioritizes structural similarity)
-        filtered_results.sort(
-            key=lambda x: x.get("combined_score", 0),
-            reverse=True,
-        )
+                # Also store individual components for reference
+                result["match_quality"] = quality_score
+                result["match_coverage"] = coverage_score
+
+            else:
+                # Fallback to the basic scoring approach
+                structural_score = result.get("raw_structural_score", 0)
+                result["combined_score"] = structural_score + (
+                    0.0001 * normalized_complexity
+                )
+                result["match_quality"] = structural_score
+                result["match_coverage"] = structural_score
+
+            # Set activation level equal to combined score
+            result["activation_level"] = result["combined_score"]
+
+            # Add match type for sorting/filtering
+            result["match_type"] = similarity_details.get(
+                "match_type",
+                (
+                    "partial_match"
+                    if result.get("raw_structural_score", 0) > 0
+                    else "no_match"
+                ),
+            )
+
+            # Log scores for debugging
+            logging.info(
+                f"Scores for concept {result['concept_id']} and image {image_id}:\n"
+                f"Match type: {result.get('match_type', 'unknown')}, "
+                f"Raw structural: {result.get('raw_structural_score', 0):.4f}, "
+                f"Quality: {result.get('match_quality', 0):.4f}, "
+                f"Coverage: {result.get('match_coverage', 0):.4f}, "
+                f"Combined: {result['combined_score']:.4f}"
+            )
+
+        # Sort by combined score (which now includes quality, coverage, match type)
+        filtered_results.sort(key=lambda x: x.get("combined_score", 0), reverse=True)
 
         return filtered_results
 
@@ -804,44 +518,903 @@ class ConceptMinorClassifier:
         tx.run(query, image_id=image_id)
         logging.info(f"Removed all nodes for image_id: {image_id}")
 
-    def _post_process_results(
-        self, results: List[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """Apply simple post-processing to refine classification results"""
-        if not results:
-            return results
+    def _find_paths_to_next_critical(
+        self,
+        graph: nx.Graph,
+        start_node: Any,
+        critical_points: Dict[str, List[Any]],
+    ) -> List[Tuple[Any, List[Any]]]:
+        """
+        Finds all simple paths from start_node to any other critical point,
+        such that the path does not contain any *other* critical points as intermediate nodes.
 
-        # Apply any additional filtering or adjustments here
-        # Since we don't have concept relationships, we just return the processed results
+        Args:
+            graph: The graph to search within
+            start_node: The critical point node ID to start from
+            critical_points: Dictionary mapping critical point types to lists of node IDs
 
-        return results
+        Returns:
+            A list of tuples, where each tuple contains (next_critical_point_id, path_nodes_list).
+            Returns all such valid paths found.
+        """
+        logging.debug(f"Finding paths from critical node {start_node}")
+        all_critical = {node for points in critical_points.values() for node in points}
+        target_critical = all_critical - {start_node}
 
-    def _count_node_labels(self, graph: nx.Graph) -> Dict[str, int]:
-        """Count occurrences of each label in the graph"""
-        label_counts = {}
-        for _, attrs in graph.nodes(data=True):
-            if "labels" in attrs:
-                for label in attrs["labels"]:
-                    if label not in label_counts:
-                        label_counts[label] = 0
-                    label_counts[label] += 1
-        return label_counts
+        found_paths = []
 
-    def _check_label_distribution_compatible(
-        self, concept_label_counts: Dict[str, int], image_label_counts: Dict[str, int]
-    ) -> bool:
-        """Check if the image has enough nodes of each label type needed by the concept"""
-        for label, count in concept_label_counts.items():
-            # Skip common labels like Point that may not be discriminative
-            if label in ["Point"]:
+        # Use BFS approach to find all paths
+        import collections
+
+        stack = collections.deque(
+            [(start_node, [start_node])]
+        )  # (current_node, path_list)
+
+        while stack:
+            current_node, path = stack.pop()  # DFS uses pop()
+
+            # Explore neighbors
+            for neighbor in graph.neighbors(current_node):
+                # Avoid cycles by checking if neighbor is already in the current path
+                if neighbor not in path:
+                    new_path = path + [neighbor]
+
+                    # Check if neighbor is a target critical point
+                    if neighbor in target_critical:
+                        # Found a valid path ending at a critical point
+                        logging.debug(
+                            f"Found path to critical point {neighbor}: {new_path}"
+                        )
+                        found_paths.append((neighbor, new_path))
+                        # Do not continue exploring further along this path branch from the target
+                    else:
+                        # Neighbor is not a critical point, continue DFS
+                        stack.append((neighbor, new_path))
+
+        # Post-processing: Filter paths that contain intermediate critical points
+        valid_paths = []
+        for end_node, path in found_paths:
+            is_valid = True
+            # Check intermediate nodes (excluding start and end)
+            for node in path[1:-1]:
+                if node in all_critical:  # Found an intermediate critical point
+                    is_valid = False
+                    logging.debug(
+                        f"Filtering out path {path} due to intermediate critical point {node}"
+                    )
+                    break
+            if is_valid:
+                valid_paths.append((end_node, path))
+
+        logging.debug(
+            f"Found {len(valid_paths)} valid simple paths from {start_node} to other critical points"
+        )
+        return valid_paths
+
+    def _calculate_path_similarity(
+        self, graph1: nx.Graph, graph2: nx.Graph, path1: List[Any], path2: List[Any]
+    ) -> float:
+        """
+        Calculates similarity between two paths based on:
+        1. Relative length (closer is better)
+        2. Node type compatibility
+
+        Args:
+            graph1: First graph (concept graph)
+            graph2: Second graph (image graph)
+            path1: Path in first graph (concept path)
+            path2: Path in second graph (image path)
+
+        Returns:
+            Similarity score between 0.0 and 1.0
+        """
+        # Check if concept path is longer than image path
+        len1, len2 = len(path1), len(path2)
+        if len1 > len2:
+            return (
+                0.0  # Fail classification when concept path is longer than image path
+            )
+
+        # Length similarity component (1.0 if equal length, decreasing as difference increases)
+        length_ratio = min(len1, len2) / max(len1, len2) if max(len1, len2) > 0 else 1.0
+
+        # Node compatibility component
+        # Sample key positions in each path and check compatibility
+        # Take start, end, and up to 3 intermediate points
+        compatible_nodes = 0
+        comparisons = 0
+
+        # Always compare start and end
+        positions = [0, -1]
+
+        # Add middle point if paths are long enough
+        if len1 > 2 and len2 > 2:
+            positions.append(len1 // 2)
+
+        # Add quarter and three-quarter points for longer paths
+        if len1 > 4 and len2 > 4:
+            positions.extend([len1 // 4, 3 * len1 // 4])
+
+        for pos in positions:
+            if pos >= len1 or (pos < 0 and abs(pos) > len1):
                 continue
 
-            # If image doesn't have this label at all, it's incompatible
-            if label not in image_label_counts:
-                return False
+            idx1 = pos
+            # Map position proportionally to path2
+            if pos >= 0:
+                idx2 = min(int(pos * len2 / len1), len2 - 1)
+            else:
+                idx2 = -min(abs(pos), len2)
 
-            # If image has fewer nodes of this label than concept needs, it's incompatible
-            if image_label_counts[label] < count:
-                return False
+            node1 = path1[idx1]
+            node2 = path2[idx2]
 
+            # Use the similarity calculator for more accurate node comparison
+            similarity = self.similarity_calculator.calculate_node_similarity(
+                graph1, graph2, node1, node2
+            )
+            if similarity > 0.3:  # Threshold for considering nodes compatible
+                compatible_nodes += 1
+            comparisons += 1
+
+        node_compatibility = compatible_nodes / comparisons if comparisons > 0 else 0.0
+
+        # Combine scores (weight length similarity less than node compatibility)
+        similarity = 0.3 * length_ratio + 0.7 * node_compatibility
+
+        return similarity
+
+    def _find_alternative_image_path(
+        self,
+        image_graph: nx.Graph,
+        start_node: Any,
+        end_node: Any,
+        max_length: int,
+        current_path: List[Any] = None,
+    ) -> List[Any]:
+        """
+        Finds an alternative path in the image graph between the start and end nodes,
+        with length less than or equal to max_length.
+
+        Args:
+            image_graph: The image graph
+            start_node: Starting node
+            end_node: Ending node
+            max_length: Maximum allowed path length
+            current_path: Currently considered path (for validation)
+
+        Returns:
+            A path with length <= max_length, or None if no such path exists
+        """
+        # Try to find alternative paths using networkx all_simple_paths
+        # but limit the path length to max_length
+        try:
+            # We add 1 to max_length since we're counting nodes, not edges
+            # And capping the cutoff to avoid excessive computation
+            cutoff = min(max_length, 20)
+
+            # Find all paths from start to end with length <= max_length
+            all_paths = list(
+                nx.all_simple_paths(
+                    image_graph, source=start_node, target=end_node, cutoff=cutoff
+                )
+            )
+
+            # Filter paths by length and take the shortest one
+            valid_paths = [p for p in all_paths if len(p) <= max_length]
+
+            if valid_paths:
+                # Sort by length (ascending)
+                valid_paths.sort(key=len)
+                logging.debug(
+                    f"Found alternative path with length {len(valid_paths[0])} (vs max {max_length})"
+                )
+                return valid_paths[0]
+
+            logging.debug(f"No alternative path found with length <= {max_length}")
+            return None
+        except Exception as e:
+            logging.warning(f"Error finding alternative path: {str(e)}")
+            return None
+
+    def _normalize_path_tuple(self, path_tuple: Tuple[Any, ...]) -> Tuple[Any, ...]:
+        """
+        Normalizes a path tuple to a canonical form that is the same regardless of direction.
+        This ensures that paths like (A->B->C) and (C->B->A) are treated as the same connection.
+
+        Args:
+            path_tuple: Original path tuple
+
+        Returns:
+            Normalized path tuple
+        """
+        # If the first node has a smaller ID than the last node, keep as is
+        # Otherwise, reverse the path
+        if not path_tuple:
+            return path_tuple
+
+        first_node, last_node = path_tuple[0], path_tuple[-1]
+        # Convert to strings for consistent comparison if nodes are different types
+        first_str = str(first_node)
+        last_str = str(last_node)
+
+        if first_str <= last_str:
+            return path_tuple
+        else:
+            return tuple(reversed(path_tuple))
+
+    def _find_optimal_path_matches(
+        self,
+        concept_graph: nx.Graph,
+        image_graph: nx.Graph,
+        paths_c: List[Tuple[Any, List[Any]]],
+        paths_i: List[Tuple[Any, List[Any]]],
+        critical_point_mapping: Dict[Any, Any],
+    ) -> List[Tuple[Tuple[Any, List[Any]], Tuple[Any, List[Any]]]]:
+        """
+        Finds optimal matches between paths using pre-computed critical point mapping.
+        Prioritizes paths connecting mapped critical points.
+
+        Args:
+            concept_graph: The concept graph
+            image_graph: The image graph
+            paths_c: List of (end_point, path) tuples from concept graph
+            paths_i: List of (end_point, path) tuples from image graph
+            critical_point_mapping: Mapping of concept critical points to image critical points
+
+        Returns:
+            List of ((end_c, path_c), (end_i, path_i)) pairs representing matched paths
+        """
+        matched_pairs = []
+        # Keep track of used paths (represented as tuples)
+        used_paths_c = set()  # Set of normalized tuples (path_c)
+        used_paths_i = set()  # Set of normalized tuples (path_i)
+
+        # Priority 1: Match paths where endpoints are mapped
+        potential_mapped_matches = []
+        for idx_c, (end_c, path_c) in enumerate(paths_c):
+            if end_c in critical_point_mapping:
+                mapped_end_i = critical_point_mapping[end_c]
+                for idx_i, (end_i, path_i) in enumerate(paths_i):
+                    # Check if the end points match according to the mapping
+                    if end_i == mapped_end_i:
+                        # If concept path is longer than image path, try to find an alternative path
+                        if len(path_c) > len(path_i):
+                            # Find start node in image_graph corresponding to start of path_c
+                            # The start node should be the mapped critical point of the first node in path_c
+                            start_node_c = path_c[0]
+                            if start_node_c in critical_point_mapping:
+                                start_node_i = critical_point_mapping[start_node_c]
+
+                                # Try to find an alternative path in image_graph
+                                alt_path_i = self._find_alternative_image_path(
+                                    image_graph, start_node_i, end_i, len(path_c)
+                                )
+
+                                if alt_path_i:
+                                    # Use the alternative path instead
+                                    path_i = alt_path_i
+                                    logging.debug(
+                                        f"Using alternative path for match {start_node_c}-{end_c}"
+                                    )
+
+                        # Calculate similarity score
+                        path_similarity = self._calculate_path_similarity(
+                            concept_graph, image_graph, path_c, path_i
+                        )
+
+                        # Store potential match with score, using path tuples as identifiers
+                        if path_similarity > 0.2:  # Threshold for mapped paths
+                            potential_mapped_matches.append(
+                                (tuple(path_c), tuple(path_i), path_similarity)
+                            )
+
+        # Sort potential mapped matches by score (descending)
+        potential_mapped_matches.sort(key=lambda x: x[2], reverse=True)
+
+        # Greedily select best mapped matches, ensuring paths aren't reused
+        path_dict_c = {
+            tuple(p[1]): p for p in paths_c
+        }  # Map path tuple back to original (end, path)
+        path_dict_i = {tuple(p[1]): p for p in paths_i}
+
+        for path_c_tuple, path_i_tuple, score in potential_mapped_matches:
+            # Normalize path tuples to handle both directions
+            norm_path_c = self._normalize_path_tuple(path_c_tuple)
+            norm_path_i = self._normalize_path_tuple(path_i_tuple)
+
+            if norm_path_c not in used_paths_c and norm_path_i not in used_paths_i:
+                end_c, path_c = path_dict_c[path_c_tuple]
+                end_i, path_i = path_dict_i[path_i_tuple]
+                matched_pairs.append(((end_c, path_c), (end_i, path_i)))
+                # Add normalized paths to used sets
+                used_paths_c.add(norm_path_c)
+                used_paths_i.add(norm_path_i)
+                logging.debug(
+                    f"Matched path (Mapped Endpoints) {end_c}-{end_i} with score {score:.2f}"
+                )
+
+        # Priority 2: Match remaining paths based on similarity
+        remaining_paths_c_tuples = set(path_dict_c.keys()) - {
+            self._normalize_path_tuple(p) for p in used_paths_c
+        }
+        remaining_paths_i_tuples = set(path_dict_i.keys()) - {
+            self._normalize_path_tuple(p) for p in used_paths_i
+        }
+
+        compatible_ends = []
+        for path_c_tuple in remaining_paths_c_tuples:
+            for path_i_tuple in remaining_paths_i_tuples:
+                end_c, path_c = path_dict_c[path_c_tuple]
+                end_i, path_i = path_dict_i[path_i_tuple]
+
+                # If concept path is longer than image path, try to find an alternative path
+                if len(path_c) > len(path_i):
+                    # Get start nodes
+                    start_node_c = path_c[0]
+                    start_node_i = path_i[
+                        0
+                    ]  # Assuming this is close to where we want to start
+
+                    # Try to find a better path in the image graph
+                    alt_path_i = self._find_alternative_image_path(
+                        image_graph, start_node_i, end_i, len(path_c)
+                    )
+
+                    if alt_path_i:
+                        # Use the alternative path
+                        path_i = alt_path_i
+                        # Update the path_i_tuple for later use
+                        path_i_tuple = tuple(path_i)
+                        logging.debug(
+                            f"Using alternative path for non-mapped match to {end_c}"
+                        )
+
+                # Check if endpoints are type compatible using similarity calculator
+                endpoint_similarity = (
+                    self.similarity_calculator.calculate_node_similarity(
+                        concept_graph, image_graph, end_c, end_i
+                    )
+                )
+
+                if endpoint_similarity > 0.3:  # Threshold for endpoint compatibility
+                    path_similarity = self._calculate_path_similarity(
+                        concept_graph, image_graph, path_c, path_i
+                    )
+                    # Combined similarity considers both endpoint and path
+                    adjusted_similarity = (
+                        0.4 * endpoint_similarity + 0.6 * path_similarity
+                    )
+
+                    if (
+                        adjusted_similarity > 0.3
+                    ):  # Threshold for non-mapped/similarity match
+                        compatible_ends.append(
+                            (path_c_tuple, path_i_tuple, adjusted_similarity)
+                        )
+
+        compatible_ends.sort(key=lambda x: x[2], reverse=True)
+
+        # Greedy selection for remaining paths
+        for path_c_tuple, path_i_tuple, score in compatible_ends:
+            # Normalize path tuples to handle both directions
+            norm_path_c = self._normalize_path_tuple(path_c_tuple)
+            norm_path_i = self._normalize_path_tuple(path_i_tuple)
+
+            if norm_path_c not in used_paths_c and norm_path_i not in used_paths_i:
+                end_c, path_c = path_dict_c[path_c_tuple]
+                end_i, path_i = path_dict_i[path_i_tuple]
+                matched_pairs.append(((end_c, path_c), (end_i, path_i)))
+                # Add normalized paths to used sets
+                used_paths_c.add(norm_path_c)
+                used_paths_i.add(norm_path_i)
+                logging.debug(
+                    f"Matched remaining path {end_c}-{end_i} with similarity score {score:.2f}"
+                )
+
+        return matched_pairs
+
+    def _calculate_critical_point_similarity(
+        self,
+        concept_graph: nx.Graph,
+        image_graph: nx.Graph,
+    ) -> Dict[str, Any]:
+        """
+        Calculate similarity between concept and image graphs based on critical points and path matching.
+        This is the core algorithm that replaces _find_concept_minor_mapping with an approach
+        more similar to GraphMinorFinder.
+
+        Args:
+            concept_graph: The concept graph
+            image_graph: The image graph
+
+        Returns:
+            Dictionary containing similarity metrics and matches
+        """
+        # 1. Identify critical points in both graphs
+        concept_critical_points = self._identify_critical_points(concept_graph)
+        image_critical_points = self._identify_critical_points(image_graph)
+
+        # Log statistics about critical points
+        concept_critical_count = sum(len(p) for p in concept_critical_points.values())
+        image_critical_count = sum(len(p) for p in image_critical_points.values())
+
+        # Critical point type counts for detailed metrics
+        concept_cp_counts = {k: len(v) for k, v in concept_critical_points.items()}
+        image_cp_counts = {k: len(v) for k, v in image_critical_points.items()}
+
+        logging.info(
+            f"Concept has {concept_critical_count} critical points, Image has {image_critical_count} critical points"
+        )
+        logging.info(f"Concept critical point breakdown: {concept_cp_counts}")
+        logging.info(f"Image critical point breakdown: {image_cp_counts}")
+
+        # 2. Perform critical point matching
+        critical_point_mapping = self._match_critical_points(
+            concept_graph,
+            image_graph,
+            concept_critical_points,
+            image_critical_points,
+        )
+
+        # If no critical points were matched, return early with zero similarity
+        if not critical_point_mapping:
+            logging.info(
+                "No critical points could be matched between concept and image"
+            )
+            return {
+                "match_type": "no_match",
+                "cp_similarity": 0.0,
+                "path_similarity": 0.0,
+                "overall_similarity": 0.0,
+                "mapped_cps": 0,
+                "total_cps": concept_critical_count,
+                "mapped_paths": 0,
+                "total_paths": 0,
+                "mapping": {},
+                "cp_type_similarities": {},
+                "quality_score": 0.0,
+            }
+
+        # 3. Calculate critical point similarity score by type (weighting different types)
+        mapped_by_type = {}
+        for concept_cp, image_cp in critical_point_mapping.items():
+            # Find type of this critical point
+            for cp_type, points in concept_critical_points.items():
+                if concept_cp in points:
+                    if cp_type not in mapped_by_type:
+                        mapped_by_type[cp_type] = 0
+                    mapped_by_type[cp_type] += 1
+                    break
+
+        # Default weights for different critical point types
+        cp_type_weights = {
+            "StartPoint": 1.0,  # StartPoints are essential
+            "EndPoint": 0.6,  # EndPoints are important structural elements
+            "IntersectionPoint": 0.8,  # IntersectionPoints define major structure
+            "CornerPoint": 0.7,  # CornerPoints define shape
+            "Point": 0.4,  # Generic points are less significant
+        }
+
+        # Calculate similarity by type
+        cp_type_similarities = {}
+        weighted_cp_sim_sum = 0.0
+        total_weight = 0.0
+
+        for cp_type, count in concept_cp_counts.items():
+            if count == 0:  # Skip types with no points
+                continue
+
+            mapped = mapped_by_type.get(cp_type, 0)
+            type_similarity = mapped / count
+            cp_type_similarities[cp_type] = type_similarity
+
+            # Apply weight for this type
+            weight = cp_type_weights.get(cp_type, 0.5)
+            weighted_cp_sim_sum += type_similarity * weight
+            total_weight += weight
+
+        # Overall critical point similarity (weighted by type)
+        cp_similarity = weighted_cp_sim_sum / total_weight if total_weight > 0 else 0.0
+
+        # Also calculate raw count-based similarity for reference
+        raw_cp_similarity = (
+            len(critical_point_mapping) / concept_critical_count
+            if concept_critical_count > 0
+            else 0.0
+        )
+
+        logging.info(f"Critical point similarity (weighted): {cp_similarity:.4f}")
+        logging.info(f"Critical point similarity (raw): {raw_cp_similarity:.4f}")
+        logging.info(f"Critical point similarities by type: {cp_type_similarities}")
+
+        # 4. Find and match paths between critical points
+        all_path_pairs = []
+        total_concept_paths = 0
+
+        # Track path quality for each critical point pair
+        path_qualities_by_pair = {}
+
+        # For each mapped critical point, find paths to other critical points
+        for concept_cp, image_cp in critical_point_mapping.items():
+            # Find paths from this critical point to other critical points
+            concept_paths = self._find_paths_to_next_critical(
+                concept_graph, concept_cp, concept_critical_points
+            )
+            image_paths = self._find_paths_to_next_critical(
+                image_graph, image_cp, image_critical_points
+            )
+
+            total_concept_paths += len(concept_paths)
+
+            # Find optimal matches between these paths
+            matched_paths = self._find_optimal_path_matches(
+                concept_graph,
+                image_graph,
+                concept_paths,
+                image_paths,
+                critical_point_mapping,
+            )
+
+            # Calculate quality metrics for paths between these critical points
+            if matched_paths:
+                pair_qualities = []
+                for (end_c, path_c), (end_i, path_i) in matched_paths:
+                    path_sim = self._calculate_path_similarity(
+                        concept_graph, image_graph, path_c, path_i
+                    )
+                    pair_qualities.append(path_sim)
+
+                # Store average quality for this critical point pair
+                if pair_qualities:
+                    pair_key = (
+                        f"{concept_cp}-{critical_point_mapping.get(end_c, 'unmapped')}"
+                    )
+                    path_qualities_by_pair[pair_key] = sum(pair_qualities) / len(
+                        pair_qualities
+                    )
+
+            all_path_pairs.extend(matched_paths)
+
+        # 5. Calculate path similarity score (coverage)
+        if total_concept_paths > 0:
+            path_similarity = len(all_path_pairs) / total_concept_paths
+        else:
+            path_similarity = 0.0
+
+        logging.info(
+            f"Path similarity: {path_similarity:.4f} ({len(all_path_pairs)}/{total_concept_paths})"
+        )
+
+        # 6. Calculate path quality scores
+        path_quality = 0.0
+        max_path_quality = 0.0
+        min_path_quality = 1.0
+
+        if all_path_pairs:
+            total_quality = 0.0
+            path_qualities = []
+
+            for (_, path_c), (_, path_i) in all_path_pairs:
+                path_sim = self._calculate_path_similarity(
+                    concept_graph, image_graph, path_c, path_i
+                )
+                path_qualities.append(path_sim)
+                total_quality += path_sim
+
+                # Track min/max for range calculation
+                max_path_quality = max(max_path_quality, path_sim)
+                min_path_quality = min(min_path_quality, path_sim)
+
+            path_quality = total_quality / len(all_path_pairs)
+
+            # Calculate standard deviation for quality consistency measure
+            if len(path_qualities) > 1:
+                import statistics
+
+                quality_std_dev = statistics.stdev(path_qualities)
+            else:
+                quality_std_dev = 0.0
+
+            quality_consistency = 1.0 - (
+                quality_std_dev / max(0.01, path_quality)
+            )  # Higher is better
+        else:
+            quality_std_dev = 0.0
+            quality_consistency = 0.0
+
+        path_quality_range = (
+            max_path_quality - min_path_quality if all_path_pairs else 0.0
+        )
+
+        logging.info(f"Average path quality: {path_quality:.4f}")
+        logging.info(
+            f"Path quality range: {min_path_quality:.2f}-{max_path_quality:.2f}"
+        )
+        logging.info(f"Quality consistency: {quality_consistency:.4f}")
+
+        # 7. Calculate connectivity score - how well critical points are connected
+        connectivity_score = 0.0
+        if (
+            concept_critical_count > 1
+        ):  # Need at least 2 critical points for connectivity
+            max_possible_pairs = (
+                concept_critical_count * (concept_critical_count - 1) / 2
+            )
+            connected_pairs = len(path_qualities_by_pair)
+            connectivity_score = connected_pairs / max_possible_pairs
+
+        logging.info(f"Connectivity score: {connectivity_score:.4f}")
+
+        # 8. Calculate structure quality score - combines connectivity and path quality
+        structure_quality = 0.5 * connectivity_score + 0.5 * path_quality
+
+        # 9. Calculate overall quality score (how well matched parts match)
+        # Weight critical point similarity more than path factors, but consider all aspects
+        quality_score = (
+            0.5 * cp_similarity
+            + 0.2 * path_similarity
+            + 0.2 * path_quality
+            + 0.1 * quality_consistency
+        )
+
+        # 10. Calculate overall similarity score (coverage + quality)
+        # More sophisticated weighting that considers both coverage and quality
+        coverage_score = 0.65 * cp_similarity + 0.35 * path_similarity
+        overall_similarity = 0.7 * coverage_score + 0.3 * quality_score
+
+        logging.info(f"Coverage score: {coverage_score:.4f}")
+        logging.info(f"Quality score: {quality_score:.4f}")
+        logging.info(f"Overall similarity score: {overall_similarity:.4f}")
+
+        # 11. Determine match type with more nuanced thresholds
+        match_type = "no_match"
+        # Complete match requires high overall similarity AND good quality
+        if overall_similarity >= 0.85 and quality_score >= 0.75:
+            match_type = "complete_match"
+        # Good match is nearly complete with good quality
+        elif overall_similarity >= 0.75 and quality_score >= 0.6:
+            match_type = "good_match"
+        # Partial match has decent similarity but may lack in quality
+        elif overall_similarity >= self.min_structural_score:
+            match_type = "partial_match"
+
+        # Create mapping result
+        # Convert critical_point_mapping to a standard dictionary for serialization
+        serializable_mapping = {
+            str(k): str(v) for k, v in critical_point_mapping.items()
+        }
+
+        return {
+            "match_type": match_type,
+            "cp_similarity": cp_similarity,
+            "raw_cp_similarity": raw_cp_similarity,
+            "path_similarity": path_similarity,
+            "path_quality": path_quality,
+            "quality_consistency": quality_consistency,
+            "connectivity_score": connectivity_score,
+            "structure_quality": structure_quality,
+            "quality_score": quality_score,
+            "coverage_score": coverage_score,
+            "overall_similarity": overall_similarity,
+            "mapped_cps": len(critical_point_mapping),
+            "total_cps": concept_critical_count,
+            "mapped_paths": len(all_path_pairs),
+            "total_paths": total_concept_paths,
+            "cp_type_similarities": cp_type_similarities,
+            "path_quality_range": [min_path_quality, max_path_quality],
+            "path_quality_by_pair": path_qualities_by_pair,
+            "mapping": serializable_mapping,
+        }
+
+    def _identify_critical_points(self, graph: nx.Graph) -> Dict[str, List[Any]]:
+        """
+        Identify critical points in a graph (intersection points, corner points, end points, start points).
+        Delegates to the preprocessor to ensure consistency with GraphMinorFinder.
+
+        Args:
+            graph: The graph to analyze
+
+        Returns:
+            Dictionary mapping point types to lists of node IDs
+        """
+        logging.debug(
+            f"Identifying critical points in graph with {len(graph.nodes)} nodes"
+        )
+        # Delegate to the preprocessor's implementation
+        critical_points = self.preprocessor._identify_critical_points(graph)
+
+        logging.debug(
+            f"Found critical points: {', '.join(f'{k}={len(v)}' for k, v in critical_points.items())}"
+        )
+        return critical_points
+
+    def _calculate_node_similarity(
+        self, graph1: nx.Graph, graph2: nx.Graph, node1: Any, node2: Any
+    ) -> float:
+        """
+        Calculate similarity between two nodes using the NodeSimilarityCalculator.
+        This replaces the basic property matching with a more sophisticated similarity measure.
+
+        Args:
+            graph1: First graph (concept)
+            graph2: Second graph (image)
+            node1: Node ID in first graph (concept)
+            node2: Node ID in second graph (image)
+
+        Returns:
+            Similarity score between 0.0 and 1.0
+        """
+        # First check asymmetric type compatibility - concept nodes must be exactly matched or higher
+        if not self._check_asymmetric_node_type_compatibility(
+            graph1.nodes[node1], graph2.nodes[node2]
+        ):
+            return 0.0  # Image node type is lower in hierarchy than concept requires
+
+        # Use the NodeSimilarityCalculator for robust similarity calculation
+        return self.similarity_calculator.calculate_node_similarity(
+            graph1, graph2, node1, node2
+        )
+
+    def _check_asymmetric_node_type_compatibility(
+        self, concept_node_data: Dict[str, Any], image_node_data: Dict[str, Any]
+    ) -> bool:
+        """
+        Check if image node type is compatible with concept node type in an asymmetric way.
+        The image node can be reduced (treated as a lower type), but concept node requirements are strict.
+
+        Hierarchy: Point (lowest) < CornerPoint < IntersectionPoint (highest)
+
+        Args:
+            concept_node_data: Node data from concept graph
+            image_node_data: Node data from image graph
+
+        Returns:
+            True if image node's type is compatible with concept node's type, False otherwise
+        """
+        # Define the hierarchy of point types (higher number = higher in hierarchy)
+        type_hierarchy = {
+            "Point": 0,
+            "CornerPoint": 1,
+            "IntersectionPoint": 2,
+            # StartPoint and EndPoint are special and handled separately
+            "StartPoint": -1,  # Special case
+            "EndPoint": -1,  # Special case
+        }
+
+        # Get labels for both nodes
+        concept_labels = concept_node_data.get("labels", [])
+        image_labels = image_node_data.get("labels", [])
+
+        # Find highest type level for concept node
+        concept_level = -1
+        for label in concept_labels:
+            if label in type_hierarchy and type_hierarchy[label] > concept_level:
+                concept_level = type_hierarchy[label]
+
+        # Find highest type level for image node
+        image_level = -1
+        for label in image_labels:
+            if label in type_hierarchy and type_hierarchy[label] > image_level:
+                image_level = type_hierarchy[label]
+
+        # StartPoint must match with StartPoint, EndPoint with EndPoint
+        if "StartPoint" in concept_labels and "StartPoint" not in image_labels:
+            return False
+        if "EndPoint" in concept_labels and "EndPoint" not in image_labels:
+            return False
+
+        # For regular point types, check hierarchy
+        # Image level must be >= concept level for compatibility
+        # This means image can match concept if it's of same or higher type
+        if concept_level >= 0:  # Only check if concept has a defined point type
+            return image_level >= concept_level
+
+        # If concept doesn't have a point type in our hierarchy, default to compatible
         return True
+
+    def _match_critical_points(
+        self,
+        concept_graph: nx.Graph,
+        image_graph: nx.Graph,
+        concept_critical_points: Dict[str, List[Any]],
+        image_critical_points: Dict[str, List[Any]],
+    ) -> Dict[Any, Any]:
+        """
+        Match critical points between concept and image graphs based on compatibility and similarity.
+        Creates a mapping from concept critical points to image critical points.
+
+        Args:
+            concept_graph: Concept graph
+            image_graph: Image graph
+            concept_critical_points: Dictionary of critical point types to nodes in concept graph
+            image_critical_points: Dictionary of critical point types to nodes in image graph
+
+        Returns:
+            Dictionary mapping concept critical points to image critical points
+        """
+        # Dictionary to store the mapping from concept critical points to image critical points
+        critical_point_mapping = {}
+
+        # Log critical point counts
+        concept_critical_count = sum(len(p) for p in concept_critical_points.values())
+        image_critical_count = sum(len(p) for p in image_critical_points.values())
+
+        logging.info(
+            f"Matching {concept_critical_count} concept critical points to {image_critical_count} image critical points"
+        )
+
+        for cp_type, concept_points in concept_critical_points.items():
+            logging.debug(
+                f"Matching critical points of type {cp_type}: {len(concept_points)} in concept, {len(image_critical_points.get(cp_type, []))} in image"
+            )
+            image_points = image_critical_points.get(cp_type, [])
+
+            # The preprocessor should have ensured that counts match, but let's verify
+            if len(concept_points) != len(image_points):
+                logging.warning(
+                    f"Critical point count mismatch for {cp_type} after preprocessing: {len(concept_points)} vs {len(image_points)}"
+                )
+
+            # Calculate similarity between all points of this type
+            available_image_points = set(image_points)
+
+            # Handle each concept point
+            for concept_cp in concept_points:
+                best_match = None
+                best_score = 0
+
+                # Find the best match among available image points
+                for image_cp in available_image_points:
+                    # Use our node similarity method for more robust comparison
+                    similarity = self._calculate_node_similarity(
+                        concept_graph, image_graph, concept_cp, image_cp
+                    )
+
+                    if similarity > best_score:
+                        best_score = similarity
+                        best_match = image_cp
+
+                # Use a good match if found
+                if (
+                    best_match and best_score > 0.3
+                ):  # Lower threshold since preprocess aligned points
+                    critical_point_mapping[concept_cp] = best_match
+                    available_image_points.remove(best_match)
+                    logging.debug(
+                        f"Matched {cp_type} {concept_cp} to {best_match} with score {best_score:.2f}"
+                    )
+                else:
+                    # Just pick the first available one if none has good similarity
+                    if available_image_points:
+                        fallback_match = next(iter(available_image_points))
+                        critical_point_mapping[concept_cp] = fallback_match
+                        available_image_points.remove(fallback_match)
+                        logging.debug(
+                            f"Fallback match for {cp_type} {concept_cp} to {fallback_match} (no good similarity)"
+                        )
+                    else:
+                        logging.warning(
+                            f"Could not find match for {cp_type} {concept_cp} - no available points left"
+                        )
+
+        # Log the results of matching
+        logging.info(
+            f"Successfully mapped {len(critical_point_mapping)} out of {concept_critical_count} concept critical points"
+        )
+
+        # Log which points were not mapped
+        unmapped_points = set()
+        for points in concept_critical_points.values():
+            for cp in points:
+                if cp not in critical_point_mapping:
+                    unmapped_points.add(cp)
+
+        if unmapped_points:
+            logging.warning(f"Failed to map {len(unmapped_points)} critical points")
+            for cp in unmapped_points:
+                for cp_type, points in concept_critical_points.items():
+                    if cp in points:
+                        logging.warning(f"  - Unmapped {cp_type}: {cp}")
+
+        return critical_point_mapping

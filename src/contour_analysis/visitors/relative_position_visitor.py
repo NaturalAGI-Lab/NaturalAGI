@@ -32,12 +32,40 @@ class RelativePositionVisitor(Visitor):
         super().__init__(graph)
         self.image_width = image_width
         self.image_height = image_height
-        self.center_x = image_width / 2
-        self.center_y = image_height / 2
-        self.max_distance = math.sqrt(self.center_x**2 + self.center_y**2)
-        self.segment_threshold = 0.2  # 25% threshold for center segments
+
+        # Find the bounding box and calculate center
+        self._calculate_bounding_box_center()
+
+        self.segment_threshold = 0.2  # 20% threshold for center segments
         self.point_positions: Dict[str, RelativePosition] = {}
         self.vector_positions: Dict[str, RelativePosition] = {}
+
+    def _calculate_bounding_box_center(self) -> None:
+        """Calculate the center based on the bounding box of all points in the graph."""
+        min_x = float("inf")
+        min_y = float("inf")
+        max_x = float("-inf")
+        max_y = float("-inf")
+
+        # Find min and max coordinates to determine the bounding box
+        for node_id, node_data in self.graph.nodes(data=True):
+            x = node_data["x"] or 0
+            y = node_data["y"] or 0
+            min_x = min(min_x, x)
+            min_y = min(min_y, y)
+            max_x = max(max_x, x)
+            max_y = max(max_y, y)
+
+        # Calculate center of the bounding box
+        self.center_x = (min_x + max_x) / 2
+        self.center_y = (min_y + max_y) / 2
+
+        # Calculate half-width and half-height of the bounding box
+        half_width = (max_x - min_x) / 2
+        half_height = (max_y - min_y) / 2
+
+        # Maximum distance is from center to the corner of the bounding box
+        self.max_distance = math.sqrt(half_width**2 + half_height**2)
 
     def visit_point(self, point: Point) -> Dict[str, Any]:
         position = self._calculate_relative_position(point.x, point.y)
@@ -68,9 +96,13 @@ class RelativePositionVisitor(Visitor):
         }
 
     def _calculate_relative_position(self, x: float, y: float) -> RelativePosition:
-        # Calculate normalized coordinates (-1 to 1)
-        normalized_x = (x - self.center_x) / self.center_x
-        normalized_y = (y - self.center_y) / self.center_y
+        # Calculate normalized coordinates (-1 to 1) relative to bounding box center
+        normalized_x = (x - self.center_x) / (
+            self.max_distance if self.max_distance > 0 else 1
+        )
+        normalized_y = (y - self.center_y) / (
+            self.max_distance if self.max_distance > 0 else 1
+        )
 
         # Calculate distance from center
         dx = x - self.center_x
@@ -97,10 +129,10 @@ class RelativePositionVisitor(Visitor):
             segments.append(RelativeSegment.RIGHT)
 
         return RelativePosition(
-            distance_from_center=round(distance, 1),
+            distance_from_center=round(distance, 2),
             segments=segments,
-            normalized_x=round(normalized_x, 1),
-            normalized_y=round(normalized_y, 1),
+            normalized_x=round(normalized_x, 2),
+            normalized_y=round(normalized_y, 2),
         )
 
     def save_result(

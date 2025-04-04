@@ -132,9 +132,33 @@ class PropertyHandlerManager:
 
         # Special handling for labels - intersection
         if "labels" in g_node_props and "labels" in h_node_props:
+            original_labels = None
+            if "labels" in result:
+                original_labels = result["labels"]
+
             result["labels"] = self._merge_node_types(
                 g_node_props["labels"], h_node_props["labels"]
             )
+
+            # Add detailed logging about label changes
+            if original_labels is not None:
+                self.logger.info(
+                    f"Labels CHANGED: original={original_labels} -> merged={result['labels']}"
+                )
+                if set(original_labels) != set(result["labels"]):
+                    self.logger.warning(
+                        f"Label set changed during merging: {set(original_labels)} -> {set(result['labels'])}"
+                    )
+            else:
+                self.logger.info(
+                    f"Labels CREATED: G={g_node_props['labels']}, H={h_node_props['labels']} -> merged={result['labels']}"
+                )
+                if set(g_node_props["labels"]) & set(h_node_props["labels"]) != set(
+                    result["labels"]
+                ):
+                    self.logger.warning(
+                        f"Merged labels are not a simple intersection: {set(g_node_props['labels']) & set(h_node_props['labels'])} vs {set(result['labels'])}"
+                    )
 
         # Process existing properties
         for key in list(result.keys()):
