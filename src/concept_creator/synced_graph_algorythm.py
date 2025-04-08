@@ -1,7 +1,7 @@
 import networkx as nx
 import collections
 import logging
-from typing import Dict, Set, Tuple, List, Any
+from typing import Dict, Set, Tuple, List, Any, Optional
 from property_handlers.property_handler_manager import PropertyHandlerManager
 from node_similarity_calculator import NodeSimilarityCalculator
 from critical_point_preprocessor import CriticalPointPreprocessor
@@ -34,16 +34,62 @@ class SyncedGraphMinorFinder:
         """
         # Preprocess the graphs to align critical points
         G_c, G_i = self.critical_point_preprocessor.preprocess_graphs(G_c, G_i)
-        if G_c.number_of_nodes() != G_i.number_of_nodes():
-            raise ValueError("The number of nodes in the two graphs are not the same")
-
-        start_c = GraphUtils.get_first_point_by_type(G_c, CriticalPointType.START_POINT)
-        start_i = GraphUtils.get_first_point_by_type(G_i, CriticalPointType.START_POINT)
 
         # Matrix of the subpaths between intersection points
         # Inside eachh subpath we have the traversal sequence of two graphs
         # Each inner list represents a continuous path between critical points
+        sync_list: List[List[Tuple[Any, Any]]] = self._generate_sync_list(G_c, G_i)
+
+        result_graph = nx.Graph()
+        for subpath in sync_list:
+            self.logger.info(f"Subpath: {subpath}")
+            self._reduce_subpath(G_c, G_i, subpath, result_graph)
+            self.logger.info(f"Result graph: {result_graph.nodes}")
+        # Find the maximum common minor
+        return result_graph
+    
+    def _reduce_subpath(
+        self,
+        G_c: nx.Graph,
+        G_i: nx.Graph,
+        subpath: List[Tuple[Any, Any]],
+        result_graph: nx.Graph,
+    ) -> List[Tuple[Any, Any]]:
+        """Reducing the subpath to the maximum common minor"""
+        processed_paths_c = list()
+        processed_paths_i = list()
+        for i in range(len(subpath) - 1):
+            start_c, end_c = subpath[i][0], subpath[i+1][0]
+            start_i, end_i = subpath[i][1], subpath[i+1][1]
+            paths_c = nx.all_simple_paths(G_c, start_c, end_c)
+            paths_i = nx.all_simple_paths(G_i, start_i, end_i)
+            for path_c in paths_c:
+                if path_c not in processed_paths_c:
+                    processed_paths_c.append(path_c)
+                    processed_paths_c.append(path_c.reverse())
+                    break
+            for path_i in paths_i:
+                if path_i not in processed_paths_i:
+                    processed_paths_i.append(path_i)
+                    processed_paths_i.append(path_i.reverse())
+                    break
+            self._create_reduced_path_in_result(
+                result_graph, G_c, G_i, start_c, end_c, path_c, start_i, end_i, path_i
+            )
+
+    def _generate_sync_list(
+        self,
+        G_c: nx.Graph,
+        G_i: nx.Graph,
+    ) -> List[List[Tuple[Any, Any]]]:
+        """Generating the sync list of the two graphs"""
         sync_list: List[List[Tuple[Any, Any]]] = []
+
+        start_c = GraphUtils.get_first_point_by_type(G_c, CriticalPointType.START_POINT)
+        start_i = GraphUtils.get_first_point_by_type(G_i, CriticalPointType.START_POINT)
+
+        if start_c is None or start_i is None:
+            raise ValueError("Could not find start points in one or both graphs.")
 
         initial_path_id = 0
         sync_list.append([(start_c, start_i)])
@@ -95,20 +141,33 @@ class SyncedGraphMinorFinder:
                 for key in matched_points.keys():
                     # Create a new path ID
                     new_path_id = len(sync_list)
+                    # Initialize the new path with the intersection point
                     sync_list.append([(current_c, current_i)])
 
-                    # Add the new path to the queue
-                    visited[(key, matched_points[key])] = {new_path_id}
+                    # Get the matched image point
+                    image_cp = matched_points[key]  # Renamed for clarity
+
+                    # Add the matched neighbor pair to the new path list
+                    sync_list[new_path_id].append((key, image_cp))
+
+                    # Add the new path to the queue using the MATCHED PAIR
+                    # Ensure the matched pair itself isn't immediately revisited on this new path
+                    if (key, image_cp) not in visited:
+                        visited[(key, image_cp)] = set()
+                    visited[(key, image_cp)].add(new_path_id)
+
                     queue.append(
                         (
-                            key,
-                            matched_points[key],
+                            key,  # Matched concept neighbor
+                            image_cp,  # Matched image neighbor
                             new_path_id,
-                            current_c,
-                            current_i,
+                            current_c,  # Previous concept node (intersection)
+                            current_i,  # Previous image node (intersection)
                         )
                     )
-                continue
+                # Mark the current path as completed since we branched
+                completed_paths.add(path_id)
+                continue  # Continue to next item in queue
 
             next_c_critical_point = GraphUtils.find_next_critical_point_bfs(
                 G_c, current_c, prev_c
@@ -129,11 +188,6 @@ class SyncedGraphMinorFinder:
                     "No next critical points found for this path, continuing"
                 )
                 continue
-            else:
-                # If both critical points are not None, we need to add the nodes to the sync list
-                sync_list[path_id].append(
-                    (next_c_critical_point, next_i_critical_point)
-                )
 
             self.logger.info(
                 f"Next critical points: {next_c_critical_point}, {next_i_critical_point}"
@@ -141,8 +195,9 @@ class SyncedGraphMinorFinder:
             if not GraphUtils.is_same_critical_point_type(
                 G_c.nodes[next_c_critical_point], G_i.nodes[next_i_critical_point]
             ):
-                self.logger.info("Critical points are not the same type, raising error")
                 raise ValueError("Critical points are not the same type")
+
+            sync_list[path_id].append((next_c_critical_point, next_i_critical_point))
 
             # Add the next critical points to the queue
             queue.append(
@@ -157,8 +212,7 @@ class SyncedGraphMinorFinder:
 
             visited[(next_c_critical_point, next_i_critical_point)] = {path_id}
 
-        # Find the maximum common minor
-        return G_c
+        return sync_list
 
     def _get_matched_intersection_point_critical_neighbors(
         self,
@@ -310,10 +364,6 @@ class SyncedGraphMinorFinder:
                     concept_cp, image_cp, _, _ = best_match
                     critical_point_mapping[concept_cp] = image_cp
 
-                    # Remove matched points from unmatched sets
-                    unmatched_concept_critical_points.remove(concept_cp)
-                    unmatched_image_critical_points.remove(image_cp)
-
                     # Remove from our local lists too
                     unmatched_concept_points.remove(concept_cp)
                     unmatched_image_points.remove(image_cp)
@@ -326,3 +376,218 @@ class SyncedGraphMinorFinder:
                     break
 
         return critical_point_mapping
+
+    def _create_reduced_path_in_result(
+        self,
+        result_graph: nx.Graph,
+        graph1: nx.Graph,
+        graph2: nx.Graph,
+        start1: Any,  # Critical point start in graph1
+        end1: Any,  # Critical point end in graph1
+        path1: List[Any],  # Full path nodes from start1 to end1
+        start2: Any,  # Critical point start in graph2
+        end2: Any,  # Critical point end in graph2
+        path2: List[Any],  # Full path nodes from start2 to end2
+    ) -> None:
+        """
+        Creates a path in the result graph by merging two paths, reducing the longer
+        path to match the shorter one (template) based on node similarity.
+
+        Implements the "Find Maximum Common Minor" and property merging for a
+        single segment between two matched critical points.
+
+        Args:
+            result_graph: The result graph being built.
+            graph1: First graph (concept).
+            graph2: Second graph (image).
+            start1: Start critical node ID in graph1.
+            end1: End critical node ID in graph1.
+            path1: Node list for the path between start1 and end1 (inclusive).
+            start2: Start critical node ID in graph2.
+            end2: End critical node ID in graph2.
+            path2: Node list for the path between start2 and end2 (inclusive).
+        """
+        self.logger.debug(
+            f"Creating reduced path in result between ({start1}, {start2}) and ({end1}, {end2})"
+        )
+
+        # Ensure start nodes are in the result graph (should have been added previously)
+        if start1 not in result_graph:
+            merged_start_props = self.prop_manager.process_node_properties(
+                {}, graph1.nodes[start1], graph2.nodes[start2]
+            )
+            result_graph.add_node(start1, **merged_start_props)
+            self.logger.debug(
+                f"Added start node {start1} to result graph (was missing)"
+            )
+
+        # Determine template (shorter) and other (longer) paths
+        # Exclude start/end critical points from length comparison and processing loop
+        sub_path1 = path1[1:-1]
+        sub_path2 = path2[1:-1]
+
+        if len(sub_path1) <= len(sub_path2):
+            template_path = sub_path1
+            template_graph = graph1
+            template_start_node = start1  # Use ID from graph1
+            template_end_node = end1  # Use ID from graph1
+            other_path = sub_path2
+            other_graph = graph2
+            self.logger.debug(
+                f"Using path1 as template (sub-path length={len(template_path)})"
+            )
+        else:
+            template_path = sub_path2
+            template_graph = graph2
+            template_start_node = start1  # Use ID from graph1
+            template_end_node = end1  # Use ID from graph1
+            other_path = sub_path1
+            other_graph = graph1
+            self.logger.debug(
+                f"Using path2 as template (sub-path length={len(template_path)})"
+            )
+
+        # Calculate node similarity matrix between the *sub-paths*
+        similarity_matrix = []
+        if template_path and other_path:  # Only calculate if both sub-paths exist
+            similarity_matrix = self.similarity_calculator.calculate_similarity_matrix(
+                template_graph, other_graph, template_path, other_path
+            )
+            self.logger.debug(
+                f"Calculated similarity matrix of size {len(template_path)}x{len(other_path)}"
+            )
+        else:
+            self.logger.debug(
+                "One or both sub-paths are empty, no similarity calculation needed."
+            )
+
+        # Add nodes from the template path to the result graph, merging properties
+        prev_node_in_result = template_start_node
+
+        for i, template_node_id in enumerate(template_path):
+            # Find the best matching node from the other path
+            best_match_idx = self._find_best_matching_node(similarity_matrix, i)
+
+            if best_match_idx is not None and best_match_idx < len(other_path):
+                other_node_id = other_path[best_match_idx]
+                self.logger.debug(
+                    f"Matching template node {template_node_id} (idx {i}) with other node {other_node_id} (idx {best_match_idx})"
+                )
+                # Merge properties from both corresponding nodes
+                node_props = self.prop_manager.process_node_properties(
+                    {},
+                    template_graph.nodes[template_node_id],
+                    other_graph.nodes[other_node_id],
+                )
+            else:
+                # No good match found, or other_path is empty, use only template properties
+                self.logger.debug(
+                    f"No good match for template node {template_node_id} (idx {i}), using its properties only."
+                )
+                node_props = template_graph.nodes[
+                    template_node_id
+                ].copy()  # Make a copy
+
+            # Use the node ID from the *first* graph (concept graph) if possible,
+            # otherwise use the template node ID. This maintains consistency if graph1 was template.
+            result_node_id = (
+                template_node_id
+                if template_graph == graph1
+                else (
+                    other_path[best_match_idx]
+                    if best_match_idx is not None
+                    else template_node_id
+                )
+            )
+            # Correction: Always use the ID from the template path's graph for the result node ID
+            # to represent the reduced structure based on the template.
+            # However, for consistency, we should probably try to map back to graph1's IDs
+            # if graph2 was the template. Let's stick to template ID for simplicity now.
+            result_node_id = template_node_id  # Node ID from the template path
+
+            # Add the node to the result graph if it doesn't exist
+            if result_node_id not in result_graph:
+                result_graph.add_node(result_node_id, **node_props)
+                self.logger.debug(f"Added node {result_node_id} to result graph")
+            else:
+                # If node exists, update properties (this might happen with complex merges)
+                # For now, we assume nodes are added once per path creation.
+                # Re-adding might indicate issues elsewhere. Let's log a warning.
+                self.logger.warning(
+                    f"Node {result_node_id} already exists in result graph. Properties not updated."
+                )
+
+            # Add the edge from the previous node in the result path
+            if prev_node_in_result != result_node_id:  # Avoid self-loops
+                # Merge edge properties if needed (currently not implemented)
+                result_graph.add_edge(prev_node_in_result, result_node_id)
+                self.logger.debug(
+                    f"Added edge ({prev_node_in_result}, {result_node_id}) to result graph"
+                )
+                prev_node_in_result = result_node_id
+            else:
+                self.logger.warning(
+                    f"Skipping self-loop edge for node {result_node_id}"
+                )
+
+        # Ensure the end critical node is in the result graph and connected
+        if template_end_node not in result_graph:
+            # Merge properties of the end critical points
+            merged_end_props = self.prop_manager.process_node_properties(
+                {}, graph1.nodes[end1], graph2.nodes[end2]
+            )
+            result_graph.add_node(template_end_node, **merged_end_props)
+            self.logger.debug(
+                f"Added end critical node {template_end_node} to result graph"
+            )
+
+        # Add the final edge connecting the last node of the processed sub-path to the end critical node
+        if prev_node_in_result != template_end_node:
+            result_graph.add_edge(prev_node_in_result, template_end_node)
+            self.logger.debug(
+                f"Added final edge ({prev_node_in_result}, {template_end_node}) to result graph"
+            )
+        elif not template_path:  # Handle direct connection between critical points
+            result_graph.add_edge(template_start_node, template_end_node)
+            self.logger.debug(
+                f"Added direct edge ({template_start_node}, {template_end_node}) between critical points"
+            )
+
+
+    def _find_best_matching_node(
+        self,
+        similarity_matrix: List[List[float]],
+        current_idx: int,
+    ) -> Optional[int]:
+        """
+        Find the best matching node in path2 for the node at current_idx in path1.
+
+        This supports finding the maximum common minor by identifying corresponding
+        nodes between two paths.
+
+        Args:
+            similarity_matrix: Node similarity matrix
+            current_idx: Index of the current node in path1
+            path1: First path
+            path2: Second path
+
+        Returns:
+            Index of the best matching node in path2, or None if no good match
+        """
+        self.logger.debug(
+            f"Finding best matching node for node at index {current_idx} in path1"
+        )
+
+        # We need to find a node in path2 that best matches the node at current_idx in path1
+        # Get similarity scores for the current node
+        scores = similarity_matrix[current_idx]
+
+        # Find the index with highest similarity
+        best_idx = max(range(len(scores)), key=lambda i: scores[i])
+        best_score = scores[best_idx]
+
+        self.logger.debug(
+            f"Best match is node at index {best_idx} with score {best_score:.2f}"
+        )
+
+        return best_idx

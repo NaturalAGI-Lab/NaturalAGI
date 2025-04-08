@@ -56,6 +56,11 @@ class GraphUtils:
             for neighbor in graph.neighbors(current):
                 if neighbor not in visited and neighbor != prev_point:
                     queue.append(neighbor)
+                    
+        # Check if there is a loop back to the previous point, so it's not considered of backtracking, but rather a loop that returns back to the previous point
+        number_of_paths_back = len(list(nx.all_simple_paths(graph, prev_point, start_point)))
+        if number_of_paths_back > 1:
+            return prev_point
         return None
 
     @staticmethod

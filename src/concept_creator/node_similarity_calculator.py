@@ -1,8 +1,7 @@
 import networkx as nx
-
-
+import math
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union, Set
 
 
 class NodeSimilarityCalculator:
@@ -61,7 +60,12 @@ class NodeSimilarityCalculator:
         return similarity_matrix
 
     def calculate_node_similarity(
-        self, graph1: nx.Graph, graph2: nx.Graph, node1: Any, node2: Any
+        self,
+        graph1: nx.Graph,
+        graph2: nx.Graph,
+        node1: Any,
+        node2: Any,
+        include_properties: Optional[Set[str]] = None,
     ) -> float:
         """
         Calculate similarity between two nodes based on their properties and structural role.
@@ -71,6 +75,8 @@ class NodeSimilarityCalculator:
             graph2: Second graph
             node1: First node
             node2: Second node
+            include_properties: If provided, only compare properties in this set,
+                                ignoring IGNORE_PROPERTIES. Defaults to None (use default behavior).
 
         Returns:
             Similarity score between 0 and 1
@@ -83,58 +89,94 @@ class NodeSimilarityCalculator:
         node1_types = node1_data.get("labels", [])
         node2_types = node2_data.get("labels", [])
 
-        # Check if they share any types
         common_types = set(node1_types).intersection(set(node2_types))
         if not common_types:
             return 0.0  # Different types, no similarity
 
         # 2. Property similarity
-        return self._calculate_property_similarity(node1_data, node2_data)
+        return self._calculate_property_similarity(
+            node1_data, node2_data, include_properties
+        )
 
     def _calculate_property_similarity(
-        self, props1: Dict[str, Any], props2: Dict[str, Any]
+        self,
+        props1: Dict[str, Any],
+        props2: Dict[str, Any],
+        include_properties: Optional[Set[str]] = None,
     ) -> float:
         """
         Calculate similarity between two sets of properties.
 
+        If include_properties is provided, only properties in that set which are
+        present in *both* props1 and props2 are compared.
+        Otherwise, all properties present in either props1 or props2, excluding
+        those in IGNORE_PROPERTIES, are considered, but only those present
+        in *both* are actually compared for the score calculation.
+
         Args:
             props1: Properties of first node
             props2: Properties of second node
+            include_properties: Optional set of properties to explicitly compare.
 
         Returns:
             Similarity score between 0 and 1
         """
-        # Get all properties from both nodes
-        all_props = set(props1.keys()) | set(props2.keys())
+        matching_props_sum = 0.0
+        properties_compared_count = 0
 
-        # Filter out ignored properties
-        relevant_props = [p for p in all_props if p not in self.IGNORE_PROPERTIES]
+        if include_properties is not None:
+            # Mode 1: Use only specified properties if they exist in BOTH nodes
+            # Find properties that are both requested and present in both nodes
+            properties_to_compare = include_properties.intersection(
+                props1.keys()
+            ).intersection(props2.keys())
 
-        if not relevant_props:
+            if not properties_to_compare:
+                # No requested properties are common, or include_properties was empty
+                return 0.0
+
+            for prop in properties_to_compare:
+                val1 = props1[prop]
+                val2 = props2[prop]
+                similarity_score = self._are_property_values_similar(val1, val2)
+                matching_props_sum += similarity_score
+                properties_compared_count += 1
+
+        else:
+            # Mode 2: Use default behavior (all non-ignored properties)
+            all_prop_keys = set(props1.keys()) | set(props2.keys())
+            # Identify properties potentially relevant for comparison
+            relevant_prop_keys = {
+                p for p in all_prop_keys if p not in self.IGNORE_PROPERTIES
+            }
+
+            if not relevant_prop_keys:
+                # Handle cases where only ignored properties exist or nodes are empty.
+                # If both nodes have no properties at all, they are perfectly similar in this context.
+                return 1.0 if not props1 and not props2 else 0.0
+
+            # Compare only the relevant properties that exist in *both* nodes
+            for prop in relevant_prop_keys:
+                if prop in props1 and prop in props2:
+                    val1 = props1[prop]
+                    val2 = props2[prop]
+                    similarity_score = self._are_property_values_similar(val1, val2)
+                    matching_props_sum += similarity_score
+                    properties_compared_count += 1
+            # Properties present in only one node, or ignored properties,
+            # do not contribute to the sum or the count.
+
+        # Normalize the score by the number of properties actually compared
+        if properties_compared_count > 0:
+            return matching_props_sum / properties_compared_count
+        elif include_properties is None and not props1 and not props2:
+            # Explicitly handle the case where Mode 2 resulted in zero comparisons
+            # because both input dictionaries were empty from the start.
+            return 1.0
+        else:
+            # No properties were actually compared (e.g., no common properties in Mode 1,
+            # or no common non-ignored properties in Mode 2).
             return 0.0
-
-        matching_props = 0
-        total_props = len(relevant_props)
-        skipped_props = 0  # Count props not present in both nodes
-
-        for prop in relevant_props:
-            # Skip properties that don't exist in both nodes
-            if prop not in props1 or prop not in props2:
-                skipped_props += 1
-                continue
-
-            val1 = props1[prop]
-            val2 = props2[prop]
-
-            # Get similarity score for this property
-            similarity_score = self._are_property_values_similar(val1, val2)
-            matching_props += similarity_score
-
-        effective_total_props = total_props - skipped_props
-        if effective_total_props > 0:
-            # Normalize the summed scores by the number of properties actually compared
-            return matching_props / effective_total_props
-        return 0.0
 
     def _are_property_values_similar(self, val1: Any, val2: Any) -> float:
         """
@@ -192,7 +234,8 @@ class NodeSimilarityCalculator:
             union = len(set1.union(set2))
             if union == 0:
                 return 1.0  # Both lists are empty
-            return intersection / union
+            # Prevent division by zero if union is zero
+            return intersection / union if union > 0 else 1.0
 
         # Dictionary comparison - for non-range dictionaries
         if isinstance(val1, dict) and isinstance(val2, dict):
@@ -202,16 +245,28 @@ class NodeSimilarityCalculator:
 
             # Compare keys and values for regular dictionaries
             common_keys = set(val1.keys()) & set(val2.keys())
-            if not common_keys:
-                return 0.0
+            all_keys = set(val1.keys()) | set(
+                val2.keys()
+            )  # Consider all keys for normalization
 
-            # Compare values of common keys
+            if not all_keys:
+                return 1.0  # Both dictionaries are empty
+
+            if not common_keys:
+                return 0.0  # No common keys to compare
+
+            # Compare values of common keys, treat non-common keys as 0 similarity implicitly
             similarity_sum = 0.0
             for key in common_keys:
+                # Recursive call might need to handle include_properties if we want fine-grained control
+                # For now, assume nested comparisons use default ignore list
                 key_similarity = self._are_property_values_similar(val1[key], val2[key])
                 similarity_sum += key_similarity
 
-            return similarity_sum / len(common_keys)
+            # Normalize by the total number of unique keys across both dictionaries
+            # This treats keys present in only one dict as contributing 0 to the similarity sum
+            # and ensures the max similarity is 1 only if all keys match and values are identical.
+            return similarity_sum / len(all_keys)
 
         # Different types or no similarity found
         return 0.0
@@ -236,7 +291,7 @@ class NodeSimilarityCalculator:
 
     def _compare_number_to_range(self, num: float, range_obj: Dict[str, Any]) -> float:
         """
-        Compare a single numeric value to a range object.
+        Compare a single numeric value to a range object using Gaussian similarity.
 
         Args:
             num: Numeric value
@@ -248,45 +303,50 @@ class NodeSimilarityCalculator:
         min_val = float(range_obj["min"])
         max_val = float(range_obj["max"])
         center = float(range_obj["center"])
-
-        # If range has zero width, compare directly to center
         range_width = max_val - min_val
-        if range_width <= 0:
-            # If num equals center, perfect match
-            if num == center:
+
+        # Tolerance for floating point comparisons
+        epsilon = 1e-9
+
+        # Handle zero or negative range width: Compare directly to center using relative difference
+        if range_width <= epsilon:
+            # If num equals center (within tolerance), perfect match
+            if abs(num - center) < epsilon:
                 return 1.0
-            # Otherwise, use relative difference
-            denominator = max(abs(num), abs(center), 1.0)
+            # Otherwise, use relative difference from center
+            denominator = max(abs(num), abs(center), 1.0)  # Avoid division by zero
+            # Prevent division by very small denominator if both num and center are near zero
+            if denominator < epsilon:
+                return 1.0 if abs(num - center) < epsilon else 0.0
             diff = abs(num - center) / denominator
+            # Ensure similarity is between 0 and 1
             return max(0.0, 1.0 - diff)
 
-        # Check if number is within range
-        if min_val <= num <= max_val:
-            # Calculate position within range (0.0 to 1.0)
-            position = (num - min_val) / range_width
-            # Calculate center position within range
-            center_position = (center - min_val) / range_width
-            # Calculate how close the number is to the center (1.0 if at center, 0.0 if at edge)
-            # Convert the distance to a similarity score
-            distance_from_center = abs(position - center_position)
-            max_distance = max(center_position, 1.0 - center_position)
-            if max_distance > 0:
-                normalized_distance = distance_from_center / max_distance
-                return max(0.0, 1.0 - normalized_distance)
-            return 1.0
-
-        # Number is outside range
-        # Calculate distance from range boundary relative to range width
-        if num < min_val:
-            distance = min_val - num
-        else:  # num > max_val
-            distance = num - max_val
-
-        # Calculate similarity based on distance outside range
-        # The further outside the range, the lower the similarity
-        # Normalize by range width to get meaningful scaling
-        normalized_distance = distance / range_width
-        return max(0.0, 1.0 - min(normalized_distance, 1.0))
+        # Handle positive range width using Gaussian similarity
+        # similarity = exp(-k * (num - center)**2 / range_width**2)
+        # We choose k=8, which results in similarity exp(-2) ≈ 0.135 at the range boundaries (num = min_val or max_val).
+        try:
+            exponent = -8.0 * (num - center) ** 2 / (range_width**2)
+            # Clamp exponent to avoid potential underflow issues with math.exp for very large negative numbers
+            # math.exp(e) approaches 0 as e approaches -inf. exp(-710) is effectively 0.
+            safe_exponent = max(
+                exponent, -709.0
+            )  # Avoid result being exactly 0 unless exponent is truly large negative
+            similarity = math.exp(safe_exponent)
+            # Ensure result is clamped between 0 and 1
+            return max(0.0, min(similarity, 1.0))
+        except OverflowError:
+            # This path should theoretically not be reachable with negative exponents
+            self.logger.warning(
+                f"OverflowError calculating similarity for num={num}, center={center}, range_width={range_width}"
+            )
+            return 0.0
+        except ValueError:
+            # Handles potential issues like range_width being zero if epsilon check failed?
+            self.logger.warning(
+                f"ValueError calculating similarity for num={num}, center={center}, range_width={range_width}"
+            )
+            return 0.0  # Treat calculation errors as zero similarity
 
     # TODO: remove this function
     def _get_node_types(self, node_data: Dict[str, Any]) -> List[str]:

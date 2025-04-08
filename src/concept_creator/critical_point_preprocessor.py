@@ -1,5 +1,6 @@
 import logging
 import networkx as nx
+import numpy as np
 from typing import Dict, List, Tuple, Any, Set
 from node_similarity_calculator import NodeSimilarityCalculator
 
@@ -14,6 +15,8 @@ class CriticalPointPreprocessor:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
         self.similarity_calculator = NodeSimilarityCalculator()
+        self.similarity_threshold = 0.6  # TODO align this
+        self.CORNER_POINT_SIMILARITY_THRESHOLD = 0.6  # Example value
 
         # Define the type reduction hierarchy
         self.type_reduction_map = {
@@ -21,6 +24,9 @@ class CriticalPointPreprocessor:
             "CornerPoint": "Point",
             "EndPoint": "Point",  # Added to enable reduction when needed
         }
+        self.properties_to_compare = set(
+            ["normalized_x", "normalized_y", "relative_distance", "segments"]
+        )
 
     def preprocess_graphs(
         self, graph1: nx.Graph, graph2: nx.Graph
@@ -211,7 +217,11 @@ class CriticalPointPreprocessor:
             best_similarity = -1
             for other_ep in other_endpoints:
                 similarity = self.similarity_calculator.calculate_node_similarity(
-                    graph_with_excess, other_graph, excess_ep, other_ep
+                    graph_with_excess,
+                    other_graph,
+                    excess_ep,
+                    other_ep,
+                    self.properties_to_compare,
                 )
                 if similarity > best_similarity:
                     best_similarity = similarity
@@ -275,7 +285,44 @@ class CriticalPointPreprocessor:
             f"CornerPoints - Graph1: {corner_count1}, Graph2: {corner_count2}"
         )
 
-        # Case 1: Reduce IntersectionPoints to CornerPoints if needed
+        # --- New Step: Initial CornerPoint reduction based on OUTLIER DETECTION ---
+        corner_points1_initial = critical_points1["CornerPoint"]
+        corner_points2_initial = critical_points2["CornerPoint"]
+
+        if (
+            corner_points1_initial and corner_points2_initial
+        ):  # Only apply if both have corner points
+            self.logger.info(
+                "Applying CornerPoint outlier reduction based on similarity scores."
+            )
+            aligned_graph1, aligned_graph2 = self._reduce_low_similarity_points(
+                aligned_graph1,
+                aligned_graph2,
+                corner_points1_initial,
+                corner_points2_initial,
+                "CornerPoint",
+                "Point",
+            )
+            # Re-identify critical points after potential outlier reduction
+            critical_points1 = self._identify_critical_points(aligned_graph1)
+            critical_points2 = self._identify_critical_points(aligned_graph2)
+        # --- End New Step ---
+
+        # Update counts after potential outlier reduction
+        intersection_count1 = len(critical_points1["IntersectionPoint"])
+        intersection_count2 = len(critical_points2["IntersectionPoint"])
+        corner_count1 = len(critical_points1["CornerPoint"])
+        corner_count2 = len(critical_points2["CornerPoint"])
+
+        self.logger.info(
+            f"After outlier reduction - IntersectionPoints: Graph1={intersection_count1}, Graph2={intersection_count2}"
+        )
+        self.logger.info(
+            f"After outlier reduction - CornerPoints: Graph1={corner_count1}, Graph2={corner_count2}"
+        )
+
+        # --- Existing Logic: Case 1 (Reduce IntersectionPoints to CornerPoints if counts differ) ---
+        # This logic remains the same, but operates on the potentially modified graphs/counts
         if intersection_count1 > intersection_count2:
             # Select IntersectionPoints to reduce in graph1 based on similarity scores
             to_reduce = intersection_count1 - intersection_count2
@@ -325,10 +372,7 @@ class CriticalPointPreprocessor:
         corner_count2 = len(updated_cp2["CornerPoint"])
 
         self.logger.info(
-            f"After first alignment - IntersectionPoints: Graph1={intersection_count1}, Graph2={intersection_count2}"
-        )
-        self.logger.info(
-            f"After first alignment - CornerPoints: Graph1={corner_count1}, Graph2={corner_count2}"
+            f"After IntersectionPoint count alignment - CornerPoints: Graph1={corner_count1}, Graph2={corner_count2}"
         )
 
         # Case 2: If CornerPoints still don't match, reduce excess to regular Points
@@ -410,7 +454,11 @@ class CriticalPointPreprocessor:
             best_similarity = -1
             for other_pt in other_points:
                 similarity = self.similarity_calculator.calculate_node_similarity(
-                    graph_with_excess, other_graph, excess_pt, other_pt
+                    graph_with_excess,
+                    other_graph,
+                    excess_pt,
+                    other_pt,
+                    self.properties_to_compare,
                 )
                 if similarity > best_similarity:
                     best_similarity = similarity
@@ -449,6 +497,9 @@ class CriticalPointPreprocessor:
             to_type: Target type to transform to
         """
         node_data = graph.nodes[point]
+        self.logger.info(
+            f"Transforming critical point {point} from {from_type} to {to_type}"
+        )
 
         if "labels" in node_data:
             if isinstance(node_data["labels"], list):
@@ -519,3 +570,125 @@ class CriticalPointPreprocessor:
                     critical_points[label].append(node)
 
         return critical_points
+
+    def _reduce_low_similarity_points(
+        self,
+        graph1: nx.Graph,
+        graph2: nx.Graph,
+        points1: List[Any],
+        points2: List[Any],
+        point_type_to_reduce: str,
+        target_type: str,
+        std_dev_factor: float = 1.5,
+        min_points_for_stats: int = 4,
+        fallback_threshold: float = 0.5,
+    ) -> Tuple[nx.Graph, nx.Graph]:
+        """
+        Reduces points in graph1 and graph2 of point_type_to_reduce if their
+        best match similarity in the other graph is statistically low (outlier).
+        """
+        if not points1 or not points2:
+            self.logger.info(
+                "Skipping similarity reduction: one or both point lists are empty."
+            )
+            return graph1, graph2
+
+        # Calculate best match similarities for all points
+        similarities_g1 = []
+        similarities_g2 = []
+        point_similarity_map_g1 = {}
+        point_similarity_map_g2 = {}
+
+        for p1 in points1:
+            best_sim_p1 = -1
+            for p2 in points2:
+                similarity = self.similarity_calculator.calculate_node_similarity(
+                    graph1,
+                    graph2,
+                    p1,
+                    p2,
+                    self.properties_to_compare,
+                )
+                if similarity > best_sim_p1:
+                    best_sim_p1 = similarity
+            similarities_g1.append(best_sim_p1)
+            point_similarity_map_g1[p1] = best_sim_p1
+
+        for p2 in points2:
+            best_sim_p2 = -1
+            for p1 in points1:
+                similarity = self.similarity_calculator.calculate_node_similarity(
+                    graph2,
+                    graph1,
+                    p2,
+                    p1,
+                    self.properties_to_compare,
+                )
+                if similarity > best_sim_p2:
+                    best_sim_p2 = similarity
+            similarities_g2.append(best_sim_p2)
+            point_similarity_map_g2[p2] = best_sim_p2
+
+        # Combine all similarity scores for statistical analysis
+        all_similarities = similarities_g1 + similarities_g2
+
+        # Determine the threshold
+        threshold = fallback_threshold
+        if len(all_similarities) >= min_points_for_stats:
+            mean_sim = np.mean(all_similarities)
+            std_dev_sim = np.std(all_similarities)
+            if std_dev_sim > 1e-6:
+                dynamic_threshold = mean_sim - std_dev_factor * std_dev_sim
+                threshold = max(0, dynamic_threshold)
+                self.logger.info(
+                    f"Calculated dynamic similarity threshold: {threshold:.4f} (mean={mean_sim:.4f}, std_dev={std_dev_sim:.4f}, factor={std_dev_factor})"
+                )
+            else:
+                self.logger.warning(
+                    f"Standard deviation of similarities is very low ({std_dev_sim:.4f}). Falling back to threshold {fallback_threshold}."
+                )
+                threshold = fallback_threshold
+        else:
+            self.logger.warning(
+                f"Not enough similarity scores ({len(all_similarities)}) to calculate stats. Falling back to threshold {fallback_threshold}."
+            )
+            threshold = fallback_threshold
+
+        # Identify points below the determined threshold
+        points_to_reduce_g1 = set()
+        points_to_reduce_g2 = set()
+
+        for p1, sim in point_similarity_map_g1.items():
+            if sim < threshold:
+                self.logger.info(
+                    f"Marking {p1} for reduction ({point_type_to_reduce} -> {target_type}) in Graph 1. Similarity: {sim:.4f} < {threshold:.4f}"
+                )
+                points_to_reduce_g1.add(p1)
+
+        for p2, sim in point_similarity_map_g2.items():
+            if sim < threshold:
+                self.logger.info(
+                    f"Marking {p2} for reduction ({point_type_to_reduce} -> {target_type}) in Graph 2. Similarity: {sim:.4f} < {threshold:.4f}"
+                )
+                points_to_reduce_g2.add(p2)
+
+        # Perform reductions
+        if points_to_reduce_g1:
+            self.logger.info(
+                f"Reducing {len(points_to_reduce_g1)} {point_type_to_reduce}(s) in Graph 1 below similarity threshold {threshold:.4f}"
+            )
+            for point in points_to_reduce_g1:
+                self._transform_critical_point(
+                    graph1, point, point_type_to_reduce, target_type
+                )
+
+        if points_to_reduce_g2:
+            self.logger.info(
+                f"Reducing {len(points_to_reduce_g2)} {point_type_to_reduce}(s) in Graph 2 below similarity threshold {threshold:.4f}"
+            )
+            for point in points_to_reduce_g2:
+                self._transform_critical_point(
+                    graph2, point, point_type_to_reduce, target_type
+                )
+
+        return graph1, graph2
