@@ -1,8 +1,8 @@
 import logging
 import networkx as nx
-import numpy as np
-from typing import Dict, List, Tuple, Any, Set
+from typing import List, Tuple, Any, Dict, Set
 from node_similarity_calculator import NodeSimilarityCalculator
+from model.critical_point import CriticalPointType
 
 
 class CriticalPointPreprocessor:
@@ -15,17 +15,20 @@ class CriticalPointPreprocessor:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
         self.similarity_calculator = NodeSimilarityCalculator()
-        self.similarity_threshold = 0.6  # TODO align this
-        self.CORNER_POINT_SIMILARITY_THRESHOLD = 0.6  # Example value
 
         # Define the type reduction hierarchy
         self.type_reduction_map = {
-            "IntersectionPoint": "CornerPoint",
-            "CornerPoint": "Point",
-            "EndPoint": "Point",  # Added to enable reduction when needed
+            CriticalPointType.INTERSECTION_POINT.value: CriticalPointType.CORNER_POINT.value,
+            CriticalPointType.CORNER_POINT.value: "Point",
+        }
+        self.critical_point_types = {
+            CriticalPointType.INTERSECTION_POINT.value,
+            CriticalPointType.CORNER_POINT.value,
+            CriticalPointType.END_POINT.value,
+            CriticalPointType.START_POINT.value,
         }
         self.properties_to_compare = set(
-            ["normalized_x", "normalized_y", "relative_distance", "segments"]
+            ["normalized_x", "normalized_y", "relative_distance"]
         )
 
     def preprocess_graphs(
@@ -33,662 +36,567 @@ class CriticalPointPreprocessor:
     ) -> Tuple[nx.Graph, nx.Graph]:
         """
         Preprocess two graphs to ensure they have compatible critical points.
+        This method modifies the original graphs until their critical point structures become isomorphic.
 
         Args:
             graph1: First graph to preprocess
             graph2: Second graph to preprocess
 
         Returns:
-            Tuple of (preprocessed_graph1, preprocessed_graph2)
+            Tuple of (preprocessed_graph1, preprocessed_graph2) - the modified original graphs
         """
-        self.logger.info("Preprocessing graphs for critical point compatibility")
+        # Make copies of the original graphs to avoid modifying the input graphs directly
+        graph1_mod = graph1.copy()
+        graph2_mod = graph2.copy()
 
-        # Create copies to avoid modifying original graphs
-        preprocessed_graph1 = graph1.copy()
-        preprocessed_graph2 = graph2.copy()
+        # Extract critical point graphs for initial isomorphism check
+        crit_graph1, _ = self._extract_critical_points_graph(graph1_mod)
+        crit_graph2, _ = self._extract_critical_points_graph(graph2_mod)
 
-        # Extract critical points from both graphs
-        critical_points1 = self._identify_critical_points(preprocessed_graph1)
-        critical_points2 = self._identify_critical_points(preprocessed_graph2)
+        is_isomorphic = nx.is_isomorphic(crit_graph1, crit_graph2)
 
-        # Count critical points by type
-        cp_count1 = {
-            cp_type: len(points) for cp_type, points in critical_points1.items()
-        }
-        cp_count2 = {
-            cp_type: len(points) for cp_type, points in critical_points2.items()
-        }
+        if not is_isomorphic:
+            self.logger.info(
+                "Critical point graphs are not isomorphic, applying reductions..."
+            )
+            self.logger.info(f"Initial critical graph 1: {crit_graph1.nodes}")
+            self.logger.info(f"Initial critical graph 2: {crit_graph2.nodes}")
 
-        self.logger.info(f"Graph1 critical points: {cp_count1}")
-        self.logger.info(f"Graph2 critical points: {cp_count2}")
-
-        # 1. Validate start points - each graph MUST have exactly one start point
-        if cp_count1["StartPoint"] != 1 or cp_count2["StartPoint"] != 1:
-            raise ValueError(
-                f"Each graph must have exactly one StartPoint. Graph1: {cp_count1['StartPoint']}, Graph2: {cp_count2['StartPoint']}"
+            # Apply graph reduction to make graphs isomorphic
+            graph1_mod, graph2_mod = self._reduce_graphs_for_isomorphism(
+                graph1_mod, graph2_mod
             )
 
-        # 2. Process endpoints - reduce excess endpoints from the graph with more
-        preprocessed_graph1, preprocessed_graph2 = self._align_endpoints(
-            preprocessed_graph1, preprocessed_graph2, critical_points1, critical_points2
-        )
+            # Extract critical point graphs again to check if they're now isomorphic
+            crit_graph1, _ = self._extract_critical_points_graph(graph1_mod)
+            crit_graph2, _ = self._extract_critical_points_graph(graph2_mod)
 
-        # Re-identify critical points after endpoint alignment
-        critical_points1 = self._identify_critical_points(preprocessed_graph1)
-        critical_points2 = self._identify_critical_points(preprocessed_graph2)
-
-        # 3. Process IntersectionPoints and CornerPoints
-        preprocessed_graph1, preprocessed_graph2 = (
-            self._align_intersection_and_corner_points(
-                preprocessed_graph1,
-                preprocessed_graph2,
-                critical_points1,
-                critical_points2,
+            is_isomorphic_after_reduction = nx.is_isomorphic(crit_graph1, crit_graph2)
+            self.logger.info(
+                f"Critical point graphs isomorphic after reduction: {is_isomorphic_after_reduction}"
             )
-        )
 
-        # Final verification
-        final_cp1 = self._identify_critical_points(preprocessed_graph1)
-        final_cp2 = self._identify_critical_points(preprocessed_graph2)
-
-        final_count1 = {cp_type: len(points) for cp_type, points in final_cp1.items()}
-        final_count2 = {cp_type: len(points) for cp_type, points in final_cp2.items()}
-
-        self.logger.info(
-            f"After preprocessing - Graph1: {final_count1}, Graph2: {final_count2}"
-        )
-
-        # Verify that the critical point counts match between graphs
-        for cp_type in ["StartPoint", "EndPoint", "IntersectionPoint", "CornerPoint"]:
-            if final_count1[cp_type] != final_count2[cp_type]:
-                self.logger.warning(
-                    f"Critical point mismatch after preprocessing: {cp_type} - Graph1: {final_count1[cp_type]}, Graph2: {final_count2[cp_type]}"
+            if not is_isomorphic_after_reduction:
+                self.logger.info(
+                    f"After reduction - Critical graph 1: {crit_graph1.nodes}"
+                )
+                self.logger.info(
+                    f"After reduction - Critical graph 2: {crit_graph2.nodes}"
                 )
 
-        return preprocessed_graph1, preprocessed_graph2
+        return graph1_mod, graph2_mod
 
-    def _align_endpoints(
-        self,
-        graph1: nx.Graph,
-        graph2: nx.Graph,
-        critical_points1: Dict[str, List[Any]],
-        critical_points2: Dict[str, List[Any]],
+    def _extract_critical_points_graph(
+        self, graph: nx.Graph
+    ) -> Tuple[nx.Graph, List[Any]]:
+        """
+        Extract a graph containing only critical points with preserved topology.
+
+        Args:
+            graph: Original graph
+
+        Returns:
+            Tuple of (New graph with only critical points and preserved topology, List of critical points)
+        """
+        # Create a new graph
+        critical_graph = nx.Graph()
+
+        # Identify critical points
+        critical_points = []
+        for node, data in graph.nodes(data=True):
+            labels = data.get("labels", "")
+            if any(label in self.critical_point_types for label in labels):
+                critical_points.append(node)
+                # Copy node and its attributes to the new graph
+                critical_graph.add_node(node, **data)
+
+        # Connect critical points if there's a path between them in the original graph
+        for i, source in enumerate(critical_points):
+            for target in critical_points[i + 1 :]:
+                if source != target:
+                    # Check if there's a path between these critical points in the original graph
+                    # that doesn't go through other critical points
+                    if self._has_path_excluding_others(
+                        graph, source, target, critical_points
+                    ):
+                        # Add edge between these critical points in the new graph
+                        critical_graph.add_edge(source, target)
+
+        return critical_graph, critical_points
+
+    def _reduce_graphs_for_isomorphism(
+        self, graph1: nx.Graph, graph2: nx.Graph
     ) -> Tuple[nx.Graph, nx.Graph]:
         """
-        Align endpoints between graphs by removing excess endpoints from the graph with more.
-        Uses similarity matching to determine which endpoints to remove.
+        Iteratively reduce graphs until their critical point structures become isomorphic.
+        This method modifies the original graphs.
 
         Args:
             graph1: First graph
             graph2: Second graph
-            critical_points1: Critical points in graph1
-            critical_points2: Critical points in graph2
 
         Returns:
-            Tuple of (aligned_graph1, aligned_graph2)
+            Tuple of (reduced_graph1, reduced_graph2)
         """
-        endpoints1 = critical_points1["EndPoint"]
-        endpoints2 = critical_points2["EndPoint"]
+        # Extract critical point graphs
+        crit_graph1, _ = self._extract_critical_points_graph(graph1)
+        crit_graph2, _ = self._extract_critical_points_graph(graph2)
 
-        # If the endpoint counts are already equal, no action needed
-        if len(endpoints1) == len(endpoints2):
-            self.logger.info("Endpoint counts already match. No alignment needed.")
-            return graph1, graph2
+        iteration = 0
+        # Iterate until critical point graphs are isomorphic or no more reductions can be made
+        while not nx.is_isomorphic(crit_graph1, crit_graph2):
+            self.logger.info(f"Reduction iteration {iteration + 1}")
+            reduction_made_this_iteration = False
 
-        # Determine which graph has excess endpoints
-        if len(endpoints1) > len(endpoints2):
-            graph_to_reduce = graph1.copy()
-            other_graph = graph2.copy()
-            endpoints_to_reduce = endpoints1
-            other_endpoints = endpoints2
-            target_count = len(endpoints2)
-            excess_count = len(endpoints1) - len(endpoints2)
-            self.logger.info(
-                f"Graph1 has excess endpoints: {len(endpoints1)} > {len(endpoints2)}"
-            )
-        else:
-            graph_to_reduce = graph2.copy()
-            other_graph = graph1.copy()
-            endpoints_to_reduce = endpoints2
-            other_endpoints = endpoints1
-            target_count = len(endpoints1)
-            excess_count = len(endpoints2) - len(endpoints1)
-            self.logger.info(
-                f"Graph2 has excess endpoints: {len(endpoints2)} > {len(endpoints1)}"
+            # STEP 1: First try type reduction based on the type reduction hierarchy
+            type_reduction_applied = self._try_type_reduction(
+                graph1, crit_graph1, graph2, crit_graph2
             )
 
-        # Calculate which endpoints to remove based on similarity to endpoints in the other graph
-        endpoints_to_remove = self._select_endpoints_to_remove(
-            graph_to_reduce,
-            other_graph,
-            endpoints_to_reduce,
-            other_endpoints,
-            excess_count,
-        )
+            if type_reduction_applied:
+                self.logger.info("Applied type reduction to one or both graphs")
+                reduction_made_this_iteration = True
+                # Check if graphs are isomorphic after type reduction
+                if nx.is_isomorphic(crit_graph1, crit_graph2):
+                    self.logger.info("Graphs became isomorphic after type reduction")
+                    break
 
-        self.logger.info(f"Will remove {len(endpoints_to_remove)} endpoints")
-
-        # Remove the selected endpoints - convert them to regular Points
-        for endpoint in endpoints_to_remove:
-            node_data = graph_to_reduce.nodes[endpoint]
-            if "labels" in node_data and isinstance(node_data["labels"], list):
-                # Remove the EndPoint label
-                node_data["labels"] = [
-                    label for label in node_data["labels"] if label != "EndPoint"
-                ]
-                self.logger.info(f"Reduced endpoint {endpoint} to Point")
-
-        # Return the graphs in the original order
-        if len(endpoints1) > len(endpoints2):
-            return graph_to_reduce, other_graph
-        else:
-            return other_graph, graph_to_reduce
-
-    def _select_endpoints_to_remove(
-        self,
-        graph_with_excess: nx.Graph,
-        other_graph: nx.Graph,
-        excess_endpoints: List[Any],
-        other_endpoints: List[Any],
-        count_to_remove: int,
-    ) -> List[Any]:
-        """
-        Select which endpoints to remove based on their similarity to endpoints in the other graph.
-        Endpoints with the lowest similarity scores will be removed.
-
-        Args:
-            graph_with_excess: The graph with excess endpoints
-            other_graph: The graph with fewer endpoints
-            excess_endpoints: List of endpoints in the graph with excess
-            other_endpoints: List of endpoints in the other graph
-            count_to_remove: Number of endpoints to remove
-
-        Returns:
-            List of endpoints to remove
-        """
-        if count_to_remove <= 0:
-            return []
-
-        # Calculate similarity scores between all pairs of endpoints
-        endpoint_scores = []
-
-        for excess_ep in excess_endpoints:
-            # Find the best matching endpoint in the other graph
-            best_similarity = -1
-            for other_ep in other_endpoints:
-                similarity = self.similarity_calculator.calculate_node_similarity(
-                    graph_with_excess,
-                    other_graph,
-                    excess_ep,
-                    other_ep,
-                    self.properties_to_compare,
-                )
-                if similarity > best_similarity:
-                    best_similarity = similarity
-
-            # Store the endpoint and its best similarity score
-            endpoint_scores.append((excess_ep, best_similarity))
-
-        # Sort by similarity score (ascending - we want to remove the least similar ones)
-        endpoint_scores.sort(key=lambda x: x[1])
-
-        # Return the endpoints with the lowest similarity scores
-        to_remove = [ep for ep, _ in endpoint_scores[:count_to_remove]]
-
-        # Log the similarity scores for removed endpoints
-        for ep, score in endpoint_scores[:count_to_remove]:
-            self.logger.info(
-                f"Selected endpoint {ep} for removal with similarity score {score:.4f}"
-            )
-
-        return to_remove
-
-    def _align_intersection_and_corner_points(
-        self,
-        graph1: nx.Graph,
-        graph2: nx.Graph,
-        critical_points1: Dict[str, List[Any]],
-        critical_points2: Dict[str, List[Any]],
-    ) -> Tuple[nx.Graph, nx.Graph]:
-        """
-        Align IntersectionPoints and CornerPoints between graphs.
-        Uses similarity matching to determine which points to reduce.
-
-        Rules:
-        1. IntersectionPoints can be reduced to CornerPoints
-        2. Both can be reduced to regular Points
-        3. Ensure the counts of each type match between graphs
-
-        Args:
-            graph1: First graph
-            graph2: Second graph
-            critical_points1: Critical points in graph1
-            critical_points2: Critical points in graph2
-
-        Returns:
-            Tuple of (aligned_graph1, aligned_graph2)
-        """
-        # Make copies to work with
-        aligned_graph1 = graph1.copy()
-        aligned_graph2 = graph2.copy()
-
-        # Count points of each type
-        intersection_count1 = len(critical_points1["IntersectionPoint"])
-        intersection_count2 = len(critical_points2["IntersectionPoint"])
-        corner_count1 = len(critical_points1["CornerPoint"])
-        corner_count2 = len(critical_points2["CornerPoint"])
-
-        self.logger.info(
-            f"IntersectionPoints - Graph1: {intersection_count1}, Graph2: {intersection_count2}"
-        )
-        self.logger.info(
-            f"CornerPoints - Graph1: {corner_count1}, Graph2: {corner_count2}"
-        )
-
-        # --- New Step: Initial CornerPoint reduction based on OUTLIER DETECTION ---
-        corner_points1_initial = critical_points1["CornerPoint"]
-        corner_points2_initial = critical_points2["CornerPoint"]
-
-        if (
-            corner_points1_initial and corner_points2_initial
-        ):  # Only apply if both have corner points
-            self.logger.info(
-                "Applying CornerPoint outlier reduction based on similarity scores."
-            )
-            aligned_graph1, aligned_graph2 = self._reduce_low_similarity_points(
-                aligned_graph1,
-                aligned_graph2,
-                corner_points1_initial,
-                corner_points2_initial,
-                "CornerPoint",
-                "Point",
-            )
-            # Re-identify critical points after potential outlier reduction
-            critical_points1 = self._identify_critical_points(aligned_graph1)
-            critical_points2 = self._identify_critical_points(aligned_graph2)
-        # --- End New Step ---
-
-        # Update counts after potential outlier reduction
-        intersection_count1 = len(critical_points1["IntersectionPoint"])
-        intersection_count2 = len(critical_points2["IntersectionPoint"])
-        corner_count1 = len(critical_points1["CornerPoint"])
-        corner_count2 = len(critical_points2["CornerPoint"])
-
-        self.logger.info(
-            f"After outlier reduction - IntersectionPoints: Graph1={intersection_count1}, Graph2={intersection_count2}"
-        )
-        self.logger.info(
-            f"After outlier reduction - CornerPoints: Graph1={corner_count1}, Graph2={corner_count2}"
-        )
-
-        # --- Existing Logic: Case 1 (Reduce IntersectionPoints to CornerPoints if counts differ) ---
-        # This logic remains the same, but operates on the potentially modified graphs/counts
-        if intersection_count1 > intersection_count2:
-            # Select IntersectionPoints to reduce in graph1 based on similarity scores
-            to_reduce = intersection_count1 - intersection_count2
-            points_to_reduce = self._select_critical_points_to_transform(
-                aligned_graph1,
-                aligned_graph2,
-                critical_points1["IntersectionPoint"],
-                critical_points2["IntersectionPoint"],
-                to_reduce,
-            )
-
-            self.logger.info(
-                f"Reducing {len(points_to_reduce)} IntersectionPoints to CornerPoints in Graph1"
-            )
-            for point in points_to_reduce:
-                self._transform_critical_point(
-                    aligned_graph1, point, "IntersectionPoint", "CornerPoint"
-                )
-
-        elif intersection_count2 > intersection_count1:
-            # Select IntersectionPoints to reduce in graph2 based on similarity scores
-            to_reduce = intersection_count2 - intersection_count1
-            points_to_reduce = self._select_critical_points_to_transform(
-                aligned_graph2,
-                aligned_graph1,
-                critical_points2["IntersectionPoint"],
-                critical_points1["IntersectionPoint"],
-                to_reduce,
-            )
-
-            self.logger.info(
-                f"Reducing {len(points_to_reduce)} IntersectionPoints to CornerPoints in Graph2"
-            )
-            for point in points_to_reduce:
-                self._transform_critical_point(
-                    aligned_graph2, point, "IntersectionPoint", "CornerPoint"
-                )
-
-        # Re-identify critical points after first transformation
-        updated_cp1 = self._identify_critical_points(aligned_graph1)
-        updated_cp2 = self._identify_critical_points(aligned_graph2)
-
-        # Update counts
-        intersection_count1 = len(updated_cp1["IntersectionPoint"])
-        intersection_count2 = len(updated_cp2["IntersectionPoint"])
-        corner_count1 = len(updated_cp1["CornerPoint"])
-        corner_count2 = len(updated_cp2["CornerPoint"])
-
-        self.logger.info(
-            f"After IntersectionPoint count alignment - CornerPoints: Graph1={corner_count1}, Graph2={corner_count2}"
-        )
-
-        # Case 2: If CornerPoints still don't match, reduce excess to regular Points
-        if corner_count1 > corner_count2:
-            # Select CornerPoints to reduce in graph1 based on similarity scores
-            to_reduce = corner_count1 - corner_count2
-            points_to_reduce = self._select_critical_points_to_transform(
-                aligned_graph1,
-                aligned_graph2,
-                updated_cp1["CornerPoint"],
-                updated_cp2["CornerPoint"],
-                to_reduce,
-            )
-
-            self.logger.info(
-                f"Reducing {len(points_to_reduce)} CornerPoints to Points in Graph1"
-            )
-            for point in points_to_reduce:
-                self._transform_critical_point(
-                    aligned_graph1, point, "CornerPoint", "Point"
-                )
-
-        elif corner_count2 > corner_count1:
-            # Select CornerPoints to reduce in graph2 based on similarity scores
-            to_reduce = corner_count2 - corner_count1
-            points_to_reduce = self._select_critical_points_to_transform(
-                aligned_graph2,
-                aligned_graph1,
-                updated_cp2["CornerPoint"],
-                updated_cp1["CornerPoint"],
-                to_reduce,
-            )
-
-            self.logger.info(
-                f"Reducing {len(points_to_reduce)} CornerPoints to Points in Graph2"
-            )
-            for point in points_to_reduce:
-                self._transform_critical_point(
-                    aligned_graph2, point, "CornerPoint", "Point"
-                )
-
-        return aligned_graph1, aligned_graph2
-
-    def _select_critical_points_to_transform(
-        self,
-        graph_with_excess: nx.Graph,
-        other_graph: nx.Graph,
-        excess_points: List[Any],
-        other_points: List[Any],
-        count_to_transform: int,
-    ) -> List[Any]:
-        """
-        Select which critical points to transform based on their similarity to points in the other graph.
-        Points with the lowest similarity scores will be transformed.
-
-        Args:
-            graph_with_excess: The graph with excess critical points
-            other_graph: The graph with fewer critical points
-            excess_points: List of critical points in the graph with excess
-            other_points: List of critical points in the other graph
-            count_to_transform: Number of points to transform
-
-        Returns:
-            List of points to transform
-        """
-        if count_to_transform <= 0 or not excess_points:
-            return []
-
-        # If there are no points in the other graph, we can't calculate similarities
-        # So just take the first N points
-        if not other_points:
-            return excess_points[:count_to_transform]
-
-        # Calculate similarity scores between all pairs of points
-        point_scores = []
-
-        for excess_pt in excess_points:
-            # Find the best matching point in the other graph
-            best_similarity = -1
-            for other_pt in other_points:
-                similarity = self.similarity_calculator.calculate_node_similarity(
-                    graph_with_excess,
-                    other_graph,
-                    excess_pt,
-                    other_pt,
-                    self.properties_to_compare,
-                )
-                if similarity > best_similarity:
-                    best_similarity = similarity
-
-            # Store the point and its best similarity score
-            point_scores.append((excess_pt, best_similarity))
-
-        # Sort by similarity score (ascending - we want to transform the least similar ones)
-        point_scores.sort(key=lambda x: x[1])
-
-        # Return the points with the lowest similarity scores
-        points_to_transform = [pt for pt, _ in point_scores[:count_to_transform]]
-
-        # Log the similarity scores for transformed points
-        for pt, score in point_scores[:count_to_transform]:
-            self.logger.info(
-                f"Selected point {pt} for transformation with similarity score {score:.4f}"
-            )
-
-        return points_to_transform
-
-    def _transform_critical_point(
-        self,
-        graph: nx.Graph,
-        point: Any,
-        from_type: str,
-        to_type: str,
-    ) -> None:
-        """
-        Transform a critical point from one type to another.
-
-        Args:
-            graph: Graph to modify
-            point: Critical point to transform
-            from_type: Original type to transform from
-            to_type: Target type to transform to
-        """
-        node_data = graph.nodes[point]
-        self.logger.info(
-            f"Transforming critical point {point} from {from_type} to {to_type}"
-        )
-
-        if "labels" in node_data:
-            if isinstance(node_data["labels"], list):
-                # Remove the from_type label
-                node_data["labels"] = [
-                    label for label in node_data["labels"] if label != from_type
-                ]
-
-                # Add the to_type label if not already present
-                if to_type not in node_data["labels"]:
-                    node_data["labels"].append(to_type)
-                    self.logger.info(
-                        f"Transformed critical point {point} from {from_type} to {to_type}"
+            # STEP 2: If type reduction wasn't enough, try node removal
+            # Try to reduce different point types in order
+            for point_type in [
+                CriticalPointType.END_POINT.value,
+                CriticalPointType.INTERSECTION_POINT.value,
+                CriticalPointType.CORNER_POINT.value,
+            ]:
+                # Determine which nodes to remove from which graph for this point type
+                nodes_to_remove_g1, nodes_to_remove_g2 = (
+                    self._handle_point_type_mismatch(
+                        crit_graph1, crit_graph2, point_type
                     )
-
-    def _transform_critical_point_type(
-        self,
-        graph: nx.Graph,
-        candidate_points: List[Any],
-        from_type: str,
-        to_type: str,
-        count: int,
-    ) -> None:
-        """
-        Transform multiple critical points from one type to another.
-
-        Args:
-            graph: Graph to modify
-            candidate_points: List of points to potentially transform
-            from_type: Original type to transform from
-            to_type: Target type to transform to
-            count: Number of points to transform
-        """
-        if not candidate_points or count <= 0:
-            return
-
-        # Limit to the requested count
-        points_to_transform = candidate_points[:count]
-
-        for point in points_to_transform:
-            self._transform_critical_point(graph, point, from_type, to_type)
-
-    def _identify_critical_points(self, graph: nx.Graph) -> Dict[str, List[Any]]:
-        """
-        Identify critical points in a graph (intersection points, corner points, end points, start points).
-
-        Args:
-            graph: The graph to analyze
-
-        Returns:
-            Dictionary mapping point types to lists of node IDs
-        """
-        critical_points = {
-            "IntersectionPoint": [],
-            "CornerPoint": [],
-            "EndPoint": [],
-            "StartPoint": [],
-        }
-
-        for node in graph.nodes:
-            node_data = graph.nodes[node]
-            # Check if node has labels attribute
-            labels = node_data.get("labels", [])
-
-            # Assign node to appropriate category
-            for label in labels:
-                if label in critical_points:
-                    critical_points[label].append(node)
-
-        return critical_points
-
-    def _reduce_low_similarity_points(
-        self,
-        graph1: nx.Graph,
-        graph2: nx.Graph,
-        points1: List[Any],
-        points2: List[Any],
-        point_type_to_reduce: str,
-        target_type: str,
-        std_dev_factor: float = 1.5,
-        min_points_for_stats: int = 4,
-        fallback_threshold: float = 0.5,
-    ) -> Tuple[nx.Graph, nx.Graph]:
-        """
-        Reduces points in graph1 and graph2 of point_type_to_reduce if their
-        best match similarity in the other graph is statistically low (outlier).
-        """
-        if not points1 or not points2:
-            self.logger.info(
-                "Skipping similarity reduction: one or both point lists are empty."
-            )
-            return graph1, graph2
-
-        # Calculate best match similarities for all points
-        similarities_g1 = []
-        similarities_g2 = []
-        point_similarity_map_g1 = {}
-        point_similarity_map_g2 = {}
-
-        for p1 in points1:
-            best_sim_p1 = -1
-            for p2 in points2:
-                similarity = self.similarity_calculator.calculate_node_similarity(
-                    graph1,
-                    graph2,
-                    p1,
-                    p2,
-                    self.properties_to_compare,
-                )
-                if similarity > best_sim_p1:
-                    best_sim_p1 = similarity
-            similarities_g1.append(best_sim_p1)
-            point_similarity_map_g1[p1] = best_sim_p1
-
-        for p2 in points2:
-            best_sim_p2 = -1
-            for p1 in points1:
-                similarity = self.similarity_calculator.calculate_node_similarity(
-                    graph2,
-                    graph1,
-                    p2,
-                    p1,
-                    self.properties_to_compare,
-                )
-                if similarity > best_sim_p2:
-                    best_sim_p2 = similarity
-            similarities_g2.append(best_sim_p2)
-            point_similarity_map_g2[p2] = best_sim_p2
-
-        # Combine all similarity scores for statistical analysis
-        all_similarities = similarities_g1 + similarities_g2
-
-        # Determine the threshold
-        threshold = fallback_threshold
-        if len(all_similarities) >= min_points_for_stats:
-            mean_sim = np.mean(all_similarities)
-            std_dev_sim = np.std(all_similarities)
-            if std_dev_sim > 1e-6:
-                dynamic_threshold = mean_sim - std_dev_factor * std_dev_sim
-                threshold = max(0, dynamic_threshold)
-                self.logger.info(
-                    f"Calculated dynamic similarity threshold: {threshold:.4f} (mean={mean_sim:.4f}, std_dev={std_dev_sim:.4f}, factor={std_dev_factor})"
-                )
-            else:
-                self.logger.warning(
-                    f"Standard deviation of similarities is very low ({std_dev_sim:.4f}). Falling back to threshold {fallback_threshold}."
-                )
-                threshold = fallback_threshold
-        else:
-            self.logger.warning(
-                f"Not enough similarity scores ({len(all_similarities)}) to calculate stats. Falling back to threshold {fallback_threshold}."
-            )
-            threshold = fallback_threshold
-
-        # Identify points below the determined threshold
-        points_to_reduce_g1 = set()
-        points_to_reduce_g2 = set()
-
-        for p1, sim in point_similarity_map_g1.items():
-            if sim < threshold:
-                self.logger.info(
-                    f"Marking {p1} for reduction ({point_type_to_reduce} -> {target_type}) in Graph 1. Similarity: {sim:.4f} < {threshold:.4f}"
-                )
-                points_to_reduce_g1.add(p1)
-
-        for p2, sim in point_similarity_map_g2.items():
-            if sim < threshold:
-                self.logger.info(
-                    f"Marking {p2} for reduction ({point_type_to_reduce} -> {target_type}) in Graph 2. Similarity: {sim:.4f} < {threshold:.4f}"
-                )
-                points_to_reduce_g2.add(p2)
-
-        # Perform reductions
-        if points_to_reduce_g1:
-            self.logger.info(
-                f"Reducing {len(points_to_reduce_g1)} {point_type_to_reduce}(s) in Graph 1 below similarity threshold {threshold:.4f}"
-            )
-            for point in points_to_reduce_g1:
-                self._transform_critical_point(
-                    graph1, point, point_type_to_reduce, target_type
                 )
 
-        if points_to_reduce_g2:
-            self.logger.info(
-                f"Reducing {len(points_to_reduce_g2)} {point_type_to_reduce}(s) in Graph 2 below similarity threshold {threshold:.4f}"
-            )
-            for point in points_to_reduce_g2:
-                self._transform_critical_point(
-                    graph2, point, point_type_to_reduce, target_type
-                )
+                # Apply reductions to graph1 if needed
+                for node_id in nodes_to_remove_g1:
+                    graph1, crit_graph1 = self._apply_reduction_to_graphs(
+                        graph1, crit_graph1, node_id, point_type
+                    )
+                    reduction_made_this_iteration = True
+                    self.logger.info(f"Removed {point_type} node {node_id} from graph1")
+
+                # Apply reductions to graph2 if needed
+                for node_id in nodes_to_remove_g2:
+                    graph2, crit_graph2 = self._apply_reduction_to_graphs(
+                        graph2, crit_graph2, node_id, point_type
+                    )
+                    reduction_made_this_iteration = True
+                    self.logger.info(f"Removed {point_type} node {node_id} from graph2")
+
+                # Check if graphs are isomorphic after this point type reduction
+                if nx.is_isomorphic(crit_graph1, crit_graph2):
+                    self.logger.info(
+                        f"Graphs became isomorphic after {point_type} reduction"
+                    )
+                    break
+
+            # If no reductions were made this iteration, we can't make the graphs isomorphic
+            if not reduction_made_this_iteration:
+                self.logger.warning("Cannot make graphs isomorphic with current rules")
+                break
+
+            iteration += 1
+            # To prevent infinite loops, limit the number of iterations
+            if iteration >= 10:  # arbitrary limit
+                self.logger.warning("Reached maximum reduction iterations, stopping")
+                break
 
         return graph1, graph2
+
+    def _try_type_reduction(
+        self,
+        graph1: nx.Graph,
+        crit_graph1: nx.Graph,
+        graph2: nx.Graph,
+        crit_graph2: nx.Graph,
+    ) -> bool:
+        """
+        Try to apply type reduction to nodes based on the type_reduction_map hierarchy.
+        This may convert an INTERSECTION_POINT to a CORNER_POINT, for example.
+
+        Args:
+            graph1: First original graph
+            crit_graph1: First critical point graph
+            graph2: Second original graph
+            crit_graph2: Second critical point graph
+
+        Returns:
+            bool: True if any reductions were applied, False otherwise
+        """
+        reduction_applied = False
+
+        # Get counts of each point type in both graphs
+        counts1 = self._count_critical_points(crit_graph1)
+        counts2 = self._count_critical_points(crit_graph2)
+
+        # First, check for potential reductions in graph1
+        reduction_applied |= self._apply_type_reduction_to_graph(
+            graph1, crit_graph1, counts1, counts2
+        )
+
+        # Then, check for potential reductions in graph2
+        reduction_applied |= self._apply_type_reduction_to_graph(
+            graph2, crit_graph2, counts2, counts1
+        )
+
+        return reduction_applied
+
+    def _apply_type_reduction_to_graph(
+        self,
+        graph: nx.Graph,
+        crit_graph: nx.Graph,
+        graph_counts: Dict[str, int],
+        other_counts: Dict[str, int],
+    ) -> bool:
+        """
+        Apply type reduction to a specific graph based on the type_reduction_map.
+
+        Args:
+            graph: The original graph to modify
+            crit_graph: The critical point graph to modify
+            graph_counts: Point type counts for this graph
+            other_counts: Point type counts for the other graph
+
+        Returns:
+            bool: True if any reductions were applied, False otherwise
+        """
+        reduction_applied = False
+
+        # Iterate through the type reduction map
+        for higher_type, lower_type in self.type_reduction_map.items():
+            # Check if this graph has more of the higher type than the other graph
+            if graph_counts.get(higher_type, 0) > other_counts.get(higher_type, 0):
+                diff = graph_counts.get(higher_type, 0) - other_counts.get(
+                    higher_type, 0
+                )
+                self.logger.info(
+                    f"Graph has {diff} more {higher_type} than the other graph"
+                )
+
+                # Find nodes of the higher type
+                nodes_of_type = [
+                    node
+                    for node, data in crit_graph.nodes(data=True)
+                    if higher_type in data.get("labels", [])
+                ]
+
+                # If we have nodes to reduce
+                if nodes_of_type:
+                    # Calculate similarity to find the best candidates for reduction
+                    # For simplicity, we'll just use the first 'diff' nodes, but this could be
+                    # enhanced with similarity calculation to choose the most suitable candidates
+                    nodes_to_reduce = nodes_of_type[:diff]
+
+                    for node_id in nodes_to_reduce:
+                        # Reduce the type in both the original and critical graphs
+                        self.logger.info(
+                            f"Reducing node {node_id} from {higher_type} to {lower_type}"
+                        )
+
+                        # Update node in original graph
+                        if node_id in graph.nodes:
+                            labels = list(graph.nodes[node_id].get("labels", []))
+                            if higher_type in labels:
+                                labels.remove(higher_type)
+                                if lower_type not in labels:
+                                    labels.append(lower_type)
+                                graph.nodes[node_id]["labels"] = labels
+
+                        # Update node in critical graph
+                        if node_id in crit_graph.nodes:
+                            labels = list(crit_graph.nodes[node_id].get("labels", []))
+                            if higher_type in labels:
+                                labels.remove(higher_type)
+                                if lower_type not in labels:
+                                    labels.append(lower_type)
+                                crit_graph.nodes[node_id]["labels"] = labels
+
+                        reduction_applied = True
+
+        return reduction_applied
+
+    def _handle_point_type_mismatch(
+        self,
+        crit_graph1: nx.Graph,
+        crit_graph2: nx.Graph,
+        point_type: str,
+    ) -> Tuple[List[Any], List[Any]]:
+        """
+        Handle mismatch in a specific point type between two critical point graphs.
+        Determines which nodes need to be removed from which graph to make them compatible.
+
+        Args:
+            crit_graph1: First critical point graph
+            crit_graph2: Second critical point graph
+            point_type: Type of critical point to handle
+
+        Returns:
+            Tuple of (nodes_to_remove_from_g1, nodes_to_remove_from_g2) - one list will be empty
+        """
+        # Count nodes by type in each graph
+        counts1 = self._count_critical_points(crit_graph1)
+        counts2 = self._count_critical_points(crit_graph2)
+
+        count1 = counts1.get(point_type, 0)
+        count2 = counts2.get(point_type, 0)
+
+        # If counts match, no action needed
+        if count1 == count2:
+            return [], []
+
+        self.logger.info(
+            f"Mismatch in {point_type} count: graph1={count1}, graph2={count2}"
+        )
+
+        # Get nodes of specified type from each graph
+        nodes1 = [
+            node
+            for node, data in crit_graph1.nodes(data=True)
+            if point_type in data.get("labels", [])
+        ]
+
+        nodes2 = [
+            node
+            for node, data in crit_graph2.nodes(data=True)
+            if point_type in data.get("labels", [])
+        ]
+
+        if count1 > count2:
+            # Graph1 has more points of this type, identify nodes to remove
+            diff = count1 - count2
+            nodes_to_remove = self._identify_nodes_to_remove(
+                crit_graph1, nodes1, crit_graph2, nodes2, point_type, diff
+            )
+            return nodes_to_remove, []
+        else:
+            # Graph2 has more points of this type, identify nodes to remove
+            diff = count2 - count1
+            nodes_to_remove = self._identify_nodes_to_remove(
+                crit_graph2, nodes2, crit_graph1, nodes1, point_type, diff
+            )
+            return [], nodes_to_remove
+
+    def _apply_reduction_to_graphs(
+        self,
+        original_graph: nx.Graph,
+        critical_graph: nx.Graph,
+        node_id_crit: Any,
+        critical_point_type: str,
+    ) -> Tuple[nx.Graph, nx.Graph]:
+        """
+        Apply reduction by removing nodes from both the original graph and its critical point graph.
+        For END_POINTs, removes the path up to the next critical point.
+        For other point types, removes just the critical point itself.
+
+        Args:
+            original_graph: The full original graph to modify
+            critical_graph: The corresponding critical point graph
+            node_id_crit: ID of the critical point to remove
+            critical_point_type: Type of the critical point
+
+        Returns:
+            Tuple of (modified_original_graph, modified_critical_graph)
+        """
+        # For END_POINTs, we need to find and remove the entire path up to the next critical point
+        if critical_point_type == CriticalPointType.END_POINT.value:
+            # Find all nodes to remove including the path to the next critical point
+            nodes_to_remove = self._find_endpoint_path_to_remove(
+                original_graph, node_id_crit
+            )
+            self.logger.info(
+                f"Removing endpoint {node_id_crit} and its path ({len(nodes_to_remove)} nodes)"
+            )
+
+            # Remove nodes from original graph
+            for node in nodes_to_remove:
+                if node in original_graph:
+                    original_graph.remove_node(node)
+        else:
+            # For other critical points, just remove the single node
+            self.logger.info(
+                f"Removing single {critical_point_type} node {node_id_crit}"
+            )
+            if node_id_crit in original_graph:
+                original_graph.remove_node(node_id_crit)
+
+        # Remove the critical point from the critical graph
+        if node_id_crit in critical_graph:
+            critical_graph.remove_node(node_id_crit)
+
+        return original_graph, critical_graph
+
+    def _find_endpoint_path_to_remove(
+        self, graph: nx.Graph, endpoint_id: Any
+    ) -> List[Any]:
+        """
+        Find all nodes on the path from an endpoint to the next critical point.
+
+        Args:
+            graph: The original graph
+            endpoint_id: ID of the endpoint node
+
+        Returns:
+            List of node IDs to remove (including the endpoint itself)
+        """
+        nodes_to_remove = [endpoint_id]
+
+        # Start BFS from the endpoint
+        visited = {endpoint_id}
+        queue = list(graph.neighbors(endpoint_id))
+
+        while queue:
+            current = queue.pop(0)
+
+            # Skip if already visited
+            if current in visited:
+                continue
+
+            visited.add(current)
+
+            # Check if this is a critical point
+            node_data = graph.nodes[current]
+            labels = node_data.get("labels", [])
+            is_critical = any(label in self.critical_point_types for label in labels)
+
+            if is_critical:
+                # Found another critical point, stop the path here (don't include this node)
+                continue
+
+            # Add this non-critical node to the removal list
+            nodes_to_remove.append(current)
+
+            # Add neighbors to the queue
+            for neighbor in graph.neighbors(current):
+                if neighbor not in visited:
+                    queue.append(neighbor)
+
+        return nodes_to_remove
+
+    def _identify_nodes_to_remove(
+        self,
+        graph_extra: nx.Graph,
+        nodes_extra: List[Any],
+        graph_fewer: nx.Graph,
+        nodes_fewer: List[Any],
+        point_type: str,
+        difference: int,
+    ) -> List[Any]:
+        """
+        Identify which nodes of a specific type should be removed from graph_extra.
+
+        Args:
+            graph_extra: Graph with more points of the specified type
+            nodes_extra: Nodes of the specified type in graph_extra
+            graph_fewer: Graph with fewer points of the specified type
+            nodes_fewer: Nodes of the specified type in graph_fewer
+            point_type: Type of critical point to consider
+            difference: Number of points to remove
+
+        Returns:
+            List of node IDs to remove from graph_extra
+        """
+        self.logger.info(f"Found {len(nodes_extra)} {point_type} in graph_extra")
+        self.logger.info(f"Found {len(nodes_fewer)} {point_type} in graph_fewer")
+
+        # Calculate similarity between nodes
+        similarity_pairs = []
+        for node1 in nodes_extra:
+            for node2 in nodes_fewer:
+                similarity = self.similarity_calculator.calculate_node_similarity(
+                    graph_extra, graph_fewer, node1, node2, self.properties_to_compare
+                )
+                similarity_pairs.append((node1, node2, similarity))
+
+        # Sort by similarity (highest first)
+        similarity_pairs.sort(key=lambda x: x[2], reverse=True)
+
+        # Find best matches using greedy approach
+        matched_extra_nodes = set()
+        matched_fewer_nodes = set()
+        matches = []
+
+        for node1, node2, similarity in similarity_pairs:
+            if node1 not in matched_extra_nodes and node2 not in matched_fewer_nodes:
+                matched_extra_nodes.add(node1)
+                matched_fewer_nodes.add(node2)
+                matches.append((node1, node2, similarity))
+
+                if len(matches) == len(nodes_fewer):
+                    # We've matched all nodes from graph_fewer
+                    break
+
+        # Find nodes to remove (unmatched or lowest similarity)
+        unmatched_nodes = [
+            node for node in nodes_extra if node not in matched_extra_nodes
+        ]
+
+        nodes_to_remove = []
+        # Add unmatched nodes first
+        nodes_to_remove.extend(unmatched_nodes)
+
+        # If we need to remove more, start from the lowest similarity matches
+        if len(nodes_to_remove) < difference:
+            # Sort matches by similarity (lowest first)
+            matches.sort(key=lambda x: x[2])
+
+            # Add nodes from lowest similarity matches
+            for node1, _, _ in matches[: difference - len(nodes_to_remove)]:
+                nodes_to_remove.append(node1)
+
+        # Return only the required number of nodes
+        return nodes_to_remove[:difference]
+
+    def _count_critical_points(self, graph: nx.Graph) -> Dict[str, int]:
+        """
+        Count critical points by type in a graph.
+
+        Args:
+            graph: The graph containing nodes to count
+
+        Returns:
+            Dictionary mapping point type to count
+        """
+        counts = {}
+        for _, data in graph.nodes(data=True):
+            labels = data.get("labels", [])
+            for label in labels:
+                if label in self.critical_point_types:
+                    counts[label] = counts.get(label, 0) + 1
+
+        return counts
+
+    def _has_path_excluding_others(
+        self, graph: nx.Graph, source: Any, target: Any, critical_points: List[Any]
+    ) -> bool:
+        """
+        Check if there's a path between source and target that doesn't go through other critical points.
+
+        Args:
+            graph: Original graph
+            source: Source node
+            target: Target node
+            critical_points: List of all critical points
+
+        Returns:
+            True if there's a valid path, False otherwise
+        """
+        # Create a subgraph excluding other critical points
+        excluded_nodes = [
+            node for node in critical_points if node != source and node != target
+        ]
+        subgraph = graph.copy()
+        subgraph.remove_nodes_from(excluded_nodes)
+
+        try:
+            nx.shortest_path(subgraph, source, target)
+            return True
+        except nx.NetworkXNoPath:
+            return False

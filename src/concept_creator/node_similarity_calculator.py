@@ -390,18 +390,8 @@ class NodeSimilarityCalculator:
         node2_data = graph2.nodes[node2]
 
         # Check for x,y coordinates
-        x_sim = self._compare_specific_coordinate(node1_data, node2_data, "x")
-        y_sim = self._compare_specific_coordinate(node1_data, node2_data, "y")
-
-        # Check for normalized coordinates if regular ones are missing
-        if x_sim is None:
-            x_sim = self._compare_specific_coordinate(
-                node1_data, node2_data, "normalized_x"
-            )
-        if y_sim is None:
-            y_sim = self._compare_specific_coordinate(
-                node1_data, node2_data, "normalized_y"
-            )
+        x_sim = self._compare_specific_coordinate(node1_data, node2_data, "normalized_x")
+        y_sim = self._compare_specific_coordinate(node1_data, node2_data, "normalized_y")
 
         # If we have both coordinates, average them
         if x_sim is not None and y_sim is not None:

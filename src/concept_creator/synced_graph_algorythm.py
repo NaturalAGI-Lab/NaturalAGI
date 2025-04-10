@@ -33,21 +33,34 @@ class SyncedGraphMinorFinder:
             nx.Graph: maximum common minor of the two graphs
         """
         # Preprocess the graphs to align critical points
-        G_c, G_i = self.critical_point_preprocessor.preprocess_graphs(G_c, G_i)
+        # This now returns the modified original graphs, not just critical point graphs
+        G_c_processed, G_i_processed = (
+            self.critical_point_preprocessor.preprocess_graphs(G_c, G_i)
+        )
+
+        self.logger.info(f"Processed concept graph nodes: {len(G_c_processed.nodes)}")
+        self.logger.info(f"Processed image graph nodes: {len(G_i_processed.nodes)}")
 
         # Matrix of the subpaths between intersection points
-        # Inside eachh subpath we have the traversal sequence of two graphs
+        # Inside each subpath we have the traversal sequence of two graphs
         # Each inner list represents a continuous path between critical points
-        sync_list: List[List[Tuple[Any, Any]]] = self._generate_sync_list(G_c, G_i)
+        sync_list: List[List[Tuple[Any, Any]]] = self._generate_sync_list(
+            G_c_processed, G_i_processed
+        )
+
+        self.logger.info(
+            "Sync list: \n" + "\n".join([str(subpath) for subpath in sync_list])
+        )
 
         result_graph = nx.Graph()
         for subpath in sync_list:
             self.logger.info(f"Subpath: {subpath}")
-            self._reduce_subpath(G_c, G_i, subpath, result_graph)
+            self._reduce_subpath(G_c_processed, G_i_processed, subpath, result_graph)
             self.logger.info(f"Result graph: {result_graph.nodes}")
-        # Find the maximum common minor
+
+        # Return the result graph which is the maximum common minor
         return result_graph
-    
+
     def _reduce_subpath(
         self,
         G_c: nx.Graph,
@@ -59,23 +72,140 @@ class SyncedGraphMinorFinder:
         processed_paths_c = list()
         processed_paths_i = list()
         for i in range(len(subpath) - 1):
-            start_c, end_c = subpath[i][0], subpath[i+1][0]
-            start_i, end_i = subpath[i][1], subpath[i+1][1]
-            paths_c = nx.all_simple_paths(G_c, start_c, end_c)
-            paths_i = nx.all_simple_paths(G_i, start_i, end_i)
-            for path_c in paths_c:
-                if path_c not in processed_paths_c:
-                    processed_paths_c.append(path_c)
-                    processed_paths_c.append(path_c.reverse())
-                    break
-            for path_i in paths_i:
-                if path_i not in processed_paths_i:
-                    processed_paths_i.append(path_i)
-                    processed_paths_i.append(path_i.reverse())
-                    break
-            self._create_reduced_path_in_result(
-                result_graph, G_c, G_i, start_c, end_c, path_c, start_i, end_i, path_i
+            start_c, end_c = subpath[i][0], subpath[i + 1][0]
+            start_i, end_i = subpath[i][1], subpath[i + 1][1]
+
+            # Get all simple paths between the critical points
+            paths_c = list(nx.all_simple_paths(G_c, start_c, end_c))
+            paths_i = list(nx.all_simple_paths(G_i, start_i, end_i))
+            
+            # Remove already processed paths to avoid reprocessing
+            if processed_paths_c and processed_paths_i:
+                # Filter out paths that have been processed before
+                # Expand to regular loops for better debugging
+                filtered_paths_c = []
+                for path in paths_c:
+                    if path not in processed_paths_c and path[::-1] not in processed_paths_c:
+                        filtered_paths_c.append(path)
+                    else:
+                        self.logger.debug(f"Skipping already processed concept path: {path}")
+                paths_c = filtered_paths_c
+                
+                filtered_paths_i = []
+                for path in paths_i:
+                    if path not in processed_paths_i and path[::-1] not in processed_paths_i:
+                        filtered_paths_i.append(path)
+                    else:
+                        self.logger.debug(f"Skipping already processed image path: {path}")
+                paths_i = filtered_paths_i
+                self.logger.debug(
+                    f"After filtering processed paths: {len(paths_c)} concept paths, {len(paths_i)} image paths remain"
+                )
+
+            if not paths_c or not paths_i:
+                self.logger.warning(
+                    f"No path found between critical points: ({start_c},{end_c}) or ({start_i},{end_i})"
+                )
+                continue
+
+            # Find the best matching paths using similarity calculation
+            best_path_c, best_path_i = self._find_best_matching_paths(
+                G_c, G_i, paths_c, paths_i
             )
+
+            self.logger.info(
+                f"Selected best matching paths: {best_path_c} and {best_path_i}"
+            )
+
+            # Add to processed paths to avoid reprocessing
+            processed_paths_c.append(best_path_c)
+            processed_paths_i.append(best_path_i)
+
+            # Create the reduced path in the result graph
+            self._create_reduced_path_in_result(
+                result_graph,
+                G_c,
+                G_i,
+                start_c,
+                end_c,
+                best_path_c,
+                start_i,
+                end_i,
+                best_path_i,
+            )
+
+    def _find_best_matching_paths(
+        self,
+        G_c: nx.Graph,
+        G_i: nx.Graph,
+        paths_c: List[List[Any]],
+        paths_i: List[List[Any]],
+    ) -> Tuple[List[Any], List[Any]]:
+        """
+        Find the best matching paths between two sets of paths using node similarity.
+
+        Args:
+            G_c: Concept graph
+            G_i: Image graph
+            paths_c: List of paths in concept graph
+            paths_i: List of paths in image graph
+
+        Returns:
+            Tuple of (best_path_c, best_path_i)
+        """
+        best_score = -1
+        best_pair = (paths_c[0], paths_i[0])  # Default to first paths
+
+        self.logger.info(
+            f"Finding best matching paths from {len(paths_c)} concept paths and {len(paths_i)} image paths"
+        )
+
+        # Compare each path pair and find the one with highest similarity
+        for path_c in paths_c:
+            for path_i in paths_i:
+                # Calculate similarity matrix between the paths
+                similarity_matrix = (
+                    self.similarity_calculator.calculate_similarity_matrix(
+                        G_c, G_i, path_c, path_i
+                    )
+                )
+
+                # Calculate overall path similarity score (average of maximum similarities per row)
+                path_score = self._calculate_path_similarity_score(similarity_matrix)
+
+                if path_score > best_score:
+                    best_score = path_score
+                    best_pair = (path_c, path_i)
+                    self.logger.debug(
+                        f"New best path pair found with score {best_score:.3f}"
+                    )
+
+        self.logger.info(f"Best path pair found with score {best_score:.3f}")
+        return best_pair
+
+    def _calculate_path_similarity_score(
+        self, similarity_matrix: List[List[float]]
+    ) -> float:
+        """
+        Calculate a similarity score between two paths based on their node similarity matrix.
+        Uses average of maximum similarities for each node in the first path.
+
+        Args:
+            similarity_matrix: Matrix of node similarity scores
+
+        Returns:
+            Overall path similarity score
+        """
+        if not similarity_matrix:
+            return 0.0
+
+        # For each node in the first path, find its best match in the second path
+        max_similarities = [max(row) if row else 0.0 for row in similarity_matrix]
+
+        # Average the maximum similarities
+        if max_similarities:
+            return sum(max_similarities) / len(max_similarities)
+        return 0.0
 
     def _generate_sync_list(
         self,
@@ -339,11 +469,8 @@ class SyncedGraphMinorFinder:
                 f"Matching remaining critical points of type {cp_type}: {len(unmatched_concept_points)} concept points, {len(unmatched_image_points)} image points"
             )
 
-            # Create a similarity calculator
-            similarity_calculator = NodeSimilarityCalculator(logger=self.logger)
-
             # Calculate similarity matrix between unmatched points
-            similarity_matrix = similarity_calculator.calculate_similarity_matrix(
+            similarity_matrix = self.similarity_calculator.calculate_similarity_matrix(
                 G_c, G_i, unmatched_concept_points, unmatched_image_points
             )
 
@@ -552,7 +679,6 @@ class SyncedGraphMinorFinder:
             self.logger.debug(
                 f"Added direct edge ({template_start_node}, {template_end_node}) between critical points"
             )
-
 
     def _find_best_matching_node(
         self,

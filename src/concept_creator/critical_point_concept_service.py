@@ -9,6 +9,7 @@ from node_similarity_calculator import NodeSimilarityCalculator
 from synced_graph_algorythm import SyncedGraphMinorFinder
 from critical_point_preprocessor import CriticalPointPreprocessor
 
+
 class CriticalPointConceptService:
     def __init__(self, neo4j_uri: str, neo4j_user: str, neo4j_password: str):
         self.repository = ConceptCreationRepository(
@@ -75,9 +76,15 @@ class CriticalPointConceptService:
             image_graph = self.repository.get_image_graph(image_id)
 
             # Find the intersection graph between current concept and new image
-            concept_graph = self.graph_minor_finder.find_max_common_minor(
-                concept_graph, image_graph
-            )
+            try:
+                concept_graph = self.graph_minor_finder.find_max_common_minor(
+                    concept_graph, image_graph
+                )
+            except Exception as e:
+                self.logger.error(f"Error finding max common minor: {e}")
+                self.logger.error(f"Concept graph: {concept_graph.nodes}")
+                self.logger.error(f"Image graph: {image_graph.nodes}")
+                continue
 
             self.logger.info(
                 f"Updated concept after image {image_id}. Nodes: {len(concept_graph.nodes)}"
