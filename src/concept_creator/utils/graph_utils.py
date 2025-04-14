@@ -82,6 +82,20 @@ class GraphUtils:
         return CriticalPointType.INTERSECTION_POINT.value in node_data.get(LABELS_KEY, [])
     
     @staticmethod
+    def is_endpoint(node_data: Dict[str, Any]) -> bool:
+        """
+        Check if a node is an endpoint.
+        """
+        return CriticalPointType.END_POINT.value in node_data.get(LABELS_KEY, [])
+    
+    @staticmethod
+    def is_corner_point(node_data: Dict[str, Any]) -> bool:
+        """
+        Check if a node is a corner point.
+        """
+        return CriticalPointType.CORNER_POINT.value in node_data.get(LABELS_KEY, [])
+    
+    @staticmethod
     def get_critical_point_type(node_data: Dict[str, Any]) -> CriticalPointType:
         """
         Get the critical point type of a node.

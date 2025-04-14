@@ -1,7 +1,7 @@
 import networkx as nx
 import collections
 import logging
-from typing import Dict, Set, Tuple, List, Any, Optional
+from typing import Dict, Set, Tuple, List, Any, Optional, FrozenSet
 from property_handlers.property_handler_manager import PropertyHandlerManager
 from node_similarity_calculator import NodeSimilarityCalculator
 from critical_point_preprocessor import CriticalPointPreprocessor
@@ -78,6 +78,10 @@ class SyncedGraphMinorFinder:
             # Get all simple paths between the critical points
             paths_c = list(nx.all_simple_paths(G_c, start_c, end_c))
             paths_i = list(nx.all_simple_paths(G_i, start_i, end_i))
+                        
+            # Remove paths that contain critical points in the middle
+            paths_c = [path for path in paths_c if not any(GraphUtils.is_critical_point(G_c.nodes[node]) for node in path[1:-1])]
+            paths_i = [path for path in paths_i if not any(GraphUtils.is_critical_point(G_i.nodes[node]) for node in path[1:-1])]
             
             # Remove already processed paths to avoid reprocessing
             if processed_paths_c and processed_paths_i:
@@ -159,6 +163,8 @@ class SyncedGraphMinorFinder:
         self.logger.info(
             f"Finding best matching paths from {len(paths_c)} concept paths and {len(paths_i)} image paths"
         )
+        self.logger.info(f"Concept paths: " + "\n".join([str(path) for path in paths_c]))
+        self.logger.info(f"Image paths: " + "\n".join([str(path) for path in paths_i]))
 
         # Compare each path pair and find the one with highest similarity
         for path_c in paths_c:
@@ -225,6 +231,8 @@ class SyncedGraphMinorFinder:
         sync_list.append([(start_c, start_i)])
 
         completed_paths = set()
+        
+        processed_segments: Set[FrozenSet[Tuple[Any, Any]]] = set()
 
         # Queue stores (node_c, node_i, path_id, prev_c, prev_i)
         # The prev_* values help avoid immediate backtracking
@@ -240,6 +248,7 @@ class SyncedGraphMinorFinder:
 
         while queue:
             current_c, current_i, path_id, prev_c, prev_i = queue.popleft()
+            current_pair = (current_c, current_i)
             self.logger.info(
                 f"Processing node {current_c}, {current_i} from path {path_id}"
             )
@@ -268,35 +277,43 @@ class SyncedGraphMinorFinder:
                 )
 
                 # For the matched points, create new path branches
-                for key in matched_points.keys():
+                for concept_neighbor_cp, image_neighbor_cp in matched_points.items():
+                    neighbor_pair = (concept_neighbor_cp, image_neighbor_cp)
+                    
+                    segment = frozenset([current_pair, neighbor_pair])
+                    if segment in processed_segments:
+                        self.logger.debug(f"Segment {segment} already processed, skipping branch.")
+                        continue
+                    processed_segments.add(segment)
+                    self.logger.debug(f"Added segment {segment} to processed set.")
+                    
                     # Create a new path ID
                     new_path_id = len(sync_list)
                     # Initialize the new path with the intersection point
-                    sync_list.append([(current_c, current_i)])
-
-                    # Get the matched image point
-                    image_cp = matched_points[key]  # Renamed for clarity
+                    sync_list.append([current_pair])
 
                     # Add the matched neighbor pair to the new path list
-                    sync_list[new_path_id].append((key, image_cp))
+                    sync_list[new_path_id].append(neighbor_pair)
 
                     # Add the new path to the queue using the MATCHED PAIR
                     # Ensure the matched pair itself isn't immediately revisited on this new path
-                    if (key, image_cp) not in visited:
-                        visited[(key, image_cp)] = set()
-                    visited[(key, image_cp)].add(new_path_id)
+                    if neighbor_pair not in visited:
+                        visited[neighbor_pair] = set()
+                    visited[neighbor_pair].add(new_path_id)
 
                     queue.append(
                         (
-                            key,  # Matched concept neighbor
-                            image_cp,  # Matched image neighbor
+                            concept_neighbor_cp,  # Matched concept neighbor
+                            image_neighbor_cp,  # Matched image neighbor
                             new_path_id,
                             current_c,  # Previous concept node (intersection)
                             current_i,  # Previous image node (intersection)
                         )
                     )
+                    self.logger.info(f"Branched to new path {new_path_id} with segment {current_pair} -> {neighbor_pair}")
                 # Mark the current path as completed since we branched
                 completed_paths.add(path_id)
+                self.logger.debug(f"Marked path {path_id} as completed due to intersection.")
                 continue  # Continue to next item in queue
 
             next_c_critical_point = GraphUtils.find_next_critical_point_bfs(
@@ -327,8 +344,30 @@ class SyncedGraphMinorFinder:
             ):
                 raise ValueError("Critical points are not the same type")
 
-            sync_list[path_id].append((next_c_critical_point, next_i_critical_point))
+            next_pair = (next_c_critical_point, next_i_critical_point)
+            
+            segment = frozenset([current_pair, next_pair])
+            if segment in processed_segments:
+                 self.logger.info(f"Path {path_id} ending: Segment {segment} already processed.")
+                 completed_paths.add(path_id)
+                 continue # Stop this path, segment covered elsewhere
+            processed_segments.add(segment)
+            self.logger.debug(f"Added segment {segment} to processed set.")
+            
+            if next_pair in visited and path_id in visited[next_pair]:
+                self.logger.info(f"Path {path_id} ending: Detected cycle by revisiting pair {next_pair}.")
+                # Append the closing pair to signify the cycle completion
+                sync_list[path_id].append(next_pair)
+                completed_paths.add(path_id)
+                continue # Stop this path, cycle detected
+            
+            sync_list[path_id].append(next_pair)
+            if next_pair not in visited:
+                visited[next_pair] = set()
+            visited[next_pair].add(path_id)
 
+            visited[(next_c_critical_point, next_i_critical_point)] = {path_id}
+            
             # Add the next critical points to the queue
             queue.append(
                 (
@@ -339,8 +378,6 @@ class SyncedGraphMinorFinder:
                     current_i,
                 )
             )
-
-            visited[(next_c_critical_point, next_i_critical_point)] = {path_id}
 
         return sync_list
 

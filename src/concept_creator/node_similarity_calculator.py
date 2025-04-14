@@ -290,63 +290,25 @@ class NodeSimilarityCalculator:
         )
 
     def _compare_number_to_range(self, num: float, range_obj: Dict[str, Any]) -> float:
-        """
-        Compare a single numeric value to a range object using Gaussian similarity.
-
-        Args:
-            num: Numeric value
-            range_obj: Range object with min, max, and center
-
-        Returns:
-            Similarity score between 0.0 and 1.0
-        """
         min_val = float(range_obj["min"])
         max_val = float(range_obj["max"])
-        center = float(range_obj["center"])
         range_width = max_val - min_val
+        epsilon = 1e-9 # Tolerance
 
-        # Tolerance for floating point comparisons
-        epsilon = 1e-9
-
-        # Handle zero or negative range width: Compare directly to center using relative difference
-        if range_width <= epsilon:
-            # If num equals center (within tolerance), perfect match
-            if abs(num - center) < epsilon:
-                return 1.0
-            # Otherwise, use relative difference from center
-            denominator = max(abs(num), abs(center), 1.0)  # Avoid division by zero
-            # Prevent division by very small denominator if both num and center are near zero
-            if denominator < epsilon:
-                return 1.0 if abs(num - center) < epsilon else 0.0
-            diff = abs(num - center) / denominator
-            # Ensure similarity is between 0 and 1
-            return max(0.0, 1.0 - diff)
-
-        # Handle positive range width using Gaussian similarity
-        # similarity = exp(-k * (num - center)**2 / range_width**2)
-        # We choose k=8, which results in similarity exp(-2) ≈ 0.135 at the range boundaries (num = min_val or max_val).
-        try:
-            exponent = -8.0 * (num - center) ** 2 / (range_width**2)
-            # Clamp exponent to avoid potential underflow issues with math.exp for very large negative numbers
-            # math.exp(e) approaches 0 as e approaches -inf. exp(-710) is effectively 0.
-            safe_exponent = max(
-                exponent, -709.0
-            )  # Avoid result being exactly 0 unless exponent is truly large negative
-            similarity = math.exp(safe_exponent)
-            # Ensure result is clamped between 0 and 1
-            return max(0.0, min(similarity, 1.0))
-        except OverflowError:
-            # This path should theoretically not be reachable with negative exponents
-            self.logger.warning(
-                f"OverflowError calculating similarity for num={num}, center={center}, range_width={range_width}"
-            )
-            return 0.0
-        except ValueError:
-            # Handles potential issues like range_width being zero if epsilon check failed?
-            self.logger.warning(
-                f"ValueError calculating similarity for num={num}, center={center}, range_width={range_width}"
-            )
-            return 0.0  # Treat calculation errors as zero similarity
+        if min_val - epsilon <= num <= max_val + epsilon:
+            return 1.0
+        elif range_width <= epsilon: # Handle zero-width range
+             return 0.0 # Outside a zero-width range means no similarity
+        else:
+            if num < min_val:
+                distance = min_val - num
+            else: # num > max_val
+                distance = num - max_val
+            
+            # Similarity decreases as distance increases relative to range width
+            # Example: If distance == range_width, similarity = 0
+            similarity = 1.0 - (distance / range_width)
+            return max(0.0, similarity) # Clamp at 0
 
     # TODO: remove this function
     def _get_node_types(self, node_data: Dict[str, Any]) -> List[str]:
@@ -390,8 +352,12 @@ class NodeSimilarityCalculator:
         node2_data = graph2.nodes[node2]
 
         # Check for x,y coordinates
-        x_sim = self._compare_specific_coordinate(node1_data, node2_data, "normalized_x")
-        y_sim = self._compare_specific_coordinate(node1_data, node2_data, "normalized_y")
+        x_sim = self._compare_specific_coordinate(
+            node1_data, node2_data, "normalized_x"
+        )
+        y_sim = self._compare_specific_coordinate(
+            node1_data, node2_data, "normalized_y"
+        )
 
         # If we have both coordinates, average them
         if x_sim is not None and y_sim is not None:

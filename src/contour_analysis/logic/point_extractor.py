@@ -29,8 +29,8 @@ class PointExtractor:
 
     def _extract_corner_points(self) -> List[CornerPoint]:
         # Step 1: Calculate angles for all degree-2 nodes
-        node_angles = {}
-        degree2_nodes = {}
+        MIN_CORNER_ANGLE = 160  # Maximum angle to be considered a corner (more than this is too straight)
+        corner_points = []
 
         for node, node_data in self.graph.nodes(data=True):
             if self.graph.degree(node) == 2:
@@ -38,39 +38,20 @@ class PointExtractor:
                 angle = self._calculate_angle_between_lines(
                     node_data, [self.graph.nodes[n] for n in neighbors]
                 )
-                node_angles[node] = angle
-                degree2_nodes[node] = {"data": node_data, "neighbors": neighbors}
 
-        # Step 2: For each node, check if it's a local angle minimum
-        # (meaning it has a sharper turn than its neighbors)
-        MIN_CORNER_ANGLE = 160  # Maximum angle to be considered a corner (more than this is too straight)
-        corner_points = []
-
-        for node, angle in node_angles.items():
-            neighbors = degree2_nodes[node]["neighbors"]
-            is_local_minimum = True
-
-            # Check if angle is smaller than both neighbors (if neighbors are degree-2 nodes)
-            for neighbor in neighbors:
-                if neighbor in node_angles and node_angles[neighbor] <= angle:
-                    is_local_minimum = False
-                    break
-
-            # Only consider as corner if angle is below threshold and is local minimum
-            if is_local_minimum and angle < MIN_CORNER_ANGLE:
-                node_data = degree2_nodes[node]["data"]
-                neighbors = degree2_nodes[node]["neighbors"]
-                corner_points.append(
-                    CornerPoint(
-                        id=node_data["uuid"],
-                        x=float(node_data["x"]),
-                        y=float(node_data["y"]),
-                        angle=angle,
-                        line1=self.graph[node][neighbors[0]].get("uuid"),
-                        line2=self.graph[node][neighbors[1]].get("uuid"),
-                        nx_id=node,
+                # Step 2: Check if the angle is below the threshold
+                if angle < MIN_CORNER_ANGLE:
+                    corner_points.append(
+                        CornerPoint(
+                            id=node_data["uuid"],
+                            x=float(node_data["x"]),
+                            y=float(node_data["y"]),
+                            angle=angle,
+                            line1=self.graph[node][neighbors[0]].get("uuid"),
+                            line2=self.graph[node][neighbors[1]].get("uuid"),
+                            nx_id=node,
+                        )
                     )
-                )
 
         return corner_points
 

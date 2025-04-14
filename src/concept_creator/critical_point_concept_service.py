@@ -6,6 +6,7 @@ import uuid
 from concept_creation_repository import ConceptCreationRepository
 from property_handlers.property_handler_manager import PropertyHandlerManager
 from node_similarity_calculator import NodeSimilarityCalculator
+from model.concept_result import ConceptResult, ConceptFormationStep
 from synced_graph_algorythm import SyncedGraphMinorFinder
 from critical_point_preprocessor import CriticalPointPreprocessor
 
@@ -34,7 +35,7 @@ class CriticalPointConceptService:
         concept_id: Optional[str] = None,
         steps: Optional[int] = None,
         debug_mode: bool = False,
-    ) -> Tuple[str, nx.Graph]:
+    ) -> ConceptResult:
         """
         Create a concept incrementally by finding the intersection graph of all training samples.
         This follows the algorithm described in the concept formation documentation.
@@ -55,6 +56,10 @@ class CriticalPointConceptService:
 
         # Get all image IDs for the session
         image_ids = self.repository.get_image_ids_for_session(session_id)
+        image_graphs = {}
+        steps_debug = []
+        error_occurred = False
+        error_message = None
 
         if not image_ids:
             raise ValueError(f"No images found for session {session_id}")
@@ -62,7 +67,17 @@ class CriticalPointConceptService:
         # Start with the first image as the initial concept
         first_image_id = image_ids[0]
         concept_graph = self.repository.get_image_graph(first_image_id)
-
+        image_graphs[first_image_id] = concept_graph
+        steps_debug.append(
+            ConceptFormationStep(
+                current_concept=concept_graph,
+                current_image=concept_graph,
+                current_image_id=first_image_id,
+                current_step=1,
+                current_step_description="Initial concept",
+                resulted_concept=concept_graph,
+            )
+        )
         # Initialize the concept with the first image
         self.logger.info(
             f"Initialized concept with graph from image {first_image_id}. Nodes: {len(concept_graph.nodes)}"
@@ -74,6 +89,8 @@ class CriticalPointConceptService:
                 break
             self.logger.info(f"Processing image {i}/{len(image_ids)}: {image_id}")
             image_graph = self.repository.get_image_graph(image_id)
+            image_graphs[image_id] = image_graph
+            concept_old = concept_graph.copy()
 
             # Find the intersection graph between current concept and new image
             try:
@@ -84,16 +101,38 @@ class CriticalPointConceptService:
                 self.logger.error(f"Error finding max common minor: {e}")
                 self.logger.error(f"Concept graph: {concept_graph.nodes}")
                 self.logger.error(f"Image graph: {image_graph.nodes}")
-                continue
+                error_occurred = True
+                error_message = str(e)
+            finally:
+                steps_debug.append(
+                    ConceptFormationStep(
+                        current_concept=concept_old,
+                        current_image=image_graph,
+                        current_image_id=image_id,
+                        current_step=i,
+                        current_step_description=f"Processing image {i}/{len(image_ids)}: {image_id}",
+                        resulted_concept=None if error_occurred else concept_graph,
+                    )
+                )
+                
+            if error_occurred:
+                break
 
             self.logger.info(
                 f"Updated concept after image {image_id}. Nodes: {len(concept_graph.nodes)}"
             )
 
         # Save the final concept
-        if not debug_mode:
+        if not debug_mode and not error_occurred:
             self.repository.save_concept(concept_id, concept_graph)
             for image_id in image_ids:
                 self.repository.remove_image_data(image_id)
 
-        return concept_id, concept_graph
+        return ConceptResult(
+            concept_id,
+            concept_graph,
+            image_graphs,
+            steps_debug,
+            is_error=error_occurred,
+            error_message=error_message,
+        )

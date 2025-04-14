@@ -1,9 +1,13 @@
 import logging
 import networkx as nx
+import os
+import json
 from typing import List, Tuple, Any, Dict, Set
 from node_similarity_calculator import NodeSimilarityCalculator
 from model.critical_point import CriticalPointType
-
+from reduction_strategy.endpoint_strategy import EndpointReductionStrategy
+from reduction_strategy.intersection_strategy import IntersectionPointReductionStrategy
+from reduction_strategy.corner_point_reduction_strategy import CornerPointReductionStrategy
 
 class CriticalPointPreprocessor:
     """
@@ -15,7 +19,9 @@ class CriticalPointPreprocessor:
         self.logger = logging.getLogger(__name__)
         self.logger.setLevel(logging.DEBUG)
         self.similarity_calculator = NodeSimilarityCalculator()
-
+        self.endpoint_reduction_strategy = EndpointReductionStrategy(self.similarity_calculator)
+        self.intersection_reduction_strategy = IntersectionPointReductionStrategy(self.similarity_calculator)
+        self.corner_point_reduction_strategy = CornerPointReductionStrategy(self.similarity_calculator)
         # Define the type reduction hierarchy
         self.type_reduction_map = {
             CriticalPointType.INTERSECTION_POINT.value: CriticalPointType.CORNER_POINT.value,
@@ -53,7 +59,7 @@ class CriticalPointPreprocessor:
         crit_graph1, _ = self._extract_critical_points_graph(graph1_mod)
         crit_graph2, _ = self._extract_critical_points_graph(graph2_mod)
 
-        is_isomorphic = nx.is_isomorphic(crit_graph1, crit_graph2)
+        is_isomorphic = self._is_graph_isomorphic(crit_graph1, crit_graph2)
 
         if not is_isomorphic:
             self.logger.info(
@@ -64,25 +70,8 @@ class CriticalPointPreprocessor:
 
             # Apply graph reduction to make graphs isomorphic
             graph1_mod, graph2_mod = self._reduce_graphs_for_isomorphism(
-                graph1_mod, graph2_mod
+                graph1_mod, graph2_mod, crit_graph1, crit_graph2
             )
-
-            # Extract critical point graphs again to check if they're now isomorphic
-            crit_graph1, _ = self._extract_critical_points_graph(graph1_mod)
-            crit_graph2, _ = self._extract_critical_points_graph(graph2_mod)
-
-            is_isomorphic_after_reduction = nx.is_isomorphic(crit_graph1, crit_graph2)
-            self.logger.info(
-                f"Critical point graphs isomorphic after reduction: {is_isomorphic_after_reduction}"
-            )
-
-            if not is_isomorphic_after_reduction:
-                self.logger.info(
-                    f"After reduction - Critical graph 1: {crit_graph1.nodes}"
-                )
-                self.logger.info(
-                    f"After reduction - Critical graph 2: {crit_graph2.nodes}"
-                )
 
         return graph1_mod, graph2_mod
 
@@ -125,7 +114,7 @@ class CriticalPointPreprocessor:
         return critical_graph, critical_points
 
     def _reduce_graphs_for_isomorphism(
-        self, graph1: nx.Graph, graph2: nx.Graph
+        self, graph1: nx.Graph, graph2: nx.Graph, crit_graph1: nx.Graph, crit_graph2: nx.Graph
     ) -> Tuple[nx.Graph, nx.Graph]:
         """
         Iteratively reduce graphs until their critical point structures become isomorphic.
@@ -138,78 +127,67 @@ class CriticalPointPreprocessor:
         Returns:
             Tuple of (reduced_graph1, reduced_graph2)
         """
-        # Extract critical point graphs
-        crit_graph1, _ = self._extract_critical_points_graph(graph1)
-        crit_graph2, _ = self._extract_critical_points_graph(graph2)
 
         iteration = 0
         # Iterate until critical point graphs are isomorphic or no more reductions can be made
-        while not nx.is_isomorphic(crit_graph1, crit_graph2):
-            self.logger.info(f"Reduction iteration {iteration + 1}")
-            reduction_made_this_iteration = False
-
-            # STEP 1: First try type reduction based on the type reduction hierarchy
-            type_reduction_applied = self._try_type_reduction(
-                graph1, crit_graph1, graph2, crit_graph2
+        while not self._is_graph_isomorphic(crit_graph1, crit_graph2):
+            # Step 1: Apply endpoints reduction
+            graph1, graph2 = self.endpoint_reduction_strategy.reduce(
+                graph1, graph2
             )
-
-            if type_reduction_applied:
-                self.logger.info("Applied type reduction to one or both graphs")
-                reduction_made_this_iteration = True
-                # Check if graphs are isomorphic after type reduction
-                if nx.is_isomorphic(crit_graph1, crit_graph2):
-                    self.logger.info("Graphs became isomorphic after type reduction")
-                    break
-
-            # STEP 2: If type reduction wasn't enough, try node removal
-            # Try to reduce different point types in order
-            for point_type in [
-                CriticalPointType.END_POINT.value,
-                CriticalPointType.INTERSECTION_POINT.value,
-                CriticalPointType.CORNER_POINT.value,
-            ]:
-                # Determine which nodes to remove from which graph for this point type
-                nodes_to_remove_g1, nodes_to_remove_g2 = (
-                    self._handle_point_type_mismatch(
-                        crit_graph1, crit_graph2, point_type
-                    )
-                )
-
-                # Apply reductions to graph1 if needed
-                for node_id in nodes_to_remove_g1:
-                    graph1, crit_graph1 = self._apply_reduction_to_graphs(
-                        graph1, crit_graph1, node_id, point_type
-                    )
-                    reduction_made_this_iteration = True
-                    self.logger.info(f"Removed {point_type} node {node_id} from graph1")
-
-                # Apply reductions to graph2 if needed
-                for node_id in nodes_to_remove_g2:
-                    graph2, crit_graph2 = self._apply_reduction_to_graphs(
-                        graph2, crit_graph2, node_id, point_type
-                    )
-                    reduction_made_this_iteration = True
-                    self.logger.info(f"Removed {point_type} node {node_id} from graph2")
-
-                # Check if graphs are isomorphic after this point type reduction
-                if nx.is_isomorphic(crit_graph1, crit_graph2):
-                    self.logger.info(
-                        f"Graphs became isomorphic after {point_type} reduction"
-                    )
-                    break
-
-            # If no reductions were made this iteration, we can't make the graphs isomorphic
-            if not reduction_made_this_iteration:
-                self.logger.warning("Cannot make graphs isomorphic with current rules")
-                break
-
+            
+            # Step 2: Apply intersection reduction
+            graph1, graph2 = self.intersection_reduction_strategy.reduce(
+                graph1, graph2
+            )
+            
+            # Step 3: Apply corner point reduction
+            graph1, graph2 = self.corner_point_reduction_strategy.reduce(
+                graph1, graph2
+            )
+            
+            crit_graph1, _ = self._extract_critical_points_graph(graph1)
+            crit_graph2, _ = self._extract_critical_points_graph(graph2)
+            
+            self.save_graphs(graph1, graph2, crit_graph1, crit_graph2, iteration)
+            
             iteration += 1
             # To prevent infinite loops, limit the number of iterations
             if iteration >= 10:  # arbitrary limit
                 self.logger.warning("Reached maximum reduction iterations, stopping")
-                break
+                raise ValueError("Reached maximum reduction iterations, stopping")
 
         return graph1, graph2
+    
+    def save_graphs(self, graph1: nx.Graph, graph2: nx.Graph, crit_graph1: nx.Graph, crit_graph2: nx.Graph, iteration: int):
+        save_dir = f"saved_graphs/{iteration}"
+        if not os.path.exists(save_dir):
+            os.makedirs(save_dir)
+
+        # Convert the graph to a JSON-serializable format
+        graph1_data = nx.node_link_data(graph1)
+        graph2_data = nx.node_link_data(graph2)
+        crit_graph1_data = nx.node_link_data(crit_graph1)
+        crit_graph2_data = nx.node_link_data(crit_graph2)
+        # Save the graph with a descriptive filename
+        json_filename = os.path.join(save_dir, "graph1.json")
+        with open(json_filename, "w") as f:
+            json.dump(graph1_data, f, indent=2)
+        json_filename = os.path.join(save_dir, "graph2.json")
+        with open(json_filename, "w") as f:
+            json.dump(graph2_data, f, indent=2)
+        json_filename = os.path.join(save_dir, "crit_graph1.json")
+        with open(json_filename, "w") as f:
+            json.dump(crit_graph1_data, f, indent=2)
+        json_filename = os.path.join(save_dir, "crit_graph2.json")
+        with open(json_filename, "w") as f:
+            json.dump(crit_graph2_data, f, indent=2)
+            
+    def _is_graph_isomorphic(self, graph1: nx.Graph, graph2: nx.Graph) -> bool:
+        def node_match(node1, node2):
+            return set(node1["labels"]) == set(node2["labels"])
+        
+        return nx.is_isomorphic(graph1, graph2, node_match=node_match)
 
     def _try_type_reduction(
         self,
@@ -290,7 +268,7 @@ class CriticalPointPreprocessor:
 
                 # If we have nodes to reduce
                 if nodes_of_type:
-                    # Calculate similarity to find the best candidates for reduction
+                    # TODO Calculate similarity to find the best candidates for reduction
                     # For simplicity, we'll just use the first 'diff' nodes, but this could be
                     # enhanced with similarity calculation to choose the most suitable candidates
                     nodes_to_reduce = nodes_of_type[:diff]
@@ -318,6 +296,29 @@ class CriticalPointPreprocessor:
                                 if lower_type not in labels:
                                     labels.append(lower_type)
                                 crit_graph.nodes[node_id]["labels"] = labels
+
+                                # Check if the node is no longer a critical point
+                                is_critical = any(
+                                    label in self.critical_point_types
+                                    for label in labels
+                                )
+                                if not is_critical:
+                                    # Get neighbors before removing the node
+                                    neighbors = list(crit_graph.neighbors(node_id))
+
+                                    # Remove the node from the critical graph
+                                    crit_graph.remove_node(node_id)
+
+                                    # Connect all neighbors to maintain topology
+                                    for i in range(len(neighbors)):
+                                        for j in range(i + 1, len(neighbors)):
+                                            crit_graph.add_edge(
+                                                neighbors[i], neighbors[j]
+                                            )
+
+                                    self.logger.info(
+                                        f"Node {node_id} removed from critical graph as it's no longer a critical point"
+                                    )
 
                         reduction_applied = True
 
@@ -383,102 +384,6 @@ class CriticalPointPreprocessor:
                 crit_graph2, nodes2, crit_graph1, nodes1, point_type, diff
             )
             return [], nodes_to_remove
-
-    def _apply_reduction_to_graphs(
-        self,
-        original_graph: nx.Graph,
-        critical_graph: nx.Graph,
-        node_id_crit: Any,
-        critical_point_type: str,
-    ) -> Tuple[nx.Graph, nx.Graph]:
-        """
-        Apply reduction by removing nodes from both the original graph and its critical point graph.
-        For END_POINTs, removes the path up to the next critical point.
-        For other point types, removes just the critical point itself.
-
-        Args:
-            original_graph: The full original graph to modify
-            critical_graph: The corresponding critical point graph
-            node_id_crit: ID of the critical point to remove
-            critical_point_type: Type of the critical point
-
-        Returns:
-            Tuple of (modified_original_graph, modified_critical_graph)
-        """
-        # For END_POINTs, we need to find and remove the entire path up to the next critical point
-        if critical_point_type == CriticalPointType.END_POINT.value:
-            # Find all nodes to remove including the path to the next critical point
-            nodes_to_remove = self._find_endpoint_path_to_remove(
-                original_graph, node_id_crit
-            )
-            self.logger.info(
-                f"Removing endpoint {node_id_crit} and its path ({len(nodes_to_remove)} nodes)"
-            )
-
-            # Remove nodes from original graph
-            for node in nodes_to_remove:
-                if node in original_graph:
-                    original_graph.remove_node(node)
-        else:
-            # For other critical points, just remove the single node
-            self.logger.info(
-                f"Removing single {critical_point_type} node {node_id_crit}"
-            )
-            if node_id_crit in original_graph:
-                original_graph.remove_node(node_id_crit)
-
-        # Remove the critical point from the critical graph
-        if node_id_crit in critical_graph:
-            critical_graph.remove_node(node_id_crit)
-
-        return original_graph, critical_graph
-
-    def _find_endpoint_path_to_remove(
-        self, graph: nx.Graph, endpoint_id: Any
-    ) -> List[Any]:
-        """
-        Find all nodes on the path from an endpoint to the next critical point.
-
-        Args:
-            graph: The original graph
-            endpoint_id: ID of the endpoint node
-
-        Returns:
-            List of node IDs to remove (including the endpoint itself)
-        """
-        nodes_to_remove = [endpoint_id]
-
-        # Start BFS from the endpoint
-        visited = {endpoint_id}
-        queue = list(graph.neighbors(endpoint_id))
-
-        while queue:
-            current = queue.pop(0)
-
-            # Skip if already visited
-            if current in visited:
-                continue
-
-            visited.add(current)
-
-            # Check if this is a critical point
-            node_data = graph.nodes[current]
-            labels = node_data.get("labels", [])
-            is_critical = any(label in self.critical_point_types for label in labels)
-
-            if is_critical:
-                # Found another critical point, stop the path here (don't include this node)
-                continue
-
-            # Add this non-critical node to the removal list
-            nodes_to_remove.append(current)
-
-            # Add neighbors to the queue
-            for neighbor in graph.neighbors(current):
-                if neighbor not in visited:
-                    queue.append(neighbor)
-
-        return nodes_to_remove
 
     def _identify_nodes_to_remove(
         self,

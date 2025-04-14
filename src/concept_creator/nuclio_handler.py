@@ -67,11 +67,12 @@ def handler(context, event):
             f"Creating concept for session {session_id}"
         )
 
-        concept_id, concept_graph = (
+        concept_result = (
             context.critical_point_service.create_concept_incrementally(
                 session_id, concept_id
             )
         )
+        concept_graph = concept_result.concept_graph
 
         # Create response with execution details
         execution_time = time.time() - start_time
