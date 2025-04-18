@@ -6,9 +6,61 @@
     {
       "labels": [
         "Point",
+        "EndPoint"
+      ],
+      "session_id": "1_1",
+      "endpoints_count": 3,
+      "segments": [
+        "top",
+        "right"
+      ],
+      "cycle_count": 0,
+      "vectors_count": 6,
+      "contour_type": "OPEN",
+      "image_id": "d6e71dcf-7038-4718-bd45-11f3c041c2e7",
+      "id": "4:5d50dcdf-d360-41f7-a8a4-f4598ce7a5d5:189",
+      "normalized_x": 0.35,
+      "relative_distance": 1.0,
+      "normalized_y": -0.94,
+      "monotony": "NON_MONOTONIC",
+      "intersection_points_count": 2,
+      "corner_points_count": 3,
+      "quadrant_change_count": 3,
+      "y": 77.47161619511117,
+      "x": 127.52838379566192
+    },
+    {
+      "labels": [
+        "Point",
+        "StartPoint"
+      ],
+      "session_id": "1_1",
+      "endpoints_count": 3,
+      "segments": [
+        "top",
+        "left"
+      ],
+      "cycle_count": 0,
+      "vectors_count": 6,
+      "contour_type": "OPEN",
+      "image_id": "d6e71dcf-7038-4718-bd45-11f3c041c2e7",
+      "id": "4:5d50dcdf-d360-41f7-a8a4-f4598ce7a5d5:190",
+      "normalized_x": -0.35,
+      "relative_distance": 0.7,
+      "normalized_y": -0.6,
+      "monotony": "NON_MONOTONIC",
+      "intersection_points_count": 2,
+      "corner_points_count": 3,
+      "quadrant_change_count": 3,
+      "y": 89.01631509981755,
+      "x": 102.98368490018245
+    },
+    {
+      "labels": [
+        "Point",
         "IntersectionPoint"
       ],
-      "session_id": "1_2",
+      "session_id": "1_1",
       "endpoints_count": 3,
       "segments": [
         "top",
@@ -19,141 +71,27 @@
       "vectors_count": 6,
       "contour_type": "OPEN",
       "angle": 220,
-      "image_id": "ceedf749-831e-4257-af09-7705a8f5b8cc",
-      "id": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:373",
-      "normalized_x": 0.24,
-      "relative_distance": 0.76,
-      "normalized_y": -0.72,
+      "image_id": "d6e71dcf-7038-4718-bd45-11f3c041c2e7",
+      "id": "4:5d50dcdf-d360-41f7-a8a4-f4598ce7a5d5:191",
+      "normalized_x": 0.25,
+      "relative_distance": 0.88,
+      "normalized_y": -0.84,
       "monotony": "NON_MONOTONIC",
       "intersection_points_count": 2,
       "corner_points_count": 3,
       "quadrant_change_count": 3,
-      "y": 58.42845979069038,
-      "x": 100.96053827497659
-    },
-    {
-      "labels": [
-        "Point",
-        "StartPoint"
-      ],
-      "session_id": "1_2",
-      "endpoints_count": 3,
-      "segments": [
-        "top",
-        "left"
-      ],
-      "cycle_count": 0,
-      "vectors_count": 6,
-      "contour_type": "OPEN",
-      "image_id": "ceedf749-831e-4257-af09-7705a8f5b8cc",
-      "id": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:374",
-      "normalized_x": -0.27,
-      "relative_distance": 0.79,
-      "normalized_y": -0.74,
-      "monotony": "NON_MONOTONIC",
-      "intersection_points_count": 2,
-      "corner_points_count": 3,
-      "quadrant_change_count": 3,
-      "y": 57.70823751959096,
-      "x": 86.03700765653507
-    },
-    {
-      "labels": [
-        "Point",
-        "EndPoint"
-      ],
-      "session_id": "1_2",
-      "endpoints_count": 3,
-      "segments": [
-        "top",
-        "right"
-      ],
-      "cycle_count": 0,
-      "vectors_count": 6,
-      "contour_type": "OPEN",
-      "image_id": "ceedf749-831e-4257-af09-7705a8f5b8cc",
-      "id": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:375",
-      "normalized_x": 0.41,
-      "relative_distance": 0.97,
-      "normalized_y": -0.88,
-      "monotony": "NON_MONOTONIC",
-      "intersection_points_count": 2,
-      "corner_points_count": 3,
-      "quadrant_change_count": 3,
-      "y": 53.76330304996757,
-      "x": 105.89519792342635
-    },
-    {
-      "labels": [
-        "Point",
-        "IntersectionPoint"
-      ],
-      "session_id": "1_2",
-      "endpoints_count": 3,
-      "segments": [
-        "bottom",
-        "center_vertical"
-      ],
-      "cycle_count": 0,
-      "is_quadrant_change": 1,
-      "vectors_count": 6,
-      "contour_type": "OPEN",
-      "angle": 190,
-      "image_id": "ceedf749-831e-4257-af09-7705a8f5b8cc",
-      "id": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:376",
-      "normalized_x": 0.06,
-      "relative_distance": 0.77,
-      "normalized_y": 0.77,
-      "monotony": "NON_MONOTONIC",
-      "intersection_points_count": 2,
-      "corner_points_count": 3,
-      "quadrant_change_count": 3,
-      "y": 102.04578014784524,
-      "x": 95.77498006597742
-    },
-    {
-      "labels": [
-        "Point",
-        "EndPoint"
-      ],
-      "session_id": "1_2",
-      "endpoints_count": 3,
-      "segments": [
-        "bottom",
-        "right"
-      ],
-      "cycle_count": 0,
-      "vectors_count": 6,
-      "contour_type": "OPEN",
-      "image_id": "ceedf749-831e-4257-af09-7705a8f5b8cc",
-      "id": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:377",
-      "normalized_x": 0.48,
-      "relative_distance": 1.0,
-      "normalized_y": 0.88,
-      "monotony": "NON_MONOTONIC",
-      "intersection_points_count": 2,
-      "corner_points_count": 3,
-      "quadrant_change_count": 3,
-      "y": 105.25436139873075,
-      "x": 107.99292155905549
+      "y": 80.7175216091189,
+      "x": 123.95137300098958
     }
   ],
   "links": [
     {
-      "source": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:373",
-      "target": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:374"
+      "source": "4:5d50dcdf-d360-41f7-a8a4-f4598ce7a5d5:189",
+      "target": "4:5d50dcdf-d360-41f7-a8a4-f4598ce7a5d5:191"
     },
     {
-      "source": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:373",
-      "target": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:375"
-    },
-    {
-      "source": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:373",
-      "target": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:376"
-    },
-    {
-      "source": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:376",
-      "target": "4:9e1c8335-dc1b-46bc-b817-da0e4e40f10b:377"
+      "source": "4:5d50dcdf-d360-41f7-a8a4-f4598ce7a5d5:190",
+      "target": "4:5d50dcdf-d360-41f7-a8a4-f4598ce7a5d5:191"
     }
   ]
 }
