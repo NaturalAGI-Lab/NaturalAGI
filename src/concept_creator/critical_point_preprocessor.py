@@ -143,7 +143,7 @@ class CriticalPointPreprocessor:
             
             # Step 3: Apply corner point reduction
             graph1, graph2 = self.corner_point_reduction_strategy.reduce(
-                graph1, graph2
+                graph1, graph2, iteration
             )
             
             crit_graph1, _ = self._extract_critical_points_graph(graph1)

@@ -2,7 +2,8 @@ import logging
 import networkx as nx
 from typing import Dict, List, Tuple, Any, Optional, Set
 import uuid
-
+import traceback
+import copy
 from concept_creation_repository import ConceptCreationRepository
 from property_handlers.property_handler_manager import PropertyHandlerManager
 from node_similarity_calculator import NodeSimilarityCalculator
@@ -90,19 +91,18 @@ class CriticalPointConceptService:
             self.logger.info(f"Processing image {i}/{len(image_ids)}: {image_id}")
             image_graph = self.repository.get_image_graph(image_id)
             image_graphs[image_id] = image_graph
-            concept_old = concept_graph.copy()
+            concept_old = copy.deepcopy(concept_graph)
 
             # Find the intersection graph between current concept and new image
             try:
                 concept_graph = self.graph_minor_finder.find_max_common_minor(
-                    concept_graph, image_graph
+                    copy.deepcopy(concept_old), copy.deepcopy(image_graph)
                 )
-            except Exception as e:
-                self.logger.error(f"Error finding max common minor: {e}")
-                self.logger.error(f"Concept graph: {concept_graph.nodes}")
-                self.logger.error(f"Image graph: {image_graph.nodes}")
+            except Exception:
+                # Log full stack trace for easier debugging
                 error_occurred = True
-                error_message = str(e)
+                error_message = traceback.format_exc()
+                self.logger.exception("Error finding max common minor", exc_info=True)
             finally:
                 steps_debug.append(
                     ConceptFormationStep(

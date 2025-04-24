@@ -11,19 +11,54 @@ from .abstract_strategy import AbstractReductionStrategy
 
 CONCEPT = "concept"
 IMAGE = "image"
+INITIAL_SIMILARITY_THRESHOLD = 0.1
 
 
 class CornerPointReductionStrategy(AbstractReductionStrategy):
+    """Reduces corner points in concept and image graphs to align them.
+
+    This strategy employs a two-phase reduction process:
+
+    1. Threshold-Based Reduction:
+       - Calculates the similarity between all corner points in the concept graph
+         and all corner points in the image graph.
+       - Removes corner points from the concept graph if their maximum similarity
+         to any image corner point is below an iteration-dependent threshold.
+       - Similarly, removes corner points from the image graph if their maximum
+         similarity to any concept corner point is below the threshold.
+       - The threshold increases with each iteration (`INITIAL_SIMILARITY_THRESHOLD * (iteration + 1)`).
+
+    2. Excess Point Reduction:
+       - If, after the threshold reduction, one graph has more corner points
+         than the other, this phase targets the graph with the larger number
+         of corner points.
+       - It identifies the number of 'excess' corner points (the difference in counts).
+       - It calculates the maximum similarity for each corner point in the larger graph
+         against all corner points in the smaller graph.
+       - It removes the 'excess' number of corner points from the larger graph that
+         have the *lowest* maximum similarity scores, effectively removing the
+         least similar corner points until the counts match.
+
+    The goal is to retain the most relevant and corresponding corner points
+    between the concept and image graphs while discarding dissimilar or
+    unmatched ones.
+
+    Handles edge cases such as graphs initially having no corner points or
+    one graph losing all corner points during the threshold reduction phase.
+    """
+
     def __init__(self, node_similarity_calculator: NodeSimilarityCalculator):
         super().__init__(node_similarity_calculator)
         self.logger = logging.getLogger(__name__)
-        self.similarity_threshold = 0.2
+        self.similarity_threshold = INITIAL_SIMILARITY_THRESHOLD
 
     def reduce(
-        self, concept_graph: nx.Graph, image_graph: nx.Graph
+        self, concept_graph: nx.Graph, image_graph: nx.Graph, iteration: int
     ) -> Tuple[nx.Graph, nx.Graph]:
         concept_corner_points = self._get_corner_points(concept_graph)
         image_corner_points = self._get_corner_points(image_graph)
+
+        self.similarity_threshold = INITIAL_SIMILARITY_THRESHOLD * (iteration + 1)
 
         if not concept_corner_points and not image_corner_points:
             self.logger.info(
@@ -195,6 +230,10 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
 
         # Create a list of (index_in_large_list, max_similarity)
         indexed_similarities = list(enumerate(max_similarities_per_large_endpoint))
+
+        # Log each node with its top similarity score
+        for idx, max_sim in indexed_similarities:
+            self.logger.info(f"Node {nodes[idx]} -> top similarity score: {max_sim}")
 
         # Sort by max_similarity in ascending order (lowest similarity first)
         indexed_similarities.sort(key=lambda x: x[1])

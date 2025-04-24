@@ -56,7 +56,9 @@ class SyncedGraphMinorFinder:
         for subpath in sync_list:
             self.logger.info(f"Subpath: {subpath}")
             self._reduce_subpath(G_c_processed, G_i_processed, subpath, result_graph)
-            self.logger.info(f"Result graph: {result_graph.nodes}")
+            self.logger.info("Result graph:")
+            for node in result_graph.nodes:
+                self.logger.info(f"Node {node}: {result_graph.nodes[node]['labels']}")
 
         # Return the result graph which is the maximum common minor
         return result_graph

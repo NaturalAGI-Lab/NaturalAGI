@@ -27,35 +27,35 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             self.logger.error("Concept or image has no endpoints.")
             return concept_graph, image_graph
 
-        similarity_matrix = self.calculate_similarity_matrix(
-            concept_graph,
-            image_graph,
-            concept_endpoints,
-            image_endpoints,
-        )
+        # similarity_matrix = self.calculate_similarity_matrix(
+        #     concept_graph,
+        #     image_graph,
+        #     concept_endpoints,
+        #     image_endpoints,
+        # )
 
-        concept_endpoints_below_threshold = self._find_endpoints_below_threshold(
-            similarity_matrix, concept_endpoints, axis=1
-        )
-        image_endpoints_below_threshold = self._find_endpoints_below_threshold(
-            similarity_matrix.T, image_endpoints, axis=1
-        )
+        # concept_endpoints_below_threshold = self._find_endpoints_below_threshold(
+        #     similarity_matrix, concept_endpoints, axis=1
+        # )
+        # image_endpoints_below_threshold = self._find_endpoints_below_threshold(
+        #     similarity_matrix.T, image_endpoints, axis=1
+        # )
 
-        if concept_endpoints_below_threshold:
-            self.logger.info(
-                f"Concept endpoints below threshold ({len(concept_endpoints_below_threshold)}): {concept_endpoints_below_threshold}"
-            )
-            concept_graph = self._apply_reduction(
-                concept_graph, concept_endpoints_below_threshold
-            )
+        # if concept_endpoints_below_threshold:
+        #     self.logger.info(
+        #         f"Concept endpoints below threshold ({len(concept_endpoints_below_threshold)}): {concept_endpoints_below_threshold}"
+        #     )
+        #     concept_graph = self._apply_reduction(
+        #         concept_graph, concept_endpoints_below_threshold
+        #     )
 
-        if image_endpoints_below_threshold:
-            self.logger.info(
-                f"Image endpoints below threshold ({len(image_endpoints_below_threshold)}): {image_endpoints_below_threshold}"
-            )
-            image_graph = self._apply_reduction(
-                image_graph, image_endpoints_below_threshold
-            )
+        # if image_endpoints_below_threshold:
+        #     self.logger.info(
+        #         f"Image endpoints below threshold ({len(image_endpoints_below_threshold)}): {image_endpoints_below_threshold}"
+        #     )
+        #     image_graph = self._apply_reduction(
+        #         image_graph, image_endpoints_below_threshold
+        #     )
 
         # Second pass: handle count mismatch
         concept_endpoints = self._get_endpoints(concept_graph)
@@ -134,6 +134,7 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
         return enpoints_below_threshold
 
     def _apply_reduction(self, graph: nx.Graph, endpoints: List[Any]) -> nx.Graph:
+        relink_edges: set[tuple[Any, Any]] = set()
         all_nodes_to_remove = set()
         for endpoint_id in endpoints:
             if endpoint_id in graph:
@@ -146,6 +147,10 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             self.logger.info(
                 f"Graph after reduction: {graph.number_of_nodes()} nodes, {graph.number_of_edges()} edges"
             )
+        # relink preserved neighbors to the target critical/intersection node
+        for u, v in relink_edges:
+            if u in graph and v in graph and not graph.has_edge(u, v):
+                graph.add_edge(u, v)
 
         return graph
 
@@ -222,4 +227,3 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
         return nodes_to_remove
             
             
-        
