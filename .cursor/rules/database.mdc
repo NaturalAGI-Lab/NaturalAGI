@@ -1,0 +1,33 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# NaturalAGI Graph Database Usage (Neo4j)
+
+*   Use consistent node and relationship patterns.
+*   Always include `image_id` and `session_id` for tracking.
+*   Use appropriate Neo4j indices for performance.
+*   Follow the bipartite graph structure for points and vectors.
+
+*Good Neo4j usage Example:*
+```python
+def save_point(tx, point, image_id, session_id):
+    query = """
+    CREATE (p:Point {
+        x: $x,
+        y: $y,
+        type: $type,
+        image_id: $image_id,
+        session_id: $session_id
+    })
+    RETURN id(p) as node_id
+    """
+    result = tx.run(query,
+                   x=point.x,
+                   y=point.y,
+                   type=point.type,
+                   image_id=image_id,
+                   session_id=session_id)
+    return result.single()["node_id"]
+```

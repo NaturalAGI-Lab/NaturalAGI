@@ -3,14 +3,12 @@
 import requests
 import traceback
 import json
-import os
-import logging
 import time
-from typing import Dict, Any, List
+from typing import Dict, Any
 from pydantic_settings import BaseSettings
 
-from concept_creation_repository import ConceptCreationRepository
-from critical_point_concept_service import CriticalPointConceptService
+from src.concept_creation_repository import ConceptCreationRepository
+from src.critical_point_concept_service import CriticalPointConceptService
 
 HANDLER_NAME = "concept_creator"
 
