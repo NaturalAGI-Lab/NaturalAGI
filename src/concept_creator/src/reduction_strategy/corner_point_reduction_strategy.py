@@ -12,7 +12,6 @@ from .abstract_strategy import AbstractReductionStrategy
 
 CONCEPT = "concept"
 IMAGE = "image"
-INITIAL_SIMILARITY_THRESHOLD = 0.1
 
 
 class CornerPointReductionStrategy(AbstractReductionStrategy):
@@ -44,7 +43,6 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
     def __init__(self, node_similarity_calculator: NodeSimilarityCalculator):
         super().__init__(node_similarity_calculator)
         self.logger = logging.getLogger(__name__)
-        self.similarity_threshold = INITIAL_SIMILARITY_THRESHOLD
         self.traversal_generator = SyncedTraversalGenerator(
             critical_point_types={
                 CriticalPointType.START_POINT,
@@ -55,12 +53,10 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
         )
 
     def reduce(
-        self, concept_graph: nx.Graph, image_graph: nx.Graph, iteration: int
+        self, concept_graph: nx.Graph, image_graph: nx.Graph
     ) -> Tuple[nx.Graph, nx.Graph]:
         concept_corner_points = self._get_corner_points(concept_graph)
         image_corner_points = self._get_corner_points(image_graph)
-
-        self.similarity_threshold = INITIAL_SIMILARITY_THRESHOLD * (iteration + 1)
 
         # Handle empty graph cases
         if not concept_corner_points and not image_corner_points:
@@ -85,13 +81,13 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
 
         # Apply subpath-based reduction instead of global similarity-based reduction
         concept_graph, image_graph = self._subpath_based_reduction(
-            concept_graph, image_graph, iteration
+            concept_graph, image_graph
         )
 
         return concept_graph, image_graph
 
     def _subpath_based_reduction(
-        self, concept_graph: nx.Graph, image_graph: nx.Graph, iteration: int
+        self, concept_graph: nx.Graph, image_graph: nx.Graph
     ) -> Tuple[nx.Graph, nx.Graph]:
         """Reduces corner points based on matched subpaths between critical points."""
         self.logger.info("Starting subpath-based corner point reduction")

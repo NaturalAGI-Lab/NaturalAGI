@@ -14,21 +14,20 @@ IMAGE = "image"
 
 class IntersectionPointReductionStrategy(AbstractReductionStrategy):
     """This is a reduction strategy that removes intersection points from the concept and image graphs.
-    
-    The reduction rules: 
+
+    The reduction rules:
         - First level reduction: Semantic reduction. Remove label (IntersectionPoint) from the nodes that have less than 3 neighbors.
-        
+
         - Second level reduction: Excessive intersection points. Remove the intersection points that have the lowest similarity to the rest of the nodes in the graph.
         The second level of reduction is applied to the graph that has more intersection points than the other graph.
         When we found the intersection points that have the lowest similarity to the rest of the nodes in the graph we need to find the path to the nearest critical point because semantically this node still
-        will be an intersection point (degree > 2). 
+        will be an intersection point (degree > 2).
         Here is the algorithm:
             - Find the intersection points that have the lowest similarity to the rest of the nodes in the graph.
             - For each intersection point find the path to the nearest critical point (priority is the next intersection point).
             - Remove the intersection point node and the path to the nearest critical point.
     """
-    
-    
+
     def __init__(self, node_similarity_calculator: NodeSimilarityCalculator):
         super().__init__(node_similarity_calculator)
         self.logger = logging.getLogger(__name__)
@@ -43,8 +42,24 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
         concept_intersection_points = self._get_intersection_points(concept_graph)
         image_intersection_points = self._get_intersection_points(image_graph)
 
-        if not concept_intersection_points or not image_intersection_points:
+        if not concept_intersection_points and not image_intersection_points:
             self.logger.error("Concept or image has no intersection points.")
+            return concept_graph, image_graph
+
+        if not concept_intersection_points and image_intersection_points:
+            self.logger.info(
+                "Concept has no intersection points. Removing intersection points from image."
+            )
+            image_graph = self._apply_reduction(image_graph, image_intersection_points)
+            return concept_graph, image_graph
+
+        if concept_intersection_points and not image_intersection_points:
+            self.logger.info(
+                "Image has no intersection points. Removing intersection points from concept."
+            )
+            concept_graph = self._apply_reduction(
+                concept_graph, concept_intersection_points
+            )
             return concept_graph, image_graph
 
         len_concept_intersection_points = len(concept_intersection_points)
@@ -72,18 +87,20 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
         similarity_matrix = self.calculate_similarity_matrix(
             graph_large, graph_small, points_large, points_small
         )
-        
-        excess_intersection_points_to_remove = self._identify_excess_intersection_points_to_remove(
-            similarity_matrix,
-            points_large,
-            abs(len_concept_intersection_points - len_image_intersection_points)
+
+        excess_intersection_points_to_remove = (
+            self._identify_excess_intersection_points_to_remove(
+                similarity_matrix,
+                points_large,
+                abs(len_concept_intersection_points - len_image_intersection_points),
+            )
         )
-        
+
         if excess_intersection_points_to_remove:
             self.logger.info(
                 f"Excess intersection points to remove ({len(excess_intersection_points_to_remove)}): {excess_intersection_points_to_remove}"
             )
-        
+
         if graph_to_reduce == CONCEPT:
             concept_graph = self._apply_reduction(
                 concept_graph, excess_intersection_points_to_remove
@@ -98,12 +115,17 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
     def _apply_degree_reduction(self, graph: nx.Graph) -> nx.Graph:
         for node, data in graph.nodes(data=True):
             if GraphUtils.is_intersection_point(data):
-                if not graph.degree(node) > 2:
+                node_degree = graph.degree(node)
+                if not node_degree > 2:
                     self.logger.info(
-                        f"Removing IntersectionPoint label from {node} with degree {graph.degree(node)}"
+                        f"Removing IntersectionPoint label from {node} with degree {node_degree}"
                     )
                     labels = graph.nodes[node]["labels"]
                     labels.remove(CriticalPointType.INTERSECTION_POINT.value)
+                    if node_degree == 1:
+                        labels.append(CriticalPointType.END_POINT.value)
+                    else:
+                        labels.append(CriticalPointType.CORNER_POINT.value)
                     graph.nodes[node]["labels"] = labels
         return graph
 
@@ -142,7 +164,9 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
             neighbors = list(graph.neighbors(intersection_id))
 
             # path_nodes to delete and the critical/intersection node to keep
-            path_nodes, target_node = self._find_path_to_nearest_critical(graph, intersection_id)
+            path_nodes, target_node = self._find_path_to_nearest_critical(
+                graph, intersection_id
+            )
             all_nodes_to_remove.update(path_nodes)
 
             # schedule relinking of original neighbors to the new critical node
@@ -175,20 +199,22 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
         if similarity_matrix.size == 0:
             self.logger.error("Similarity matrix is empty. Raising error.")
             raise ValueError("Similarity matrix is empty.")
-        
+
         max_similarities_per_large_point = np.max(similarity_matrix, axis=1)
-        
+
         indexed_similarities = list(enumerate(max_similarities_per_large_point))
-        
+
         indexed_similarities.sort(key=lambda x: x[1])
-        
+
         indices_to_remove = [idx for idx, sim in indexed_similarities[:difference]]
-        
+
         nodes_to_remove = [points_large[i] for i in indices_to_remove]
-        
-        self.logger.debug(f"Indices identified for removal based on lowest max similarity: {indices_to_remove}")
+
+        self.logger.debug(
+            f"Indices identified for removal based on lowest max similarity: {indices_to_remove}"
+        )
         self.logger.debug(f"Nodes identified for removal: {nodes_to_remove}")
-        
+
         return nodes_to_remove
 
     def _find_path_to_nearest_critical(
@@ -240,7 +266,8 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
                 if is_critical:
                     # Check if an unvisited intersection is queued at the same depth.
                     intersection_at_same_depth = any(
-                        (len(p) == depth_now) and (
+                        (len(p) == depth_now)
+                        and (
                             GraphUtils.is_intersection_point(graph.nodes[n])
                             or graph.degree(n) > 2
                         )

@@ -85,7 +85,9 @@ class CriticalPointPreprocessor:
                 graph1_mod, graph2_mod, crit_graph1, crit_graph2
             )
         else:
-            self.logger.info("Critical point graphs are isomorphic, no reductions needed")
+            self.logger.info(
+                "Critical point graphs are isomorphic, no reductions needed"
+            )
 
         return graph1_mod, graph2_mod
 
@@ -125,12 +127,35 @@ class CriticalPointPreprocessor:
                 graph1, graph2 = self.intersection_reduction_strategy.reduce(
                     graph1, graph2
                 )
+                crit_graph1, _ = CriticalGraphUtils.get_critical_graph(graph1)
+                crit_graph2, _ = CriticalGraphUtils.get_critical_graph(graph2)
+                is_intersections_and_endpoints_isomorphic = (
+                    CriticalGraphUtils._is_critical_graph_isomorphic(
+                        crit_graph1,
+                        crit_graph2,
+                        {
+                            CriticalPointType.INTERSECTION_POINT,
+                            CriticalPointType.END_POINT,
+                        },
+                    )
+                )
+                self.save_graphs(graph1, graph2, crit_graph1, crit_graph2, iteration)
+                iteration += 1
+                # To prevent infinite loops, limit the number of iterations
+                if iteration > 5:  # arbitrary limit
+                    self.logger.warning(
+                        "Reached maximum reduction iterations, stopping"
+                    )
+                    raise ValueError("Reached maximum reduction iterations, stopping")
+                continue
             else:
-                self.logger.info("Intersections and endpoints are isomorphic, applying corner point reduction")
+                self.logger.info(
+                    "Intersections and endpoints are isomorphic, applying corner point reduction"
+                )
 
             # Step 3: Apply corner point reduction
             graph1, graph2 = self.corner_point_reduction_strategy.reduce(
-                graph1, graph2, iteration
+                graph1, graph2
             )
 
             crit_graph1, _ = CriticalGraphUtils.get_critical_graph(graph1)
@@ -147,7 +172,7 @@ class CriticalPointPreprocessor:
 
             iteration += 1
             # To prevent infinite loops, limit the number of iterations
-            if iteration > 1:  # arbitrary limit
+            if iteration > 5:  # arbitrary limit
                 self.logger.warning("Reached maximum reduction iterations, stopping")
                 raise ValueError("Reached maximum reduction iterations, stopping")
 
