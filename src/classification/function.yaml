@@ -5,9 +5,17 @@ metadata:
   labels:
     nuclio.io/project-name: "default"
 spec:
+  maxWorkers: 10
   httpTimeout: 1000
   handler: "nuclio_handler:handler"
   runtime: "python:3.9"
+  resources:
+    limits:
+      cpu: "4"
+      memory: "4Gi"
+    requests:
+      cpu: "2"
+      memory: "2Gi"
   env:
     - name: EXAMPLE_ENV_VAR
       value: "some-value"
@@ -16,9 +24,10 @@ spec:
     commands:
       - 'apt-get update -y --fix-missing'
       - 'apt-get install -y libgl1-mesa-glx'
-      - 'pip install numpy requests pydantic-settings neo4j'
+      - 'pip install numpy==1.26.4 requests pydantic-settings neo4j kafka-python networkx scipy grakel natural-agi-common==0.1.4 torch torch-geometric'
   triggers:
     default-http:
       kind: "http"
       attributes:
         port: 5001
+  replicas: 3

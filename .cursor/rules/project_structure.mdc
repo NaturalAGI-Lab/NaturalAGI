@@ -1,0 +1,28 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# NaturalAGI Project Structure
+
+*   Follow the NaturalAGI project structure.
+*   Keep related code together.
+*   Use consistent file organization.
+*   Group by feature rather than type.
+
+```plaintext
+# NaturalAGI project structure
+NaturalAGI/
+├── src/                      # Source code
+│   ├── skeletonization/      # Image skeletonization using GNG
+│   ├── contour_analysis/     # Analysis of structural elements
+│   ├── classification/       # Concept matching
+│   ├── concept_creator/      # Concept formation
+│   └── connector/            # Communication between components
+├── common/                   # Shared utilities
+├── docs/                     # Documentation
+├── scripts/                  # Utility scripts
+├── tests/                    # Test suite
+└── training_data/            # Training datasets
+```
+

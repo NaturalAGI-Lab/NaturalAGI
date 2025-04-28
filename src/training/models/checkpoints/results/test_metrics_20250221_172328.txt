@@ -1,0 +1,57 @@
+Test Results (20250221_172328)
+==================================================
+
+Overall Accuracy: 0.8841
+
+Per-class Metrics:
+------------------------------
+
+Class 0:
+Precision: 1.0000
+Recall: 0.8191
+F1-score: 0.9006
+
+Class 1:
+Precision: 0.9750
+Recall: 0.9176
+F1-score: 0.9455
+
+Class 2:
+Precision: 1.0000
+Recall: 0.5765
+F1-score: 0.7313
+
+Class 3:
+Precision: 0.6640
+Recall: 0.9765
+F1-score: 0.7905
+
+Class 4:
+Precision: 0.7857
+Recall: 1.0000
+F1-score: 0.8800
+
+Class 5:
+Precision: 0.9560
+Recall: 0.9457
+F1-score: 0.9508
+
+Class 6:
+Precision: 0.8353
+Recall: 0.7802
+F1-score: 0.8068
+
+Class 7:
+Precision: 0.9000
+Recall: 0.9529
+F1-score: 0.9257
+
+Class 8:
+Precision: 0.9756
+Recall: 0.9877
+F1-score: 0.9816
+
+Class 9:
+Precision: 0.9438
+Recall: 0.8936
+F1-score: 0.9180

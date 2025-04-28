@@ -9,14 +9,20 @@ spec:
   handler: "nuclio_handler:handler"
   runtime: "python:3.9"
   env:
-    - name: EXAMPLE_ENV_VAR
-      value: "some-value"
+    - name: NEO4J_DSN
+      value: "bolt://neo4j:7687"
+    - name: NEO4J_USER
+      value: "neo4j"
+    - name: NEO4J_PASS
+      value: "111122223333"
+    - name: USE_ENERGY_MINIMIZATION
+      value: "false"
   build:
     baseImage: "python:3.9"
     commands:
-      - 'apt-get update -y --fix-missing'
-      - 'apt-get install -y libgl1-mesa-glx'
-      - 'pip install numpy requests pydantic-settings neo4j'
+      - "apt-get update -y --fix-missing"
+      - "apt-get install -y libgl1-mesa-glx"
+      - "pip install numpy requests pydantic-settings neo4j gspan-mining networkx pandas matplotlib"
   triggers:
     default-http:
       kind: "http"

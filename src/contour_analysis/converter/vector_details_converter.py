@@ -1,9 +1,9 @@
 from typing import List
 
-from model.vector_details import VectorDetails
+from model.vector import Vector
 
 
 class VectorDetailsConverter:
     @staticmethod
-    def dict_to_vector_details(result: dict) -> List[VectorDetails]:
-        return [VectorDetails(**vector) for vector in result]
+    def dict_to_vector_details(result: dict) -> List[Vector]:
+        return [Vector(**vector) for vector in result]

@@ -1,0 +1,29 @@
+apiVersion: "nuclio.io/v1"
+kind: "Function"
+metadata:
+  name: skeletonization
+  labels:
+    nuclio.io/project-name: "default"
+spec:
+  httpTimeout: 1000
+  handler: "nuclio_handler:handler"
+  runtime: "python:3.8"
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPU: 75
+  build:
+    baseImage: "python:3.9"
+    commands:
+      - 'apt-get update -y --fix-missing'
+      - 'apt-get install -y libgl1-mesa-glx'
+      - 'pip install numpy pydantic-settings kafka-python rdp scikit-image networkx ypstruct opencv-python natural-agi-common==0.1.2'
+  triggers:
+    kafka-trigger:
+      kind: kafka-cluster
+      attributes:
+        initialOffset: earliest
+        topics:
+          - connector-output-topic
+        brokers:
+          - ${KAFKA_BOOTSTRAP_SERVERS}
+        consumerGroup: skeletonization-group

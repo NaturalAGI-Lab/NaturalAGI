@@ -1,0 +1,10 @@
+MATCH (n) RETURN n
+
+MATCH (n) DETACH DELETE n
+
+MATCH (n:Feature)
+RETURN size(n.samples)
+
+MATCH (n)
+WHERE NOT (n:Concept)
+RETURN n

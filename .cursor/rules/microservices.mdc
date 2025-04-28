@@ -1,0 +1,39 @@
+---
+description: 
+globs: 
+alwaysApply: false
+---
+# NaturalAGI Microservices Guidelines (Nuclio & Kafka)
+
+*   Each Nuclio function should have a clear, single responsibility.
+*   Ensure proper error handling and logging.
+*   Use explicit dependency injection.
+*   Follow the established communication patterns via Kafka.
+*   Write code that can run in multiple instances (design for horizontal scaling).
+*   Avoid shared state that isn't managed by Kafka or Neo4j.
+*   Use appropriate replica counts for different services.
+
+*Good Nuclio function structure Example:*
+```python
+def handler(context, event):
+    try:
+        # Parse input
+        data = json.loads(event.body.decode('utf-8'))
+
+        # Process data
+        result = process_data(data)
+
+        # Publish result to Kafka
+        publish_to_kafka(result)
+
+        return context.Response(body=json.dumps({"status": "success"}),
+                               headers={},
+                               content_type="application/json",
+                               status_code=200)
+    except Exception as e:
+        context.logger.error(f"Error processing request: {str(e)}")
+        return context.Response(body=json.dumps({"error": str(e)}),
+                               headers={},
+                               content_type="application/json",
+                               status_code=500)
+```

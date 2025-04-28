@@ -1,0 +1,69 @@
+Test Results (20250221_173021)
+==================================================
+
+Train size:  300
+Val size:  320
+Test size:  980
+Trainset label distribution:  Counter({3: 40, 5: 35, 1: 32, 4: 31, 0: 30, 2: 29, 7: 28, 6: 27, 9: 26, 8: 22})
+Valset label distribution:  Counter({8: 42, 9: 40, 5: 34, 7: 32, 2: 31, 0: 30, 1: 29, 4: 29, 6: 28, 3: 25})
+Testset label distribution:  Counter({6: 105, 4: 100, 7: 100, 2: 100, 0: 100, 1: 99, 8: 96, 3: 95, 9: 94, 5: 91})
+GAT initialized with 3 layers, [8, 8, 1] heads per layer, [34, 64, 64, 10] features per layer
+Dropout: 0.1
+Add skip connection: True
+Bias: True
+Log attention weights: True
+
+Overall Accuracy: 0.9337
+
+Per-class Metrics:
+------------------------------
+
+Class 0:
+Precision: 0.9065
+Recall: 0.9700
+F1-score: 0.9372
+
+Class 1:
+Precision: 0.9474
+Recall: 0.9091
+F1-score: 0.9278
+
+Class 2:
+Precision: 0.9783
+Recall: 0.9000
+F1-score: 0.9375
+
+Class 3:
+Precision: 0.8824
+Recall: 0.9474
+F1-score: 0.9137
+
+Class 4:
+Precision: 0.8899
+Recall: 0.9700
+F1-score: 0.9282
+
+Class 5:
+Precision: 1.0000
+Recall: 0.9231
+F1-score: 0.9600
+
+Class 6:
+Precision: 0.9462
+Recall: 0.8381
+F1-score: 0.8889
+
+Class 7:
+Precision: 0.9074
+Recall: 0.9800
+F1-score: 0.9423
+
+Class 8:
+Precision: 1.0000
+Recall: 0.9479
+F1-score: 0.9733
+
+Class 9:
+Precision: 0.9091
+Recall: 0.9574
+F1-score: 0.9326

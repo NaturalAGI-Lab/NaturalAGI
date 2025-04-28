@@ -1,0 +1,1387 @@
+[
+  {
+    "directed": false,
+    "multigraph": false,
+    "graph": {},
+    "nodes": [
+      {
+        "labels": [
+          "Point",
+          "CornerPoint"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "bottom",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "angle": 290,
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12779",
+        "normalized_x": 0.0,
+        "relative_distance": 0.5,
+        "normalized_y": 0.8,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 87.87307860377702,
+        "x": 52.1715428667712
+      },
+      {
+        "labels": [
+          "Point",
+          "CornerPoint"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "bottom",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "angle": 280,
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12780",
+        "normalized_x": -0.1,
+        "relative_distance": 0.3,
+        "normalized_y": 0.5,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 74.16322827830224,
+        "x": 45.16397556441548
+      },
+      {
+        "labels": [
+          "Point"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "bottom",
+          "right"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "angle": 200,
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12781",
+        "normalized_x": 0.3,
+        "relative_distance": 0.4,
+        "normalized_y": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 68.02981444641061,
+        "x": 67.23619543454198
+      },
+      {
+        "labels": [
+          "Point",
+          "EndPoint"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "bottom",
+          "right"
+        ],
+        "cycle_count": 1,
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12782",
+        "normalized_x": 0.6,
+        "relative_distance": 0.5,
+        "normalized_y": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 71.98340429462228,
+        "x": 81.13896747670844
+      },
+      {
+        "labels": [
+          "Point"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "center_horizontal",
+          "right"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "angle": 220,
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12783",
+        "normalized_x": 0.5,
+        "relative_distance": 0.4,
+        "normalized_y": -0.1,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 44.02913515930067,
+        "x": 75.96501441652399
+      },
+      {
+        "labels": [
+          "Point"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "top",
+          "right"
+        ],
+        "cycle_count": 1,
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "angle": 220,
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12784",
+        "normalized_x": 0.3,
+        "relative_distance": 0.4,
+        "normalized_y": -0.5,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 26.56844309916568,
+        "x": 64.24890469404514
+      },
+      {
+        "labels": [
+          "Point"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "top",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "angle": 250,
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12785",
+        "normalized_x": 0.0,
+        "relative_distance": 0.4,
+        "normalized_y": -0.5,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 23.698025778774888,
+        "x": 50.23998505844352
+      },
+      {
+        "labels": [
+          "Point",
+          "StartPoint"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "top",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12786",
+        "normalized_x": -0.2,
+        "relative_distance": 0.2,
+        "normalized_y": -0.2,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 39.270559259020715,
+        "x": 40.38141831603373
+      },
+      {
+        "labels": [
+          "Point",
+          "IntersectionPoint"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "bottom",
+          "right"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "angle": 260,
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12787",
+        "normalized_x": 0.4,
+        "relative_distance": 0.4,
+        "normalized_y": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 68.49882854718925,
+        "x": 72.10392712253278
+      },
+      {
+        "labels": [
+          "Vector",
+          "VerticalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "bottom",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 5,
+        "x2": 45.16397556441548,
+        "x1": 52.1715428667712,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12788",
+        "relative_distance": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 15.396947601520433,
+        "angle_with_ox": 120,
+        "endpoints_count": 1,
+        "horizontal_direction": "LEFT",
+        "vertical_direction": "TOP",
+        "y1": 87.87307860377702,
+        "y2": 74.16322827830224,
+        "half_plane": "lower",
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "quadrant": 3,
+        "normalized_x": -0.0,
+        "normalized_y": 0.6,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "bottom",
+          "right"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 4,
+        "x2": 72.10392712253278,
+        "x1": 52.1715428667712,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12789",
+        "relative_distance": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 27.79678951559916,
+        "angle_with_ox": 140,
+        "endpoints_count": 1,
+        "horizontal_direction": "LEFT",
+        "vertical_direction": "BOTTOM",
+        "y1": 87.87307860377702,
+        "y2": 68.49882854718925,
+        "half_plane": "left",
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "quadrant": 2,
+        "normalized_x": 0.2,
+        "normalized_y": 0.6,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "bottom",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 6,
+        "x2": 67.23619543454198,
+        "x1": 45.16397556441548,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12790",
+        "relative_distance": 0.3,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 22.908549828141606,
+        "angle_with_ox": 20,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "TOP",
+        "y1": 74.16322827830224,
+        "y2": 68.02981444641061,
+        "half_plane": "right",
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "quadrant": 4,
+        "normalized_x": 0.1,
+        "normalized_y": 0.4,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "bottom",
+          "right"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 7,
+        "x2": 72.10392712253278,
+        "x1": 67.23619543454198,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12791",
+        "relative_distance": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 4.890274635743777,
+        "angle_with_ox": 10,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "BOTTOM",
+        "y1": 68.02981444641061,
+        "y2": 68.49882854718925,
+        "half_plane": "right",
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "quadrant": 1,
+        "normalized_x": 0.4,
+        "normalized_y": 0.4,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "bottom",
+          "right"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 8,
+        "x2": 72.10392712253278,
+        "x1": 81.13896747670844,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12797",
+        "relative_distance": 0.5,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 9.68370912105383,
+        "angle_with_ox": 20,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "BOTTOM",
+        "y1": 71.98340429462228,
+        "y2": 68.49882854718925,
+        "half_plane": "right",
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "quadrant": 1,
+        "normalized_x": 0.5,
+        "normalized_y": 0.4,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "VerticalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "top",
+          "right"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 2,
+        "x2": 64.24890469404514,
+        "x1": 75.96501441652399,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18905",
+        "relative_distance": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 21.027196538008212,
+        "angle_with_ox": 60,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "BOTTOM",
+        "y1": 44.02913515930067,
+        "y2": 26.56844309916568,
+        "half_plane": "upper",
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "quadrant": 1,
+        "normalized_x": 0.4,
+        "normalized_y": -0.3,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "VerticalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "center_horizontal",
+          "right"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 3,
+        "x2": 72.10392712253278,
+        "x1": 75.96501441652399,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18906",
+        "relative_distance": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 24.772442140190748,
+        "angle_with_ox": 100,
+        "endpoints_count": 1,
+        "horizontal_direction": "LEFT",
+        "vertical_direction": "BOTTOM",
+        "y1": 44.02913515930067,
+        "y2": 68.49882854718925,
+        "half_plane": "upper",
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "quadrant": 2,
+        "normalized_x": 0.5,
+        "normalized_y": 0.1,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "top",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 1,
+        "x2": 50.23998505844352,
+        "x1": 64.24890469404514,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18907",
+        "relative_distance": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 14.299969403811462,
+        "angle_with_ox": 10,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "BOTTOM",
+        "y1": 26.56844309916568,
+        "y2": 23.698025778774888,
+        "half_plane": "right",
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "quadrant": 1,
+        "normalized_x": 0.1,
+        "normalized_y": -0.5,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "VerticalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "top",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 0,
+        "x2": 40.38141831603373,
+        "x1": 50.23998505844352,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18908",
+        "relative_distance": 0.3,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 18.430820307515496,
+        "angle_with_ox": 60,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "TOP",
+        "y1": 23.698025778774888,
+        "y2": 39.270559259020715,
+        "half_plane": "lower",
+        "vectors_count": 9,
+        "contour_type": "OPEN",
+        "image_id": "3d402dcb-053c-4ab3-ac5b-05c0dc7e55a3",
+        "quadrant": 4,
+        "normalized_x": -0.1,
+        "normalized_y": -0.4,
+        "quadrant_change_count": 6
+      }
+    ],
+    "links": [
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12779",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12788"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12779",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12789"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12780",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12788"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12780",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12790"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12781",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12790"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12781",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12791"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12782",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12797"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12783",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18905"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12783",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18906"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12784",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18907"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12784",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18905"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12785",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18907"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12785",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18908"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12786",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18908"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12787",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12791"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12787",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12797"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12787",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18906"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12787",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:12789"
+      }
+    ]
+  },
+  {
+    "directed": false,
+    "multigraph": false,
+    "graph": {},
+    "nodes": [
+      {
+        "labels": [
+          "Point",
+          "EndPoint"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "bottom",
+          "right"
+        ],
+        "cycle_count": 1,
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18883",
+        "normalized_x": 0.3,
+        "relative_distance": 0.4,
+        "normalized_y": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 71.20912016272098,
+        "x": 63.41731793348174
+      },
+      {
+        "labels": [
+          "Point"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "center_horizontal",
+          "right"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "angle": 220,
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18884",
+        "normalized_x": 0.4,
+        "relative_distance": 0.3,
+        "normalized_y": -0.1,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 46.15724607806333,
+        "x": 71.46996527566436
+      },
+      {
+        "labels": [
+          "Point"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "top",
+          "right"
+        ],
+        "cycle_count": 1,
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "angle": 240,
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18885",
+        "normalized_x": 0.4,
+        "relative_distance": 0.5,
+        "normalized_y": -0.5,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 22.750678698684073,
+        "x": 68.9418208211245
+      },
+      {
+        "labels": [
+          "Point"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "top",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "angle": 240,
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18886",
+        "normalized_x": 0.1,
+        "relative_distance": 0.5,
+        "normalized_y": -0.7,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 15.352932893261762,
+        "x": 54.29059784797837
+      },
+      {
+        "labels": [
+          "Point",
+          "StartPoint"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "top",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18887",
+        "normalized_x": -0.2,
+        "relative_distance": 0.4,
+        "normalized_y": -0.5,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 25.31363841759328,
+        "x": 40.87353590297377
+      },
+      {
+        "labels": [
+          "Point"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "bottom",
+          "left"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "angle": 230,
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18888",
+        "normalized_x": -0.2,
+        "relative_distance": 0.4,
+        "normalized_y": 0.5,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 74.78191519630748,
+        "x": 38.43696983040434
+      },
+      {
+        "labels": [
+          "Point",
+          "CornerPoint"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "bottom",
+          "left"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "angle": 260,
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18889",
+        "normalized_x": -0.4,
+        "relative_distance": 0.4,
+        "normalized_y": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 70.59276952998103,
+        "x": 28.322550925922993
+      },
+      {
+        "labels": [
+          "Point",
+          "CornerPoint"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "center_horizontal",
+          "left"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "angle": 270,
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18890",
+        "normalized_x": -0.4,
+        "relative_distance": 0.3,
+        "normalized_y": 0.1,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 56.76742511046819,
+        "x": 32.14470143236354
+      },
+      {
+        "labels": [
+          "Point"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "bottom",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "angle": 210,
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18891",
+        "normalized_x": 0.1,
+        "relative_distance": 0.2,
+        "normalized_y": 0.3,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 62.53523983829936,
+        "x": 53.33744938902275
+      },
+      {
+        "labels": [
+          "Point",
+          "IntersectionPoint"
+        ],
+        "session_id": "2_2",
+        "endpoints_count": 1,
+        "segments": [
+          "bottom",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "is_quadrant_change": 1,
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "angle": 290,
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18892",
+        "normalized_x": 0.1,
+        "relative_distance": 0.2,
+        "normalized_y": 0.3,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "quadrant_change_count": 6,
+        "y": 65.0647730983419,
+        "x": 56.28541673064376
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "bottom",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 4,
+        "x2": 56.28541673064376,
+        "x1": 63.41731793348174,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18893",
+        "relative_distance": 0.3,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 9.413661116408727,
+        "angle_with_ox": 40,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "BOTTOM",
+        "y1": 71.20912016272098,
+        "y2": 65.0647730983419,
+        "half_plane": "right",
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "quadrant": 1,
+        "normalized_x": 0.2,
+        "normalized_y": 0.4,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "VerticalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "top",
+          "right"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 2,
+        "x2": 68.9418208211245,
+        "x1": 71.46996527566436,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18894",
+        "relative_distance": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 23.542703983791704,
+        "angle_with_ox": 80,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "BOTTOM",
+        "y1": 46.15724607806333,
+        "y2": 22.750678698684073,
+        "half_plane": "upper",
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "quadrant": 1,
+        "normalized_x": 0.4,
+        "normalized_y": -0.3,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "VerticalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "center_horizontal",
+          "right"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 3,
+        "x2": 56.28541673064376,
+        "x1": 71.46996527566436,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18895",
+        "relative_distance": 0.2,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 24.250053454346272,
+        "angle_with_ox": 130,
+        "endpoints_count": 1,
+        "horizontal_direction": "LEFT",
+        "vertical_direction": "BOTTOM",
+        "y1": 46.15724607806333,
+        "y2": 65.0647730983419,
+        "half_plane": "upper",
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "quadrant": 2,
+        "normalized_x": 0.3,
+        "normalized_y": 0.1,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "top",
+          "right"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 1,
+        "x2": 54.29059784797837,
+        "x1": 68.9418208211245,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18896",
+        "relative_distance": 0.5,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 16.41295152038439,
+        "angle_with_ox": 30,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "BOTTOM",
+        "y1": 22.750678698684073,
+        "y2": 15.352932893261762,
+        "half_plane": "right",
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "quadrant": 1,
+        "normalized_x": 0.2,
+        "normalized_y": -0.6,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "top",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 0,
+        "x2": 40.87353590297377,
+        "x1": 54.29059784797837,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18897",
+        "relative_distance": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 16.710272462726003,
+        "angle_with_ox": 40,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "TOP",
+        "y1": 15.352932893261762,
+        "y2": 25.31363841759328,
+        "half_plane": "right",
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "quadrant": 4,
+        "normalized_x": -0.0,
+        "normalized_y": -0.6,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "bottom",
+          "left"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 6,
+        "x2": 28.322550925922993,
+        "x1": 38.43696983040434,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18898",
+        "relative_distance": 0.4,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 10.947621257105641,
+        "angle_with_ox": 160,
+        "endpoints_count": 1,
+        "horizontal_direction": "LEFT",
+        "vertical_direction": "TOP",
+        "y1": 74.78191519630748,
+        "y2": 70.59276952998103,
+        "half_plane": "left",
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "quadrant": 3,
+        "normalized_x": -0.3,
+        "normalized_y": 0.5,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "bottom",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 5,
+        "x2": 56.28541673064376,
+        "x1": 38.43696983040434,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18899",
+        "relative_distance": 0.3,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 20.322153116801406,
+        "angle_with_ox": 150,
+        "endpoints_count": 1,
+        "horizontal_direction": "LEFT",
+        "vertical_direction": "BOTTOM",
+        "y1": 74.78191519630748,
+        "y2": 65.0647730983419,
+        "half_plane": "left",
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "quadrant": 2,
+        "normalized_x": -0.1,
+        "normalized_y": 0.4,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "VerticalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "bottom",
+          "left"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 7,
+        "x2": 32.14470143236354,
+        "x1": 28.322550925922993,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18900",
+        "relative_distance": 0.3,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 14.343952830793837,
+        "angle_with_ox": 70,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "TOP",
+        "y1": 70.59276952998103,
+        "y2": 56.76742511046819,
+        "half_plane": "lower",
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "quadrant": 4,
+        "normalized_x": -0.4,
+        "normalized_y": 0.3,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "center_horizontal",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 8,
+        "x2": 53.33744938902275,
+        "x1": 32.14470143236354,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18901",
+        "relative_distance": 0.2,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 21.963612013716446,
+        "angle_with_ox": 20,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "BOTTOM",
+        "y1": 56.76742511046819,
+        "y2": 62.53523983829936,
+        "half_plane": "right",
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "quadrant": 1,
+        "normalized_x": -0.1,
+        "normalized_y": 0.2,
+        "quadrant_change_count": 6
+      },
+      {
+        "labels": [
+          "Vector",
+          "HorizontalVector"
+        ],
+        "session_id": "2_2",
+        "segments": [
+          "bottom",
+          "center_vertical"
+        ],
+        "cycle_count": 1,
+        "direction_sequence_index": 9,
+        "x2": 56.28541673064376,
+        "x1": 53.33744938902275,
+        "id": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18902",
+        "relative_distance": 0.2,
+        "monotony": "NON_MONOTONIC",
+        "intersection_points_count": 1,
+        "corner_points_count": 3,
+        "length": 3.884462634770154,
+        "angle_with_ox": 40,
+        "endpoints_count": 1,
+        "horizontal_direction": "RIGHT",
+        "vertical_direction": "BOTTOM",
+        "y1": 62.53523983829936,
+        "y2": 65.0647730983419,
+        "half_plane": "right",
+        "vectors_count": 10,
+        "contour_type": "OPEN",
+        "image_id": "d6d42039-68b9-42bf-bcdc-9a59f44f944b",
+        "quadrant": 1,
+        "normalized_x": 0.1,
+        "normalized_y": 0.3,
+        "quadrant_change_count": 6
+      }
+    ],
+    "links": [
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18883",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18893"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18884",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18895"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18884",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18894"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18885",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18894"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18885",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18896"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18886",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18897"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18886",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18896"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18887",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18897"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18888",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18898"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18888",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18899"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18889",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18900"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18889",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18898"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18890",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18901"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18890",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18900"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18891",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18902"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18891",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18901"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18892",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18899"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18892",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18893"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18892",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18902"
+      },
+      {
+        "type": "CONNECTED_TO",
+        "source": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18892",
+        "target": "4:95f7de00-19a5-43d7-b929-cea0efad5c70:18895"
+      }
+    ]
+  }
+]

@@ -1,0 +1,393 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Instructions for NaturalAGI Project:
+Keep it simple!
+
+1. Embrace Simplicity Over Cleverness
+- Write code that's immediately understandable to others
+- If a solution feels complex, it probably needs simplification
+- Optimize for readability first, performance second unless proven otherwise
+- Avoid premature optimization
+
+```python
+# Avoid clever one-liners
+# Bad
+return [point for point in points if all(np.linalg.norm(point - p) > threshold for p in special_points)]
+
+# Good
+def filter_points_by_distance(points, special_points, threshold):
+    filtered_points = []
+    for point in points:
+        is_far_enough = True
+        for special_point in special_points:
+            distance = np.linalg.norm(point - special_point)
+            if distance <= threshold:
+                is_far_enough = False
+                break
+        if is_far_enough:
+            filtered_points.append(point)
+    return filtered_points
+```
+
+2. Focus on Core Functionality
+- Start with the minimum viable solution
+- Question every feature: "Is this really necessary for the NaturalAGI pipeline?"
+- Build incrementally based on actual needs, not hypothetical ones
+- Delete unnecessary code and features
+
+```python
+# Bad: Overengineered from the start
+class ImageProcessor:
+    def __init__(self, image, cache_service, logger, metrics, notification_service):
+        self.image = image
+        self.cache = cache_service
+        self.logger = logger
+        self.metrics = metrics
+        self.notification = notification_service
+
+# Good: Start simple, expand when needed
+class ImageProcessor:
+    def __init__(self, image):
+        self.image = image
+```
+
+3. Leverage Existing Solutions
+- Use standard libraries (OpenCV, scikit-image, NetworkX) whenever possible
+- Don't reinvent the wheel
+- Choose well-maintained, popular libraries for common tasks
+- Keep dependencies minimal but practical
+
+```python
+# Bad: Custom implementation
+def calculate_skeleton(image):
+    # Custom skeletonization algorithm...
+    pass
+
+# Good: Use scikit-image
+from skimage.morphology import skeletonize
+
+def calculate_skeleton(image):
+    return skeletonize(image)
+```
+
+4. Function Design
+- Each function should have a single responsibility
+- Keep functions short (typically under 20 lines)
+- Use descriptive names that indicate purpose
+- Limit number of parameters (3 or fewer is ideal)
+
+```python
+# Bad: Multiple responsibilities
+def process_image(image_path):
+    # Loads, processes, analyzes, and saves results
+    image = cv2.imread(image_path)
+    skeleton = skeletonize(image)
+    graph = create_graph(skeleton)
+    features = extract_features(graph)
+    save_to_database(features)
+    return features
+
+# Good: Single responsibility
+def extract_features_from_image(graph):
+    """Extracts features from a graph representation of an image."""
+    if not graph:
+        raise ValueError("Graph cannot be empty")
+    return feature_extractor.extract(graph)
+```
+
+5. Project Structure
+- Follow the NaturalAGI project structure
+- Keep related code together
+- Use consistent file organization
+- Group by feature rather than type
+
+```plaintext
+# NaturalAGI project structure
+NaturalAGI/
+├── src/                      # Source code
+│   ├── skeletonization/      # Image skeletonization using GNG
+│   ├── contour_analysis/     # Analysis of structural elements
+│   ├── classification/       # Concept matching
+│   ├── concept_creator/      # Concept formation
+│   └── connector/            # Communication between components
+├── common/                   # Shared utilities
+├── docs/                     # Documentation
+├── scripts/                  # Utility scripts
+├── tests/                    # Test suite
+└── training_data/            # Training datasets
+```
+
+6. Microservices Guidelines
+- Each Nuclio function should have a clear, single responsibility
+- Ensure proper error handling and logging
+- Use explicit dependency injection
+- Follow the established communication patterns via Kafka
+
+```python
+# Good Nuclio function structure
+def handler(context, event):
+    try:
+        # Parse input
+        data = json.loads(event.body.decode('utf-8'))
+        
+        # Process data
+        result = process_data(data)
+        
+        # Publish result to Kafka
+        publish_to_kafka(result)
+        
+        return context.Response(body=json.dumps({"status": "success"}),
+                               headers={},
+                               content_type="application/json",
+                               status_code=200)
+    except Exception as e:
+        context.logger.error(f"Error processing request: {str(e)}")
+        return context.Response(body=json.dumps({"error": str(e)}),
+                               headers={},
+                               content_type="application/json",
+                               status_code=500)
+```
+
+7. Graph Database Usage
+- Use consistent node and relationship patterns
+- Always include image_id and session_id for tracking
+- Use appropriate Neo4j indices for performance
+- Follow the bipartite graph structure for points and vectors
+
+```python
+# Good Neo4j usage
+def save_point(tx, point, image_id, session_id):
+    query = """
+    CREATE (p:Point {
+        x: $x,
+        y: $y,
+        type: $type,
+        image_id: $image_id,
+        session_id: $session_id
+    })
+    RETURN id(p) as node_id
+    """
+    result = tx.run(query, 
+                   x=point.x, 
+                   y=point.y, 
+                   type=point.type,
+                   image_id=image_id,
+                   session_id=session_id)
+    return result.single()["node_id"]
+```
+
+8. Scaling Considerations
+- Write code that can run in multiple instances
+- Avoid shared state that isn't managed by Kafka or Neo4j
+- Design for horizontal scaling
+- Use appropriate replica counts for different services
+
+Remember:
+- Simple code is easier to maintain and debug
+- Write code for humans first, computers second
+- Add complexity only when justified by requirements
+- If you can't explain your code simply, it's probably too complex
+
+Workflow Guidelines:
+- Always check the docs/ directory for relevant documentation before answering questions
+- Use the Makefile commands for common operations
+- When you finish editing, present me with a list of options of how we could continue
+- When I just send you the letter c, I mean continue
+- Make scripts executable
+- Don't add any docstrings or comments, unless they really are needed for explaining the why
+- When you see comments or docstrings that are not absolutely necessary remove them
+- Use type hints whenever possible
+- Use descriptive, meaningful names for variables, functions, and classes
+- Group related code together
+- Use consistent indentation (4 spaces)
+- Add spacing between logical sections
+- Handle potential errors explicitly
+- Validate input data
+- Return meaningful error messages
+- Use consistent formatting
+- Avoid deep nesting of conditionals
+
+Debugging NaturalAGI:
+1. Figure Out the Symptoms
+   - Check logs from the specific Nuclio function
+   - Examine Kafka messages for errors
+   - Look for Neo4j query failures
+
+2. Reproduce the Bug
+   - Use the Makefile commands to reproduce the issue
+   - Isolate which part of the pipeline is failing
+
+3. Understand the System
+   - Review the component interactions via Kafka
+   - Check the graph structure in Neo4j
+   - Understand the data flow between microservices
+
+4. Form a Hypothesis
+   - Identify which component might be causing the issue
+   - Check if it's related to scaling or concurrency
+
+5. Test Your Hypothesis
+   - Add logging to the suspected component
+   - Use the Neo4j browser to inspect the graph
+   - Check Kafka messages at each stage of processing
+
+
+
+# Object-Oriented Programming Guidelines for Simple, Robust Code
+
+## Core Principles
+
+### 1. Single Responsibility Principle
+Each class should have one clear purpose and reason to change. Break complex classes into smaller, focused ones.
+
+Example:
+```python
+# Bad
+class UserManager:
+    def save_user(self, user): ...
+    def send_email(self, user): ...
+    def generate_report(self): ...
+
+# Good
+class UserRepository:
+    def save_user(self, user): ...
+
+class EmailService:
+    def send_email(self, user): ...
+
+class ReportGenerator:
+    def generate_report(self): ...
+```
+
+### 2. Encapsulation
+Hide internal details and provide a clean interface. Use private attributes and public methods judiciously.
+
+Example:
+```python
+class BankAccount:
+    def __init__(self):
+        self._balance = 0  # Protected attribute
+        
+    def deposit(self, amount):
+        if amount <= 0:
+            raise ValueError("Amount must be positive")
+        self._balance += amount
+        
+    def get_balance(self):
+        return self._balance
+```
+
+### 3. Clear Constructor Initialization
+Initialize all attributes in the constructor. Make the object's state clear from the start.
+
+Example:
+```python
+class Customer:
+    def __init__(self, name, email):
+        self.name = name
+        self.email = email
+        self.orders = []
+        self.total_spent = 0
+```
+
+### 4. Favor Composition Over Inheritance
+Use composition to build complex objects from simpler ones instead of deep inheritance hierarchies.
+
+Example:
+```python
+# Bad
+class SupermarketItem(ElectronicDevice, Perishable, Taxable):
+    pass
+
+# Good
+class SupermarketItem:
+    def __init__(self):
+        self.electronic = ElectronicProperties()
+        self.perishable = PerishableProperties()
+        self.tax = TaxProperties()
+```
+
+### 5. Make Dependencies Explicit
+Use dependency injection instead of creating dependencies inside methods.
+
+Example:
+```python
+# Bad
+class OrderService:
+    def process_order(self, order):
+        emailer = EmailService()  # Hidden dependency
+        emailer.send_confirmation(order)
+
+# Good
+class OrderService:
+    def __init__(self, email_service):
+        self.email_service = email_service  # Explicit dependency
+        
+    def process_order(self, order):
+        self.email_service.send_confirmation(order)
+```
+
+### 7. Use Strong Types and Interface Contracts
+Define clear interfaces and type hints to make code more maintainable and self-documenting.
+
+Example:
+```python
+from typing import List, Optional
+
+class ShoppingCart:
+    def __init__(self) -> None:
+        self.items: List[Item] = []
+        
+    def add_item(self, item: Item) -> None:
+        self.items.append(item)
+        
+    def get_total(self) -> float:
+        return sum(item.price for item in self.items)
+```
+
+### 8. Keep Methods Short and Focused
+Each method should do one thing well. Extract complex logic into helper methods.
+
+Example:
+```python
+# Bad
+def process_order(self, order):
+    # 100 lines of mixed logic
+
+# Good
+def process_order(self, order):
+    self.validate_order(order)
+    total = self.calculate_total(order)
+    self.apply_discounts(order)
+    self.update_inventory(order)
+    self.send_confirmation(order)
+```
+
+## Best Practices for Testing
+
+1. Write tests first (TDD) when possible
+2. Test public interfaces, not implementation details
+3. Use meaningful test names that describe the scenario
+4. Keep tests independent and isolated
+5. Test edge cases and error conditions
+
+Example:
+```python
+def test_withdraw_insufficient_funds():
+    account = BankAccount()
+    account.deposit(100)
+    
+    with pytest.raises(InsufficientFunds):
+        account.withdraw(150)
+```
+
+## Common Anti-Patterns to Avoid
+
+1. God Classes: Classes that do too much
+2. Feature Envy: Methods that use more features of other classes than their own
+3. Long Parameter Lists: Methods with too many parameters
+4. Tight Coupling: Classes that know too much about each other
+5. Premature Optimization: Making code complex for theoretical performance gains

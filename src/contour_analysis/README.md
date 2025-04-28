@@ -30,7 +30,7 @@
       "length": 31
     }
   ],
-  "angle_points": [
+  "points": [
     {
       "id": "6ff50728-ca53-4ae8-8b31-d507bb1d0f36",
       "x": 111,
