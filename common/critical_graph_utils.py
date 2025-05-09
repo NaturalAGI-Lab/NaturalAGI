@@ -1,7 +1,7 @@
 from typing import List, Set, Tuple, Any
 import networkx as nx
 
-from src.model.critical_point import CriticalPointType
+from critical_point import CriticalPointType
 
 CRITICAL_POINT_TYPES = [
     CriticalPointType.INTERSECTION_POINT,
