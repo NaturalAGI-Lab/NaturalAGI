@@ -27,13 +27,8 @@ def init_context(context):
         f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
     )
 
-    producer = KafkaProducer(
-        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
-        value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-        key_serializer=lambda k: json.dumps(k).encode('utf-8') if k else None
-    )
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
-    setattr(context.user_data, "kafka_producer", producer)
+    setattr(context.user_data, "kafka_bootstrap_servers", settings.kafka_bootstrap_servers)
 
 
 def http_handler(context, event):
@@ -116,17 +111,21 @@ def http_handler(context, event):
         )
 
 def send_to_kafka(context, operation: str, parameters: dict):
+    producer = KafkaProducer(
+        bootstrap_servers=context.user_data.kafka_bootstrap_servers.split(","),
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
     kafka_message = {
         "operation": operation,
         "parameters": parameters
     }
     
-    context.user_data.kafka_producer.send(
+    producer.send(
         context.user_data.kafka_topic,
         value=kafka_message
     )
     context.logger.info_with(f"Image path sent to Kafka: {parameters['image_path']}", handler=HANDLER_NAME)
-
+    producer.close()
 
 def handler(context, event):
     """Nuclio main handler"""

@@ -35,14 +35,6 @@ def init_context(context):
         f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
     )
     settings = Settings()
-    setattr(
-        context.user_data,
-        "kafka_producer",
-        KafkaProducer(
-            bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
-            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        ),
-    )
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
 
@@ -92,6 +84,11 @@ def kafka_handler(context, event):
         max_workers=10,
         use_multithreading=True,
     )
+    # Responding to the HTTP request
+    producer = KafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
 
     try:
         if not image_id:
@@ -104,8 +101,8 @@ def kafka_handler(context, event):
             f"Classification results: {comparison_results}", handler=HANDLER_NAME
         )
 
-        # Responding to the HTTP request
-        context.user_data.kafka_producer.send(
+        
+        producer.send(
             context.user_data.kafka_topic,
             value={
                 "status": "success",
@@ -120,7 +117,7 @@ def kafka_handler(context, event):
         context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)
         logging.error(f"Error: {e}", exc_info=True, stack_info=True)
 
-        context.user_data.kafka_producer.send(
+        producer.send(
             context.user_data.dlq_topic,
             value={"error": str(e), "source": HANDLER_NAME, "value": data},
         )
@@ -129,6 +126,7 @@ def kafka_handler(context, event):
         if delete_image_nodes:
             comparator.remove_image_nodes(image_id)
         comparator.close()
+        producer.close()
 
 
 def handler(context, event):
