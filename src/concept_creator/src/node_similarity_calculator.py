@@ -1,7 +1,6 @@
 import networkx as nx
-import math
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union, Set
+from typing import Any, Dict, List, Optional, Set
 
 
 class NodeSimilarityCalculator:

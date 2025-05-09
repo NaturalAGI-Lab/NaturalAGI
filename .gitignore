@@ -168,3 +168,9 @@ tests/generated_samples/
 tests/test-data/
 tests/prepared_samples/
 MNIST/
+
+# Neo4j
+neo4j/
+neo4j-data/
+neo4j-logs/
+neo4j-dumps/

@@ -1,11 +1,12 @@
 import logging
-from typing import Any, List, Tuple
-from .abstract_strategy import AbstractReductionStrategy
-from utils.graph_utils import GraphUtils
-from node_similarity_calculator import NodeSimilarityCalculator
 import numpy as np
-from model.critical_point import CriticalPointType
 import networkx as nx
+from typing import Any, List, Tuple
+
+from src.model.critical_point import CriticalPointType
+from src.node_similarity_calculator import NodeSimilarityCalculator
+from src.utils.graph_utils import GraphUtils
+from .abstract_strategy import AbstractReductionStrategy
 
 
 CONCEPT = "concept"

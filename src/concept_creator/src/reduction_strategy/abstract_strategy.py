@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
 from typing import Tuple, List, Any
-from node_similarity_calculator import NodeSimilarityCalculator
 import numpy as np
 import networkx as nx
 import logging
+
+from src.node_similarity_calculator import NodeSimilarityCalculator
 
 class AbstractReductionStrategy(ABC):
 

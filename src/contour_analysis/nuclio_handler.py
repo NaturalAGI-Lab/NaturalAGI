@@ -52,10 +52,6 @@ def init_context(context):
         f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
     )
 
-    producer = KafkaProducer(
-        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
-        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-    )
     graph_persistence_service = GraphPersistenceService(
         settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
     )
@@ -69,6 +65,8 @@ def init_context(context):
     analysis_result_persistence_service = AnalysisResultPersistenceService(
         settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
     )
+    
+    setattr(context.user_data, "kafka_bootstrap_servers", settings.kafka_bootstrap_servers)
     setattr(context.user_data, "tertiary_features_service", tertiary_features_service)
     setattr(context.user_data, "data_preprocessing_service", data_preprocessing_service)
     setattr(
@@ -83,7 +81,6 @@ def init_context(context):
     )
     setattr(context.user_data, "next_nuclio", settings.next_nuclio)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
-    setattr(context.user_data, "kafka_producer", producer)
     setattr(context.user_data, "settings", settings)
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
 
@@ -145,7 +142,11 @@ def kafka_handler(context, event):
             image_id, session_id
         )
 
-        context.user_data.kafka_producer.send(
+        producer = KafkaProducer(
+            bootstrap_servers=context.user_data.settings.kafka_bootstrap_servers.split(","),
+            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+        )
+        producer.send(
             context.user_data.kafka_topic,
             value={"operation": operation, "parameters": parameters},
         )
@@ -168,6 +169,8 @@ def kafka_handler(context, event):
             error_details=error_json,
         )
         send_to_dlq(context, input_data, error_info)
+    finally:
+        producer.close()
 
 
 def handler(context, event):

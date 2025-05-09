@@ -1,12 +1,12 @@
 import networkx as nx
 import logging
-from typing import Dict, Set, Tuple, List, Any, Optional
-from property_handlers.property_handler_manager import PropertyHandlerManager
-from node_similarity_calculator import NodeSimilarityCalculator
-from critical_point_preprocessor import CriticalPointPreprocessor
-from logic.synced_traversal_generator import SyncedTraversalGenerator
-from model.critical_point import CriticalPointType
-from utils.graph_utils import GraphUtils
+from typing import Tuple, List, Any, Optional
+from src.property_handlers.property_handler_manager import PropertyHandlerManager
+from src.node_similarity_calculator import NodeSimilarityCalculator
+from src.critical_point_preprocessor import CriticalPointPreprocessor
+from src.logic.synced_traversal_generator import SyncedTraversalGenerator
+from src.model.critical_point import CriticalPointType
+from src.utils.graph_utils import GraphUtils
 
 
 class SyncedGraphMinorFinder:

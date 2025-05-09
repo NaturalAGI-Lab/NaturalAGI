@@ -23,15 +23,9 @@ def init_context(context):
     context.logger.debug_with(
         f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
     )
-    
-    producer = KafkaProducer(
-        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
-        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-    )
 
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
-    setattr(context.user_data, "kafka_producer", producer)
 
 
 def kafka_handler(context, event):
@@ -74,7 +68,12 @@ def kafka_handler(context, event):
             "Processed request successfully", handler=HANDLER_NAME
         )
         data["skeleton"] = json_net
-        context.user_data.kafka_producer.send(
+        
+        producer = KafkaProducer(
+            bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+        )
+        producer.send(
             context.user_data.kafka_topic,
             value=data
         )
@@ -95,6 +94,9 @@ def kafka_handler(context, event):
             context.user_data.dlq_topic,
             value=dlq_model.model_dump()
         )
+    finally:
+        del net, json_net
+        producer.close()
 
 
 def handler(context, event):

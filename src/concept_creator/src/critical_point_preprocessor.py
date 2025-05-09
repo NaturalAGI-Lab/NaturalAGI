@@ -1,18 +1,17 @@
 import logging
 import networkx as nx
 import os
-import json
-from typing import List, Tuple, Any, Dict, Set
-from node_similarity_calculator import NodeSimilarityCalculator
-from model.critical_point import CriticalPointType
-from reduction_strategy.endpoint_strategy import EndpointReductionStrategy
-from reduction_strategy.intersection_strategy import IntersectionPointReductionStrategy
-from reduction_strategy.corner_point_reduction_strategy import (
+from typing import Tuple
+from src.node_similarity_calculator import NodeSimilarityCalculator
+from src.model.critical_point import CriticalPointType
+from src.reduction_strategy.endpoint_strategy import EndpointReductionStrategy
+from src.reduction_strategy.intersection_strategy import IntersectionPointReductionStrategy
+from src.reduction_strategy.corner_point_reduction_strategy import (
     CornerPointReductionStrategy,
 )
-from utils.graph_saver import GraphSaver
-from utils.critical_graph_utils import CriticalGraphUtils
-from utils.graph_utils import GraphUtils
+from src.utils.graph_saver import GraphSaver
+from src.utils.critical_graph_utils import CriticalGraphUtils
+from src.utils.graph_utils import GraphUtils
 
 
 class CriticalPointPreprocessor:
@@ -120,56 +119,20 @@ class CriticalPointPreprocessor:
         iteration = 0
         # Iterate until critical point graphs are isomorphic or no more reductions can be made
         while not GraphUtils.is_graph_isomorphic(crit_graph1, crit_graph2):
-            if not is_intersections_and_endpoints_isomorphic:
-                # Step 1: Apply endpoints reduction
-                graph1, graph2 = self.endpoint_reduction_strategy.reduce(graph1, graph2)
-                # Step 2: Apply intersection reduction
-                graph1, graph2 = self.intersection_reduction_strategy.reduce(
-                    graph1, graph2
-                )
-                crit_graph1, _ = CriticalGraphUtils.get_critical_graph(graph1)
-                crit_graph2, _ = CriticalGraphUtils.get_critical_graph(graph2)
-                is_intersections_and_endpoints_isomorphic = (
-                    CriticalGraphUtils._is_critical_graph_isomorphic(
-                        crit_graph1,
-                        crit_graph2,
-                        {
-                            CriticalPointType.INTERSECTION_POINT,
-                            CriticalPointType.END_POINT,
-                        },
-                    )
-                )
-                self.save_graphs(graph1, graph2, crit_graph1, crit_graph2, iteration)
-                iteration += 1
-                # To prevent infinite loops, limit the number of iterations
-                if iteration > 5:  # arbitrary limit
-                    self.logger.warning(
-                        "Reached maximum reduction iterations, stopping"
-                    )
-                    raise ValueError("Reached maximum reduction iterations, stopping")
-                continue
-            else:
-                self.logger.info(
-                    "Intersections and endpoints are isomorphic, applying corner point reduction"
-                )
-
+            
+            # Step 1: Apply endpoints reduction
+            graph1, graph2 = self.endpoint_reduction_strategy.reduce(graph1, graph2)
+            # Step 2: Apply intersection reduction
+            graph1, graph2 = self.intersection_reduction_strategy.reduce(
+                graph1, graph2
+            )
             # Step 3: Apply corner point reduction
             graph1, graph2 = self.corner_point_reduction_strategy.reduce(
                 graph1, graph2
             )
-
             crit_graph1, _ = CriticalGraphUtils.get_critical_graph(graph1)
             crit_graph2, _ = CriticalGraphUtils.get_critical_graph(graph2)
-            is_intersections_and_endpoints_isomorphic = (
-                CriticalGraphUtils._is_critical_graph_isomorphic(
-                    crit_graph1,
-                    crit_graph2,
-                    {CriticalPointType.INTERSECTION_POINT, CriticalPointType.END_POINT},
-                )
-            )
-
             self.save_graphs(graph1, graph2, crit_graph1, crit_graph2, iteration)
-
             iteration += 1
             # To prevent infinite loops, limit the number of iterations
             if iteration > 5:  # arbitrary limit

@@ -2,10 +2,8 @@ import logging
 from typing import List
 from neo4j import GraphDatabase, ManagedTransaction
 import networkx as nx
-from neo4j_to_networkx import Neo4jToNetworkx
-import json
-
-from networkx_to_neo4j import NetworkxToNeo4j
+from src.neo4j_to_networkx import Neo4jToNetworkx
+from src.networkx_to_neo4j import NetworkxToNeo4j
 
 
 class ConceptCreationRepository:

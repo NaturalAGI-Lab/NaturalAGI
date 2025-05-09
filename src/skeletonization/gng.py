@@ -4,18 +4,15 @@ from settings import Settings
 
 # Fit a Growing Neural Gas Network
 def fit(data, params: Settings):
-
     # Data Size and Dimension
     ndata = data.shape[0]
     ndim = data.shape[1]
-
     # Shuffle Data Points
     np.random.shuffle(data)
 
     # Find Min. and Max. of Data Points
     xmin = np.amin(data, axis=0)
     xmax = np.amax(data, axis=0)
-
     # Parameters
     N = params.N
     maxit = params.maxit
@@ -32,11 +29,9 @@ def fit(data, params: Settings):
     C = np.zeros((N,N))
     t = np.zeros((N,N))
     tt = 0
-
     K = 2
     for i in range(K):
         w[i] = np.random.uniform(xmin, xmax, (1,ndim))
-
     # Main Loop
     nx = 0
     for it in range(maxit):
@@ -116,8 +111,6 @@ def fit(data, params: Settings):
             E *= delta
 
         # Display Iteration Info
-        # print("Iteration {0}".format(it))
-
     net = structure()
     net.w = w
     net.C = C
