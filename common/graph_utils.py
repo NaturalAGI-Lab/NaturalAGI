@@ -3,7 +3,9 @@ from typing import Any, Dict, Set
 
 import networkx as nx
 
-from src.model.critical_point import CriticalPointType
+from .critical_point import CriticalPointType
+
+
 
 LABELS_KEY = "labels"
 

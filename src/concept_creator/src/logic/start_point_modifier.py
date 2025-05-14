@@ -2,7 +2,7 @@ from typing import Tuple
 import numpy as np
 import networkx as nx
 
-from src.model.critical_point import CriticalPointType
+from common.critical_point import CriticalPointType
 
 class StartPointModifier:
     def __init__(self, start_point_characteristic: Tuple[str, np.ndarray]):

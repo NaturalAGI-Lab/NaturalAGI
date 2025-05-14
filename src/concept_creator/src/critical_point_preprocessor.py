@@ -2,7 +2,7 @@ import logging
 import networkx as nx
 import os
 from typing import Tuple
-from common import CriticalGraphUtils, CriticalPointType
+from common import CriticalGraphUtils, CriticalPointType, GraphUtils
 from src.node_similarity_calculator import NodeSimilarityCalculator
 from src.reduction_strategy.endpoint_strategy import EndpointReductionStrategy
 from src.reduction_strategy.intersection_strategy import IntersectionPointReductionStrategy
@@ -10,7 +10,6 @@ from src.reduction_strategy.corner_point_reduction_strategy import (
     CornerPointReductionStrategy,
 )
 from src.utils.graph_saver import GraphSaver
-from src.utils.graph_utils import GraphUtils
 
 
 class CriticalPointPreprocessor:
