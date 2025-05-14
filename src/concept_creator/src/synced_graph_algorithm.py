@@ -5,8 +5,8 @@ from src.property_handlers.property_handler_manager import PropertyHandlerManage
 from src.node_similarity_calculator import NodeSimilarityCalculator
 from src.critical_point_preprocessor import CriticalPointPreprocessor
 from src.logic.synced_traversal_generator import SyncedTraversalGenerator
-from src.model.critical_point import CriticalPointType
-from src.utils.graph_utils import GraphUtils
+from common.critical_point import CriticalPointType
+from common.graph_utils import GraphUtils
 
 
 class SyncedGraphMinorFinder:

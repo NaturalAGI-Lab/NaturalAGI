@@ -9,7 +9,7 @@ import numpy as np
 from sklearn.cluster import DBSCAN, AgglomerativeClustering, KMeans, OPTICS
 
 # Local imports
-from src.model.critical_point import CriticalPoint, CriticalPointType
+from common.critical_point import CriticalPoint, CriticalPointType
 
 
 class StartPointPicker:

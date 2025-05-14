@@ -22,7 +22,8 @@ spec:
     commands:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-glx"
-      - "pip install numpy requests pydantic-settings neo4j gspan-mining networkx pandas matplotlib scikit-learn natural-agi-common==0.1.11"
+      - "pip install numpy requests pydantic-settings neo4j gspan-mining networkx pandas matplotlib scikit-learn"
+      - "pip install --upgrade natural-agi-common"
   triggers:
     default-http:
       kind: "http"
