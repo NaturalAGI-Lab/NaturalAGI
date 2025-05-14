@@ -4,8 +4,8 @@ import networkx as nx
 from skimage.morphology import skeletonize
 import gng
 from settings import Settings
-from .network_simplification import NetworkSimplification
-from .converter import Converter
+from network_simplification import NetworkSimplification
+from converter import Converter
 
 
 class SkeletonGNGMapper:
