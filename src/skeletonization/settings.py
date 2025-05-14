@@ -10,14 +10,14 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str
     kafka_group_id: str = "growing-neural-gas"
     # # Neural Gas Parameters
-    N: int = 40
-    maxit: int = 100
+    N: int = 35
+    maxit: int = 50
     L: int = 40
     epsilon_b: float = 0.2
     epsilon_n: float = 0.01
     alpha: float = 0.5
     delta: float = 0.995
-    T: int = 100
+    T: int = 50
     cnr_threshold: float = 0
     skeletonization_threshold: float = 170
     simplification_epsilon: float = 2

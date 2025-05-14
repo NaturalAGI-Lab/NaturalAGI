@@ -5,6 +5,11 @@ metadata:
   labels:
     nuclio.io/project-name: "default"
 spec:
+  platform:
+    dockerConfig:
+      loggingOpts:
+        maxSize: 10m
+        max-file: "3"
   httpTimeout: 1000
   handler: "nuclio_handler:handler"
   runtime: "python:3.8"

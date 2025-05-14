@@ -30,6 +30,11 @@ services:
       - NEO4J_dbms_memory_transaction_total_max=512M
       - NEO4J_dbms.security.procedures.unrestricted=apoc.*
 
+    volumes:
+      - ./neo4j-data:/data
+      - ./neo4j-logs:/logs
+      - ./neo4j-dumps:/dumps
+
     # Simple check testing whether the port 7474 is opened.
     # If so, the instance running inside the container is considered as "healthy".
     # This status can be checked using the "docker ps" command.

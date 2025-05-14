@@ -2,9 +2,9 @@ import logging
 from typing import Any, List, Tuple, Set, FrozenSet, Dict
 import networkx as nx
 import collections
-from node_similarity_calculator import NodeSimilarityCalculator
-from utils.graph_utils import GraphUtils
-from model.critical_point import CriticalPointType
+from src.node_similarity_calculator import NodeSimilarityCalculator
+from src.utils.graph_utils import GraphUtils
+from src.model.critical_point import CriticalPointType
 
 
 class SyncedTraversalGenerator:

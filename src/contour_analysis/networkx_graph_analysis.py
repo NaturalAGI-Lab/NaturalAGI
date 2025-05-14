@@ -281,6 +281,12 @@ class NetworkxGraphAnalysis:
     def perform_graph_traversal(self, image_id: str, session_id: str):
         top_leftmost_point = self.find_top_leftmost_point()
 
+        if top_leftmost_point is None:
+            print(
+                "Error: Could not find a valid starting point for graph traversal. The graph might be empty."
+            )
+            return
+
         for point, vector in self.graph_traversal.dfs_traversal(top_leftmost_point):
             print(f"Node: {point}, Edge: {vector}")
             for visitor in self.visitors:
@@ -308,10 +314,26 @@ class NetworkxGraphAnalysis:
         if not self.graph.nodes:
             return None
 
-        top_leftmost_node = min(
-            [node for node in self.graph.nodes if self.graph.degree[node] == 1],
-            key=lambda n: (self.graph.nodes[n]["x"] + self.graph.nodes[n]["y"]),
-        )
+        # First, try to find nodes with degree 1 (endpoints)
+        degree_1_nodes = [
+            node for node in self.graph.nodes if self.graph.degree[node] == 1
+        ]
+
+        # If there are no nodes with degree 1, use any node in the graph
+        if not degree_1_nodes:
+            print(
+                "Warning: No nodes with degree 1 found in the graph. Using any node as starting point."
+            )
+            top_leftmost_node = min(
+                self.graph.nodes,
+                key=lambda n: (self.graph.nodes[n]["x"] + self.graph.nodes[n]["y"]),
+            )
+        else:
+            top_leftmost_node = min(
+                degree_1_nodes,
+                key=lambda n: (self.graph.nodes[n]["x"] + self.graph.nodes[n]["y"]),
+            )
+
         return top_leftmost_node
 
     def calculate_length(

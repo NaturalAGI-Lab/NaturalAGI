@@ -1,10 +1,11 @@
 import logging
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Dict
 
 import numpy as np
 import networkx as nx
-from node_similarity_calculator import NodeSimilarityCalculator
-from utils.graph_utils import GraphUtils
+from src.node_similarity_calculator import NodeSimilarityCalculator
+from src.model.critical_point import CriticalPointType
+from src.utils.graph_utils import GraphUtils
 
 from .abstract_strategy import AbstractReductionStrategy
 
@@ -15,7 +16,7 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
     def __init__(self, node_similarity_calculator: NodeSimilarityCalculator):
         super().__init__(node_similarity_calculator)
         self.logger = logging.getLogger(__name__)
-        self.similarity_threshold = 0.2
+        self.similarity_threshold = 0.25
 
     def reduce(
         self, concept_graph: nx.Graph, image_graph: nx.Graph
@@ -37,35 +38,35 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             concept_graph = self._apply_reduction(concept_graph, concept_endpoints)
             return concept_graph, image_graph        
 
-        # similarity_matrix = self.calculate_similarity_matrix(
-        #     concept_graph,
-        #     image_graph,
-        #     concept_endpoints,
-        #     image_endpoints,
-        # )
+        similarity_matrix = self.calculate_similarity_matrix(
+            concept_graph,
+            image_graph,
+            concept_endpoints,
+            image_endpoints,
+        )
 
-        # concept_endpoints_below_threshold = self._find_endpoints_below_threshold(
-        #     similarity_matrix, concept_endpoints, axis=1
-        # )
-        # image_endpoints_below_threshold = self._find_endpoints_below_threshold(
-        #     similarity_matrix.T, image_endpoints, axis=1
-        # )
+        concept_endpoints_below_threshold = self._find_endpoints_below_threshold(
+            similarity_matrix, concept_endpoints, axis=1
+        )
+        image_endpoints_below_threshold = self._find_endpoints_below_threshold(
+            similarity_matrix.T, image_endpoints, axis=1
+        )
 
-        # if concept_endpoints_below_threshold:
-        #     self.logger.info(
-        #         f"Concept endpoints below threshold ({len(concept_endpoints_below_threshold)}): {concept_endpoints_below_threshold}"
-        #     )
-        #     concept_graph = self._apply_reduction(
-        #         concept_graph, concept_endpoints_below_threshold
-        #     )
+        if concept_endpoints_below_threshold:
+            self.logger.info(
+                f"Concept endpoints below threshold ({len(concept_endpoints_below_threshold)}): {concept_endpoints_below_threshold}"
+            )
+            concept_graph = self._apply_reduction(
+                concept_graph, concept_endpoints_below_threshold
+            )
 
-        # if image_endpoints_below_threshold:
-        #     self.logger.info(
-        #         f"Image endpoints below threshold ({len(image_endpoints_below_threshold)}): {image_endpoints_below_threshold}"
-        #     )
-        #     image_graph = self._apply_reduction(
-        #         image_graph, image_endpoints_below_threshold
-        #     )
+        if image_endpoints_below_threshold:
+            self.logger.info(
+                f"Image endpoints below threshold ({len(image_endpoints_below_threshold)}): {image_endpoints_below_threshold}"
+            )
+            image_graph = self._apply_reduction(
+                image_graph, image_endpoints_below_threshold
+            )
 
         # Second pass: handle count mismatch
         concept_endpoints = self._get_endpoints(concept_graph)
@@ -124,9 +125,26 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
         return [
             node
             for node, data in graph.nodes(data=True)
-            if GraphUtils.is_endpoint(data)
+            if GraphUtils.is_endpoint(data) or self._node_is_semantically_endpoint(node, graph)
         ]
-
+    
+    def _node_is_semantically_endpoint(self, node: Any, graph: nx.Graph) -> bool:
+        data = graph.nodes[node]
+        labels = data.get("labels", [])
+        
+        # A node is semantically an endpoint if it has only one connection
+        # and is not a start point
+        is_endpoint = graph.degree(node) == 1 and CriticalPointType.START_POINT.value not in labels
+        
+        # If it's an endpoint but not labeled as one, add the label
+        if is_endpoint and not any(pt.value in labels for pt in [CriticalPointType.END_POINT, CriticalPointType.START_POINT]):
+            self.logger.info(f"Node {node} is an endpoint but not labeled as one. Adding label {CriticalPointType.END_POINT.value}.")
+            data["labels"].clear()
+            data["labels"].append(CriticalPointType.END_POINT.value)
+            data["labels"].append("Point")
+            
+        return is_endpoint
+            
     def _find_endpoints_below_threshold(
         self, similarity_matrix: np.ndarray, endpoints: List[Any], axis: int
     ) -> List[Any]:
