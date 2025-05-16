@@ -64,6 +64,8 @@ lib:
 	@twine upload dist/* --verbose
 	@rm -rf dist
 	@echo -e "${GREEN}Library built and uploaded.${NC}"
+	@pip install --upgrade natural-agi-common
+	@echo -e "${GREEN}Library installed.${NC}"
 
 start_services:
 	@echo -e "${BLUE}Starting Docker services...${NC}"

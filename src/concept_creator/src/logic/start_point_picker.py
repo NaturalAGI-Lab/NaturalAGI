@@ -267,7 +267,10 @@ class StartPointPicker:
             )
 
     def get_start_point_characteristic(self) -> Optional[Tuple[str, np.ndarray]]:
-        """Returns the determined start point characteristic."""
+        """Returns the determined start point characteristic.
+        Format: (dominant_label, centroid)
+        centroid: (x, y)
+        """
         if self.start_point_characteristic is None:
             # Optionally run determination if not already done, or raise error/warning
             print(
@@ -353,5 +356,5 @@ class StartPointPicker:
             )
             return fallback_candidates[0][0]
 
-        print("Error: No suitable start point found in the graph.")
+        print("Error: No suitable start point found in the graph")
         return None

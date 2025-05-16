@@ -21,7 +21,8 @@ COPY --from=uhttpc /home/nuclio/bin/uhttpc /usr/local/bin/uhttpc
 RUN apt-get update && apt-get install -y libgl1-mesa-glx
 
 RUN pip install --upgrade pip
-RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-python neo4j Pillow networkx scipy grakel natural-agi-common==0.1.4 torch torch-geometric
+RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-python neo4j Pillow networkx scipy grakel torch torch-geometric
+RUN pip install --upgrade natural-agi-common
 
 # Create models directory
 RUN mkdir -p /opt/nuclio/models

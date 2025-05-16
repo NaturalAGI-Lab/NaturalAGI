@@ -95,7 +95,6 @@ def kafka_handler(context, event):
             value=dlq_model.model_dump()
         )
     finally:
-        del net, json_net
         producer.close()
 
 

@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Dict
 import networkx as nx
-from neo4j import Session
+from neo4j import Session, Result
 
 logging.basicConfig(level=logging.INFO)
 
@@ -29,28 +29,10 @@ class Neo4jToNetworkX:
                elementId(m) AS target_id
         """
         result = session.run(query, image_id=image_id)
-        return Neo4jToNetworkX._build_networkx_graph(result)
+        return Neo4jToNetworkX.build_networkx_graph(result)
 
     @staticmethod
-    def extract_concept_graph(session: Session, concept_id: str) -> nx.Graph:
-        """Extract graph from Neo4j (with segments) for a given concept_id and convert to NetworkX format."""
-        query = """
-        MATCH (n {concept_id: $concept_id})
-        WHERE n:Point OR n:Vector
-        WITH n, labels(n) AS node_labels, properties(n) as node_props
-        OPTIONAL MATCH (n)-[r]-(m {concept_id: $concept_id})
-        WITH n, node_labels, r, m, node_props
-        RETURN elementId(n) AS node_id, 
-               node_labels,
-               node_props,
-               type(r) AS rel_type, 
-               elementId(m) AS target_id
-        """
-        result = session.run(query, concept_id=concept_id)
-        return Neo4jToNetworkX._build_networkx_graph(result)
-
-    @staticmethod
-    def _build_networkx_graph(result) -> nx.Graph:
+    def build_networkx_graph(result: Result) -> nx.Graph:
         """
         Builds a NetworkX graph from a Neo4j result that includes segments.
         This is used by extract_concept_graph.

@@ -31,13 +31,13 @@ class PropertyMatcherManager:
         "quadrant_change_count",  # TODO check if this is relevant
         "length",
         "direction_sequence_index",
-        "corner_points_count",
-        "vectors_count",
-        "normalized_x",
-        "normalized_y",
-        "relative_distance",
-        "angle_with_ox",
-        "angle"
+        # "corner_points_count",
+        # "vectors_count",
+        # "normalized_x",
+        # "normalized_y",
+        # "relative_distance",
+        # "angle_with_ox",
+        # "angle"
     ]
 
     def __init__(self):

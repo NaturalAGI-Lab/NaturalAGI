@@ -6,7 +6,8 @@ import json
 from pydantic_settings import BaseSettings
 from common import ClassificationParams
 from concept_minor_classifier import ConceptMinorClassifier
-
+from repository.concept_repository import ConceptRepository
+from repository.image_repository import ImageRepository
 HANDLER_NAME = "classification"
 
 
@@ -77,10 +78,19 @@ def kafka_handler(context, event):
     context.logger.info_with(
         f"Classification params: {classification_params}", handler=HANDLER_NAME
     )
-    comparator = ConceptMinorClassifier(
+    concept_repository = ConceptRepository(
         settings.neo4j_dsn,
         settings.neo4j_user,
         settings.neo4j_pass,
+    )
+    image_repository = ImageRepository(
+        settings.neo4j_dsn,
+        settings.neo4j_user,
+        settings.neo4j_pass,
+    )
+    classifier = ConceptMinorClassifier(
+        concept_repository,
+        image_repository,
         max_workers=10,
         use_multithreading=True,
     )
@@ -95,13 +105,12 @@ def kafka_handler(context, event):
             raise ValueError("image_id must be provided in the request body")
 
         # Perform graph comparison
-        comparison_results = comparator.classify(image_id)
+        comparison_results = classifier.classify(image_id)
 
         context.logger.info_with(
             f"Classification results: {comparison_results}", handler=HANDLER_NAME
         )
 
-        
         producer.send(
             context.user_data.kafka_topic,
             value={
@@ -124,8 +133,9 @@ def kafka_handler(context, event):
 
     finally:
         if delete_image_nodes:
-            comparator.remove_image_nodes(image_id)
-        comparator.close()
+            image_repository.remove_image_nodes(image_id)
+        image_repository.close()
+        concept_repository.close()
         producer.close()
 
 

@@ -27,7 +27,7 @@ class RangePropertyMatcher(PropertyMatcher):
         Initialize the RangePropertyMatcher.
 
         Args:
-            numeric_tolerance: The tolerance to use for numeric comparisons (default: 0.1 or 10%)
+            numeric_tolerance: The tolerance to use for numeric comparisons (default: 0.2 or 20%)
         """
         self.logger = logging.getLogger(__name__)
         self.ABSOLUTE_TOLERANCE = numeric_tolerance

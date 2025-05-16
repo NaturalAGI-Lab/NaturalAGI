@@ -19,6 +19,8 @@ class StartPointModifier:
 
         graph.nodes[new_start_point]["labels"].clear()
         graph.nodes[new_start_point]["labels"].append(CriticalPointType.START_POINT.value)
+        graph.nodes[new_start_point]["labels"].append("Point")
+        graph.nodes[new_start_point]["centroid"] = self.start_point_characteristic[1]
         return graph
     
     def _get_old_start_point(self, graph: nx.Graph) -> int:

@@ -1,11 +1,14 @@
 import logging
 import networkx as nx
 import os
+import copy
 from typing import Tuple
-from common import CriticalGraphUtils, CriticalPointType, GraphUtils
+from common import CriticalGraphUtils, GraphUtils
 from src.node_similarity_calculator import NodeSimilarityCalculator
 from src.reduction_strategy.endpoint_strategy import EndpointReductionStrategy
-from src.reduction_strategy.intersection_strategy import IntersectionPointReductionStrategy
+from src.reduction_strategy.intersection_strategy import (
+    IntersectionPointReductionStrategy,
+)
 from src.reduction_strategy.corner_point_reduction_strategy import (
     CornerPointReductionStrategy,
 )
@@ -31,17 +34,6 @@ class CriticalPointPreprocessor:
         self.corner_point_reduction_strategy = CornerPointReductionStrategy(
             self.similarity_calculator
         )
-        # Define the type reduction hierarchy
-        self.type_reduction_map = {
-            CriticalPointType.INTERSECTION_POINT.value: CriticalPointType.CORNER_POINT.value,
-            CriticalPointType.CORNER_POINT.value: "Point",
-        }
-        self.critical_point_types = {
-            CriticalPointType.INTERSECTION_POINT.value,
-            CriticalPointType.CORNER_POINT.value,
-            CriticalPointType.END_POINT.value,
-            CriticalPointType.START_POINT.value,
-        }
         self.properties_to_compare = set(
             ["normalized_x", "normalized_y", "relative_distance"]
         )
@@ -61,8 +53,8 @@ class CriticalPointPreprocessor:
             Tuple of (preprocessed_graph1, preprocessed_graph2) - the modified original graphs
         """
         # Make copies of the original graphs to avoid modifying the input graphs directly
-        graph1_mod = graph1.copy()
-        graph2_mod = graph2.copy()
+        graph1_mod = copy.deepcopy(graph1)
+        graph2_mod = copy.deepcopy(graph2)
 
         # Extract critical point graphs for initial isomorphism check
         crit_graph1, _ = CriticalGraphUtils.get_critical_graph(graph1_mod)
@@ -106,28 +98,16 @@ class CriticalPointPreprocessor:
         Returns:
             Tuple of (reduced_graph1, reduced_graph2)
         """
-        is_intersections_and_endpoints_isomorphic = (
-            CriticalGraphUtils._is_critical_graph_isomorphic(
-                crit_graph1,
-                crit_graph2,
-                {CriticalPointType.INTERSECTION_POINT, CriticalPointType.END_POINT},
-            )
-        )
-
         iteration = 0
         # Iterate until critical point graphs are isomorphic or no more reductions can be made
         while not GraphUtils.is_graph_isomorphic(crit_graph1, crit_graph2):
-            
+
             # Step 1: Apply endpoints reduction
             graph1, graph2 = self.endpoint_reduction_strategy.reduce(graph1, graph2)
             # Step 2: Apply intersection reduction
-            graph1, graph2 = self.intersection_reduction_strategy.reduce(
-                graph1, graph2
-            )
+            graph1, graph2 = self.intersection_reduction_strategy.reduce(graph1, graph2)
             # Step 3: Apply corner point reduction
-            graph1, graph2 = self.corner_point_reduction_strategy.reduce(
-                graph1, graph2
-            )
+            graph1, graph2 = self.corner_point_reduction_strategy.reduce(graph1, graph2)
             crit_graph1, _ = CriticalGraphUtils.get_critical_graph(graph1)
             crit_graph2, _ = CriticalGraphUtils.get_critical_graph(graph2)
             self.save_graphs(graph1, graph2, crit_graph1, crit_graph2, iteration)

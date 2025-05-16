@@ -24,7 +24,8 @@ spec:
     commands:
       - 'apt-get update -y --fix-missing'
       - 'apt-get install -y libgl1-mesa-glx'
-      - 'pip install numpy==1.26.4 requests pydantic-settings neo4j kafka-python networkx scipy grakel natural-agi-common==0.1.4 torch torch-geometric'
+      - 'pip install numpy==1.26.4 requests pydantic-settings neo4j kafka-python networkx scipy grakel torch torch-geometric'
+      - 'pip install --upgrade natural-agi-common'
   triggers:
     default-http:
       kind: "http"

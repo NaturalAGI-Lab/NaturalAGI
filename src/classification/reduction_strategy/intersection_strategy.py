@@ -5,63 +5,49 @@ from typing import Any, List, Tuple
 
 from common.critical_point import CriticalPointType
 from common.graph_utils import GraphUtils
-from src.node_similarity_calculator import NodeSimilarityCalculator
+from node_similarity_calculator import NodeSimilarityCalculator
 from .abstract_strategy import AbstractReductionStrategy
 
 
-CONCEPT = "concept"
-IMAGE = "image"
-
-
 class IntersectionPointReductionStrategy(AbstractReductionStrategy):
-    """This is a reduction strategy that removes intersection points from the concept and image graphs.
-
-    The reduction rules:
-        - First level reduction: Semantic reduction. Remove label (IntersectionPoint) from the nodes that have less than 3 neighbors.
-
-        - Second level reduction: Excessive intersection points. Remove the intersection points that have the lowest similarity to the rest of the nodes in the graph.
-        The second level of reduction is applied to the graph that has more intersection points than the other graph.
-        When we found the intersection points that have the lowest similarity to the rest of the nodes in the graph we need to find the path to the nearest critical point because semantically this node still
-        will be an intersection point (degree > 2).
-        Here is the algorithm:
-            - Find the intersection points that have the lowest similarity to the rest of the nodes in the graph.
-            - For each intersection point find the path to the nearest critical point (priority is the next intersection point).
-            - Remove the intersection point node and the path to the nearest critical point.
+    """
+    This is basically the same as the intersection reduction strategy in the concept creator,
+    but with the difference that we apply it to the image graph.
     """
 
-    def __init__(self, node_similarity_calculator: NodeSimilarityCalculator):
+    def __init__(
+        self,
+        node_similarity_calculator: NodeSimilarityCalculator,
+        similarity_threshold: float = 0.5,
+        logger: logging.Logger = logging.getLogger(__name__),
+    ):
         super().__init__(node_similarity_calculator)
-        self.logger = logging.getLogger(__name__)
-        self.similarity_threshold = 0.5
+        self.logger = logger
+        self.similarity_threshold = similarity_threshold
 
     def reduce(
-        self, concept_graph: nx.Graph, image_graph: nx.Graph
+        self,
+        image_graph: nx.Graph,
+        concept_graph: nx.Graph,
     ) -> Tuple[nx.Graph, nx.Graph]:
-        concept_graph = self._apply_degree_reduction(concept_graph)
         image_graph = self._apply_degree_reduction(image_graph)
 
         concept_intersection_points = self._get_intersection_points(concept_graph)
         image_intersection_points = self._get_intersection_points(image_graph)
 
         if not concept_intersection_points and not image_intersection_points:
-            self.logger.error("Concept or image has no intersection points.")
-            return concept_graph, image_graph
+            self.logger.info("Concept or image has no intersection points.")
+            return image_graph, concept_graph
 
         if not concept_intersection_points and image_intersection_points:
             self.logger.info(
                 "Concept has no intersection points. Removing intersection points from image."
             )
             image_graph = self._apply_reduction(image_graph, image_intersection_points)
-            return concept_graph, image_graph
+            return image_graph, concept_graph
 
         if concept_intersection_points and not image_intersection_points:
-            self.logger.info(
-                "Image has no intersection points. Removing intersection points from concept."
-            )
-            concept_graph = self._apply_reduction(
-                concept_graph, concept_intersection_points
-            )
-            return concept_graph, image_graph
+            raise ValueError("Concept has intersection points but image does not.")
 
         len_concept_intersection_points = len(concept_intersection_points)
         len_image_intersection_points = len(image_intersection_points)
@@ -70,20 +56,17 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
             self.logger.info(
                 "Concept and image have the same number of intersection points. No reduction needed."
             )
-            return concept_graph, image_graph
+            return image_graph, concept_graph
 
         if len_concept_intersection_points > len_image_intersection_points:
-            graph_large = concept_graph
-            graph_small = image_graph
-            points_large = concept_intersection_points
-            points_small = image_intersection_points
-            graph_to_reduce = CONCEPT
+            raise ValueError(
+                f"Concept has more intersection points than image. {len_concept_intersection_points} > {len_image_intersection_points}"
+            )
         else:
             graph_large = image_graph
             graph_small = concept_graph
             points_large = image_intersection_points
             points_small = concept_intersection_points
-            graph_to_reduce = IMAGE
 
         similarity_matrix = self.calculate_similarity_matrix(
             graph_large, graph_small, points_large, points_small
@@ -102,16 +85,11 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
                 f"Excess intersection points to remove ({len(excess_intersection_points_to_remove)}): {excess_intersection_points_to_remove}"
             )
 
-        if graph_to_reduce == CONCEPT:
-            concept_graph = self._apply_reduction(
-                concept_graph, excess_intersection_points_to_remove
-            )
-        else:
-            image_graph = self._apply_reduction(
-                image_graph, excess_intersection_points_to_remove
-            )
+        image_graph = self._apply_reduction(
+            image_graph, excess_intersection_points_to_remove
+        )
 
-        return concept_graph, image_graph
+        return image_graph, concept_graph
 
     def _apply_degree_reduction(self, graph: nx.Graph) -> nx.Graph:
         for node, data in graph.nodes(data=True):
@@ -124,8 +102,14 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
                     labels = graph.nodes[node]["labels"]
                     labels.remove(CriticalPointType.INTERSECTION_POINT.value)
                     if node_degree == 1:
+                        self.logger.info(
+                            f"Adding EndPoint label to {node} with degree {node_degree}"
+                        )
                         labels.append(CriticalPointType.END_POINT.value)
                     else:
+                        self.logger.info(
+                            f"Adding CornerPoint label to {node} with degree {node_degree}"
+                        )
                         labels.append(CriticalPointType.CORNER_POINT.value)
                     graph.nodes[node]["labels"] = labels
         return graph
@@ -176,7 +160,7 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
                     relink_edges.add((nbr, target_node))
 
         if all_nodes_to_remove:
-            self.logger.info(f"Removing {len(all_nodes_to_remove)} nodes from graph. Nodes to remove: {all_nodes_to_remove}")
+            self.logger.info(f"Removing {len(all_nodes_to_remove)} nodes from graph.")
             graph.remove_nodes_from(all_nodes_to_remove)
             self.logger.info(f"Graph after reduction has {len(graph.nodes)} nodes.")
 

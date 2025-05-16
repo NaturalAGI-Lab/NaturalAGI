@@ -2,7 +2,7 @@ import networkx as nx
 
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Set
 
 
 class NodeSimilarityCalculator:
@@ -61,7 +61,12 @@ class NodeSimilarityCalculator:
         return similarity_matrix
 
     def calculate_node_similarity(
-        self, graph1: nx.Graph, graph2: nx.Graph, node1: Any, node2: Any
+        self,
+        graph1: nx.Graph,
+        graph2: nx.Graph,
+        node1: Any,
+        node2: Any,
+        include_properties: Optional[Set[str]] = None,
     ) -> float:
         """
         Calculate similarity between two nodes based on their properties and structural role.
@@ -89,10 +94,15 @@ class NodeSimilarityCalculator:
             return 0.0  # Different types, no similarity
 
         # 2. Property similarity
-        return self._calculate_property_similarity(node1_data, node2_data)
+        return self._calculate_property_similarity(
+            node1_data, node2_data, include_properties
+        )
 
     def _calculate_property_similarity(
-        self, props1: Dict[str, Any], props2: Dict[str, Any]
+        self,
+        props1: Dict[str, Any],
+        props2: Dict[str, Any],
+        include_properties: Optional[Set[str]] = None,
     ) -> float:
         """
         Calculate similarity between two sets of properties.
@@ -104,11 +114,14 @@ class NodeSimilarityCalculator:
         Returns:
             Similarity score between 0 and 1
         """
-        # Get all properties from both nodes
-        all_props = set(props1.keys()) | set(props2.keys())
+        if include_properties:
+            relevant_props = list(include_properties)
+        else:
+            # Get all properties from both nodes
+            all_props = set(props1.keys()) | set(props2.keys())
 
-        # Filter out ignored properties
-        relevant_props = [p for p in all_props if p not in self.IGNORE_PROPERTIES]
+            # Filter out ignored properties
+            relevant_props = [p for p in all_props if p not in self.IGNORE_PROPERTIES]
 
         if not relevant_props:
             return 0.0
