@@ -8,6 +8,7 @@ from common import ClassificationParams
 from concept_minor_classifier import ConceptMinorClassifier
 from repository.concept_repository import ConceptRepository
 from repository.image_repository import ImageRepository
+
 HANDLER_NAME = "classification"
 
 
@@ -92,7 +93,7 @@ def kafka_handler(context, event):
         concept_repository,
         image_repository,
         max_workers=10,
-        use_multithreading=True,
+        use_multithreading=False,
     )
     # Responding to the HTTP request
     producer = KafkaProducer(
@@ -115,7 +116,9 @@ def kafka_handler(context, event):
             context.user_data.kafka_topic,
             value={
                 "status": "success",
-                "classification_results": comparison_results,
+                "classification_results": [
+                    result.__dict__ for result in comparison_results
+                ],
                 "image_id": image_id,
                 "image_path": data["parameters"]["image_path"],
                 "parameters": {**params, **data["parameters"]},

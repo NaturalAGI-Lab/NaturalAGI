@@ -18,6 +18,9 @@ from reduction_strategy.corner_point_reduction_strategy import (
     CornerPointReductionStrategy,
 )
 from node_similarity_calculator import NodeSimilarityCalculator
+from graph_similarity.graph_edit_distance_comparator import (
+    GraphEditDistanceComparator,
+)
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -51,7 +54,7 @@ class ConceptMinorClassifier:
             ),
         ),
         property_matcher: PropertyMatcherManager = PropertyMatcherManager(),
-        start_point_preprocessor: StartPointPreprocessor = StartPointPreprocessor(),    
+        start_point_preprocessor: StartPointPreprocessor = StartPointPreprocessor(),
     ):
         self.max_workers = max_workers
         self.use_multithreading = use_multithreading
@@ -61,6 +64,7 @@ class ConceptMinorClassifier:
         self.concept_repository = concept_repository
         self.image_repository = image_repository
         self.start_point_preprocessor = start_point_preprocessor
+
     def classify(
         self,
         image_id: str,
@@ -132,7 +136,8 @@ class ConceptMinorClassifier:
         concept_graph = self.concept_repository.get_concept_graph(concept_id)
 
         if self.complexity_preprocessor.is_concept_more_complex(
-            concept_graph, image_graph
+            concept_graph=concept_graph,
+            image_graph=image_graph,
         ):
             logging.info(
                 f"Concept {concept_id} is too complex to be a minor of the image"
@@ -146,10 +151,29 @@ class ConceptMinorClassifier:
         try:
             logging.info("Preprocessing image graph")
             image_graph = self.start_point_preprocessor.preprocess(
-                image_graph, concept_graph
+                inference_graph=image_graph,
+                concept_graph=concept_graph,
             )
-            self.critical_point_preprocessor.preprocess_graphs(
-                image_graph, concept_graph
+            preprocessed_image_graph, preprocessed_concept_graph = (
+                self.critical_point_preprocessor.preprocess_graphs(
+                    inference_graph=image_graph,
+                    concept_graph=concept_graph,
+                )
+            )
+            similarity = GraphEditDistanceComparator.compare_graphs_ged(
+                image_graph=image_graph,
+                concept_graph=concept_graph,
+                concept_name=concept_id,
+                ged_timeout=10,
+            )
+            logging.info(
+                f"Similarity between image and concept {concept_id}: {similarity}"
+            )
+            return ClassificationResult(
+                concept_id=concept_id,
+                is_minor=True,
+                message=f"Similarity between image and concept {concept_id}: {similarity}",
+                similarity=similarity,
             )
         except Exception as e:
             logging.warning(
@@ -162,12 +186,6 @@ class ConceptMinorClassifier:
                 message=f"Preprocessing failed: {str(e)}",
             )
 
-        return ClassificationResult(
-            concept_id=concept_id,
-            is_minor=True,
-            message="Concept is a minor of the image",
-        )
-
     def _process_and_sort_results(
         self, results: List[ClassificationResult], image_id: str
     ) -> List[ClassificationResult]:
@@ -179,4 +197,4 @@ class ConceptMinorClassifier:
             if result.is_minor:
                 filtered_results.append(result)
 
-        return filtered_results
+        return sorted(filtered_results, key=lambda x: x.similarity, reverse=True)

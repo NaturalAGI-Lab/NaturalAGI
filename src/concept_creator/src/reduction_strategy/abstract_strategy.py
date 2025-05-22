@@ -12,7 +12,7 @@ class AbstractReductionStrategy(ABC):
         self.node_similarity_calculator = node_similarity_calculator
         self.logger = logging.getLogger(__name__)
         self.properties_to_compare = set(
-            ["normalized_x", "normalized_y", "relative_distance"]
+            ["normalized_x", "normalized_y", "relative_distance", "segments", "x", "y"]
         )
 
     @abstractmethod

@@ -24,6 +24,7 @@ class NodeSimilarityCalculator:
         "y1",
         "y2",
         "length",
+        "centroid",
     ]
 
     def __init__(self, logger=None):
@@ -309,27 +310,6 @@ class NodeSimilarityCalculator:
             similarity = 1.0 - (distance / range_width)
             return max(0.0, similarity) # Clamp at 0
 
-    # TODO: remove this function
-    def _get_node_types(self, node_data: Dict[str, Any]) -> List[str]:
-        """
-        Get the types/labels of a node.
-
-        Args:
-            node_data: Node data dictionary
-
-        Returns:
-            List of node type strings
-        """
-        labels = node_data.get("labels", [])
-
-        if not isinstance(labels, list):
-            if isinstance(labels, set):
-                labels = list(labels)
-            else:
-                labels = [labels]
-
-        return labels
-
     def calculate_coordinate_similarity(
         self, graph1: nx.Graph, graph2: nx.Graph, node1: Any, node2: Any
     ) -> float:
@@ -513,7 +493,6 @@ class NodeSimilarityCalculator:
             True if value can be converted to a number, False otherwise
         """
         try:
-            float(val)
-            return True
+            return isinstance(val, (int, float))
         except (ValueError, TypeError):
             return False

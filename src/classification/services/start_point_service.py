@@ -127,12 +127,4 @@ class StartPointService:
         return None
 
     def _determine_structure_type(self, graph: nx.Graph) -> str:
-        has_endpoint = True
-        for node_id in graph.nodes:
-            if nx.degree(graph, node_id) == 1:
-                has_endpoint_in_graph = True
-                break
-            if not has_endpoint_in_graph:
-                has_endpoint = False
-                break
-        return "Open" if has_endpoint else "Closed"
+        return "Open" if any(nx.degree(graph, node) == 1 for node in graph.nodes) else "Closed"

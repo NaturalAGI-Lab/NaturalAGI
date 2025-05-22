@@ -301,27 +301,6 @@ class NodeSimilarityCalculator:
         normalized_distance = distance / range_width
         return max(0.0, 1.0 - min(normalized_distance, 1.0))
 
-    # TODO: remove this function
-    def _get_node_types(self, node_data: Dict[str, Any]) -> List[str]:
-        """
-        Get the types/labels of a node.
-
-        Args:
-            node_data: Node data dictionary
-
-        Returns:
-            List of node type strings
-        """
-        labels = node_data.get("labels", [])
-
-        if not isinstance(labels, list):
-            if isinstance(labels, set):
-                labels = list(labels)
-            else:
-                labels = [labels]
-
-        return labels
-
     def calculate_coordinate_similarity(
         self, graph1: nx.Graph, graph2: nx.Graph, node1: Any, node2: Any
     ) -> float:
