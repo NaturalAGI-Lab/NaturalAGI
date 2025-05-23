@@ -1,7 +1,7 @@
 import networkx as nx
 import logging
 from typing import Tuple, List, Any, Optional
-from src.property_handlers.property_handler_manager import PropertyHandlerManager
+from src.property_handlers import PropertyProcessor
 from src.node_similarity_calculator import NodeSimilarityCalculator
 from src.critical_point_preprocessor import CriticalPointPreprocessor
 from src.logic.synced_traversal_generator import SyncedTraversalGenerator
@@ -12,7 +12,7 @@ from common.graph_utils import GraphUtils
 class SyncedGraphMinorFinder:
     def __init__(
         self,
-        prop_manager: PropertyHandlerManager,
+        prop_manager: PropertyProcessor,
         similarity_calculator: NodeSimilarityCalculator,
         critical_point_preprocessor: CriticalPointPreprocessor,
         logger=None,
@@ -285,7 +285,7 @@ class SyncedGraphMinorFinder:
 
         # Ensure start nodes are in the result graph (should have been added previously)
         if start1 not in result_graph:
-            merged_start_props = self.prop_manager.process_node_properties(
+            merged_start_props = self.prop_manager.process_properties(
                 {}, graph1.nodes[start1], graph2.nodes[start2]
             )
             result_graph.add_node(start1, **merged_start_props)
@@ -346,7 +346,7 @@ class SyncedGraphMinorFinder:
                     f"Matching template node {template_node_id} (idx {i}) with other node {other_node_id} (idx {best_match_idx})"
                 )
                 # Merge properties from both corresponding nodes
-                node_props = self.prop_manager.process_node_properties(
+                node_props = self.prop_manager.process_properties(
                     {},
                     template_graph.nodes[template_node_id],
                     other_graph.nodes[other_node_id],
@@ -405,7 +405,7 @@ class SyncedGraphMinorFinder:
         # Ensure the end critical node is in the result graph and connected
         if template_end_node not in result_graph:
             # Merge properties of the end critical points
-            merged_end_props = self.prop_manager.process_node_properties(
+            merged_end_props = self.prop_manager.process_properties(
                 {}, graph1.nodes[end1], graph2.nodes[end2]
             )
             result_graph.add_node(template_end_node, **merged_end_props)

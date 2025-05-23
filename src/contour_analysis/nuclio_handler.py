@@ -16,7 +16,6 @@ from service.graph_analysis.analyzers.contour_type_analyzer import ContourTypeAn
 from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
 from service.graph_analysis.analyzers.cycle_count_analyzer import CycleCountAnalyzer
 from service.graph_analysis.analyzers.graph_metrics_analyzer import GraphMetricsAnalyzer
-from service.graph_analysis.analyzers.curve_analyzer import CurveAnalyzer
 from visitors.relative_position_visitor import RelativePositionVisitor
 from visitors.angle_visitor import AngleVisitor
 from visitors.half_plane_visitor import HalfPlaneVisitor

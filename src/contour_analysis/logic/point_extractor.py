@@ -5,7 +5,6 @@ import math
 from model.point import (
     Point,
     CornerPoint,
-    InflectionPoint,
     IntersectionPoint,
     EndPoint,
     StartPoint,
@@ -54,33 +53,6 @@ class PointExtractor:
                     )
 
         return corner_points
-
-    def _extract_inflection_points(self) -> List[InflectionPoint]:
-        # This is a simplified implementation and may need to be refined
-        inflection_points = []
-        for node, node_data in self.graph.nodes(data=True):
-            if self.graph.degree(node) == 2:
-                neighbors = list(self.graph.neighbors(node))
-                curvature_before = self._calculate_curvature(
-                    self.graph.nodes[neighbors[0]], node, self.graph.nodes[neighbors[1]]
-                )
-                curvature_after = self._calculate_curvature(
-                    self.graph.nodes[node],
-                    self.graph.nodes[neighbors[1]],
-                    self.graph.nodes[list(self.graph.neighbors(neighbors[1]))[0]],
-                )
-                if curvature_before * curvature_after < 0:
-                    inflection_points.append(
-                        InflectionPoint(
-                            id=node_data["uuid"],
-                            x=float(node_data["x"]),
-                            y=float(node_data["y"]),
-                            curvature_before=curvature_before,
-                            curvature_after=curvature_after,
-                            nx_id=node,
-                        )
-                    )
-        return inflection_points
 
     def _extract_intersection_points(self) -> List[IntersectionPoint]:
         intersection_points = []

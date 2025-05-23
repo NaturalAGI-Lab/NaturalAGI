@@ -13,7 +13,7 @@ from src.logic.start_point_modifier import StartPointModifier
 from src.logic.start_point_picker import StartPointPicker
 from src.model.concept_result import ConceptFormationStep, ConceptResult
 from src.node_similarity_calculator import NodeSimilarityCalculator
-from src.property_handlers.property_handler_manager import PropertyHandlerManager
+from src.property_handlers import PropertyProcessor
 from src.synced_graph_algorithm import SyncedGraphMinorFinder
 
 
@@ -22,7 +22,7 @@ class CriticalPointConceptService:
         self.repository = ConceptCreationRepository(
             neo4j_uri, neo4j_user, neo4j_password
         )
-        self.prop_manager = PropertyHandlerManager()
+        self.prop_manager = PropertyProcessor()
         self.similarity_calculator = NodeSimilarityCalculator()
         self.critical_point_preprocessor = CriticalPointPreprocessor()
         self.logger = logging.getLogger(__name__)
@@ -62,7 +62,10 @@ class CriticalPointConceptService:
 
         # Get all image IDs for the session
         image_ids = self.repository.get_image_ids_for_session(session_id)
-        image_graphs = {image_id: self.repository.get_image_graph(image_id) for image_id in image_ids}
+        image_graphs = {
+            image_id: self.repository.get_image_graph(image_id)
+            for image_id in image_ids
+        }
         image_graphs = self._determine_start_point(image_graphs)
         steps_debug = []
         error_occurred = False
@@ -119,7 +122,7 @@ class CriticalPointConceptService:
                         resulted_concept=None if error_occurred else concept_graph,
                     )
                 )
-                
+
             if error_occurred:
                 break
 
@@ -141,20 +144,28 @@ class CriticalPointConceptService:
             is_error=error_occurred,
             error_message=error_message,
         )
-        
-    def _determine_start_point(self, image_graphs: Dict[str, nx.Graph]) -> Dict[str, nx.Graph]:
+
+    def _determine_start_point(
+        self, image_graphs: Dict[str, nx.Graph]
+    ) -> Dict[str, nx.Graph]:
         MAX_ITERATIONS = 15
         start_clustering_eps = 0.01
         eps_step = 0.05
         min_samples_coefficient = np.arange(0.4, 0.8)
         clustering_algorithm = "optics"
         start_point_characteristic = None
-        
-        start_point_picker = StartPointPicker(image_graphs.values(), clustering_algorithm=clustering_algorithm)
+
+        start_point_picker = StartPointPicker(
+            image_graphs.values(), clustering_algorithm=clustering_algorithm
+        )
         for min_samples_coefficient in min_samples_coefficient:
-            start_clustering_min_samples = int(len(image_graphs) * min_samples_coefficient)
+            start_clustering_min_samples = int(
+                len(image_graphs) * min_samples_coefficient
+            )
             for _ in range(MAX_ITERATIONS):
-                start_point_characteristic = start_point_picker.get_start_point_characteristic()
+                start_point_characteristic = (
+                    start_point_picker.get_start_point_characteristic()
+                )
                 if start_point_characteristic is not None:
                     break
                 start_point_picker.determine_start_point_characteristic(
@@ -165,18 +176,20 @@ class CriticalPointConceptService:
                 start_clustering_min_samples += 1
             if start_point_characteristic is not None:
                 break
-            
+
         if start_point_characteristic is None:
             self.logger.error("Could not determine start point characteristic")
             raise ValueError("Could not determine start point characteristic")
-            
+
         start_point_modifier = StartPointModifier(start_point_characteristic)
         for image_id, image_graph in image_graphs.items():
             self.logger.info(f"Determining start point for image {image_id}")
             start_point = start_point_picker.get_start_point_for_graph(image_graph)
             if start_point is not None:
                 self.logger.info(f"Start point for image {image_id}: {start_point}")
-                image_graph = start_point_modifier.change_start_point(image_graph, start_point)
+                image_graph = start_point_modifier.change_start_point(
+                    image_graph, start_point
+                )
                 image_graphs[image_id] = image_graph
             else:
                 self.logger.info(f"No start point found for image {image_id}")

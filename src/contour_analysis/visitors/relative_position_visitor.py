@@ -36,7 +36,7 @@ class RelativePositionVisitor(Visitor):
         # Find the bounding box and calculate center
         self._calculate_bounding_box_center()
 
-        self.segment_threshold = 0.2  # 20% threshold for center segments
+        self.segment_threshold = 0.05  # 20% threshold for center segments
         self.point_positions: Dict[str, RelativePosition] = {}
         self.vector_positions: Dict[str, RelativePosition] = {}
 

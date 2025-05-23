@@ -16,7 +16,7 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
     def __init__(self, node_similarity_calculator: NodeSimilarityCalculator):
         super().__init__(node_similarity_calculator)
         self.logger = logging.getLogger(__name__)
-        self.similarity_threshold = 0.5
+        self.similarity_threshold = 0.2
 
     def reduce(
         self, concept_graph: nx.Graph, image_graph: nx.Graph
