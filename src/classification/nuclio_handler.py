@@ -1,12 +1,12 @@
 """Generic Nuclio Handler Template"""
 
 import logging
+import multiprocessing as mp
 from kafka import KafkaProducer
 import json
 from pydantic_settings import BaseSettings
 from common import ClassificationParams
-from concept_minor_classifier import ConceptMinorClassifier
-from repository.concept_repository import ConceptRepository
+from classification_orchestrator import ClassificationOrchestrator
 from repository.image_repository import ImageRepository
 
 HANDLER_NAME = "classification"
@@ -38,10 +38,20 @@ def init_context(context):
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
 
+    # Initialize multiprocessing settings
+    try:
+        mp.set_start_method("fork", force=True)
+        context.logger.info_with(
+            "Multiprocessing start method set to 'fork'", handler=HANDLER_NAME
+        )
+    except Exception as e:
+        context.logger.warning_with(
+            f"Could not set multiprocessing start method: {e}", handler=HANDLER_NAME
+        )
+
 
 def kafka_handler(context, event):
     """Handles HTTP requests"""
-    # Parse the request body
     if isinstance(event.body, dict):
         data = event.body
     else:
@@ -54,18 +64,15 @@ def kafka_handler(context, event):
     delete_image_nodes = data["parameters"].get("delete_image_nodes", True)
     settings = Settings()
 
-    # Filter only the parameters that ClassificationParams expects
     classification_params_fields = {
         "ged_timeout",
-        # Add any other fields that ClassificationParams expects
     }
 
-    # Create params dict with only the relevant fields
     params = {
         key: value
         for key, value in {
-            **settings.model_dump(),  # Get all settings as defaults
-            **data["parameters"],  # Override with any provided parameters
+            **settings.model_dump(),
+            **data["parameters"],
         }.items()
         if key in classification_params_fields
     }
@@ -75,24 +82,21 @@ def kafka_handler(context, event):
     context.logger.info_with(
         f"Classification params: {classification_params}", handler=HANDLER_NAME
     )
-    concept_repository = ConceptRepository(
-        settings.neo4j_dsn,
-        settings.neo4j_user,
-        settings.neo4j_pass,
-    )
-    image_repository = ImageRepository(
-        settings.neo4j_dsn,
-        settings.neo4j_user,
-        settings.neo4j_pass,
-    )
-    classifier = ConceptMinorClassifier(
-        concept_repository,
-        image_repository,
-        max_workers=10,
-        use_multithreading=False,
+
+    # Get orchestrator parameters
+    use_multiprocessing = data["parameters"].get("use_multiprocessing", True)
+    max_workers_override = data["parameters"].get("max_workers")
+
+    # Create the classification orchestrator
+    orchestrator = ClassificationOrchestrator(
+        neo4j_dsn=settings.neo4j_dsn,
+        neo4j_user=settings.neo4j_user,
+        neo4j_pass=settings.neo4j_pass,
         ged_timeout=classification_params.ged_timeout,
+        max_workers_override=max_workers_override,
+        use_multiprocessing=use_multiprocessing,
     )
-    # Responding to the HTTP request
+
     producer = KafkaProducer(
         bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
         value_serializer=lambda v: json.dumps(v).encode("utf-8"),
@@ -102,11 +106,12 @@ def kafka_handler(context, event):
         if not image_id:
             raise ValueError("image_id must be provided in the request body")
 
-        # Perform graph comparison
-        comparison_results = classifier.classify(image_id)
+        # Perform classification using orchestrator
+        comparison_results = orchestrator.classify_image(image_id)
 
         context.logger.info_with(
-            f"Classification results: {comparison_results}", handler=HANDLER_NAME
+            f"Classification results: {len(comparison_results)} matches found",
+            handler=HANDLER_NAME,
         )
 
         producer.send(
@@ -133,9 +138,13 @@ def kafka_handler(context, event):
 
     finally:
         if delete_image_nodes:
+            image_repository = ImageRepository(
+                settings.neo4j_dsn,
+                settings.neo4j_user,
+                settings.neo4j_pass,
+            )
             image_repository.remove_image_nodes(image_id)
-        image_repository.close()
-        concept_repository.close()
+            image_repository.close()
         producer.close()
 
 
