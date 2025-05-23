@@ -254,7 +254,7 @@ dep_classification:
 		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 		-e NEO4J_USER=neo4j \
 		-e NEO4J_PASS=${NEO4J_PASS} \
-		-e GED_TIMEOUT=5
+		-e GED_TIMEOUT=15
 	@echo -e "${GREEN}Classification deployed.${NC}"
 
 dep_all: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification
