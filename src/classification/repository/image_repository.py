@@ -25,11 +25,12 @@ class ImageRepository:
                 node_labels,
                 node_props,
                 type(r) AS rel_type, 
+                elementId(r) AS rel_id,
                 elementId(m) AS target_id
         """
         with self.driver.session() as session:
             result = session.run(query, image_id=image_id)
-            return Neo4jToNetworkX.build_networkx_graph(result)
+            return Neo4jToNetworkX.build_networkx_graph(result, is_concept=False)
         
     def remove_image_nodes(self, image_id: str) -> None:
         query = """

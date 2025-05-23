@@ -22,8 +22,6 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str
     dlq_topic: str
     ged_timeout: float
-    feature_weight: float
-    structural_weight: float
 
 
 def init_context(context):
@@ -58,8 +56,6 @@ def kafka_handler(context, event):
 
     # Filter only the parameters that ClassificationParams expects
     classification_params_fields = {
-        "feature_weight",
-        "structural_weight",
         "ged_timeout",
         # Add any other fields that ClassificationParams expects
     }
@@ -94,6 +90,7 @@ def kafka_handler(context, event):
         image_repository,
         max_workers=10,
         use_multithreading=False,
+        ged_timeout=classification_params.ged_timeout,
     )
     # Responding to the HTTP request
     producer = KafkaProducer(

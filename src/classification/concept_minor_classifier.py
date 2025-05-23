@@ -3,7 +3,6 @@ import networkx as nx
 from typing import List, Dict, Any
 from concurrent.futures import ThreadPoolExecutor
 
-from property_handlers import PropertyMatcherManager
 from services.pre_processing.critical_point_preprocessor import (
     CriticalPointPreprocessor,
 )
@@ -12,6 +11,7 @@ from repository.image_repository import ImageRepository
 from models import ClassificationResult
 from services.pre_processing.complexity_preprocessor import ComplexityPreprocessor
 from services.pre_processing.start_point_preprocessor import StartPointPreprocessor
+from services.graph_complexity_service import GraphComplexityService
 from reduction_strategy.endpoint_strategy import EndpointReductionStrategy
 from reduction_strategy.intersection_strategy import IntersectionPointReductionStrategy
 from reduction_strategy.corner_point_reduction_strategy import (
@@ -41,7 +41,9 @@ class ConceptMinorClassifier:
         image_repository: ImageRepository,
         max_workers: int = 4,
         use_multithreading: bool = False,
-        complexity_preprocessor: ComplexityPreprocessor = ComplexityPreprocessor(),
+        ged_timeout: float = 15,
+        graph_complexity_service: GraphComplexityService = None,
+        complexity_preprocessor: ComplexityPreprocessor = None,
         critical_point_preprocessor: CriticalPointPreprocessor = CriticalPointPreprocessor(
             endpoint_reduction_strategy=EndpointReductionStrategy(
                 node_similarity_calculator=NodeSimilarityCalculator()
@@ -53,17 +55,26 @@ class ConceptMinorClassifier:
                 node_similarity_calculator=NodeSimilarityCalculator()
             ),
         ),
-        property_matcher: PropertyMatcherManager = PropertyMatcherManager(),
         start_point_preprocessor: StartPointPreprocessor = StartPointPreprocessor(),
     ):
         self.max_workers = max_workers
         self.use_multithreading = use_multithreading
-        self.property_matcher = property_matcher
         self.critical_point_preprocessor = critical_point_preprocessor
-        self.complexity_preprocessor = complexity_preprocessor
+
+        # Create graph_complexity_service if not provided
+        if graph_complexity_service is None:
+            self.graph_complexity_service = GraphComplexityService()
+
+        # Create complexity_preprocessor if not provided, using the injected graph_complexity_service
+        if complexity_preprocessor is None:
+            self.complexity_preprocessor = ComplexityPreprocessor(
+                graph_complexity_service=self.graph_complexity_service,
+            )
+
         self.concept_repository = concept_repository
         self.image_repository = image_repository
         self.start_point_preprocessor = start_point_preprocessor
+        self.ged_timeout = ged_timeout
 
     def classify(
         self,
@@ -164,7 +175,7 @@ class ConceptMinorClassifier:
                 image_graph=image_graph,
                 concept_graph=concept_graph,
                 concept_name=concept_id,
-                ged_timeout=10,
+                ged_timeout=self.ged_timeout,
             )
             logging.info(
                 f"Similarity between image and concept {concept_id}: {similarity}"
@@ -174,6 +185,12 @@ class ConceptMinorClassifier:
                 is_minor=True,
                 message=f"Similarity between image and concept {concept_id}: {similarity}",
                 similarity=similarity,
+                concept_complexity=self.graph_complexity_service.get_default_graph_complexity(
+                    concept_graph
+                ),
+                image_complexity=self.graph_complexity_service.get_default_graph_complexity(
+                    image_graph
+                ),
             )
         except Exception as e:
             logging.warning(
@@ -197,4 +214,8 @@ class ConceptMinorClassifier:
             if result.is_minor:
                 filtered_results.append(result)
 
-        return sorted(filtered_results, key=lambda x: x.similarity, reverse=True)
+        return sorted(
+            filtered_results,
+            key=lambda x: (x.similarity, x.concept_complexity),
+            reverse=True,
+        )

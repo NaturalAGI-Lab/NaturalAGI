@@ -5,8 +5,9 @@ from .cost_functions import (
     node_subst_cost,
     node_del_cost,
     node_ins_cost,
-    node_match,
     edge_match,
+    edge_del_cost,
+    edge_ins_cost,
 )
 
 logger = logging.getLogger(__name__)
@@ -30,11 +31,12 @@ class GraphEditDistanceComparator:
             ged = nx.graph_edit_distance(
                 image_graph,
                 concept_graph,
-                node_match=node_match,
-                edge_match=edge_match,
-                # node_subst_cost=node_subst_cost,
+                node_subst_cost=node_subst_cost,
                 node_del_cost=node_del_cost,
                 node_ins_cost=node_ins_cost,
+                edge_match=edge_match,
+                edge_del_cost=edge_del_cost,
+                edge_ins_cost=edge_ins_cost,
                 timeout=ged_timeout,
             )
 
@@ -46,6 +48,7 @@ class GraphEditDistanceComparator:
             # Convert GED to similarity score (inverse and normalize)
             max_possible_ged = max(len(image_graph) + len(concept_graph), 1)
             similarity = 1.0 - (ged / max_possible_ged)
+            similarity = round(similarity, 2)
             logging.info(
                 f"GED: {ged}, max_possible_ged: {max_possible_ged}, similarity: {similarity}"
             )

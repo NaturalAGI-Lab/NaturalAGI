@@ -7,3 +7,5 @@ class ClassificationResult:
     is_minor: bool
     message: str
     similarity: float = 0.0
+    concept_complexity: int = 0
+    image_complexity: int = 0

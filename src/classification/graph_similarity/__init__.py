@@ -3,7 +3,6 @@ from .cost_functions import (
     node_subst_cost,
     node_del_cost,
     node_ins_cost,
-    node_match,
     edge_match,
 )
 
@@ -12,6 +11,5 @@ __all__ = [
     "node_subst_cost",
     "node_del_cost",
     "node_ins_cost",
-    "node_match",
     "edge_match",
 ]

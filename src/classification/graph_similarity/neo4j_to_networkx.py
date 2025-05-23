@@ -2,7 +2,7 @@ import json
 import logging
 from typing import Dict
 import networkx as nx
-from neo4j import Session, Result
+from neo4j import Result
 
 logging.basicConfig(level=logging.INFO)
 
@@ -11,28 +11,7 @@ class Neo4jToNetworkX:
     """Responsible for converting Neo4j graphs to NetworkX format"""
 
     @staticmethod
-    def extract_image_graph(session: Session, image_id: str) -> nx.Graph:
-        """
-        Extracts a graph from Neo4j for a given image_id and converts it to NetworkX format.
-        This version excludes segment embedding (i.e. no Segment nodes or HAS_RELATIVE_POSITION edges).
-        """
-        query = """
-        MATCH (n {image_id: $image_id})
-        WHERE n:Point OR n:Vector
-        WITH n, labels(n) as node_labels, properties(n) as node_props
-        OPTIONAL MATCH (n)-[r]-(m {image_id: $image_id})
-        WITH n, node_labels, r, m, node_props
-        RETURN elementId(n) AS node_id, 
-               node_labels,
-               node_props,
-               type(r) AS rel_type, 
-               elementId(m) AS target_id
-        """
-        result = session.run(query, image_id=image_id)
-        return Neo4jToNetworkX.build_networkx_graph(result)
-
-    @staticmethod
-    def build_networkx_graph(result: Result) -> nx.Graph:
+    def build_networkx_graph(result: Result, is_concept: bool = False) -> nx.Graph:
         """
         Builds a NetworkX graph from a Neo4j result that includes segments.
         This is used by extract_concept_graph.
@@ -59,6 +38,7 @@ class Neo4jToNetworkX:
             parsed_properties["labels"] = record["node_labels"]
             node_data = {
                 "labels": set(record["node_labels"]),
+                "is_concept": is_concept,
                 **parsed_properties,
             }
             nodes[node_id] = node_data
@@ -68,8 +48,14 @@ class Neo4jToNetworkX:
 
         for record in records:
             # Add regular edges
-            if record["target_id"] is not None:
+            if record["target_id"] is not None and record["rel_id"] is not None:
                 G.add_edge(
-                    record["node_id"], record["target_id"], type=record["rel_type"]
+                    record["node_id"],
+                    record["target_id"],
+                    type=record["rel_type"],
+                    id=record["rel_id"],
+                    source=record["node_id"],
+                    target=record["target_id"],
+                    is_concept=is_concept,
                 )
         return G
