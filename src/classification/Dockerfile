@@ -26,7 +26,7 @@ RUN apt-get update && apt-get install -y \
 
 RUN pip install --upgrade pip
 RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-python neo4j Pillow networkx scipy grakel torch torch-geometric
-RUN pip install --upgrade natural-agi-common
+RUN pip install --upgrade natural-agi-common==0.1.19
 
 # Create models directory
 RUN mkdir -p /opt/nuclio/models

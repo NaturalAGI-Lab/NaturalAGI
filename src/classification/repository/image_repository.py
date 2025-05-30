@@ -1,7 +1,8 @@
 from neo4j import GraphDatabase
 import networkx as nx
 import logging
-from graph_similarity.neo4j_to_networkx import Neo4jToNetworkX
+from common.decorator import timed
+from .neo4j_to_networkx import Neo4jToNetworkX
 
 
 class ImageRepository:
@@ -11,9 +12,11 @@ class ImageRepository:
         self.neo4j_pass = neo4j_pass
         self.driver = GraphDatabase.driver(neo4j_dsn, auth=(neo4j_user, neo4j_pass))
         self.logger = logging.getLogger(__name__)
+
     def close(self):
         self.driver.close()
 
+    @timed(label="get_image_graph")
     def get_image_graph(self, image_id: str) -> nx.Graph:
         query = """
             MATCH (n {image_id: $image_id})
@@ -31,7 +34,7 @@ class ImageRepository:
         with self.driver.session() as session:
             result = session.run(query, image_id=image_id)
             return Neo4jToNetworkX.build_networkx_graph(result, is_concept=False)
-        
+
     def remove_image_nodes(self, image_id: str) -> None:
         query = """
             MATCH (n)

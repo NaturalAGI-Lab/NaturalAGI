@@ -1,4 +1,7 @@
 from typing import Any, Dict, List, Union
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def is_array(value: Any) -> bool:
@@ -38,7 +41,6 @@ def can_merge(value1: Any, value2: Any) -> bool:
     if value1 is None or value2 is None:
         return False
 
-    # TODO: For array-like properties (numpy arrays), just pick first value without complex logic
     if is_array(value1) and is_array(value2):
         return True
 
@@ -68,7 +70,6 @@ def merge_values(*values: Any) -> Any:
 
     first_value = filtered_values[0]
 
-    # TODO: For array-like properties (numpy arrays), just pick first value without complex logic
     if is_array(first_value):
         return first_value
 
@@ -95,7 +96,6 @@ def is_match(concept_value: Any, instance_value: Any) -> bool:
     if concept_value is None or instance_value is None:
         return concept_value == instance_value
 
-    # TODO: For array-like properties (numpy arrays), just do basic comparison for now
     if is_array(concept_value) and is_array(instance_value):
         try:
             return len(concept_value) == len(instance_value) and all(
@@ -195,6 +195,8 @@ class PropertyProcessor:
                 else:
                     # Remove property if values can't be merged
                     del result[key]
+            else:
+                logger.warning(f"Property {key} not found in G or H")
 
         # Add new properties that exist in both G and H
         for key in g_props:
@@ -204,6 +206,10 @@ class PropertyProcessor:
 
                 if can_merge(g_value, h_value):
                     result[key] = merge_values(g_value, h_value)
+                else:
+                    logger.warning(
+                        f"Property {key} cannot be merged: {g_value} and {h_value}"
+                    )
 
         return result
 

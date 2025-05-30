@@ -1,10 +1,10 @@
 import logging
-import multiprocessing as mp
 import os
 from typing import List, Dict, Any
 from concurrent.futures import ProcessPoolExecutor
 import networkx as nx
 
+from common.decorator import timed
 from concept_minor_classifier import ConceptMinorClassifier
 from repository.concept_repository import ConceptRepository
 from repository.image_repository import ImageRepository
@@ -62,8 +62,8 @@ class ClassificationOrchestrator:
         # Get CPU count
         cpu_count = os.cpu_count() or 1
 
-        # Use 75% of available CPUs, but at least 1 and at most 8
-        optimal_workers = max(1, min(8, int(cpu_count * 0.75)))
+        # Use all available CPUs, but at least 1 and at most 8
+        optimal_workers = max(1, min(8, cpu_count))
 
         logging.info(f"Detected {cpu_count} CPUs, using {optimal_workers} workers")
         return optimal_workers
@@ -259,7 +259,7 @@ class ClassificationOrchestrator:
         )
         return sorted_results
 
-
+@timed(label="process_single_concept")
 def _process_single_concept(work_package: Dict[str, Any]) -> ClassificationResult:
     """
     Worker function for processing a single concept in a separate process.

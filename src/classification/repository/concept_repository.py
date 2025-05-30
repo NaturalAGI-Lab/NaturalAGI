@@ -2,7 +2,8 @@ from typing import List
 from neo4j import GraphDatabase
 import networkx as nx
 
-from graph_similarity.neo4j_to_networkx import Neo4jToNetworkX
+from .neo4j_to_networkx import Neo4jToNetworkX
+from common.decorator import timed
 
 
 class ConceptRepository:
@@ -18,6 +19,7 @@ class ConceptRepository:
     def close(self):
         self.driver.close()
 
+    @timed(label="get_all_concept_ids")
     def get_all_concept_ids(self) -> List[str]:
         with self.driver.session() as session:
             concept_query = """

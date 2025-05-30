@@ -1,9 +1,12 @@
 import networkx as nx
 from typing import Dict, Any
+from common.decorator import timed
 
 
 class GraphDeserializer:
+
     @staticmethod
+    @timed(label="GraphDeserializer.deserialize")
     def deserialize(graph_dict: Dict[str, Any]) -> nx.Graph:
         """
         Deserialize a JSON string to a NetworkX graph.

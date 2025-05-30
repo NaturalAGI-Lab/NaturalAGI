@@ -1,6 +1,7 @@
 """Generic Nuclio Handler Template"""
 
 import json
+import time
 import cv2
 from kafka import KafkaProducer
 import traceback
@@ -30,72 +31,83 @@ def init_context(context):
 
 def kafka_handler(context, event):
     """Handles Kafka messages"""
-    
-    # Get JSON from the event.body
+
     data = json.loads(event.body)
+    producer = None
+
     try:
+        start_time = time.time_ns()
+        context.logger.info_with(f"Received request: {data}", handler=HANDLER_NAME)
+
+        operation = data.get("operation")
+        parameters = data.get("parameters", {})
 
         context.logger.info_with(
-            f"Received request: {data}", handler=HANDLER_NAME
+            f"Received request: {event.trigger.kind}", handler=HANDLER_NAME
         )
-        
-        operation = data.get('operation')
-        parameters = data.get('parameters', {})
-        
-        context.logger.info_with(f"Received request: {event.trigger.kind}", handler=HANDLER_NAME)
         context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
         context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
 
         image = cv2.imread(parameters["image_path"], 0)
-        
+
         image_width = image.shape[1]
         image_height = image.shape[0]
-        
+
         parameters["image_width"] = image_width
         parameters["image_height"] = image_height
-        
+
         settings = Settings()
-        skeletonization_threshold = parameters.get("skeletonization_threshold", settings.skeletonization_threshold)
-        simplification_epsilon = parameters.get("simplification_epsilon", settings.simplification_epsilon)
-        net, threshold = SkeletonGNGMapper(settings, skeletonization_threshold, simplification_epsilon).process_image(image)
+        skeletonization_threshold = parameters.get(
+            "skeletonization_threshold", settings.skeletonization_threshold
+        )
+        simplification_epsilon = parameters.get(
+            "simplification_epsilon", settings.simplification_epsilon
+        )
+        net, threshold = SkeletonGNGMapper(
+            settings, skeletonization_threshold, simplification_epsilon
+        ).process_image(image)
         data["parameters"]["skeletonization_threshold"] = threshold
         data["parameters"]["simplification_epsilon"] = simplification_epsilon
-        
+
         json_net = GraphSerializer.serialize(net)
         context.logger.info_with(f"Net: {json_net}", handler=HANDLER_NAME)
 
-        context.logger.info_with(
-            "Processed request successfully", handler=HANDLER_NAME
-        )
+        context.logger.info_with("Processed request successfully", handler=HANDLER_NAME)
         data["skeleton"] = json_net
-        
+
+        if "profiling" not in data:
+            data["profiling"] = {}
+        data["profiling"]["skeletonization_time_ms"] = (
+            time.time_ns() - start_time
+        ) / 1_000_000
+
         producer = KafkaProducer(
             bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
-        producer.send(
-            context.user_data.kafka_topic,
-            value=data
-        )
+        producer.send(context.user_data.kafka_topic, value=data)
 
     except Exception as e:
         context.logger.warn_with(f"Error: {e}", handler=HANDLER_NAME)
         traceback.print_exc()
 
+        settings = Settings()
         dlq_model = DLQModel(
             source=HANDLER_NAME,
-            error= {
-                "error": str(e),
-                "traceback": traceback.format_exc()
-            },
-            value=data
+            error={"error": str(e), "traceback": traceback.format_exc()},
+            value=data,
         )
-        context.user_data.kafka_producer.send(
-            context.user_data.dlq_topic,
-            value=dlq_model.model_dump()
+
+        dlq_producer = KafkaProducer(
+            bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
+        dlq_producer.send(context.user_data.dlq_topic, value=dlq_model.model_dump())
+        dlq_producer.close()
+
     finally:
-        producer.close()
+        if producer:
+            producer.close()
 
 
 def handler(context, event):

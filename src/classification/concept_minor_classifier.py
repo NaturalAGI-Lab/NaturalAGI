@@ -19,6 +19,7 @@ from node_similarity_calculator import NodeSimilarityCalculator
 from graph_similarity.graph_edit_distance_comparator import (
     GraphEditDistanceComparator,
 )
+from common.decorator import timed
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -67,6 +68,7 @@ class ConceptMinorClassifier:
         self.start_point_preprocessor = start_point_preprocessor
         self.ged_timeout = ged_timeout
 
+    @timed(label="check_single_concept")
     def check_single_concept(
         self,
         image_graph: nx.Graph,
@@ -111,7 +113,7 @@ class ConceptMinorClassifier:
                 )
             )
             similarity = GraphEditDistanceComparator.compare_graphs_ged(
-                image_graph=preprocessed_image_graph,
+                image_graph=image_graph,
                 concept_graph=concept_graph,
                 concept_name=concept_id,
                 ged_timeout=self.ged_timeout,

@@ -16,11 +16,10 @@ properties = [
     "segments",
     "normalized_x",
     "normalized_y",
-    "relative_distance",
-    "cycle_count",
-    "vertical_direction",
-    "horizontal_direction",
-    "labels",
+    # "angle_with_ox",
+    # "relative_distance",
+    # "vertical_direction",
+    # "horizontal_direction",
 ]
 
 
@@ -41,13 +40,16 @@ def edge_del_cost(edge_data: Any) -> float:
     if edge_data.get("is_concept"):
         return NodeCost.IMPOSSIBLE.value
     else:
-        return NodeCost.GENERAL.value
+        return NodeCost.MINOR.value
 
-def edge_ins_cost(_: Any) -> float:
+def edge_ins_cost(edge_data: Any) -> float:
     """
     Cost function for edge insertion.
     """
-    return NodeCost.IMPOSSIBLE.value
+    if edge_data.get("is_concept"):
+        return NodeCost.IMPOSSIBLE.value
+    else:
+        return NodeCost.GENERAL.value
 
 def node_subst_cost(image_node_data: Any, concept_node_data: Any) -> float:
     """
@@ -74,7 +76,7 @@ def node_del_cost(node_data: Any) -> float:
     Cost function for node deletion.
     """
     is_concept = node_data.get("concept_id") is not None
-    return NodeCost.IMPOSSIBLE.value if is_concept else NodeCost.GENERAL.value
+    return NodeCost.IMPOSSIBLE.value if is_concept else NodeCost.MINOR.value
 
 
 def node_ins_cost(_: Any) -> float:
@@ -93,6 +95,10 @@ def _check_labels_match(image_node_data: Any, concept_node_data: Any) -> bool:
 
     if not image_labels or not concept_labels:
         raise ValueError("Labels are not present in the node data")
+    
+    # TODO experimantal
+    if len(concept_labels.intersection(image_labels)) > 0:
+        return True
 
     if concept_labels.issubset(image_labels):
         return True
@@ -251,26 +257,17 @@ def _calculate_list_similarity_cost(concept_list: list, image_list: list) -> flo
     if not concept_list and not image_list:
         return NodeCost.NO_COST.value
 
-    if not concept_list or not image_list:
-        return NodeCost.NO_COST.value
+    if not concept_list and image_list:
+        return NodeCost.NO_MATCH.value
 
     concept_set = set(concept_list)
     image_set = set(image_list)
 
-    intersection = concept_set.intersection(image_set)
-    union = concept_set.union(image_set)
-
-    if not intersection:
-        return NodeCost.NO_MATCH.value
-
-    jaccard_similarity = len(intersection) / len(union)
-
-    if jaccard_similarity >= 0.9:
+    if concept_set.issubset(image_set):
         return NodeCost.NO_COST.value
-    elif jaccard_similarity >= 0.7:
-        return NodeCost.MINOR.value
     else:
         return NodeCost.NO_MATCH.value
+
 
 
 def _match(concept_value: Any, image_value: Any) -> bool:

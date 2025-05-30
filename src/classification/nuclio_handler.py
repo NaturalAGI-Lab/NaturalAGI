@@ -2,6 +2,7 @@
 
 import logging
 import multiprocessing as mp
+import time
 from kafka import KafkaProducer
 import json
 from pydantic_settings import BaseSettings
@@ -52,6 +53,7 @@ def init_context(context):
 
 def kafka_handler(context, event):
     """Handles HTTP requests"""
+    start_time = time.time_ns()
     if isinstance(event.body, dict):
         data = event.body
     else:
@@ -61,6 +63,7 @@ def kafka_handler(context, event):
         return
 
     image_id = data["parameters"]["image_id"]
+    profiling = data["profiling"]
     delete_image_nodes = data["parameters"].get("delete_image_nodes", True)
     settings = Settings()
 
@@ -114,6 +117,7 @@ def kafka_handler(context, event):
             handler=HANDLER_NAME,
         )
 
+        profiling["classification_time_ms"] = (time.time_ns() - start_time) / 1_000_000
         producer.send(
             context.user_data.kafka_topic,
             value={
@@ -124,6 +128,7 @@ def kafka_handler(context, event):
                 "image_id": image_id,
                 "image_path": data["parameters"]["image_path"],
                 "parameters": {**params, **data["parameters"]},
+                "profiling": profiling,
             },
         )
 
