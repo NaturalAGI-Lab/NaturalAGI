@@ -24,20 +24,6 @@ class CornerPoint(Point):
     line1: str
     line2: str
 
-
-@dataclass
-class InflectionPoint(Point):
-    """
-    #TODO not used for now. Implement support for it later
-
-    An inflection point is where the curvature of a contour changes sign,
-    i.e., where it transitions from being concave to convex or vice versa.
-    """
-
-    curvature_before: float
-    curvature_after: float
-
-
 @dataclass
 class IntersectionPoint(Point):
     """

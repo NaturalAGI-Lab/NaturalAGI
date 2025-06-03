@@ -16,11 +16,14 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
     def __init__(self, node_similarity_calculator: NodeSimilarityCalculator):
         super().__init__(node_similarity_calculator)
         self.logger = logging.getLogger(__name__)
-        self.similarity_threshold = 0.25
+        self.similarity_threshold = 0.2
 
     def reduce(
         self, concept_graph: nx.Graph, image_graph: nx.Graph
     ) -> Tuple[nx.Graph, nx.Graph]:
+        concept_graph = self._apply_degree_reduction(concept_graph)
+        image_graph = self._apply_degree_reduction(image_graph)
+
         concept_endpoints = self._get_endpoints(concept_graph)
         image_endpoints = self._get_endpoints(image_graph)
 
@@ -120,6 +123,14 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
                 image_graph, excess_endpoints_to_remove
             )
         return concept_graph, image_graph
+
+    def _apply_degree_reduction(self, graph: nx.Graph) -> nx.Graph:
+        for node, data in graph.nodes(data=True):
+            if GraphUtils.is_endpoint(data) and not graph.degree(node) == 1:
+                self.logger.info(f"Node {node} is an endpoint but has degree {graph.degree(node)}. Removing endpoint label and adding corner point label.")
+                graph.nodes[node]["labels"].remove(CriticalPointType.END_POINT.value)
+                graph.nodes[node]["labels"].append(CriticalPointType.CORNER_POINT.value)
+        return graph
 
     def _get_endpoints(self, graph: nx.Graph) -> List[Any]:
         return [

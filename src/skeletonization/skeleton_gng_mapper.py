@@ -79,11 +79,13 @@ class SkeletonGNGMapper:
             self.logger.error(f"Failed to process image: {str(e)}")
             raise
 
-    def binary_image(self, image):
-        return image > self.skeletonization_threshold
+    def binary_image(self, image, threshold=None):
+        if threshold is None:
+            threshold = self.skeletonization_threshold
+        return image > threshold
 
-    def skeletonize(self, image):
-        binary = self.binary_image(image)
+    def skeletonize(self, image, threshold=None):
+        binary = self.binary_image(image, threshold)
         skeleton = skeletonize(binary)
         return skeleton
 

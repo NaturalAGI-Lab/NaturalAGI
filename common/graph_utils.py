@@ -1,4 +1,5 @@
 import collections
+from functools import singledispatch
 from typing import Any, Dict, Set
 
 import networkx as nx
@@ -71,6 +72,9 @@ class GraphUtils:
                 if neighbor not in visited and neighbor != prev_point:
                     queue.append(neighbor)
 
+        if prev_point is None:
+            return None
+        
         # Check if there is a loop back to the previous point, so it's not considered of backtracking, but rather a loop that returns back to the previous point
         number_of_paths_back = len(
             list(nx.all_simple_paths(graph, prev_point, start_point))

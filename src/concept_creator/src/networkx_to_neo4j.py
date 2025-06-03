@@ -3,6 +3,7 @@ import networkx as nx
 from neo4j import ManagedTransaction
 import uuid
 import logging
+import numpy as np
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,13 @@ class NetworkxToNeo4j:
                 "uuid": uu_id,
             }
             # Add all other properties except labels
-            props.update({k: NetworkxToNeo4j.serialize_value(v) for k, v in data.items() if k != "labels"})
+            props.update(
+                {
+                    k: NetworkxToNeo4j.serialize_value(v)
+                    for k, v in data.items()
+                    if k != "labels"
+                }
+            )
 
             # Create node with all its labels
             labels_str = ":".join(labels)
@@ -53,8 +60,10 @@ class NetworkxToNeo4j:
             """
             tx.run(query, concept_id=concept_id, u_uuid=u_uuid, v_uuid=v_uuid)
         logger.info(f"Created structure for concept {concept_id}")
-        logger.info(f"Created {len(graph.nodes())} nodes and {len(graph.edges())} edges")
-        
+        logger.info(
+            f"Created {len(graph.nodes())} nodes and {len(graph.edges())} edges"
+        )
+
     # Helper functions for serialization
     @staticmethod
     def is_primitive(value):
@@ -62,7 +71,9 @@ class NetworkxToNeo4j:
 
     @staticmethod
     def is_list_of_primitives(value):
-        return isinstance(value, list) and all(NetworkxToNeo4j.is_primitive(item) for item in value)
+        return isinstance(value, list) and all(
+            NetworkxToNeo4j.is_primitive(item) for item in value
+        )
 
     @staticmethod
     def needs_serialization(value):
@@ -75,7 +86,9 @@ class NetworkxToNeo4j:
 
     @staticmethod
     def serialize_value(value):
-        if NetworkxToNeo4j.needs_serialization(value):
+        if isinstance(value, np.ndarray):
+            return json.dumps(value.tolist())
+        elif NetworkxToNeo4j.needs_serialization(value):
             return json.dumps(value)
         else:
             return value

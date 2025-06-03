@@ -176,7 +176,7 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
                     relink_edges.add((nbr, target_node))
 
         if all_nodes_to_remove:
-            self.logger.info(f"Removing {len(all_nodes_to_remove)} nodes from graph.")
+            self.logger.info(f"Removing {len(all_nodes_to_remove)} nodes from graph. Nodes to remove: {all_nodes_to_remove}")
             graph.remove_nodes_from(all_nodes_to_remove)
             self.logger.info(f"Graph after reduction has {len(graph.nodes)} nodes.")
 

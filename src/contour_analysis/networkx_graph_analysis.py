@@ -7,7 +7,7 @@ from service.visitor_result_persistence_service import VisitorResultPersistenceS
 from service.analysis_result_persistence_service import AnalysisResultPersistenceService
 from service.graph_analysis.analyzers.base_analyzer import BaseAnalyzer
 from visitors.visitor import Visitor
-
+from common.decorator import timed
 
 class NetworkxGraphAnalysis:
     def __init__(
@@ -32,6 +32,7 @@ class NetworkxGraphAnalysis:
         analyzer = analyzer_class(self.graph)
         self.analyzers.append(analyzer)
 
+    @timed(label="merge_close_intersection_points")
     def merge_close_intersection_points(self, threshold_distance: float = None):
         """
         Merges intersection points that are close to each other and connected by a short vector.

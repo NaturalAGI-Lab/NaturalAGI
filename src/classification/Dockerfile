@@ -18,16 +18,29 @@ COPY --from=processor /home/nuclio/bin/processor /usr/local/bin/processor
 COPY --from=processor /home/nuclio/bin/py /opt/nuclio/
 COPY --from=uhttpc /home/nuclio/bin/uhttpc /usr/local/bin/uhttpc
 
-RUN apt-get update && apt-get install -y libgl1-mesa-glx
+# Install system dependencies for multiprocessing and graphics
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 RUN pip install --upgrade pip
-RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-python neo4j Pillow networkx scipy grakel natural-agi-common==0.1.4 torch torch-geometric
+RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-python neo4j Pillow networkx scipy grakel torch torch-geometric
+RUN pip install --upgrade natural-agi-common==0.1.19
 
 # Create models directory
 RUN mkdir -p /opt/nuclio/models
 
 # Copy model file - make sure to add your model file to the src/classification/models directory
 COPY models/*.pth /opt/nuclio/models/
+
+# Set environment variables for better multiprocessing performance
+ENV PYTHONUNBUFFERED=1
+ENV OMP_NUM_THREADS=1
+ENV OPENBLAS_NUM_THREADS=1
+ENV MKL_NUM_THREADS=1
+ENV VECLIB_MAXIMUM_THREADS=1
+ENV NUMEXPR_NUM_THREADS=1
 
 # Readiness probe
 HEALTHCHECK --interval=1s --timeout=3s CMD /usr/local/bin/uhttpc --url http://127.0.0.1:8082/ready || exit 1

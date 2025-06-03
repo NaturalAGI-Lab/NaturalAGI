@@ -64,6 +64,8 @@ lib:
 	@twine upload dist/* --verbose
 	@rm -rf dist
 	@echo -e "${GREEN}Library built and uploaded.${NC}"
+	@pip install --upgrade natural-agi-common
+	@echo -e "${GREEN}Library installed.${NC}"
 
 start_services:
 	@echo -e "${BLUE}Starting Docker services...${NC}"
@@ -252,10 +254,7 @@ dep_classification:
 		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 		-e NEO4J_USER=neo4j \
 		-e NEO4J_PASS=${NEO4J_PASS} \
-		-e GED_TIMEOUT=5 \
-		-e FEATURE_WEIGHT=0.6 \
-		-e STRUCTURAL_WEIGHT=0.4 \
-		-e USE_ENERGY_MINIMIZATION=${USE_ENERGY_MINIMIZATION}
+		-e GED_TIMEOUT=15
 	@echo -e "${GREEN}Classification deployed.${NC}"
 
 dep_all: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification

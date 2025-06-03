@@ -1,5 +1,6 @@
 import json
 import traceback
+import time
 
 from kafka import KafkaProducer
 from pydantic_settings import BaseSettings
@@ -16,7 +17,6 @@ from service.graph_analysis.analyzers.contour_type_analyzer import ContourTypeAn
 from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
 from service.graph_analysis.analyzers.cycle_count_analyzer import CycleCountAnalyzer
 from service.graph_analysis.analyzers.graph_metrics_analyzer import GraphMetricsAnalyzer
-from service.graph_analysis.analyzers.curve_analyzer import CurveAnalyzer
 from visitors.relative_position_visitor import RelativePositionVisitor
 from visitors.angle_visitor import AngleVisitor
 from visitors.half_plane_visitor import HalfPlaneVisitor
@@ -88,6 +88,7 @@ def init_context(context):
 def kafka_handler(context, event):
     """Handles Kafka messages"""
     try:
+        start_time = time.time_ns()
         context.logger.info_with(
             f"New event received: {event.trigger.kind}", handler=HANDLER_NAME
         )
@@ -95,6 +96,7 @@ def kafka_handler(context, event):
 
         operation = input_data["operation"]
         parameters = input_data["parameters"]
+        profiling = input_data["profiling"]
         session_id = parameters["session_id"]
         image_id = parameters["image_id"]
 
@@ -123,7 +125,7 @@ def kafka_handler(context, event):
         networkx_graph_analysis.add_visitor(QuadrantVisitor())
         # networkx_graph_analysis.add_visitor(LengthComparisonVisitor())
         networkx_graph_analysis.add_visitor(AngleVisitor(network))
-        networkx_graph_analysis.add_visitor(HalfPlaneVisitor(network))
+        # networkx_graph_analysis.add_visitor(HalfPlaneVisitor(network))
         networkx_graph_analysis.add_visitor(
             RelativePositionVisitor(
                 network, parameters["image_width"], parameters["image_height"]
@@ -134,7 +136,7 @@ def kafka_handler(context, event):
         networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
         networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
         networkx_graph_analysis.add_analyzer(CycleCountAnalyzer)
-        networkx_graph_analysis.add_analyzer(GraphMetricsAnalyzer)
+        # networkx_graph_analysis.add_analyzer(GraphMetricsAnalyzer)
         # networkx_graph_analysis.add_analyzer(CurveAnalyzer)
         networkx_graph_analysis.analyze_graph(image_id, session_id)
 
@@ -146,9 +148,10 @@ def kafka_handler(context, event):
             bootstrap_servers=context.user_data.settings.kafka_bootstrap_servers.split(","),
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
+        profiling["contour_analysis_time_ms"] = (time.time_ns() - start_time) / 1_000_000
         producer.send(
             context.user_data.kafka_topic,
-            value={"operation": operation, "parameters": parameters},
+            value={"operation": operation, "parameters": parameters, "profiling": profiling},
         )
 
         context.logger.info_with(

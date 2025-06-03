@@ -4,6 +4,8 @@ from .minor_check import find_common_minors_in_dataset_return_biggest, is_minor
 from .critical_graph_utils import CriticalGraphUtils
 from .critical_point import CriticalPoint, CriticalPointType
 from .graph_utils import GraphUtils
+from .decorator import timed
+
 __all__ = [
     "DLQModel",
     "ContourType",
@@ -15,4 +17,5 @@ __all__ = [
     "CriticalPoint",
     "CriticalPointType",
     "GraphUtils",
+    "timed",
 ]
