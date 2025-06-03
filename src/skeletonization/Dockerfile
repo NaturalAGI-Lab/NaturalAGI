@@ -21,7 +21,7 @@ COPY --from=uhttpc /home/nuclio/bin/uhttpc /usr/local/bin/uhttpc
 RUN apt-get update && apt-get install -y libgl1-mesa-glx
 
 RUN pip install --upgrade pip
-RUN pip install msgpack nuclio_sdk pydantic pydantic-settings opencv-python neo4j Pillow
+RUN pip install msgpack nuclio_sdk pydantic pydantic-settings opencv-python neo4j Pillow skan
 RUN pip install --upgrade natural-agi-common
 
 # Readiness probe

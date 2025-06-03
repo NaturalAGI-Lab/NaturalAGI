@@ -12,15 +12,17 @@ class NodeCost(enum.Enum):
     IMPOSSIBLE = 100.0
 
 
-properties = [
-    "segments",
-    "normalized_x",
-    "normalized_y",
-    # "angle_with_ox",
-    # "relative_distance",
-    # "vertical_direction",
-    # "horizontal_direction",
-]
+class FeatureLevel(enum.Enum):
+    HIGH_LEVEL = ["segments"]
+    LOW_LEVEL = [
+        "normalized_x",
+        "normalized_y",
+        # "angle_with_ox",
+        # "angle",
+        # "quadrant_change_count",
+        # "intersection_points_count",
+        # "endpoints_count",
+    ]
 
 
 logger = logging.getLogger(__name__)
@@ -33,6 +35,7 @@ def edge_match(_: Any, __: Any) -> bool:
     """
     return True
 
+
 def edge_del_cost(edge_data: Any) -> float:
     """
     Cost function for edge deletion.
@@ -40,7 +43,8 @@ def edge_del_cost(edge_data: Any) -> float:
     if edge_data.get("is_concept"):
         return NodeCost.IMPOSSIBLE.value
     else:
-        return NodeCost.MINOR.value
+        return NodeCost.GENERAL.value
+
 
 def edge_ins_cost(edge_data: Any) -> float:
     """
@@ -51,7 +55,8 @@ def edge_ins_cost(edge_data: Any) -> float:
     else:
         return NodeCost.GENERAL.value
 
-def node_subst_cost(image_node_data: Any, concept_node_data: Any) -> float:
+
+def node_subst_cost(image_node_data: Any, concept_node_data: Any) -> bool:
     """
     Cost function for node substitution.
     """
@@ -64,7 +69,10 @@ def node_subst_cost(image_node_data: Any, concept_node_data: Any) -> float:
         )
 
         total_cost = labels_cost + properties_cost
-        return min(total_cost, NodeCost.NO_MATCH.value)
+        if total_cost < NodeCost.NO_MATCH.value:
+            return True
+        else:
+            return False
 
     except Exception as e:
         logger.error(f"Error calculating node substitution cost: {e}")
@@ -95,9 +103,9 @@ def _check_labels_match(image_node_data: Any, concept_node_data: Any) -> bool:
 
     if not image_labels or not concept_labels:
         raise ValueError("Labels are not present in the node data")
-    
+
     # TODO experimantal
-    if len(concept_labels.intersection(image_labels)) > 0:
+    if concept_labels.intersection(image_labels):
         return True
 
     if concept_labels.issubset(image_labels):
@@ -123,11 +131,14 @@ def _calculate_properties_similarity_cost(
     image_node_data: Any, concept_node_data: Any
 ) -> float:
 
+    feature_level = _check_feature_level(concept_node_data, image_node_data)
+    properties_to_check = FeatureLevel.HIGH_LEVEL.value + FeatureLevel.LOW_LEVEL.value
+
     total_cost = 0.0
     properties_checked = 0
-    max_prop_penalty = 1.0 / len(properties)
+    max_prop_penalty = 1.0 / len(properties_to_check)
 
-    for property_name in properties:
+    for property_name in properties_to_check:
         concept_value = concept_node_data.get(property_name)
         image_value = image_node_data.get(property_name)
 
@@ -141,7 +152,7 @@ def _calculate_properties_similarity_cost(
             continue
 
         property_cost = _calculate_property_similarity_cost(
-            concept_value, image_value, property_name
+            concept_value, image_value, property_name, max_prop_penalty
         )
         total_cost += min(property_cost, max_prop_penalty)
         properties_checked += 1
@@ -150,7 +161,7 @@ def _calculate_properties_similarity_cost(
 
 
 def _calculate_property_similarity_cost(
-    concept_value: Any, image_value: Any, property_name: str = None
+    concept_value: Any, image_value: Any, property_name: str = None, max_cost: float = NodeCost.NO_MATCH.value
 ) -> float:
     if concept_value == image_value:
         return NodeCost.NO_COST.value
@@ -160,7 +171,7 @@ def _calculate_property_similarity_cost(
             return _calculate_number_similarity_cost(concept_value, image_value)
 
         elif _is_range(concept_value) and _is_number(image_value):
-            return _calculate_range_similarity_cost(concept_value, image_value)
+            return _calculate_range_similarity_cost(concept_value, image_value, max_cost)
 
         elif _is_string(concept_value) and _is_string(image_value):
             return _calculate_string_similarity_cost(concept_value, image_value)
@@ -208,11 +219,12 @@ def _calculate_number_similarity_cost(
 
 
 def _calculate_range_similarity_cost(
-    concept_range: dict, image_num: Union[int, float]
+    concept_range: dict, image_num: Union[int, float], max_cost: float
 ) -> float:
     try:
         min_val = concept_range["min"]
         max_val = concept_range["max"]
+        center = concept_range["center"]
 
         if not _is_number(min_val) or not _is_number(max_val):
             raise ValueError(f"Invalid range values: min={min_val}, max={max_val}")
@@ -220,23 +232,30 @@ def _calculate_range_similarity_cost(
         if min_val > max_val:
             raise ValueError(f"Invalid range: min ({min_val}) > max ({max_val})")
 
-        if min_val <= image_num <= max_val:
-            return NodeCost.NO_COST.value
-
-        range_width = max_val - min_val
-
-        if image_num < min_val:
-            distance = min_val - image_num
-        else:
-            distance = image_num - max_val
-
-        if range_width == 0:
+        if not (min_val <= image_num <= max_val):
             return NodeCost.NO_MATCH.value
 
-        penalty_ratio = min(distance / range_width, 10.0)
-        penalty_cost = NodeCost.MINOR.value * penalty_ratio
-
-        return min(penalty_cost, NodeCost.NO_MATCH.value)
+         # Value is within range - calculate distance-based cost
+        range_width = max_val - min_val
+        
+        # Handle single point range
+        if range_width == 0:
+            return NodeCost.NO_COST.value
+        
+        # Calculate distance from range center
+        distance_from_center = abs(image_num - center)
+        
+        # Normalize distance (0.0 at center, 0.5 at edges)
+        normalized_distance = distance_from_center / (range_width / 2.0)
+        
+        # Apply graduated cost: closer to center = lower cost
+        # Use cosine similarity inspired approach for smooth gradation
+        cost_factor = normalized_distance  # Linear factor from 0 to 1
+        
+        # Scale between NO_COST and MINOR based on position
+        graduated_cost = NodeCost.NO_COST.value + (max_cost * cost_factor)
+        
+        return min(graduated_cost, max_cost)
 
     except Exception as e:
         logger.error(f"Error in range similarity calculation: {e}", exc_info=True)
@@ -269,20 +288,47 @@ def _calculate_list_similarity_cost(concept_list: list, image_list: list) -> flo
         return NodeCost.NO_MATCH.value
 
 
-
-def _match(concept_value: Any, image_value: Any) -> bool:
+def _check_feature_level(
+    concept_properties: dict, image_properties: dict
+) -> FeatureLevel:
     """
-    Match function.
+    Check if the feature level is high.
     """
-    is_concept_range = isinstance(concept_value, dict)
-    is_str = isinstance(concept_value, str)
-    is_list = isinstance(concept_value, list)
+    high_level_properties = set(FeatureLevel.HIGH_LEVEL.value)
 
-    if is_concept_range:
-        return concept_value["min"] <= image_value <= concept_value["max"]
-    elif is_str:
-        return concept_value.lower() == image_value.lower()
-    elif is_list:
-        return concept_value in image_value
-    else:
-        return concept_value == image_value
+    for prop_name in high_level_properties:
+        if not _check_property_existence(
+            prop_name, concept_properties, image_properties
+        ):
+            return FeatureLevel.LOW_LEVEL
+
+    return FeatureLevel.HIGH_LEVEL
+
+
+def _check_property_existence(
+    prop_name: str, concept_properties: dict, image_properties: dict
+) -> bool:
+    if (
+        prop_name not in concept_properties.keys()
+        or prop_name not in image_properties.keys()
+    ):
+        return False
+    if concept_properties[prop_name] is None or image_properties[prop_name] is None:
+        return False
+    if isinstance(concept_properties[prop_name], dict) and isinstance(
+        image_properties[prop_name], dict
+    ):
+        if (
+            len(concept_properties[prop_name].keys()) == 0
+            or len(image_properties[prop_name].keys()) == 0
+        ):
+            return False
+    if isinstance(concept_properties[prop_name], list) and isinstance(
+        image_properties[prop_name], list
+    ):
+        if (
+            len(concept_properties[prop_name]) == 0
+            or len(image_properties[prop_name]) == 0
+        ):
+            return False
+    return True

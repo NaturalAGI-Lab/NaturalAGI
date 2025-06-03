@@ -21,7 +21,7 @@ COPY --from=uhttpc /home/nuclio/bin/uhttpc /usr/local/bin/uhttpc
 RUN apt-get update && apt-get install -y libgl1-mesa-glx
 
 RUN pip install --upgrade pip
-RUN pip install msgpack nuclio_sdk pydantic pydantic-settings opencv-python neo4j Pillow scikit-learn sklearn
+RUN pip install msgpack nuclio_sdk pydantic pydantic-settings opencv-python neo4j Pillow scikit-learn sklearn numpy networkx scipy
 RUN pip install --upgrade natural-agi-common==0.1.18
 
 # Readiness probe

@@ -1,7 +1,8 @@
 import logging
 import numpy as np
 import networkx as nx
-from skimage.morphology import skeletonize
+from skan import Skeleton, summarize
+from skimage.morphology import closing, square, remove_small_objects, skeletonize
 import gng
 from settings import Settings
 from network_simplification import NetworkSimplification
@@ -79,15 +80,27 @@ class SkeletonGNGMapper:
             self.logger.error(f"Failed to process image: {str(e)}")
             raise
 
-    def binary_image(self, image, threshold=None):
-        if threshold is None:
-            threshold = self.skeletonization_threshold
-        return image > threshold
+    def binary_image(self, image, threshold):
+        binary = image > threshold
+        binary = remove_small_objects(binary, min_size=10)
+        binary = closing(binary, square(3))
+        return binary
 
-    def skeletonize(self, image, threshold=None):
+    def skeletonize(self, image, threshold):
         binary = self.binary_image(image, threshold)
         skeleton = skeletonize(binary)
-        return skeleton
+        MIN_BRANCH_LEN = 7  # pixels; adjust to taste
+        sk = Skeleton(skeleton, source_image=binary)
+        summary  = summarize(sk, separator='_')   # use '_' for nicer column names
+
+        # junction-to-endpoint branches shorter than MIN_BRANCH_LEN
+        short_branches = summary[
+            (summary.branch_type == 1) &          # 1 = junction → endpoint
+            (summary.branch_distance < MIN_BRANCH_LEN)
+        ].index                                    # <- the row index *is* the branch id
+
+        sk = sk.prune_paths(short_branches)        # same as delete_paths(...) in ≤0.11
+        return sk.skeleton_image
 
     def skeleton_to_points(self, skeleton: np.ndarray):
         points = []

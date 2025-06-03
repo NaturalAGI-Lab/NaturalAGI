@@ -31,7 +31,7 @@ class GraphEditDistanceComparator:
             ged = nx.graph_edit_distance(
                 image_graph,
                 concept_graph,
-                node_subst_cost=node_subst_cost,
+                node_match=node_subst_cost,
                 node_del_cost=node_del_cost,
                 node_ins_cost=node_ins_cost,
                 edge_match=edge_match,

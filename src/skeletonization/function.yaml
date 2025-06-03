@@ -21,7 +21,7 @@ spec:
     commands:
       - 'apt-get update -y --fix-missing'
       - 'apt-get install -y libgl1-mesa-glx'
-      - 'pip install numpy pydantic-settings kafka-python rdp scikit-image networkx ypstruct opencv-python'
+      - 'pip install numpy pydantic-settings kafka-python rdp scikit-image networkx ypstruct opencv-python skan'
       - 'pip install --upgrade natural-agi-common'
   triggers:
     kafka-trigger:
