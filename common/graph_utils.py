@@ -1,11 +1,9 @@
 import collections
-from functools import singledispatch
 from typing import Any, Dict, Set
 
 import networkx as nx
 
 from .critical_point import CriticalPointType
-
 
 
 LABELS_KEY = "labels"
@@ -74,7 +72,7 @@ class GraphUtils:
 
         if prev_point is None:
             return None
-        
+
         # Check if there is a loop back to the previous point, so it's not considered of backtracking, but rather a loop that returns back to the previous point
         number_of_paths_back = len(
             list(nx.all_simple_paths(graph, prev_point, start_point))
