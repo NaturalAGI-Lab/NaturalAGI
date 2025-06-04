@@ -31,23 +31,23 @@ class CycleCountAnalyzer(BaseAnalyzer):
         image_id: str,
         result: int
     ) -> None:
-        query = """
-            MERGE (cycle_count_feature:CycleCount:Feature {
-                session_id: $session_id,
-                value: $result
-            })
-            ON CREATE SET cycle_count_feature.samples = [$image_id]
-            ON MATCH SET cycle_count_feature.samples = CASE
-                WHEN NOT $image_id IN cycle_count_feature.samples THEN cycle_count_feature.samples + $image_id
-                ELSE cycle_count_feature.samples
-            END
-        """
-        mx.run(
-            query,
-            session_id=session_id,
-            result=result,
-            image_id=image_id
-        )
+        # query = """
+        #     MERGE (cycle_count_feature:CycleCount:Feature {
+        #         session_id: $session_id,
+        #         value: $result
+        #     })
+        #     ON CREATE SET cycle_count_feature.samples = [$image_id]
+        #     ON MATCH SET cycle_count_feature.samples = CASE
+        #         WHEN NOT $image_id IN cycle_count_feature.samples THEN cycle_count_feature.samples + $image_id
+        #         ELSE cycle_count_feature.samples
+        #     END
+        # """
+        # mx.run(
+        #     query,
+        #     session_id=session_id,
+        #     result=result,
+        #     image_id=image_id
+        # )
         query = """
             MATCH (n {session_id: $session_id})
             WHERE n:Point or n:Vector

@@ -5,23 +5,16 @@ import time
 from kafka import KafkaProducer
 from pydantic_settings import BaseSettings
 
-from common import DLQModel
+from common.model import DLQModel
 from service.graph_persistance_service import GraphPersistenceService
 from converter.graph_serializer import GraphDeserializer
 from data_preprocessing_service import DataPreprocessingService
 from networkx_graph_analysis import NetworkxGraphAnalysis
-from service.visitor_result_persistence_service import VisitorResultPersistenceService
 from logic.tertiary_features.tertiary_features_service import TertiaryFeaturesService
 from service.analysis_result_persistence_service import AnalysisResultPersistenceService
 from service.graph_analysis.analyzers.contour_type_analyzer import ContourTypeAnalyzer
 from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
 from service.graph_analysis.analyzers.cycle_count_analyzer import CycleCountAnalyzer
-from service.graph_analysis.analyzers.graph_metrics_analyzer import GraphMetricsAnalyzer
-from visitors.relative_position_visitor import RelativePositionVisitor
-from visitors.angle_visitor import AngleVisitor
-from visitors.half_plane_visitor import HalfPlaneVisitor
-from visitors.quadrant_visitor import QuadrantVisitor
-from visitors.direction_visitor import DirectionVisitor
 
 HANDLER_NAME = "Contour analysis"
 
@@ -55,9 +48,6 @@ def init_context(context):
     graph_persistence_service = GraphPersistenceService(
         settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
     )
-    visitor_result_persistence_service = VisitorResultPersistenceService(
-        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
-    )
     data_preprocessing_service = DataPreprocessingService(graph_persistence_service)
     tertiary_features_service = TertiaryFeaturesService(
         settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
@@ -69,11 +59,6 @@ def init_context(context):
     setattr(context.user_data, "kafka_bootstrap_servers", settings.kafka_bootstrap_servers)
     setattr(context.user_data, "tertiary_features_service", tertiary_features_service)
     setattr(context.user_data, "data_preprocessing_service", data_preprocessing_service)
-    setattr(
-        context.user_data,
-        "visitor_result_persistence_service",
-        visitor_result_persistence_service,
-    )
     setattr(
         context.user_data,
         "analysis_result_persistence_service",
@@ -108,7 +93,6 @@ def kafka_handler(context, event):
         # Create NetworkxGraphAnalysis instance
         networkx_graph_analysis = NetworkxGraphAnalysis(
             network,
-            visitor_result_persistence_service=context.user_data.visitor_result_persistence_service,
             analysis_result_persistence_service=context.user_data.analysis_result_persistence_service,
             merge_threshold=context.user_data.settings.merge_threshold,
         )
@@ -121,23 +105,9 @@ def kafka_handler(context, event):
             network, image_id, parameters["session_id"]
         )
 
-        # Continue with the rest of the analysis
-        networkx_graph_analysis.add_visitor(QuadrantVisitor())
-        # networkx_graph_analysis.add_visitor(LengthComparisonVisitor())
-        networkx_graph_analysis.add_visitor(AngleVisitor(network))
-        # networkx_graph_analysis.add_visitor(HalfPlaneVisitor(network))
-        networkx_graph_analysis.add_visitor(
-            RelativePositionVisitor(
-                network, parameters["image_width"], parameters["image_height"]
-            )
-        )
-        networkx_graph_analysis.add_visitor(DirectionVisitor())
-
         networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
         networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
         networkx_graph_analysis.add_analyzer(CycleCountAnalyzer)
-        # networkx_graph_analysis.add_analyzer(GraphMetricsAnalyzer)
-        # networkx_graph_analysis.add_analyzer(CurveAnalyzer)
         networkx_graph_analysis.analyze_graph(image_id, session_id)
 
         context.user_data.tertiary_features_service.create_tertiary_features(

@@ -40,18 +40,18 @@ class MonotonyAnalyzer(BaseAnalyzer):
         image_id: str,
         result: ContourDevelopment,
     ):
-        query = """
-            MERGE (contour_development:ContourDevelopment:Feature {
-                session_id: $session_id,
-                value: $result
-            })
-            ON CREATE SET contour_development.samples = [$image_id]
-            ON MATCH SET contour_development.samples = CASE
-                WHEN NOT $image_id IN contour_development.samples THEN contour_development.samples + $image_id
-                ELSE contour_development.samples
-            END
-        """
-        mx.run(query, session_id=session_id, result=result.name, image_id=image_id)
+        # query = """
+        #     MERGE (contour_development:ContourDevelopment:Feature {
+        #         session_id: $session_id,
+        #         value: $result
+        #     })
+        #     ON CREATE SET contour_development.samples = [$image_id]
+        #     ON MATCH SET contour_development.samples = CASE
+        #         WHEN NOT $image_id IN contour_development.samples THEN contour_development.samples + $image_id
+        #         ELSE contour_development.samples
+        #     END
+        # """
+        # mx.run(query, session_id=session_id, result=result.name, image_id=image_id)
         query = """
             MATCH (n {session_id: $session_id})
             WHERE n:Point or n:Vector

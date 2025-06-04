@@ -1,8 +1,6 @@
 import networkx as nx
 from neo4j import GraphDatabase
 from logic.point_extractor import PointExtractor
-from typing import List
-from model.curve import Curve, CurveType
 
 
 class GraphPersistenceService:

@@ -2,7 +2,7 @@ from typing import Dict, List, Any, Optional
 import networkx as nx
 import uuid
 import math
-from model.point import (
+from common.model import (
     Point,
     CornerPoint,
     IntersectionPoint,

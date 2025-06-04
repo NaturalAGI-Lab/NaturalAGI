@@ -1,32 +1,22 @@
 import math
-from typing import Optional, List, Tuple, Any, Type
+from typing import List, Tuple, Type
 import networkx as nx
 
-from logic.graph_traversal import GraphTraversal
-from service.visitor_result_persistence_service import VisitorResultPersistenceService
 from service.analysis_result_persistence_service import AnalysisResultPersistenceService
 from service.graph_analysis.analyzers.base_analyzer import BaseAnalyzer
-from visitors.visitor import Visitor
 from common.decorator import timed
 
 class NetworkxGraphAnalysis:
     def __init__(
         self,
         graph: nx.Graph,
-        visitor_result_persistence_service: VisitorResultPersistenceService,
         analysis_result_persistence_service: AnalysisResultPersistenceService,
         merge_threshold: float = 10.0,
     ):
         self.graph = graph
-        self.visitors: List[Visitor] = []
         self.analyzers: List[BaseAnalyzer] = []
-        self.graph_traversal = GraphTraversal(self.graph)
-        self.visitor_result_persistence_service = visitor_result_persistence_service
         self.analysis_result_persistence_service = analysis_result_persistence_service
         self.merge_threshold = merge_threshold
-
-    def add_visitor(self, visitor: Visitor):
-        self.visitors.append(visitor)
 
     def add_analyzer(self, analyzer_class: Type[BaseAnalyzer]):
         analyzer = analyzer_class(self.graph)
@@ -258,19 +248,9 @@ class NetworkxGraphAnalysis:
 
     def analyze_graph(self, image_id: str, session_id: str):
         print(
-            "Starting graph analysis with visitors: ",
-            [type(visitor).__name__ for visitor in self.visitors],
-        )
-        print(
             "Starting graph analysis with analyzers: ",
             [type(analyzer).__name__ for analyzer in self.analyzers],
         )
-
-        # The merge_close_intersection_points is now called separately before graph persistence
-        # so we don't need to call it here anymore
-
-        # Graph traversal
-        self.perform_graph_traversal(image_id, session_id)
 
         # Graph exposition analysis
         for analyzer in self.analyzers:
@@ -278,64 +258,6 @@ class NetworkxGraphAnalysis:
             self.analysis_result_persistence_service.save_analysis_result(
                 analyzer, result, image_id, session_id
             )
-
-    def perform_graph_traversal(self, image_id: str, session_id: str):
-        top_leftmost_point = self.find_top_leftmost_point()
-
-        if top_leftmost_point is None:
-            print(
-                "Error: Could not find a valid starting point for graph traversal. The graph might be empty."
-            )
-            return
-
-        for point, vector in self.graph_traversal.dfs_traversal(top_leftmost_point):
-            print(f"Node: {point}, Edge: {vector}")
-            for visitor in self.visitors:
-                result = visitor.visit_point(point)
-                if result:
-                    self.visitor_result_persistence_service.save_visitor_result(
-                        visitor, result, image_id, session_id
-                    )
-
-            if vector:
-                for visitor in self.visitors:
-                    result = visitor.visit_line(vector)
-                    if result:
-                        self.visitor_result_persistence_service.save_visitor_result(
-                            visitor, result, image_id, session_id
-                        )
-
-    def find_top_leftmost_point(self) -> Optional[Any]:
-        """
-        Finds the top-leftmost point in the graph based on x and y coordinates.
-
-        Returns:
-            Optional[Any]: The top-leftmost point node or None if the graph is empty.
-        """
-        if not self.graph.nodes:
-            return None
-
-        # First, try to find nodes with degree 1 (endpoints)
-        degree_1_nodes = [
-            node for node in self.graph.nodes if self.graph.degree[node] == 1
-        ]
-
-        # If there are no nodes with degree 1, use any node in the graph
-        if not degree_1_nodes:
-            print(
-                "Warning: No nodes with degree 1 found in the graph. Using any node as starting point."
-            )
-            top_leftmost_node = min(
-                self.graph.nodes,
-                key=lambda n: (self.graph.nodes[n]["x"] + self.graph.nodes[n]["y"]),
-            )
-        else:
-            top_leftmost_node = min(
-                degree_1_nodes,
-                key=lambda n: (self.graph.nodes[n]["x"] + self.graph.nodes[n]["y"]),
-            )
-
-        return top_leftmost_node
 
     def calculate_length(
         self, coordinates1: Tuple[float, float], coordinates2: Tuple[float, float]
