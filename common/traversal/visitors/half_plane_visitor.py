@@ -1,18 +1,18 @@
 from typing import Any, Dict
 
 from neo4j import ManagedTransaction
-from model.feature.half_plane import HalfPlane
-from visitors.visitor import Visitor
-from model.point import Point
-from model.vector import Vector
+from ...model.half_plane import HalfPlane
+from .visitor import Visitor
+from ...model.point import Point
+from ...model.vector import Vector
 
 
 class HalfPlaneVisitor(Visitor):
     def __init__(self, graph):
         super().__init__(graph)
         self.half_planes: Dict[str, HalfPlane] = {}
-        
-    def visit_point(self, point: Point) -> None:
+
+    def visit_point(self, _: Point) -> None:
         # This visitor does not handle points
         return None
 
@@ -21,7 +21,7 @@ class HalfPlaneVisitor(Visitor):
         dy = line.y2 - line.y1
         half_plane = self.determine_half_plane(dx, dy)
         self.half_planes[line.id] = half_plane
-        return {"half_plane": half_plane.value, "line_id": line.id}
+        self.graph.nodes[line.id]["half_plane"] = half_plane.value
 
     def save_result(
         self,

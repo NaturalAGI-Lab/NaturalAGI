@@ -1,12 +1,14 @@
 import networkx as nx
 from neo4j import GraphDatabase
 from logic.point_extractor import PointExtractor
+import logging
 
 
 class GraphPersistenceService:
     def __init__(self, uri: str, user: str, password: str):
         self.driver = GraphDatabase.driver(uri, auth=(user, password))
         self.point_extractor = None
+        self.logger = logging.getLogger(__name__)
 
     def save_graph_to_neo4j(
         self, graph: nx.Graph, image_id: str, session_id: str
@@ -17,38 +19,38 @@ class GraphPersistenceService:
 
     def _save_graph(self, tx, graph: nx.Graph, image_id: str, session_id: str) -> None:
         # Extract all points
+        self.logger.info(
+            f"Extracting points for image {image_id} and session {session_id}"
+        )
         all_points = self.point_extractor.extract_points()
+        self.logger.info(f"Extracted {len(all_points)} points")
+        self.logger.info(f"Points: {all_points}")
 
         # Create a dictionary to map node ids to their point types
         point_types = {point.id: type(point).__name__ for point in all_points}
 
         # Create nodes
-        for _, data in graph.nodes(data=True):
+        for node_id, data in graph.nodes(data=True):
             labels = ["Point"]
-            if data["uuid"] in point_types:
-                labels.append(point_types[data["uuid"]])
+            if node_id in point_types:
+                labels.append(point_types[node_id])
 
+            params = {
+                "id": node_id,
+                "image_id": image_id,
+                "session_id": session_id,
+                **data,
+            }
             tx.run(
                 f"""
-                CREATE (n:{':'.join(labels)} {{id: $id, x: $x, y: $y, image_id: $image_id, session_id: $session_id}})
+                CREATE (n:{':'.join(labels)} $params)
                 """,
-                id=data["uuid"],
-                x=data["x"],
-                y=data["y"],
-                image_id=image_id,
-                session_id=session_id,
+                params=params,
             )
 
         # Create edges
         for u, v, data in graph.edges(data=True):
-            u_data = graph.nodes[u]
-            v_data = graph.nodes[v]
-            vector_id = data["uuid"]
-
-            # Calculate length
-            dx = v_data["x"] - u_data["x"]
-            dy = v_data["y"] - u_data["y"]
-            length = (dx**2 + dy**2) ** 0.5
+            vector_id = data["id"]
 
             tx.run(
                 """
@@ -64,12 +66,12 @@ class GraphPersistenceService:
                 MERGE (a)-[:CONNECTED_TO]->(v)
                 MERGE (v)<-[:CONNECTED_TO]-(b)            
                 """,
-                u=u_data["uuid"],
-                v=v_data["uuid"],
+                u=u,
+                v=v,
                 vector_id=vector_id,
                 image_id=image_id,
                 session_id=session_id,
-                length=length,
+                length=data["length"],
             )
 
     def close(self):

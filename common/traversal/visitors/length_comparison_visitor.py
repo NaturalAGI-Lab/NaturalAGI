@@ -1,9 +1,9 @@
 from typing import Dict, Any, List
 
 from neo4j import ManagedTransaction
-from visitors.visitor import Visitor
-from model.vector import Vector
-from model.feature.length_comparison_result import LengthComparisonResult
+from .visitor import Visitor
+from ...model.vector import Vector
+from ...model.length_comparison_result import LengthComparisonResult
 
 
 class LengthComparisonVisitor(Visitor):
@@ -38,7 +38,13 @@ class LengthComparisonVisitor(Visitor):
             "line2_id": self.line_ids[-1],
         }
 
-    def save_result(self, tx: ManagedTransaction, image_id: str, session_id: str, result: Dict[str, Any]) -> None:
+    def save_result(
+        self,
+        tx: ManagedTransaction,
+        image_id: str,
+        session_id: str,
+        result: Dict[str, Any],
+    ) -> None:
         query = """
             MATCH (v1:Vector {id: $line1_id})--(:Point)--(v2:Vector {id: $line2_id})
             MERGE (vc:VectorComparison:Feature {

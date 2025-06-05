@@ -1,4 +1,5 @@
 import json
+import dataclasses
 import traceback
 import time
 
@@ -55,8 +56,10 @@ def init_context(context):
     analysis_result_persistence_service = AnalysisResultPersistenceService(
         settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
     )
-    
-    setattr(context.user_data, "kafka_bootstrap_servers", settings.kafka_bootstrap_servers)
+
+    setattr(
+        context.user_data, "kafka_bootstrap_servers", settings.kafka_bootstrap_servers
+    )
     setattr(context.user_data, "tertiary_features_service", tertiary_features_service)
     setattr(context.user_data, "data_preprocessing_service", data_preprocessing_service)
     setattr(
@@ -115,13 +118,21 @@ def kafka_handler(context, event):
         )
 
         producer = KafkaProducer(
-            bootstrap_servers=context.user_data.settings.kafka_bootstrap_servers.split(","),
+            bootstrap_servers=context.user_data.settings.kafka_bootstrap_servers.split(
+                ","
+            ),
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
-        profiling["contour_analysis_time_ms"] = (time.time_ns() - start_time) / 1_000_000
+        profiling["contour_analysis_time_ms"] = (
+            time.time_ns() - start_time
+        ) / 1_000_000
         producer.send(
             context.user_data.kafka_topic,
-            value={"operation": operation, "parameters": parameters, "profiling": profiling},
+            value={
+                "operation": operation,
+                "parameters": parameters,
+                "profiling": profiling,
+            },
         )
 
         context.logger.info_with(
@@ -172,5 +183,5 @@ def send_to_dlq(context, value, error):
 
     dlq_model = DLQModel(source=HANDLER_NAME, error=error, value=value)
     context.user_data.kafka_producer.send(
-        context.user_data.dlq_topic, value=dlq_model.model_dump()
+        context.user_data.dlq_topic, value=dataclasses.asdict(dlq_model)
     )

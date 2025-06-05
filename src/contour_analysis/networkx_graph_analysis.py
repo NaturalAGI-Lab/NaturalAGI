@@ -115,13 +115,13 @@ class NetworkxGraphAnalysis:
                         line_uuids = set()
                         for neighbor in neighbors1:
                             edge_data = self.graph.get_edge_data(node1, neighbor)
-                            if "uuid" in edge_data:
-                                line_uuids.add(edge_data["uuid"])
+                            if "id" in edge_data:
+                                line_uuids.add(edge_data["id"])
 
                         for neighbor in neighbors2:
                             edge_data = self.graph.get_edge_data(node2, neighbor)
-                            if "uuid" in edge_data:
-                                line_uuids.add(edge_data["uuid"])
+                            if "id" in edge_data:
+                                line_uuids.add(edge_data["id"])
 
                         # Simply use an integer ID for the merged node
                         # Find the maximum integer node ID and increment it
@@ -139,7 +139,7 @@ class NetworkxGraphAnalysis:
 
                         # Add new node with merged attributes
                         merged_uuid = (
-                            f"{node1_data.get('uuid', '')}_{node2_data.get('uuid', '')}"
+                            f"{node1_data.get('id', '')}_{node2_data.get('id', '')}"
                         )
                         self.graph.add_node(
                             merged_node,
@@ -235,7 +235,7 @@ class NetworkxGraphAnalysis:
                 node_data = self.graph.nodes[node]
                 if "merged_from" in node_data:
                     print(
-                        f"Merged node {node}: uuid={node_data.get('uuid', 'N/A')}, "
+                        f"Merged node {node}: id={node_data.get('id', 'N/A')}, "
                         f"position=({node_data.get('x', 'N/A')}, {node_data.get('y', 'N/A')}), "
                         f"degree={self.graph.degree[node]}, "
                         f"merged_from={node_data.get('merged_from', 'N/A')}, "

@@ -1,13 +1,11 @@
 from typing import Dict, List, Any, Optional
 import networkx as nx
-import uuid
 import math
 from common.model import (
     Point,
     CornerPoint,
     IntersectionPoint,
     EndPoint,
-    StartPoint,
 )
 
 
@@ -18,12 +16,8 @@ class PointExtractor:
     def extract_points(self) -> List[Point]:
         points: List[Point] = []
         points.extend(self._extract_corner_points())
-        # points.extend(self._extract_inflection_points())
         points.extend(self._extract_intersection_points())
         points.extend(self._extract_end_points())
-        start_point = self._extract_start_point()
-        if start_point:
-            points.append(start_point)
         return points
 
     def _extract_corner_points(self) -> List[CornerPoint]:
@@ -42,13 +36,10 @@ class PointExtractor:
                 if angle < MIN_CORNER_ANGLE:
                     corner_points.append(
                         CornerPoint(
-                            id=node_data["uuid"],
+                            id=node,
                             x=float(node_data["x"]),
                             y=float(node_data["y"]),
                             angle=angle,
-                            line1=self.graph[node][neighbors[0]].get("uuid"),
-                            line2=self.graph[node][neighbors[1]].get("uuid"),
-                            nx_id=node,
                         )
                     )
 
@@ -62,20 +53,12 @@ class PointExtractor:
 
         for node in nodes_with_degree_gt_2:
             node_data = self.graph.nodes[node]
-            lines = []
-            for neighbor in self.graph.neighbors(node):
-                edge_data = self.graph.get_edge_data(node, neighbor)
-                lines.append(edge_data["uuid"])
-
-            if len(lines) >= 2:
-                intersection_point = IntersectionPoint(
-                    id=node_data["uuid"],
-                    x=float(node_data["x"]),
-                    y=float(node_data["y"]),
-                    lines=lines,
-                    nx_id=node,
-                )
-                intersection_points.append(intersection_point)
+            intersection_point = IntersectionPoint(
+                id=node,
+                x=float(node_data["x"]),
+                y=float(node_data["y"]),
+            )
+            intersection_points.append(intersection_point)
 
         return intersection_points
 
@@ -83,60 +66,14 @@ class PointExtractor:
         end_points = []
         for node, node_data in self.graph.nodes(data=True):
             if self.graph.degree(node) == 1:
-                neighbor = list(self.graph.neighbors(node))[0]
                 end_points.append(
                     EndPoint(
-                        id=node_data.get("uuid", str(uuid.uuid4())),
+                        id=node,
                         x=float(node_data["x"]),
                         y=float(node_data["y"]),
-                        line=self.graph[node][neighbor].get("uuid"),
-                        nx_id=node,
                     )
                 )
         return end_points
-
-    def _extract_start_point(self) -> Optional[StartPoint]:
-        if not self.graph.nodes:
-            return None
-
-        # Priority 1: Look for endpoints (nodes with degree 1)
-        end_point_nodes = [
-            node for node in self.graph.nodes() if self.graph.degree(node) == 1
-        ]
-
-        # If there are endpoints, select the top-leftmost endpoint
-        if end_point_nodes:
-            # Find the top-leftmost endpoint
-            top_leftmost_node = min(
-                end_point_nodes,
-                key=lambda n: (
-                    float(self.graph.nodes[n]["y"]) + float(self.graph.nodes[n]["x"]),
-                ),
-            )
-        else:
-            # Priority 2: If no endpoints, find the top-leftmost point out of any points
-            top_leftmost_node = min(
-                self.graph.nodes(),
-                key=lambda n: (
-                    float(self.graph.nodes[n]["y"]) + float(self.graph.nodes[n]["x"]),
-                ),
-            )
-
-        node_data = self.graph.nodes[top_leftmost_node]
-
-        # Get the line connected to this point
-        line = None
-        if self.graph.degree(top_leftmost_node) > 0:
-            neighbor = list(self.graph.neighbors(top_leftmost_node))[0]
-            line = self.graph[top_leftmost_node][neighbor].get("uuid")
-
-        return StartPoint(
-            id=node_data.get("uuid", str(uuid.uuid4())),
-            x=float(node_data["x"]),
-            y=float(node_data["y"]),
-            line=line,
-            nx_id=top_leftmost_node,
-        )
 
     def _calculate_angle_between_lines(
         self, node: Dict[str, Any], neighbors: List[Dict[str, Any]]

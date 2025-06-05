@@ -5,8 +5,9 @@ import math
 import networkx as nx
 from neo4j import ManagedTransaction
 
-from visitors.visitor import Visitor
-from common.models import Point, Vector
+from .visitor import Visitor
+from ...model.point import Point
+from ...model.vector import Vector
 
 
 class RelativeSegment(Enum):
@@ -27,10 +28,8 @@ class RelativePosition:
 
 
 class RelativePositionVisitor(Visitor):
-    def __init__(self, graph: nx.Graph, image_width: int, image_height: int):
+    def __init__(self, graph: nx.Graph):
         super().__init__(graph)
-        self.image_width = image_width
-        self.image_height = image_height
 
         # Find the bounding box and calculate center
         self._calculate_bounding_box_center()
@@ -48,8 +47,11 @@ class RelativePositionVisitor(Visitor):
 
         # Find min and max coordinates to determine the bounding box
         for node_id, node_data in self.graph.nodes(data=True):
-            x = node_data["x"] or 0
-            y = node_data["y"] or 0
+            if "Point" not in node_data["labels"]:
+                continue
+
+            x = node_data["x"]
+            y = node_data["y"]
             min_x = min(min_x, x)
             min_y = min(min_y, y)
             max_x = max(max_x, x)
@@ -69,6 +71,11 @@ class RelativePositionVisitor(Visitor):
     def visit_point(self, point: Point) -> Dict[str, Any]:
         position = self._calculate_relative_position(point.x, point.y)
         self.point_positions[point.id] = position
+        node = self.graph.nodes[point.id]
+        node["relative_distance"] = position.distance_from_center
+        node["normalized_x"] = position.normalized_x
+        node["normalized_y"] = position.normalized_y
+        node["segments"] = [seg.value for seg in position.segments]
 
         return {
             "point_id": point.id,
@@ -85,6 +92,11 @@ class RelativePositionVisitor(Visitor):
 
         position = self._calculate_relative_position(mid_x, mid_y)
         self.vector_positions[line.id] = position
+        node = self.graph.nodes[line.id]
+        node["relative_distance"] = position.distance_from_center
+        node["normalized_x"] = position.normalized_x
+        node["normalized_y"] = position.normalized_y
+        node["segments"] = [seg.value for seg in position.segments]
 
         return {
             "line_id": line.id,

@@ -12,3 +12,14 @@ class Vector:
     length: float
     horizontal_direction: HorizontalDirection = HorizontalDirection.NONE
     vertical_direction: VerticalDirection = VerticalDirection.NONE
+
+    @classmethod
+    def from_node_data(cls, node_data: dict) -> "Vector":
+        return cls(
+            id=node_data["id"],
+            x1=node_data["x1"],
+            y1=node_data["y1"],
+            x2=node_data["x2"],
+            y2=node_data["y2"],
+            length=node_data["length"],
+        )

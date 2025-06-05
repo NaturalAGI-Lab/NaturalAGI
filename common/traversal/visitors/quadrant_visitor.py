@@ -1,13 +1,15 @@
 from typing import Any, Dict
 
+import networkx as nx
 from neo4j import ManagedTransaction
-from visitors.visitor import Visitor
-from model.point import Point
-from model.vector import Vector
+from .visitor import Visitor
+from ...model.point import Point
+from ...model.vector import Vector
 
 
 class QuadrantVisitor(Visitor):
-    def __init__(self):
+    def __init__(self, graph: nx.Graph):
+        super().__init__(graph)
         self.quadrants: Dict[str, int] = {}
 
     def visit_point(self, point: Point) -> None:
@@ -42,6 +44,11 @@ class QuadrantVisitor(Visitor):
         vector_type = self.determine_vector_type(dx, dy)
 
         self.quadrants[line.id] = quadrant
+        self.graph.nodes[line.id]["quadrant"] = quadrant
+        self.graph.nodes[line.id]["vector_type"] = vector_type
+        self.graph.nodes[line.id]["labels"].append(vector_type)
+        self.graph.nodes[line.id]["dx"] = dx
+        self.graph.nodes[line.id]["dy"] = dy
         return {
             "quadrant": quadrant,
             "line_id": line.id,
@@ -62,7 +69,7 @@ class QuadrantVisitor(Visitor):
         MATCH (v:Vector {{id: $id}})
         SET v:{result['vector_type']}
         """
-        
+
         # Second query to handle quadrant relationship
         quadrant_query = """
         MATCH (v:Vector {id: $id})
@@ -74,7 +81,7 @@ class QuadrantVisitor(Visitor):
         END, v.quadrant = $quadrant
         MERGE (v)-[:IS_IN_QUADRANT]->(q)
         """
-        
+
         # Execute both queries
         tx.run(set_type_query, id=result["line_id"])
         tx.run(

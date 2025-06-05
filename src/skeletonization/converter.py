@@ -7,7 +7,9 @@ import uuid
 
 class Converter:
     @staticmethod
-    def convert_simplified_network_to_networkx(simplified_network: List[List[np.ndarray]]) -> nx.Graph:
+    def convert_simplified_network_to_networkx(
+        simplified_network: List[List[np.ndarray]],
+    ) -> nx.Graph:
         """
         Convert the simplified network to a NetworkX graph with labeled nodes and edge data.
 
@@ -19,31 +21,33 @@ class Converter:
             nx.Graph: A NetworkX graph with nodes labeled by coordinates and edges with endpoint data.
         """
         G = nx.Graph()
-        for i, segment in enumerate(simplified_network):
+        for _, segment in enumerate(simplified_network):
             for j in range(len(segment) - 1):
                 source_coord = tuple(segment[j])
                 target_coord = tuple(segment[j + 1])
 
                 # Create unique identifiers for source and target nodes
-                source_id = hash(source_coord)
-                target_id = hash(target_coord)
+                source_node_hash = hash(source_coord)
+                target_node_hash = hash(target_coord)
+                source_id = str(uuid.uuid4())
+                target_id = str(uuid.uuid4())
 
                 # Add source node with attributes if not already present
-                if source_id not in G:
+                if source_node_hash not in G:
                     G.add_node(
-                        source_id,
+                        source_node_hash,
                         x=source_coord[0],
                         y=source_coord[1],
-                        uuid=str(uuid.uuid4()),
+                        id=source_id,
                     )
 
                 # Add target node with attributes if not already present
-                if target_id not in G:
+                if target_node_hash not in G:
                     G.add_node(
-                        target_id,
+                        target_node_hash,
                         x=target_coord[0],
                         y=target_coord[1],
-                        uuid=str(uuid.uuid4()),
+                        id=target_id,
                     )
 
                 # Calculate edge length
@@ -51,10 +55,9 @@ class Converter:
 
                 # Add edge with segment ID and endpoint information
                 G.add_edge(
-                    source_id,
-                    target_id,
-                    segment_id=i,
-                    uuid=str(uuid.uuid4()),
+                    source_node_hash,
+                    target_node_hash,
+                    id=str(uuid.uuid4()),
                     x1=source_coord[0],
                     y1=source_coord[1],
                     x2=target_coord[0],

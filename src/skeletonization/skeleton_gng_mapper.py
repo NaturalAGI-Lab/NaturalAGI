@@ -7,6 +7,8 @@ import gng
 from settings import Settings
 from network_simplification import NetworkSimplification
 from converter import Converter
+from normalization import normalize_graph
+from common import timed
 
 
 class SkeletonGNGMapper:
@@ -27,6 +29,7 @@ class SkeletonGNGMapper:
             simplification_epsilon or self.settings.simplification_epsilon
         )
 
+    @timed(label="process_image")
     def process_image(self, image):
         try:
             self.logger.info(
@@ -58,6 +61,7 @@ class SkeletonGNGMapper:
                     graph = Converter.convert_simplified_network_to_networkx(
                         simplified_network
                     )
+                    graph = normalize_graph(graph)
                     self.logger.debug(
                         f"Created graph with {graph.number_of_nodes()} nodes and {graph.number_of_edges()} edges"
                     )
@@ -80,28 +84,31 @@ class SkeletonGNGMapper:
             self.logger.error(f"Failed to process image: {str(e)}")
             raise
 
+    @timed(label="binary_image")
     def binary_image(self, image, threshold):
         binary = image > threshold
         binary = remove_small_objects(binary, min_size=10)
         binary = closing(binary, square(3))
         return binary
 
+    @timed(label="skeletonize")
     def skeletonize(self, image, threshold):
         binary = self.binary_image(image, threshold)
         skeleton = skeletonize(binary)
         MIN_BRANCH_LEN = 7  # pixels; adjust to taste
         sk = Skeleton(skeleton, source_image=binary)
-        summary  = summarize(sk, separator='_')   # use '_' for nicer column names
+        summary = summarize(sk, separator="_")  # use '_' for nicer column names
 
         # junction-to-endpoint branches shorter than MIN_BRANCH_LEN
         short_branches = summary[
-            (summary.branch_type == 1) &          # 1 = junction → endpoint
-            (summary.branch_distance < MIN_BRANCH_LEN)
-        ].index                                    # <- the row index *is* the branch id
+            (summary.branch_type == 1)  # 1 = junction → endpoint
+            & (summary.branch_distance < MIN_BRANCH_LEN)
+        ].index  # <- the row index *is* the branch id
 
-        sk = sk.prune_paths(short_branches)        # same as delete_paths(...) in ≤0.11
+        sk = sk.prune_paths(short_branches)  # same as delete_paths(...) in ≤0.11
         return sk.skeleton_image
 
+    @timed(label="skeleton_to_points")
     def skeleton_to_points(self, skeleton: np.ndarray):
         points = []
         h, w = skeleton.shape
@@ -111,5 +118,6 @@ class SkeletonGNGMapper:
                     points.append([x, y])
         return np.array(points)
 
+    @timed(label="fit_gng")
     def fit_gng(self, points):
         return gng.fit(points, self.settings)

@@ -1,6 +1,6 @@
 from typing import List
 
-from model.vector import Vector
+from common.model.vector import Vector
 
 
 class VectorDetailsConverter:

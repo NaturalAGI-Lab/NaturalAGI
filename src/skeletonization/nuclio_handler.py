@@ -1,11 +1,12 @@
 """Generic Nuclio Handler Template"""
 
+import dataclasses
 import json
 import time
 import cv2
 from kafka import KafkaProducer
 import traceback
-from common import DLQModel
+from common.model.dlq import DLQModel
 from settings import Settings
 from skeleton_gng_mapper import SkeletonGNGMapper
 from graph_serializer import GraphSerializer
@@ -102,7 +103,7 @@ def kafka_handler(context, event):
             bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
             value_serializer=lambda v: json.dumps(v).encode("utf-8"),
         )
-        dlq_producer.send(context.user_data.dlq_topic, value=dlq_model.model_dump())
+        dlq_producer.send(context.user_data.dlq_topic, value=dataclasses.asdict(dlq_model))
         dlq_producer.close()
 
     finally:
