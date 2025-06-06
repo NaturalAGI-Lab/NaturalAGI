@@ -1,6 +1,7 @@
 import networkx as nx
 import json
 import numpy as np
+from enum import Enum
 
 
 class NumpyJSONEncoder(json.JSONEncoder):
@@ -11,6 +12,8 @@ class NumpyJSONEncoder(json.JSONEncoder):
             return int(obj)
         if isinstance(obj, np.floating):
             return float(obj)
+        if isinstance(obj, Enum):
+            return obj.value
         return super().default(obj)
 
 

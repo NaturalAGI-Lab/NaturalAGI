@@ -29,8 +29,8 @@ class AngleVisitor(Visitor):
             return {"angles": angles, "point_id": point.id}
         return None
 
-    def visit_line(self, line: Vector) -> Dict[str, Any]:
-        angle_with_ox = self._calculate_angle_with_ox(line)
+    def visit_line(self, line: Vector, start_point: Point) -> Dict[str, Any]:
+        angle_with_ox = self._calculate_angle_with_ox(line, start_point)
         self.line_angles[line.id] = angle_with_ox
         self.graph.nodes[line.id]["angle_with_ox"] = angle_with_ox
         return {"angle_with_ox": angle_with_ox, "line_id": line.id}
@@ -112,20 +112,18 @@ class AngleVisitor(Visitor):
     def _get_connected_lines(self, point: Point) -> List[Vector]:
         connected_lines = []
         node = [
-            node
-            for node, data in self.graph.nodes(data=True)
-            if data["uuid"] == point.id
+            node for node, data in self.graph.nodes(data=True) if data["id"] == point.id
         ][0]
         for neighbor in self.graph.neighbors(node):
-            edge_data = self.graph.get_edge_data(node, neighbor)
+            vector_data = self.graph.nodes[neighbor]
             connected_lines.append(
                 Vector(
-                    id=edge_data["uuid"],
-                    x1=edge_data["x1"],
-                    y1=edge_data["y1"],
-                    x2=edge_data["x2"],
-                    y2=edge_data["y2"],
-                    length=edge_data["length"],
+                    id=vector_data["id"],
+                    x1=vector_data["x1"],
+                    y1=vector_data["y1"],
+                    x2=vector_data["x2"],
+                    y2=vector_data["y2"],
+                    length=vector_data["length"],
                 )
             )
         return connected_lines
@@ -161,8 +159,14 @@ class AngleVisitor(Visitor):
         angle2 = round(angle2 / 10) * 10
         return [angle1, angle2]
 
-    def _calculate_angle_with_ox(self, line: Vector) -> float:
-        vector = (line.x2 - line.x1, line.y2 - line.y1)
+    def _calculate_angle_with_ox(self, line: Vector, start_point: Point) -> float:
+        start_coords = (start_point.x, start_point.y)
+        end_coords = (
+            (line.x2, line.y2)
+            if line.x1 == start_point.x and line.y1 == start_point.y
+            else (line.x1, line.y1)
+        )
+        vector = (end_coords[0] - start_coords[0], end_coords[1] - start_coords[1])
         dot_product = vector[0] * 1 + vector[1] * 0
         magnitude = math.sqrt(vector[0] ** 2 + vector[1] ** 2)
         cos_angle = dot_product / magnitude

@@ -13,8 +13,10 @@ class QuadrantVisitor(Visitor):
         self.quadrants: Dict[str, int] = {}
 
     def visit_point(self, point: Point) -> None:
-        # Implementation for point-related operations
-        return None
+        x = point.normalized_x
+        y = point.normalized_y
+        quadrant = self.determine_quadrant(x, y)
+        self.graph.nodes[point.id]["quadrant"] = quadrant
 
     def determine_vector_type(self, dx: float, dy: float) -> str:
         """Determine vector type based on relative dimensions.
@@ -37,9 +39,15 @@ class QuadrantVisitor(Visitor):
         else:
             return "VerticalVector"
 
-    def visit_line(self, line: Vector) -> Dict[str, Any]:
-        dx = line.x2 - line.x1
-        dy = line.y2 - line.y1
+    def visit_line(self, line: Vector, start_point: Point) -> Dict[str, Any]:
+        start_coords = (start_point.x, start_point.y)
+        end_coords = (
+            (line.x2, line.y2)
+            if line.x1 == start_point.x and line.y1 == start_point.y
+            else (line.x1, line.y1)
+        )
+        dx = end_coords[0] - start_coords[0]
+        dy = end_coords[1] - start_coords[1]
         quadrant = self.determine_quadrant(dx, dy)
         vector_type = self.determine_vector_type(dx, dy)
 

@@ -7,7 +7,14 @@ import copy
 
 import numpy as np
 
+from common.decorator import timed
+from common.traversal.visitors import (
+    AngleVisitor,
+    QuadrantVisitor,
+    DirectionVisitor,
+)
 from src.concept_creation_repository import ConceptCreationRepository
+from src.logic.graph_analyzer import GraphAnalyzer
 from src.critical_point_preprocessor import CriticalPointPreprocessor
 from src.logic.start_point_modifier import StartPointModifier
 from src.logic.start_point_picker import StartPointPicker
@@ -67,6 +74,10 @@ class CriticalPointConceptService:
             for image_id in image_ids
         }
         image_graphs = self._determine_start_point(image_graphs)
+        image_graphs = {
+            image_id: self._analyze_graph(graph)
+            for image_id, graph in image_graphs.items()
+        }
         steps_debug = []
         error_occurred = False
         error_message = None
@@ -195,3 +206,14 @@ class CriticalPointConceptService:
                 self.logger.info(f"No start point found for image {image_id}")
                 raise ValueError(f"No start point found for image {image_id}")
         return image_graphs
+
+    @timed(label="analyze_graph")
+    def _analyze_graph(self, graph: nx.Graph) -> nx.Graph:
+        visitors = [
+            AngleVisitor(graph),
+            QuadrantVisitor(graph),
+            DirectionVisitor(graph),
+        ]
+        analyzer = GraphAnalyzer(graph, visitors)
+        analyzer.analyze()
+        return graph

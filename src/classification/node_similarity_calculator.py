@@ -16,7 +16,6 @@ class NodeSimilarityCalculator:
         "image_id",
         "session_id",
         "visualization",
-        "uuid",
         "concept_id",
         "labels",
         "direction_sequence_index",

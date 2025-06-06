@@ -1,6 +1,5 @@
 import networkx as nx
 import math
-import copy
 
 
 def normalize_graph(graph: nx.Graph) -> nx.Graph:
@@ -40,11 +39,9 @@ def normalize_graph(graph: nx.Graph) -> nx.Graph:
 
     # Normalize all coordinates
     for _, node_data in graph.nodes(data=True):
-        if max_distance > 0:
-            if "x" in node_data:
-                normalized_x = (node_data["x"] - center_x) / max_distance
-                node_data["normalized_x"] = round(normalized_x, 1)
-            if "y" in node_data:
-                normalized_y = (node_data["y"] - center_y) / max_distance
-                node_data["normalized_y"] = round(normalized_y, 1)
+        if "x" in node_data and "y" in node_data:
+            normalized_x = (node_data["x"] - center_x) / max_distance
+            node_data["normalized_x"] = round(normalized_x, 1)
+            normalized_y = (node_data["y"] - center_y) / max_distance
+            node_data["normalized_y"] = round(normalized_y, 1)
     return graph

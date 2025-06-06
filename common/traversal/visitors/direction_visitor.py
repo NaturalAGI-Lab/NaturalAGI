@@ -53,10 +53,16 @@ class DirectionVisitor(Visitor):
         # No specific operation for points in this visitor
         return None
 
-    def visit_line(self, line: Vector) -> Dict[str, Any]:
+    def visit_line(self, line: Vector, start_point: Point) -> Dict[str, Any]:
         # Extract direction information
+        start_coords = (start_point.x, start_point.y)
+        end_coords = (
+            (line.x2, line.y2)
+            if line.x1 == start_point.x and line.y1 == start_point.y
+            else (line.x1, line.y1)
+        )
         h_direction, v_direction = self.calculate_direction(
-            line.x1, line.y1, line.x2, line.y2
+            start_coords[0], start_coords[1], end_coords[0], end_coords[1]
         )
         line.horizontal_direction = h_direction
         line.vertical_direction = v_direction

@@ -2,6 +2,7 @@ from typing import Dict, Any, List
 
 from neo4j import ManagedTransaction
 from .visitor import Visitor
+from ...model.point import Point
 from ...model.vector import Vector
 from ...model.length_comparison_result import LengthComparisonResult
 
@@ -16,7 +17,7 @@ class LengthComparisonVisitor(Visitor):
         # This visitor does not handle points
         return None
 
-    def visit_line(self, line: Vector) -> Dict[str, Any]:
+    def visit_line(self, line: Vector, start_point: Point) -> Dict[str, Any]:
         comparison = LengthComparisonResult.N_A
         if self.previous_length:
             if line.length > self.previous_length:

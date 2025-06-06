@@ -39,6 +39,8 @@ class PointExtractor:
                             id=node,
                             x=float(node_data["x"]),
                             y=float(node_data["y"]),
+                            normalized_x=float(node_data["normalized_x"]),
+                            normalized_y=float(node_data["normalized_y"]),
                             angle=angle,
                         )
                     )
@@ -57,6 +59,8 @@ class PointExtractor:
                 id=node,
                 x=float(node_data["x"]),
                 y=float(node_data["y"]),
+                normalized_x=float(node_data["normalized_x"]),
+                normalized_y=float(node_data["normalized_y"]),
             )
             intersection_points.append(intersection_point)
 
@@ -71,6 +75,8 @@ class PointExtractor:
                         id=node,
                         x=float(node_data["x"]),
                         y=float(node_data["y"]),
+                        normalized_x=float(node_data["normalized_x"]),
+                        normalized_y=float(node_data["normalized_y"]),
                     )
                 )
         return end_points

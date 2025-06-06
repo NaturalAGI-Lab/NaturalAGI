@@ -1,10 +1,11 @@
 import math
 from typing import List, Tuple, Type
 import networkx as nx
-
+import uuid
 from service.analysis_result_persistence_service import AnalysisResultPersistenceService
 from service.graph_analysis.analyzers.base_analyzer import BaseAnalyzer
 from common.decorator import timed
+
 
 class NetworkxGraphAnalysis:
     def __init__(
@@ -101,6 +102,12 @@ class NetworkxGraphAnalysis:
                         # Create a new point at the average position
                         merged_x = (node1_data["x"] + node2_data["x"]) / 2
                         merged_y = (node1_data["y"] + node2_data["y"]) / 2
+                        merged_normalized_x = (
+                            node1_data["normalized_x"] + node2_data["normalized_x"]
+                        ) / 2
+                        merged_normalized_y = (
+                            node1_data["normalized_y"] + node2_data["normalized_y"]
+                        ) / 2
 
                         # Get all neighbors except the other point being merged
                         neighbors1 = list(self.graph.neighbors(node1))
@@ -111,44 +118,16 @@ class NetworkxGraphAnalysis:
                         if node1 in neighbors2:
                             neighbors2.remove(node1)
 
-                        # Collect all line UUIDs from both nodes for the merged node
-                        line_uuids = set()
-                        for neighbor in neighbors1:
-                            edge_data = self.graph.get_edge_data(node1, neighbor)
-                            if "id" in edge_data:
-                                line_uuids.add(edge_data["id"])
-
-                        for neighbor in neighbors2:
-                            edge_data = self.graph.get_edge_data(node2, neighbor)
-                            if "id" in edge_data:
-                                line_uuids.add(edge_data["id"])
-
-                        # Simply use an integer ID for the merged node
-                        # Find the maximum integer node ID and increment it
-                        max_id = 0
-                        for n in self.graph.nodes:
-                            if isinstance(n, int) and n > max_id:
-                                max_id = n
-                            elif isinstance(n, str) and n.isdigit() and int(n) > max_id:
-                                max_id = int(n)
-
-                        # New merged node ID will be max_id + 1
-                        merged_node = max_id + 1
+                        merged_node = str(uuid.uuid4())
 
                         print(f"Created merged node with ID: {merged_node}")
 
-                        # Add new node with merged attributes
-                        merged_uuid = (
-                            f"{node1_data.get('id', '')}_{node2_data.get('id', '')}"
-                        )
                         self.graph.add_node(
                             merged_node,
                             x=merged_x,
                             y=merged_y,
-                            uuid=merged_uuid,
-                            lines=list(
-                                line_uuids
-                            ),  # Store the combined lines for extraction as IntersectionPoint
+                            normalized_x=merged_normalized_x,
+                            normalized_y=merged_normalized_y,
                         )
 
                         # Connect all neighbors to the new node

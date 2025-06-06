@@ -1,3 +1,4 @@
+from enum import Enum
 import json
 import networkx as nx
 from neo4j import ManagedTransaction
@@ -88,6 +89,8 @@ class NetworkxToNeo4j:
     def serialize_value(value):
         if isinstance(value, np.ndarray):
             return json.dumps(value.tolist())
+        elif isinstance(value, Enum):
+            return value.value
         elif NetworkxToNeo4j.needs_serialization(value):
             return json.dumps(value)
         else:

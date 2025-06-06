@@ -16,7 +16,7 @@ class Visitor(ABC):
         pass
 
     @abstractmethod
-    def visit_line(self, line: Vector) -> Any:
+    def visit_line(self, line: Vector, start_point: Point) -> Any:
         pass
 
     @abstractmethod
