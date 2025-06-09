@@ -19,7 +19,7 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
     def __init__(
         self,
         node_similarity_calculator: NodeSimilarityCalculator,
-        similarity_threshold: float = 0.25,
+        similarity_threshold: float = 0.1,
         logger: logging.Logger = logging.getLogger(__name__),
     ):
         super().__init__(node_similarity_calculator)
@@ -150,7 +150,7 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
     ) -> List[Any]:
         enpoints_below_threshold = []
         if similarity_matrix.size == 0:
-            self.logger.error("Similarity matrix is empty. Raising error.")
+            self.logger.error("Similarity matrix is empty. Raising error.", exc_info=True)
             raise ValueError("Similarity matrix is empty.")
 
         max_similarity = np.max(similarity_matrix, axis=axis)
@@ -230,7 +230,8 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
 
         if not path_found:
             self.logger.error(
-                f"No path found for endpoint {endpoint_id}. Returning empty list."
+                f"No path found for endpoint {endpoint_id}. Returning empty list.",
+                exc_info=True,
             )
             raise ValueError(f"No path found for endpoint {endpoint_id}.")
 
@@ -243,11 +244,11 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
         difference: int,
     ) -> List[Any]:
         if difference <= 0:
-            self.logger.error("Difference is less than or equal to 0. Raising error.")
+            self.logger.error("Difference is less than or equal to 0. Raising error.", exc_info=True)
             raise ValueError("Difference is less than or equal to 0.")
 
         if similarity_matrix.size == 0:
-            self.logger.error("Similarity matrix is empty. Raising error.")
+            self.logger.error("Similarity matrix is empty. Raising error.", exc_info=True)
             raise ValueError("Similarity matrix is empty.")
 
         # Find the maximum similarity for each endpoint in the larger set (each row in the matrix)

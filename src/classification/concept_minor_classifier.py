@@ -1,6 +1,6 @@
 import logging
+import copy
 import networkx as nx
-from typing import List
 from services.pre_processing.critical_point_preprocessor import (
     CriticalPointPreprocessor,
 )
@@ -20,6 +20,8 @@ from graph_similarity.graph_edit_distance_comparator import (
     GraphEditDistanceComparator,
 )
 from common.decorator import timed
+from services.graph_analyzer import GraphAnalyzer
+from common.traversal.visitors import AngleVisitor, QuadrantVisitor, DirectionVisitor
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -84,6 +86,7 @@ class ConceptMinorClassifier:
         Returns:
             Classification result for this concept
         """
+        image_graph = copy.deepcopy(image_graph)
         logging.info(f"Checking concept {concept_id} for minor of image")
         concept_graph = self.concept_repository.get_concept_graph(concept_id)
 
@@ -106,6 +109,14 @@ class ConceptMinorClassifier:
                 inference_graph=image_graph,
                 concept_graph=concept_graph,
             )
+            GraphAnalyzer(
+                graph=image_graph,
+                visitors=[
+                    AngleVisitor(image_graph),
+                    QuadrantVisitor(image_graph),
+                    DirectionVisitor(image_graph),
+                ],
+            ).analyze()
             preprocessed_image_graph, _ = (
                 self.critical_point_preprocessor.preprocess_graphs(
                     inference_graph=image_graph,

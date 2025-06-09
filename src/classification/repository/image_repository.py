@@ -24,12 +24,12 @@ class ImageRepository:
             WITH n, labels(n) as node_labels, properties(n) as node_props
             OPTIONAL MATCH (n)-[r]-(m {image_id: $image_id})
             WITH n, node_labels, r, m, node_props
-            RETURN elementId(n) AS node_id, 
+            RETURN n.id AS node_id, 
                 node_labels,
                 node_props,
                 type(r) AS rel_type, 
                 elementId(r) AS rel_id,
-                elementId(m) AS target_id
+                m.id AS target_id
         """
         with self.driver.session() as session:
             result = session.run(query, image_id=image_id)

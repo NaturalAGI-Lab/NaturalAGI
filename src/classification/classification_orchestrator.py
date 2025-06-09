@@ -157,7 +157,7 @@ class ClassificationOrchestrator:
                     results.append(result)
                     logging.debug(f"Completed classification for concept {concept_id}")
                 except Exception as e:
-                    logging.error(f"Error processing concept {concept_id}: {str(e)}")
+                    logging.error(f"Error processing concept {concept_id}: {str(e)}", exc_info=True)
                     # Create a failed result
                     results.append(
                         ClassificationResult(
@@ -210,7 +210,7 @@ class ClassificationOrchestrator:
                     result = classifier.check_single_concept(image_graph, concept_id)
                     results.append(result)
                 except Exception as e:
-                    logging.error(f"Error processing concept {concept_id}: {str(e)}")
+                    logging.error(f"Error processing concept {concept_id}: {str(e)}", exc_info=True)
                     results.append(
                         ClassificationResult(
                             concept_id=concept_id,
@@ -303,7 +303,8 @@ def _process_single_concept(work_package: Dict[str, Any]) -> ClassificationResul
 
     except Exception as e:
         logging.error(
-            f"Worker error processing concept {work_package.get('concept_id', 'unknown')}: {str(e)}"
+            f"Worker error processing concept {work_package.get('concept_id', 'unknown')}: {str(e)}",
+            exc_info=True,
         )
         return ClassificationResult(
             concept_id=work_package.get("concept_id", "unknown"),

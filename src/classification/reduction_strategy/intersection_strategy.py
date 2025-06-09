@@ -126,7 +126,7 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
     ) -> List[Any]:
         intersection_points_below_threshold = []
         if similarity_matrix.size == 0:
-            self.logger.error("Similarity matrix is empty. Raising error.")
+            self.logger.error("Similarity matrix is empty. Raising error.", exc_info=True)
             raise ValueError("Similarity matrix is empty.")
 
         max_similarity = np.max(similarity_matrix, axis=axis)
@@ -178,11 +178,11 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
         difference: int,
     ) -> List[Any]:
         if difference <= 0:
-            self.logger.error("Difference is less than or equal to 0. Raising error.")
+            self.logger.error("Difference is less than or equal to 0. Raising error.", exc_info=True)
             raise ValueError("Difference is less than or equal to 0.")
 
         if similarity_matrix.size == 0:
-            self.logger.error("Similarity matrix is empty. Raising error.")
+            self.logger.error("Similarity matrix is empty. Raising error.", exc_info=True)
             raise ValueError("Similarity matrix is empty.")
 
         max_similarities_per_large_point = np.max(similarity_matrix, axis=1)

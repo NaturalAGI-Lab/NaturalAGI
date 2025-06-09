@@ -97,27 +97,26 @@ class StartPointService:
             )
             return fallback_candidates[0][0]
 
-        self.logger.error("No suitable start point found in the graph")
+        self.logger.error("No suitable start point found in the graph", exc_info=True)
         return None
 
     def change_start_point(self, graph: nx.Graph, new_start_point: int) -> nx.Graph:
         old_start_point = self._get_old_start_point(graph)
-        if old_start_point is None:
-            raise ValueError("Old start point not found")
-
-        graph.nodes[old_start_point]["labels"].remove(
-            CriticalPointType.START_POINT.value
-        )
-        if nx.degree(graph, old_start_point) == 1:
-            graph.nodes[old_start_point]["labels"].append(
-                CriticalPointType.END_POINT.value
+        if old_start_point is not None:
+            graph.nodes[old_start_point]["labels"].remove(
+                CriticalPointType.START_POINT.value
             )
+            if nx.degree(graph, old_start_point) == 1:
+                graph.nodes[old_start_point]["labels"].append(
+                    CriticalPointType.END_POINT.value
+                )
 
         graph.nodes[new_start_point]["labels"].clear()
         graph.nodes[new_start_point]["labels"].append(
             CriticalPointType.START_POINT.value
         )
         graph.nodes[new_start_point]["labels"].append("Point")
+        graph.graph["start_point"] = new_start_point
         return graph
 
     def _get_old_start_point(self, graph: nx.Graph) -> int:
@@ -127,4 +126,8 @@ class StartPointService:
         return None
 
     def _determine_structure_type(self, graph: nx.Graph) -> str:
-        return "Open" if any(nx.degree(graph, node) == 1 for node in graph.nodes) else "Closed"
+        return (
+            "Open"
+            if any(nx.degree(graph, node) == 1 for node in graph.nodes)
+            else "Closed"
+        )

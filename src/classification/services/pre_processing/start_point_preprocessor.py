@@ -16,16 +16,8 @@ class StartPointPreprocessor:
         if concept_start_point is None:
             raise ValueError("Concept start point not found")
 
-        # TODO: uncomment after next training
-        # centroid = concept_graph.nodes[concept_start_point]["centroid"]
-        # TODO: comment after next training
-        data = concept_graph.nodes[concept_start_point]
-        centroid = np.array(
-            [
-                data["normalized_x"]["center"],
-                data["normalized_y"]["center"],
-            ]
-        )
+        centroid = concept_graph.nodes[concept_start_point]["centroid"]
+        centroid = np.array(centroid)
         logger.info(f"Centroid: {centroid}")
         start_point_service = StartPointService(centroid=centroid)
 

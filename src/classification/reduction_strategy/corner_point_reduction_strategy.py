@@ -271,7 +271,7 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
             return []
 
         if similarity_matrix.size == 0:
-            self.logger.error("Similarity matrix is empty. Raising error.")
+            self.logger.error("Similarity matrix is empty. Raising error.", exc_info=True)
             raise ValueError("Similarity matrix is empty.")
 
         # Find the maximum similarity for each corner point in the larger set
