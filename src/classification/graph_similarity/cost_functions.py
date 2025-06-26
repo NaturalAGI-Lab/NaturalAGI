@@ -11,21 +11,19 @@ class NodeCost(enum.Enum):
     NO_MATCH = 1.0
     IMPOSSIBLE = 100.0
 
-
-class FeatureLevel(enum.Enum):
-    HIGH_LEVEL = ["segments"]
-    LOW_LEVEL = [
-        "normalized_x",
-        "normalized_y",
-        "horizontal_direction",
-        "vertical_direction",
-        # "quadrant"
-        # "angle_with_ox",
-        # "angle",
-        # "quadrant_change_count",
-        # "intersection_points_count",
-        # "endpoints_count",
-    ]
+features = [
+    "segments",
+    "normalized_x",
+    "normalized_y",
+    "horizontal_direction",
+    "vertical_direction",
+    # "quadrant"
+    # "angle_with_ox",
+    # "angle",
+    # "quadrant_change_count",
+    # "intersection_points_count",
+    # "endpoints_count",
+]
 
 
 logger = logging.getLogger(__name__)
@@ -116,8 +114,7 @@ def _calculate_properties_similarity_cost(
     image_node_data: Any, concept_node_data: Any
 ) -> float:
 
-    feature_level = _check_feature_level(concept_node_data, image_node_data)
-    properties_to_check = FeatureLevel.HIGH_LEVEL.value + FeatureLevel.LOW_LEVEL.value
+    properties_to_check = features
 
     total_cost = 0.0
     properties_checked = 0
@@ -290,49 +287,3 @@ def _calculate_list_similarity_cost(concept_list: list, image_list: list) -> flo
         return NodeCost.NO_COST.value
     else:
         return NodeCost.NO_MATCH.value
-
-
-def _check_feature_level(
-    concept_properties: dict, image_properties: dict
-) -> FeatureLevel:
-    """
-    Check if the feature level is high.
-    """
-    high_level_properties = set(FeatureLevel.HIGH_LEVEL.value)
-
-    for prop_name in high_level_properties:
-        if not _check_property_existence(
-            prop_name, concept_properties, image_properties
-        ):
-            return FeatureLevel.LOW_LEVEL
-
-    return FeatureLevel.HIGH_LEVEL
-
-
-def _check_property_existence(
-    prop_name: str, concept_properties: dict, image_properties: dict
-) -> bool:
-    if (
-        prop_name not in concept_properties.keys()
-        or prop_name not in image_properties.keys()
-    ):
-        return False
-    if concept_properties[prop_name] is None or image_properties[prop_name] is None:
-        return False
-    if isinstance(concept_properties[prop_name], dict) and isinstance(
-        image_properties[prop_name], dict
-    ):
-        if (
-            len(concept_properties[prop_name].keys()) == 0
-            or len(image_properties[prop_name].keys()) == 0
-        ):
-            return False
-    if isinstance(concept_properties[prop_name], list) and isinstance(
-        image_properties[prop_name], list
-    ):
-        if (
-            len(concept_properties[prop_name]) == 0
-            or len(image_properties[prop_name]) == 0
-        ):
-            return False
-    return True

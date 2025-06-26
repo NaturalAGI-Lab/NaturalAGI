@@ -168,37 +168,9 @@ The core classification algorithm implements a sequential pipeline that combines
 
 ##### 3.4.1 Complexity Pre-filtering
 
-The algorithm initiates with a complexity-based pre-filtering stage that implements the monotonicity principle to achieve early elimination of incompatible concept-image pairs. This stage serves as the primary computational optimization mechanism, significantly reducing the number of concepts requiring detailed analysis.
+The algorithm's first step is a complexity-based pre-filtering stage, which serves as the primary optimization for the entire classification process. This stage applies the monotonicity principle, as defined in the theoretical foundation (Section 3.2.3), to rapidly eliminate concept-image pairs that are fundamentally incompatible.
 
-**Graph Complexity Metrics**
-
-The complexity assessment employs the structural complexity metric
-```math
-C_S(G) = |V| + |E|
-```
-where |V| represents the node count and |E| represents the edge count of graph G. This metric provides a computationally efficient measure that captures the essential structural size characteristics while maintaining the fundamental property that more complex graphs contain greater numbers of structural elements.
-
-The complexity calculation operates on the original, unprocessed graph representations to ensure that the filtering decision reflects the true structural capacity of both concept and image graphs. This approach prevents inappropriate filtering that could occur if complexity calculations were performed on preprocessed or reduced graph representations.
-
-**Early Rejection Criteria**
-
-The pre-filtering mechanism implements a strict inequality comparison: if
-```math
-C_S(\text{concept}) > C_S(\text{image})
-```
-the concept is immediately rejected as a potential match. This criterion is based on the fundamental principle that a concept graph cannot exist as a minor within an image graph if it possesses greater structural complexity than the image itself.
-
-The early rejection process generates a classification result indicating non-compatibility, eliminating the need for subsequent preprocessing and comparison operations. This mechanism provides significant computational savings, particularly when processing large concept repositories where many concepts exceed the structural complexity of the target image.
-
-**Computational Efficiency Considerations**
-
-The complexity pre-filtering achieves computational efficiency through several design principles. The complexity calculation requires only linear traversal of graph nodes and edges, providing
-```math
-O(|V| + |E|)
-```
-computational complexity that scales efficiently with graph size. The comparison operation itself requires constant time, enabling rapid filtering decisions regardless of graph complexity.
-
-The filtering stage maintains detailed logging of rejection decisions, providing diagnostic information that facilitates performance analysis and system optimization. The early termination capability prevents unnecessary allocation of computational resources to obviously incompatible concept-image pairs, enabling the system to focus processing capacity on promising classification candidates.
+The filtering mechanism compares the structural complexity of the concept and image graphs. If the concept's complexity, $C_S(\text{concept})$, is greater than the image's, $C_S(\text{image})$, it is immediately rejected without further processing. This early rejection provides significant computational savings, particularly for large concept repositories, by ensuring that the more resource-intensive stages of the algorithm are only performed on viable candidates.
 
 ##### 3.4.2 Graph Reduction and Alignment
 
@@ -258,81 +230,25 @@ The similarity assessment concludes with normalization operations that convert e
 
 The feature-based comparison system implements hierarchical node property analysis within the graph edit distance computation framework. Rather than operating as a separate comparison layer, feature analysis is integrated directly into the node substitution cost functions, enabling sophisticated property-level similarity assessment during the core matching process.
 
-##### 3.5.1 Multi-level Feature Analysis
+##### 3.5.1 Unified Feature Comparison
 
-The feature analysis framework employs a two-tier hierarchical structure that distinguishes between high-level structural features and low-level geometric properties. This stratification enables appropriate weighting of different property types while maintaining semantic coherence throughout the comparison process.
+The feature analysis framework has been streamlined to utilize a unified set of predefined properties for comparing nodes. This approach simplifies the comparison logic by removing the previous hierarchical distinction between high-level structural features and low-level geometric properties.
 
-**High-level Structural Features**
+The system employs a single, curated list of features deemed relevant for similarity assessment, including both structural (`segments`) and geometric (`normalized_x`, `normalized_y`, `horizontal_direction`, `vertical_direction`) attributes.
 
-The high-level feature category encompasses abstract structural properties that capture essential topological characteristics. The current implementation focuses on segment-based features that represent structural connectivity and relationship patterns within the graph representation. These features provide coarse-grained structural characterization that remains stable across minor geometric variations.
-
-High-level features receive prioritized treatment in the comparison process, as they represent fundamental structural properties that are essential for accurate concept identification. The presence or absence of high-level feature compatibility determines the overall feature assessment approach for individual node comparisons.
-
-**Low-level Geometric Properties**
-
-Low-level features encompass specific geometric and spatial properties that provide detailed characterization of individual nodes within the graph structure. The implemented feature set includes normalized coordinate information, directional properties, and spatial orientation characteristics.
-
-The low-level feature inventory comprises normalized spatial coordinates that provide scale-independent position information, horizontal and vertical directional indicators that capture orientation characteristics, and additional geometric properties that encode specific spatial relationships. These features enable fine-grained similarity assessment while maintaining robustness to minor geometric variations.
-
-**Feature Hierarchy and Weighting**
-
-The hierarchical feature structure implements differential weighting that prioritizes structural compatibility over geometric precision. Feature level determination operates through mathematical assessment of feature availability and completeness.
-
-**Mathematical Feature Level Determination**
-
-The feature level classification function is defined as:
-
-```math
-\text{FeatureLevel}(n_i, n_c) =
-\begin{cases}
-  \text{HIGH\_LEVEL}, & \text{if } \forall p \in F_{\text{high}} : \text{PropertyExists}(p, n_i, n_c) \\
-  \text{LOW\_LEVEL},  & \text{otherwise}
-\end{cases}
-```
-
-where 
-```math
-F_{\text{high}} = \{\text{"segments"}\}
-```
-represents the set of high-level structural features, and $\text{PropertyExists}(p, n_i, n_c)$ evaluates to true when property p is present and non-empty in both nodes.
-
-The property set for comparison is determined as:
-
-```math
-P_{\text{check}} =
-\begin{cases}
-  F_{\text{high}} \cup F_{\text{low}}, & \text{if FeatureLevel}(n_i, n_c) = \text{HIGH\_LEVEL} \\
-  F_{\text{low}},             & \text{if FeatureLevel}(n_i, n_c) = \text{LOW\_LEVEL}
-\end{cases}
-```
-
-where
-```math
-F_{\text{low}} = \{\text{normalized\_x, normalized\_y, horizontal\_direction, vertical\_direction}\}
-```
-represents the low-level geometric feature set.
-
-**Weighting Mechanism**
-
-The weighting mechanism distributes comparison responsibility equally across all available features within the determined hierarchy level:
-
-```math
-w_{\text{prop}} = \frac{1}{|P_{\text{common}} \cap P_{\text{check}}|}
-```
-
-where each property receives equal weighting allocation. This ensures that no single feature dominates the similarity assessment, while comprehensive feature coverage provides robust characterization across diverse node types and structural configurations.
+During the node substitution cost calculation, the algorithm identifies the subset of these predefined features that are present in both the image node and the concept node. The final similarity cost is calculated based only on this common set of properties. This dynamic selection ensures that nodes are compared only on the basis of mutually available information, providing a robust and fair assessment. The weighting is distributed equally among the features in this common set, as detailed in the following section.
 
 ##### 3.5.2 Similarity Metrics and Cost Functions
 
-The similarity assessment framework implements type-specific comparison algorithms that accommodate the diverse data types and semantic characteristics present in node property representations. The framework provides specialized handling for numeric values, range specifications, string comparisons, and list-based feature sets.
+The similarity assessment framework implements type-specific comparison algorithms that accommodate the diverse data types and semantic characteristics present in node property representations. The framework provides specialized handling for numeric values, range specifications, string comparisons, and list-based feature sets, ensuring that comparisons are semantically appropriate for each property type.
 
 **Node Property Comparison**
 
-Property comparison employs type-aware algorithms that adapt their assessment criteria based on the specific characteristics of compared values. The mathematical framework implements distinct cost functions for different data types, ensuring appropriate similarity assessment across the diverse property landscape.
+The cornerstone of the similarity framework is the node substitution cost function, which quantifies the dissimilarity between a node from the image graph ($n_i$) and a node from the concept graph ($n_c$). The computation begins by verifying label compatibility, a prerequisite for any further comparison. If the set of labels on the concept node is not a subset of the labels on the image node, the nodes are considered incompatible, and an infinite cost is assigned.
 
 **Mathematical Formulation of Cost Functions**
 
-The overall node substitution cost is computed as:
+The overall node substitution cost is defined as:
 
 ```math
 C_{\text{node}}(n_i, n_c) =
@@ -342,19 +258,23 @@ C_{\text{node}}(n_i, n_c) =
 \end{cases}
 ```
 
-where $n_i$ represents an image node, $n_c$ represents a concept node, and $C_{\text{props}}$ denotes the property similarity cost function.
+If the labels are compatible, the cost is determined by the cumulative dissimilarity of their shared properties, denoted as $C_{\text{props}}(n_i, n_c)$. This function aggregates the comparison costs of individual properties that are common to both nodes and are part of a predefined set of comparable features.
 
-The property similarity cost is calculated as:
+Let $P_i$ be the set of properties in the image node, $P_c$ be the set of properties in the concept node, and $F$ be the set of predefined features considered for comparison. The set of properties to be compared, $P_{\text{compare}}$, is the intersection of these three sets: $P_{\text{compare}} = P_i \cap P_c \cap F$.
+
+The property similarity cost is then calculated as the sum of individual property costs, where each property's cost is capped to ensure that a single mismatched property does not disproportionately influence the total cost. The contribution of each property is weighted equally. The formula is:
 
 ```math
-C_{\text{props}}(n_i, n_c) = \frac{1}{|P_{\text{common}}|} \sum_{p \in P_{\text{common}}} \min(C_{\text{prop}}(v_i^p, v_c^p), \frac{1}{|P_{\text{common}}|})
+C_{\text{props}}(n_i, n_c) = \sum_{p \in P_{\text{compare}}} \min\left(C_{\text{prop}}(v_i^p, v_c^p), \frac{1}{|P_{\text{compare}}|}\right)
 ```
 
-where $P_{\text{common}}$ represents the intersection of available properties between concept and image nodes, and $C_{\text{prop}}$ denotes the type-specific property comparison function.
+where $C_{\text{prop}}(v_i^p, v_c^p)$ is the type-specific cost function for a given property $p$. This formulation results in a total cost between 0.0 (for a perfect match) and 1.0 (for a total mismatch across all compared properties). If the set $P_{\text{compare}}$ is empty, a maximum mismatch cost is returned.
 
 **Type-Specific Cost Functions**
 
-Numeric property comparison implements tolerance-based matching:
+To handle the heterogeneity of property data, the framework employs specialized cost functions for different value types:
+
+Numeric property comparison implements tolerance-based matching to account for minor floating-point discrepancies:
 
 ```math
 C_{\text{numeric}}(v_i, v_c) =
@@ -364,7 +284,7 @@ C_{\text{numeric}}(v_i, v_c) =
 \end{cases}
 ```
 
-Range-based property comparison provides graduated cost assessment:
+Range-based property comparison provides a graduated cost for numeric values that fall within a concept's specified range. The cost is proportional to the value's distance from the center of the range, encouraging matches closer to the ideal value:
 
 ```math
 C_{\text{range}}(v_i, r_c) =
@@ -375,9 +295,9 @@ C_{\text{range}}(v_i, r_c) =
 \end{cases}
 ```
 
-where $r_{\text{width}} = r_{\text{max}} - r_{\text{min}}$ and $C_{\text{max}}$ represents the maximum allowable cost for the property.
+where $r_{\text{width}} = r_{\max} - r_{\min}$, and $C_{\max}$ is the maximum possible cost for that property (i.e., $1/|P_{\text{compare}}|$).
 
-String comparison employs exact categorical matching:
+String comparison employs case-insensitive categorical matching:
 
 ```math
 C_{\text{string}}(s_i, s_c) =
@@ -387,7 +307,7 @@ C_{\text{string}}(s_i, s_c) =
 \end{cases}
 ```
 
-List comparison implements subset relationship evaluation:
+List comparison implements subset relationship evaluation, which allows an image node's property to be a superset of the concept's requirement:
 
 ```math
 C_{\text{list}}(L_i, L_c) =
@@ -397,7 +317,7 @@ C_{\text{list}}(L_i, L_c) =
 \end{cases}
 ```
 
-This approach ensures that concept specifications can be satisfied by more comprehensive image characterizations while maintaining strict compatibility requirements.
+This multi-faceted approach ensures that concept specifications can be satisfied by more detailed or comprehensive image characterizations while upholding strict compatibility requirements for the core features.
 
 **Structural Compatibility Assessment**
 
@@ -414,14 +334,28 @@ Range-based tolerance implements graduated cost assessment that provides smooth 
 The tolerance framework balances flexibility with discrimination capability, ensuring that minor measurement variations do not prevent valid concept matches while maintaining sufficient precision to distinguish between genuinely different structural configurations.
 
 #### 3.6 Performance Optimization
-- 3.6.1 Parallel Processing Strategy
-  - Concept-level Parallelization
-  - Load Balancing Mechanisms
-  - Scalability Considerations
-- 3.6.2 Computational Complexity Analysis
-  - Time Complexity Bounds
-  - Memory Usage Optimization
-  - Timeout Management
+
+To ensure the classification system operates efficiently, particularly when processing large concept repositories against complex images, several key performance optimization strategies are employed. These strategies focus on reducing the overall computational load through parallel processing and managing the inherent complexity of graph comparison algorithms.
+
+##### 3.6.1 Parallel Processing Strategy
+
+The classification architecture is designed for horizontal scalability through a concept-level parallelization strategy. The system implements a master-worker paradigm using a process pool that distributes the workload of comparing an image against numerous concepts across multiple CPU cores.
+
+**Concept-level Parallelization**
+The core of the strategy involves partitioning the concept repository into individual work units, where each unit represents a single concept-to-image comparison task. The orchestration layer submits these tasks to a `multiprocessing.Pool`, allowing the operating system to manage the scheduling and execution of these tasks across available processors. This approach is highly effective because each comparison is an independent operation, requiring no inter-process communication, thus minimizing synchronization overhead and maximizing throughput. The number of worker processes is dynamically configured based on the available system cores, ensuring optimal resource utilization.
+
+**Load Balancing and Fault Tolerance**
+This parallel architecture provides implicit load balancing, as the operating system assigns new tasks to worker processes as soon as they become free. This ensures that processing resources remain consistently engaged. Furthermore, the design enhances fault tolerance. An error or exception within a single concept comparison task is isolated to its respective process, preventing it from halting the entire classification pipeline. The main orchestrator can handle such failures gracefully, logging the issue while allowing other comparisons to proceed uninterrupted.
+
+##### 3.6.2 Computational Complexity Management
+
+The primary bottleneck in the classification algorithm is the graph edit distance (GED) computation, which is known to be NP-hard in the general case. To mitigate this, the system incorporates two critical mechanisms: complexity-based pre-filtering and timeout-constrained execution.
+
+**Complexity Pre-filtering**
+As detailed in section 3.4.1, the first line of defense against computational intractability is the complexity pre-filtering stage. By performing a computationally inexpensive check ($O(|V| + |E|)$), the algorithm immediately rejects any concept graph that is structurally more complex than the image graph. This step dramatically reduces the number of candidate concepts that must undergo the more expensive GED analysis, significantly improving overall performance, especially with large and diverse concept repositories.
+
+**Timeout-Constrained Graph Matching**
+For concepts that pass the pre-filtering stage, the GED computation is performed within a strictly enforced time limit. A timeout is applied to the graph matching function, ensuring that the system does not become stalled on computationally challenging graph pairs that could otherwise consume excessive resources and time. If a comparison exceeds the allocated time, it is terminated, and the concept is marked as a non-match. This pragmatic approach ensures predictable performance and system responsiveness, trading exhaustive comparison in edge cases for guaranteed completion time across the entire concept set. This is crucial for maintaining throughput in a production environment where timely results are paramount.
 
 #### 3.7 Quality Assessment and Validation
 - 3.7.1 Classification Accuracy Metrics
