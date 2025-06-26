@@ -86,11 +86,19 @@ The complexity-based filtering strategy provides a theoretical framework for ear
 
 **Complexity Metrics**: The theoretical foundation defines a single complexity measure:
 
-**Structural Complexity**: Quantified as a function of node count and edge count. For a graph G = (V, E), the structural complexity is defined as $C_S(G) = |V| + |E|$, representing the total number of structural elements in the graph. This metric provides a computationally efficient measure of graph size while maintaining the essential property that larger, more connected graphs have higher complexity values.
+**Structural Complexity**: Quantified as a function of node count and edge count. For a graph G = (V, E), the structural complexity is defined as
+```math
+C_S(G) = |V| + |E|
+```
+representing the total number of structural elements in the graph. This metric provides a computationally efficient measure of graph size while maintaining the essential property that larger, more connected graphs have higher complexity values.
 
 **Filtering Criteria**: The complexity-based filtering employs several theoretical principles:
 
-**Monotonicity Principle**: If $complexity(C) > complexity(I)$, then C cannot be a semantic minor of I. This principle provides the theoretical justification for early elimination of obviously incompatible concept-image pairs.
+**Monotonicity Principle**: If
+```math
+complexity(C) > complexity(I)
+```
+then C cannot be a semantic minor of I. This principle provides the theoretical justification for early elimination of obviously incompatible concept-image pairs.
 
 **Complexity Preservation**: Graph reduction operations must be complexity-monotonic, meaning that the complexity of a reduced graph cannot exceed the complexity of the original graph. This ensures that complexity-based filtering remains valid throughout the preprocessing pipeline.
 
@@ -164,19 +172,31 @@ The algorithm initiates with a complexity-based pre-filtering stage that impleme
 
 **Graph Complexity Metrics**
 
-The complexity assessment employs the structural complexity metric $C_S(G) = |V| + |E|$, where $|V|$ represents the node count and $|E|$ represents the edge count of graph G. This metric provides a computationally efficient measure that captures the essential structural size characteristics while maintaining the fundamental property that more complex graphs contain greater numbers of structural elements.
+The complexity assessment employs the structural complexity metric
+```math
+C_S(G) = |V| + |E|
+```
+where |V| represents the node count and |E| represents the edge count of graph G. This metric provides a computationally efficient measure that captures the essential structural size characteristics while maintaining the fundamental property that more complex graphs contain greater numbers of structural elements.
 
 The complexity calculation operates on the original, unprocessed graph representations to ensure that the filtering decision reflects the true structural capacity of both concept and image graphs. This approach prevents inappropriate filtering that could occur if complexity calculations were performed on preprocessed or reduced graph representations.
 
 **Early Rejection Criteria**
 
-The pre-filtering mechanism implements a strict inequality comparison: if $C_S(\text{concept}) > C_S(\text{image})$, the concept is immediately rejected as a potential match. This criterion is based on the fundamental principle that a concept graph cannot exist as a minor within an image graph if it possesses greater structural complexity than the image itself.
+The pre-filtering mechanism implements a strict inequality comparison: if
+```math
+C_S(\text{concept}) > C_S(\text{image})
+```
+the concept is immediately rejected as a potential match. This criterion is based on the fundamental principle that a concept graph cannot exist as a minor within an image graph if it possesses greater structural complexity than the image itself.
 
 The early rejection process generates a classification result indicating non-compatibility, eliminating the need for subsequent preprocessing and comparison operations. This mechanism provides significant computational savings, particularly when processing large concept repositories where many concepts exceed the structural complexity of the target image.
 
 **Computational Efficiency Considerations**
 
-The complexity pre-filtering achieves computational efficiency through several design principles. The complexity calculation requires only linear traversal of graph nodes and edges, providing $O(|V| + |E|)$ computational complexity that scales efficiently with graph size. The comparison operation itself requires constant time, enabling rapid filtering decisions regardless of graph complexity.
+The complexity pre-filtering achieves computational efficiency through several design principles. The complexity calculation requires only linear traversal of graph nodes and edges, providing
+```math
+O(|V| + |E|)
+```
+computational complexity that scales efficiently with graph size. The comparison operation itself requires constant time, enabling rapid filtering decisions regardless of graph complexity.
 
 The filtering stage maintains detailed logging of rejection decisions, providing diagnostic information that facilitates performance analysis and system optimization. The early termination capability prevents unnecessary allocation of computational resources to obviously incompatible concept-image pairs, enabling the system to focus processing capacity on promising classification candidates.
 
@@ -262,35 +282,43 @@ The hierarchical feature structure implements differential weighting that priori
 
 The feature level classification function is defined as:
 
-\[
+```math
 \text{FeatureLevel}(n_i, n_c) =
 \begin{cases}
   \text{HIGH\_LEVEL}, & \text{if } \forall p \in F_{\text{high}} : \text{PropertyExists}(p, n_i, n_c) \\
   \text{LOW\_LEVEL},  & \text{otherwise}
 \end{cases}
-\]
+```
 
-where $F_{\text{high}} = \{\text{"segments"}\}$ represents the set of high-level structural features, and $\text{PropertyExists}(p, n_i, n_c)$ evaluates to true when property p is present and non-empty in both nodes.
+where 
+```math
+F_{\text{high}} = \{\text{"segments"}\}
+```
+represents the set of high-level structural features, and $\text{PropertyExists}(p, n_i, n_c)$ evaluates to true when property p is present and non-empty in both nodes.
 
 The property set for comparison is determined as:
 
-\[
+```math
 P_{\text{check}} =
 \begin{cases}
   F_{\text{high}} \cup F_{\text{low}}, & \text{if FeatureLevel}(n_i, n_c) = \text{HIGH\_LEVEL} \\
   F_{\text{low}},             & \text{if FeatureLevel}(n_i, n_c) = \text{LOW\_LEVEL}
 \end{cases}
-\]
+```
 
-where $F_{\text{low}} = \{\text{"normalized\_x", "normalized\_y", "horizontal\_direction", "vertical\_direction"}\}$ represents the low-level geometric feature set.
+where
+```math
+F_{\text{low}} = \{\text{normalized\_x, normalized\_y, horizontal\_direction, vertical\_direction}\}
+```
+represents the low-level geometric feature set.
 
 **Weighting Mechanism**
 
 The weighting mechanism distributes comparison responsibility equally across all available features within the determined hierarchy level:
 
-\[
+```math
 w_{\text{prop}} = \frac{1}{|P_{\text{common}} \cap P_{\text{check}}|}
-\]
+```
 
 where each property receives equal weighting allocation. This ensures that no single feature dominates the similarity assessment, while comprehensive feature coverage provides robust characterization across diverse node types and structural configurations.
 
@@ -306,21 +334,21 @@ Property comparison employs type-aware algorithms that adapt their assessment cr
 
 The overall node substitution cost is computed as:
 
-\[
+```math
 C_{\text{node}}(n_i, n_c) =
 \begin{cases}
   \infty, & \text{if } \text{labels}(n_c) \not\subseteq \text{labels}(n_i) \\
   C_{\text{props}}(n_i, n_c), & \text{otherwise}
 \end{cases}
-\]
+```
 
 where $n_i$ represents an image node, $n_c$ represents a concept node, and $C_{\text{props}}$ denotes the property similarity cost function.
 
 The property similarity cost is calculated as:
 
-\[
+```math
 C_{\text{props}}(n_i, n_c) = \frac{1}{|P_{\text{common}}|} \sum_{p \in P_{\text{common}}} \min(C_{\text{prop}}(v_i^p, v_c^p), \frac{1}{|P_{\text{common}}|})
-\]
+```
 
 where $P_{\text{common}}$ represents the intersection of available properties between concept and image nodes, and $C_{\text{prop}}$ denotes the type-specific property comparison function.
 
@@ -328,46 +356,46 @@ where $P_{\text{common}}$ represents the intersection of available properties be
 
 Numeric property comparison implements tolerance-based matching:
 
-\[
+```math
 C_{\text{numeric}}(v_i, v_c) =
 \begin{cases}
   0.0, & \text{if } |v_i - v_c| < 1 \times 10^{-10} \\
   1.0, & \text{otherwise}
 \end{cases}
-\]
+```
 
 Range-based property comparison provides graduated cost assessment:
 
-\[
+```math
 C_{\text{range}}(v_i, r_c) =
 \begin{cases}
   1.0, & \text{if } v_i \notin [r_{\min}, r_{\max}] \\
   0.0, & \text{if } r_{\max} = r_{\min} \\
   \frac{|v_i - r_{\text{center}}|}{r_{\text{width}}/2} \times C_{\max}, & \text{if } v_i \in [r_{\min}, r_{\max}]
 \end{cases}
-\]
+```
 
 where $r_{\text{width}} = r_{\text{max}} - r_{\text{min}}$ and $C_{\text{max}}$ represents the maximum allowable cost for the property.
 
 String comparison employs exact categorical matching:
 
-\[
+```math
 C_{\text{string}}(s_i, s_c) =
 \begin{cases}
   0.0, & \text{if } \text{lowercase}(s_i) = \text{lowercase}(s_c) \\
   1.0, & \text{otherwise}
 \end{cases}
-\]
+```
 
 List comparison implements subset relationship evaluation:
 
-\[
+```math
 C_{\text{list}}(L_i, L_c) =
 \begin{cases}
   0.0, & \text{if } L_c \subseteq L_i \\
   1.0, & \text{otherwise}
 \end{cases}
-\]
+```
 
 This approach ensures that concept specifications can be satisfied by more comprehensive image characterizations while maintaining strict compatibility requirements.
 
