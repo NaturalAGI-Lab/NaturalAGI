@@ -386,7 +386,7 @@ The selection of an appropriate similarity threshold is critical for balancing t
 
 A detailed log of all incorrect classifications is maintained (e.g., `incorrect_results.csv`) to facilitate in-depth error analysis. By studying the characteristics of misclassified examples, the cost functions and graph preprocessing stages can be iteratively refined to improve the classifier's accuracy and reliability.
 
-![Confusion Matrix](../../../src/training/training_results/run_20250620_183851/confusion_matrix.png)
+![Confusion Matrix](confusion_matrix.png)
 
 
 
