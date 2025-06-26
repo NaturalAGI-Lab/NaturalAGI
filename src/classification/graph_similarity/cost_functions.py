@@ -5,9 +5,9 @@ from typing import Any, Union
 
 class NodeCost(enum.Enum):
     NO_COST = 0.0
-    MINOR = 0.2
-    GENERAL = 0.5
-    SEVERE = 0.7
+    MINOR = 0.25
+    GENERAL = 0.4
+    SEVERE = 0.65
     NO_MATCH = 1.0
     IMPOSSIBLE = 100.0
 
@@ -19,6 +19,7 @@ class FeatureLevel(enum.Enum):
         "normalized_y",
         "horizontal_direction",
         "vertical_direction",
+        # "quadrant"
         # "angle_with_ox",
         # "angle",
         # "quadrant_change_count",
@@ -48,6 +49,8 @@ def edge_del_cost(edge_data: Any) -> float:
 def edge_ins_cost(edge_data: Any) -> float:
     """
     Cost function for edge insertion.
+    When the node is removed, the edge to connect neighbors should be created.
+    This is a special case of edge substitution.
     """
     return NodeCost.NO_COST.value
 
