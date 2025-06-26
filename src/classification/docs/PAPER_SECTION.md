@@ -358,9 +358,37 @@ As detailed in section 3.4.1, the first line of defense against computational in
 For concepts that pass the pre-filtering stage, the GED computation is performed within a strictly enforced time limit. A timeout is applied to the graph matching function, ensuring that the system does not become stalled on computationally challenging graph pairs that could otherwise consume excessive resources and time. If a comparison exceeds the allocated time, it is terminated, and the concept is marked as a non-match. This pragmatic approach ensures predictable performance and system responsiveness, trading exhaustive comparison in edge cases for guaranteed completion time across the entire concept set. This is crucial for maintaining throughput in a production environment where timely results are paramount.
 
 #### 3.7 Quality Assessment and Validation
-- 3.7.1 Classification Accuracy Metrics
-- 3.7.2 Similarity Score Interpretation
-- 3.7.3 False Positive/Negative Analysis
+
+The quality of the classification system is assessed through a combination of quantitative metrics and the nuanced interpretation of a continuous similarity score. This section details the validation framework and presents results from a representative test run (`run_20250620_183851`) conducted on a dataset of 4,734 images across six distinct classes.
+
+##### 3.7.1 Classification Accuracy Metrics
+
+To quantitatively evaluate the classifier's performance, a labeled dataset containing images and their corresponding ground-truth concepts is used. Based on a predefined similarity threshold, any concept match producing a score above this threshold is considered a positive prediction.
+
+In the reference test run, the system achieved a high level of overall accuracy. The key performance indicators were as follows:
+- **Accuracy**: 82.4%
+- **Precision**: 83.3%
+- **Recall**: 82.4%
+- **F1-Score**: 82.3%
+
+These metrics indicate a robust and well-balanced classifier. The F1-Score, being the harmonic mean of precision and recall, suggests that the system maintains a strong balance between correctly identifying concepts and not making false claims. Further analysis of per-class metrics reveals variance in performance, with certain classes (e.g., class '6' with 93.6% precision) being identified more reliably than others (e.g., class '2' with 59.8% recall), indicating areas for future targeted improvements.
+
+##### 3.7.2 Similarity Score Interpretation
+
+The primary output for any concept-image pair is a similarity score between 0.0 and 1.0, derived from the Graph Edit Distance (GED). This score provides a more intuitive measure of structural correspondence than the raw GED cost. The conversion is performed by normalizing the raw GED cost against the maximum possible cost and subtracting the result from 1. A score of 1.0 thus signifies a perfect match, while a score near 0.0 indicates a complete mismatch. This continuous score is crucial for ranking potential matches and is the basis for the thresholding decision that produces the final classification.
+
+##### 3.7.3 False Positive and Negative Analysis
+
+The selection of an appropriate similarity threshold is critical for balancing the trade-off between false positives and false negatives. A visual analysis of the `confusion_matrix.png` generated during the test run provides insight into the specific inter-class confusions driving these errors.
+
+- **False Positives (Type I Error)**: Occur when an incorrect concept is matched with a score above the threshold. For example, the confusion matrix may reveal that images of class '2' are sometimes misclassified as class '3'. Such errors often arise from shared sub-structural similarities.
+- **False Negatives (Type II Error)**: Occur when a correct concept is rejected for falling below the threshold. The lower recall for class '2' (59.8%) suggests that these images may contain significant noise or structural variations that inflate the graph edit distance, causing them to be missed.
+
+A detailed log of all incorrect classifications is maintained (e.g., `incorrect_results.csv`) to facilitate in-depth error analysis. By studying the characteristics of misclassified examples, the cost functions and graph preprocessing stages can be iteratively refined to improve the classifier's accuracy and reliability.
+
+![Confusion Matrix](../../../src/training/training_results/run_20250620_183851/confusion_matrix.png)
+
+
 
 #### 3.8 Integration with NaturalAGI Pipeline
 - 3.8.1 Input Interface from Contour Analysis
