@@ -10,9 +10,24 @@ The classification function represents a critical component in the NaturalAGI fr
 
 ##### 3.1.1 Graph-based Concept Matching Problem
 
-In the context of structural image analysis, the classification problem can be formally defined as follows: given an image graph G_image derived from contour analysis and a set of concept graphs {C_1, C_2, ..., C_n} representing previously learned patterns, the task is to identify which concepts, if any, are structurally present within the image. This problem transcends simple graph isomorphism, as it requires identifying partial structural matches that preserve essential topological and geometric relationships while allowing for variations in non-critical features.
+In the context of structural image analysis, the classification problem can be formally defined as follows: given an image graph G_image derived from contour analysis and a set of concept graphs {C_1, C_2, ..., C_n} representing previously learned patterns (Figure 1), the task is to identify which concepts, if any, are structurally present within the image. This problem transcends simple graph isomorphism, as it requires identifying partial structural matches that preserve essential topological and geometric relationships while allowing for variations in non-critical features.
+
+<img src="concept_image_6.png" alt="Figure 1: Example of concept graph" width="600" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;" />
+
+*Figure 1: Example of concept graph*
+<br>
 
 The fundamental challenge lies in the asymmetric nature of this comparison. Unlike traditional graph matching problems where both graphs are treated equally, concept classification requires preserving the integrity of concept graphs while allowing controlled reduction and transformation of image graphs. This asymmetry reflects the semantic distinction between learned concepts, which represent canonical structural patterns, and image graphs, which may contain additional complexity, noise, or contextual elements that do not affect the presence of the underlying concept.
+
+<img src="mnist_sample.png" alt="Figure 2: Example of image graph" width="400" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;" />
+
+*Figure 2: MNIST sample image*
+<br>
+
+<img src="reduction_example.png" alt="Figure 3: Example of reduction" width="800" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;" />
+
+*Figure 3: Example of reduction*
+<br>
 
 ##### 3.1.2 Minor Graph Isomorphism in Pattern Recognition
 
