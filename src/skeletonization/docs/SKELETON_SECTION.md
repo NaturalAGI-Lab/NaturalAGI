@@ -64,6 +64,33 @@ The system employs adaptive threshold selection to balance noise reduction with 
 
 To address this trade-off, the system iteratively reduces the threshold value when disconnected graphs are detected, progressively incorporating previously "lost" structural details until graph connectivity is achieved. This adaptive approach ensures that the final representation captures sufficient structural information to maintain topological integrity while preserving the noise reduction benefits of initial high-threshold processing.
 
+**Figure 1: Complete Skeletonization Pipeline**
+
+<img src="skeletonization_example.png" alt="Figure 1: Complete skeletonization pipeline showing transformation from raster image to graph representation" style="width: 100%; max-width: 800px;" />
+
+*Figure 1: Comprehensive illustration of the skeletonization pipeline, demonstrating the progressive transformation from input raster image through morphological processing, neural network topology learning, and final graph representation.*
+
+**Figure 2: Adaptive Threshold Selection Analysis**
+
+The following sequence demonstrates the iterative threshold reduction strategy employed to achieve optimal connectivity while maintaining noise suppression:
+
+<img src="threshold_200.png" alt="Figure 2a: Binary image at threshold θ=200" style="width: 100%; display: block; margin: 0 auto 1em auto;" />
+<img src="threshold_195.png" alt="Figure 2b: Binary image at threshold θ=195" style="width: 100%; display: block; margin: 0 auto 1em auto;" />
+<img src="threshold_180.png" alt="Figure 2c: Binary image at threshold θ=180" style="width: 100%; display: block; margin: 0 auto 1em auto;" />
+
+*Figure 2: Progressive threshold reduction demonstrating the adaptive selection mechanism. (a) Initial high threshold (θ=200) produces clean but potentially disconnected structures. (b) Intermediate threshold (θ=195) begins to recover connecting elements. (c) Final threshold (θ=180) achieves connectivity while preserving essential structural characteristics. The algorithm systematically reduces threshold values until graph connectivity criteria are satisfied.*
+
+This iterative approach implements the mathematical optimization:
+
+```math
+\theta_{\text{optimal}} = \arg\max_{\theta} \{\theta : \text{connectivity}(G_{\theta}) = \text{true} \land \theta \geq \theta_{\text{min}}\}
+```
+
+where G_θ represents the graph derived from binary image I_θ, and connectivity(G_θ) evaluates topological connectivity constraints.
+
+
+
+
 ### 2.4 Performance Characteristics
 
 The system demonstrates robust performance across diverse image types through:
