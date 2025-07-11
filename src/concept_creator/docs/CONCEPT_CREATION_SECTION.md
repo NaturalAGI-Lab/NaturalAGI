@@ -240,6 +240,26 @@ where C₀ represents the initial concept and G₁ denotes the first training sa
 4. **Subpath Reduction**: Identify maximum common substructures along matched path segments
 5. **Property Integration**: Merge geometric and semantic properties using statistical methods
 
+<img src="initial_concept.png" alt="Initial Concept" width="600" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;" />
+
+*Figure 2: Initial concept graph*
+<br>
+
+<img src="legend.png" alt="Legend" width="600" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;" />
+
+*Figure 2: Legend for mapping and visualization of the concept graph*
+<br>
+
+<img src="first_iteration_concept_creation.png" alt="First Iteration Concept Creation" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;" />
+
+*Figure 3: First iteration concept creation*
+<br>
+
+<img src="second_iteration_concept_creation.png" alt="Second Iteration Concept Creation" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;" />
+
+*Figure 4: Second iteration concept creation*
+<br>
+
 **Error Handling and Recovery**: The integration process implements comprehensive error handling that isolates problematic samples while allowing concept formation to continue. Timeout mechanisms prevent indefinite blocking on challenging sample combinations, ensuring predictable completion times.
 
 #### 4.4.2 Maximum Common Minor Identification
@@ -275,6 +295,65 @@ The property merging mechanism implements type-specific integration strategies t
 ```
 
 **List Property Integration**: List-based properties are integrated through set intersection operations that preserve only common elements across all samples, ensuring that concept representations include only universally present features.
+
+#### 4.4.4 Feature Merging Examples
+
+The following table demonstrates how different feature types are merged during concept creation, using examples from actual training samples:
+
+| **Feature Type**              | **Sample 1 Value**         | **Sample 2 Value**      | **Sample 3 Value**        | **Merged Concept Value**                                          | **Merging Strategy**                                                       |
+| ----------------------------- | -------------------------- | ----------------------- | ------------------------- | ----------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| **Point Numeric Properties**  |
+| `endpoints_count`             | `2`                        | `2`                     | `2`                       | `{"min": 2.0, "max": 2.0, "center": 2.0, "type": "range"}`        | Range-based: min/max/center calculation                                    |
+| `cycle_count`                 | `1`                        | `0`                     | `1`                       | `{"min": 0.0, "max": 1.0, "center": 0.667, "type": "range"}`      | Range-based: structural cycle information                                  |
+| `vectors_count`               | `7`                        | `10`                    | `8`                       | `{"min": 7.0, "max": 10.0, "center": 8.333, "type": "range"}`     | Range-based: captures variation across samples                             |
+| `normalized_x`                | `-0.1`                     | `0.1`                   | `-0.4`                    | `{"min": -0.4, "max": 0.1, "center": -0.167, "type": "range"}`    | Range-based: spatial coordinate ranges                                     |
+| `normalized_y`                | `-0.6`                     | `0.5`                   | `0.89`                    | `{"min": -0.6, "max": 0.89, "center": 0.23, "type": "range"}`     | Range-based: spatial coordinate ranges                                     |
+| `intersection_points_count`   | `1`                        | `2`                     | `3`                       | `{"min": 1.0, "max": 3.0, "center": 2.0, "type": "range"}`        | Range-based: topological complexity                                        |
+| `corner_points_count`         | `5`                        | `8`                     | `3`                       | `{"min": 3.0, "max": 8.0, "center": 5.333, "type": "range"}`      | Range-based: structural complexity variation                               |
+| `quadrant_change_count`       | `0`                        | `0`                     | `4`                       | `{"min": 0.0, "max": 4.0, "center": 1.333, "type": "range"}`      | Range-based: directional changes                                           |
+| `x`                           | `49.1`                     | `55.38`                 | `32.43`                   | `{"min": 32.43, "max": 55.38, "center": 45.64, "type": "range"}`  | Range-based: absolute coordinates                                          |
+| `y`                           | `16.18`                    | `59.40`                 | `87.38`                   | `{"min": 16.18, "max": 87.38, "center": 54.32, "type": "range"}`  | Range-based: absolute coordinates                                          |
+| `relative_distance`           | `0.92`                     | `0.49`                  | `1.0`                     | `{"min": 0.49, "max": 1.0, "center": 0.80, "type": "range"}`      | Range-based: contour position measures                                     |
+| `angle` (single value)        | `220`                      | `190`                   | `150`                     | `{"min": 150.0, "max": 220.0, "center": 186.67, "type": "range"}` | Range-based: directional angle at point                                    |
+| `is_quadrant_change`          | `1`                        | `0`                     | `1`                       | `{"min": 0.0, "max": 1.0, "center": 0.667, "type": "range"}`      | Range-based: binary quadrant change indicator                              |
+| **Vector Numeric Properties** |
+| `x1`                          | `32.36`                    | `75.35`                 | `25.24`                   | `{"min": 25.24, "max": 75.35, "center": 44.32, "type": "range"}`  | Range-based: vector start coordinates                                      |
+| `y1`                          | `58.68`                    | `68.0`                  | `53.76`                   | `{"min": 53.76, "max": 68.0, "center": 60.15, "type": "range"}`   | Range-based: vector start coordinates                                      |
+| `x2`                          | `27.36`                    | `55.38`                 | `31.89`                   | `{"min": 27.36, "max": 55.38, "center": 38.21, "type": "range"}`  | Range-based: vector end coordinates                                        |
+| `y2`                          | `70.21`                    | `59.40`                 | `49.03`                   | `{"min": 49.03, "max": 70.21, "center": 59.55, "type": "range"}`  | Range-based: vector end coordinates                                        |
+| `length`                      | `12.57`                    | `23.03`                 | `8.16`                    | `{"min": 8.16, "max": 23.03, "center": 14.59, "type": "range"}`   | Range-based: geometric measurements                                        |
+| `angle_with_ox`               | `110`                      | `180`                   | `40`                      | `{"min": 40.0, "max": 180.0, "center": 110.0, "type": "range"}`   | Range-based: angular measurements                                          |
+| `quadrant`                    | `2`                        | `3`                     | `4`                       | `{"min": 2.0, "max": 4.0, "center": 3.0, "type": "range"}`        | Range-based: coordinate quadrant                                           |
+| `dx`                          | `-5.0`                     | `-23.02`                | `6.65`                    | `{"min": -23.02, "max": 6.65, "center": -7.12, "type": "range"}`  | Range-based: x-component of vector                                         |
+| `dy`                          | `11.54`                    | `-0.73`                 | `-4.73`                   | `{"min": -4.73, "max": 11.54, "center": 2.03, "type": "range"}`   | Range-based: y-component of vector                                         |
+| `direction_sequence_index`    | `4`                        | `3`                     | `0`                       | `{"min": 0.0, "max": 4.0, "center": 2.33, "type": "range"}`       | Range-based: sequence order in path                                        |
+| **String Properties**         |
+| `session_id`                  | `"2_2"`                    | `"2_2"`                 | `"1_1"`                   | *Property removed*                                                | Exact match: removed if inconsistent                                       |
+| `contour_type`                | `"OPEN"`                   | `"OPEN"`                | `"OPEN"`                  | `"OPEN"`                                                          | Exact match: kept if identical across all samples                          |
+| `monotony`                    | `"NON_MONOTONIC"`          | `"NON_MONOTONIC"`       | `"NON_MONOTONIC"`         | `"NON_MONOTONIC"`                                                 | Exact match: preserved when consistent                                     |
+| `vector_type`                 | `"HorizontalVector"`       | `"HorizontalVector"`    | `"VerticalVector"`        | *Property removed*                                                | Exact match: removed if inconsistent                                       |
+| `horizontal_direction`        | `"Left"`                   | `"Right"`               | `"RIGHT"`                 | *Property removed*                                                | Exact match: removed if inconsistent                                       |
+| `vertical_direction`          | `"Bottom"`                 | `"Top"`                 | `"TOP"`                   | *Property removed*                                                | Exact match: removed if inconsistent                                       |
+| `image_id`                    | `"ca73ae8b-35c1-..."`      | `"652c1d46-332b-..."`   | `"6e89212a-7468-..."`     | *Property removed*                                                | Exact match: removed if inconsistent                                       |
+| **List Properties**           |
+| `labels`                      | `["Point", "CornerPoint"]` | `["Point", "EndPoint"]` | `["StartPoint", "Point"]` | `["Point"]`                                                       | Set intersection: common labels preserved                                  |
+| `segments`                    | `["bottom"]`               | `["top", "left"]`       | `["top", "right"]`        | `[]` (empty array)                                                | Set intersection: only common elements kept                                |
+| **Object Properties**         |
+| `centroid`                    | `[-0.165, -0.55]`          | `[-0.165, -0.55]`       | `[-0.165, -0.55]`         | `[-0.165, -0.55]`                                                 | Special case, We keep this property to find start point for classification |
+| **Identifier Properties**     |
+| `id`                          | `1617808174648617942`      | `"7883e97b-e1cb-..."`   | `"4:d56c147a-80b2-..."`   | *Property removed*                                                | Exact match: removed due to different types/values                         |
+
+**Key Merging Principles**
+
+1. **Range-Based Merging** (Numeric Properties): Creates statistical representations capturing minimum, maximum, and center values across all training samples.
+
+2. **Exact Matching** (String Properties): Preserves properties that are identical across all samples; removes inconsistent properties to maintain concept coherence.
+
+3. **Set Intersection** (List Properties): Retains only elements present in all training samples, ensuring universal feature representation.
+
+4. **Compatibility Validation**: Properties that cannot be meaningfully merged are excluded from the final concept, ensuring only statistically coherent features are preserved.
+
+This merging strategy enables the concept creation system to capture variation ranges for numeric properties, preserve common characteristics across all samples, filter out inconsistent features that don't represent the core concept, and maintain statistical coherence in the final concept representation.
 
 ### 4.5 Performance Characteristics and Validation
 
