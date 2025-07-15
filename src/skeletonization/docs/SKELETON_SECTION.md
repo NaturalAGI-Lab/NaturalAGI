@@ -27,25 +27,11 @@ The system applies morphological closing operations and small object removal to 
 
 The Growing Neural Gas (GNG) algorithm [2] provides the theoretical foundation for learning topological relationships from skeletal point data. GNG dynamically constructs network topologies by incrementally adding nodes and adjusting connections based on input data distribution.
 
-Nodes adapt their positions through local learning rules:
-<!-- 
-```math
-\Delta w_i = \epsilon_b \cdot (x - w_i) \text{ for winner node}
-```
 
-```math
-\Delta w_j = \epsilon_n \cdot (x - w_j) \text{ for neighbor nodes}
-``` -->
-
-where ε_b and ε_n are learning rates for the best matching unit and its neighbors, respectively.
 
 #### 2.2.3 Network Simplification
 
 The network simplification employs the Ramer-Douglas-Peucker (RDP) algorithm [3] to reduce complexity while preserving essential geometric characteristics. The algorithm uses perpendicular distance criterion for point elimination.
-<!-- 
-```math
-d = \frac{|(y_2-y_1)x_0 - (x_2-x_1)y_0 + x_2y_1 - y_2x_1|}{\sqrt{(y_2-y_1)^2 + (x_2-x_1)^2}}
-``` -->
 
 ### 2.3 Algorithm Architecture
 

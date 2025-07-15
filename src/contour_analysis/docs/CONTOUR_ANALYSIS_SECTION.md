@@ -15,8 +15,8 @@ The system addresses the fundamental challenge of quantifying structural charact
 The analysis begins with graph preprocessing that consolidates redundant structural elements. The system implements intersection point merging based on spatial proximity criteria:
 
 ```math
-\text{merge}(p_1, p_2) = \begin{cases}
-\text{true}, & \text{if } d(p_1, p_2) \leq \theta \text{ and } \deg(p_1) > 2 \text{ and } \deg(p_2) > 2 \\
+\operatorname{merge}(p_1, p_2) = \begin{cases}
+\text{true}, & \text{if } d(p_1, p_2) \leq \theta \text{ and } \operatorname{deg}(p_1) > 2 \text{ and } \operatorname{deg}(p_2) > 2 \\
 \text{false}, & \text{otherwise}
 \end{cases}
 ```
@@ -30,8 +30,8 @@ The analysis employs a modular analyzer framework that applies specialized algor
 **Contour Type Analysis**: Determines topological classification by examining node degree distribution:
 
 ```math
-\text{ContourType} = \begin{cases}
-\text{CLOSED}, & \text{if } \forall n \in V: \deg(n) = 2 \\
+\operatorname{ContourType} = \begin{cases}
+\text{CLOSED}, & \text{if } \forall n \in V, \operatorname{deg}(n) = 2 \\
 \text{OPEN}, & \text{otherwise}
 \end{cases}
 ```

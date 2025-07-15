@@ -37,11 +37,11 @@ The concept formation process employs an extended interpretation of graph minor 
 **Progressive Graph Intersection**: The concept formation algorithm implements a progressive intersection strategy where each new training sample is integrated with the current concept representation through maximum common minor identification. This process is defined recursively:
 
 ```math
-C₀ = G₁
+C_0 = G_1
 ```
 
 ```math
-C_{i+1} = \text{MaxCommonMinor}(C_i, G_{i+1}) \text{ for } i = 1, 2, ..., n-1
+C_{i+1} = \operatorname{MaxCommonMinor}(C_i, G_{i+1}) \text{ for } i = 1, 2, \dots, n-1
 ```
 
 where Cᵢ represents the concept after incorporating i training samples, and MaxCommonMinor denotes the maximum common minor operation that preserves both structural connectivity and semantic properties.
@@ -76,13 +76,13 @@ The concept formation process implements sophisticated property integration mech
 **Range-Based Property Merging**: Numeric properties are integrated using range-based statistical measures that capture both central tendencies and acceptable variation bounds:
 
 ```math
-P_{\text{merged}} = \{\text{min}: \min(P_1, P_2, ..., P_n), \text{max}: \max(P_1, P_2, ..., P_n), \text{center}: \frac{\sum P_i}{n}\}
+P_{\text{merged}} = \{\text{min}: \min(P_1, P_2, \dots, P_n), \text{max}: \max(P_1, P_2, \dots, P_n), \text{center}: \frac{\sum_i P_i}{n}\}
 ```
 
 **Set-Based Property Integration**: Categorical and list-based properties employ intersection-based integration that preserves only the common elements across all training samples:
 
 ```math
-P_{\text{merged}} = P_1 \cap P_2 \cap ... \cap P_n
+P_{\text{merged}} = P_1 \cap P_2 \cap \dots \cap P_n
 ```
 
 **Compatibility Validation**: The property integration framework includes compatibility validation mechanisms that ensure property merging operations maintain semantic coherence. Properties that cannot be meaningfully merged across samples are excluded from the final concept representation, ensuring that only consistent and reliable features are preserved.
@@ -110,8 +110,8 @@ The start point selection mechanism addresses the fundamental challenge of estab
 **Structure Type Classification**: The selection strategy incorporates structure type analysis that distinguishes between open and closed structural patterns:
 
 ```math
-\text{StructureType} = \begin{cases}
-\text{OPEN}, & \text{if } \exists G_i : \text{EndPoint} \in \text{CriticalPoints}(G_i) \\
+\operatorname{StructureType} = \begin{cases}
+\text{OPEN}, & \text{if } \exists G_i : \operatorname{EndPoint} \in \operatorname{CriticalPoints}(G_i) \\
 \text{CLOSED}, & \text{otherwise}
 \end{cases}
 ```
@@ -129,7 +129,7 @@ The preprocessing pipeline implements iterative reduction strategies that align 
 **Convergence Criteria**: The preprocessing pipeline implements convergence detection based on critical point graph isomorphism:
 
 ```math
-\text{Convergence} = \text{IsIsomorphic}(\text{CriticalGraph}(G_c), \text{CriticalGraph}(G_i))
+\operatorname{Convergence} = \operatorname{IsIsomorphic}(\operatorname{CriticalGraph}(G_c), \operatorname{CriticalGraph}(G_i))
 ```
 
 with maximum iteration limits (typically 5) to prevent infinite loops in challenging cases.
@@ -182,7 +182,7 @@ graph TB
 
 **Traversal Mechanics**
 
-The algorithm maintains strict critical point type correspondence throughout the traversal process. When advancing from one critical point to the next, the system employs breadth-first search to locate the subsequent critical point in each graph, ensuring that both graphs reach critical points of identical types. This constraint prevents inappropriate alignments between structurally incompatible graph regions.
+The algorithm maintains strict critical point type correspondence throughout the traversal process. When advancing from one critical point to the next, the system employs breadth-first search to locate the subsequent critical point in each graph using BFS, ensuring type compatibility, and continues the traversal linearly.
 
 The traversal process follows a systematic approach:
 
@@ -226,8 +226,8 @@ The concept formation process begins with the first training sample as the initi
 
 **Initialization Phase**: The algorithm establishes the first training sample as the baseline concept:
 
-```
-C₀ = G₁
+```math
+C_0 = G_1
 ```
 
 where C₀ represents the initial concept and G₁ denotes the first training sample graph.
@@ -271,7 +271,7 @@ The maximum common minor identification process operates through coordinated ana
 **Path Matching and Similarity Assessment**: The algorithm employs comprehensive similarity assessment that evaluates structural correspondence between path pairs:
 
 ```math
-\text{Similarity}(P_c, P_i) = \frac{1}{|P_c|} \sum_{j=1}^{|P_c|} \max_{k} S(n_{c,j}, n_{i,k})
+\operatorname{Similarity}(P_c, P_i) = \frac{1}{|P_c|} \sum_{j=1}^{|P_c|} \max_{k} S(n_{c,j}, n_{i,k})
 ```
 
 where P_c and P_i represent paths in concept and image graphs respectively, and S(n₁, n₂) denotes node-level similarity.
@@ -285,13 +285,13 @@ The property merging mechanism implements type-specific integration strategies t
 **Numeric Property Integration**: Numeric values are merged using range-based representation that captures both central tendency and acceptable variation:
 
 ```math
-\text{Merge}(v_1, v_2, ..., v_n) = \{\text{min}: \min_i v_i, \text{max}: \max_i v_i, \text{center}: \frac{\sum_i v_i}{n}\}
+\operatorname{Merge}(v_1, v_2, \dots, v_n) = \{\text{min}: \min_i v_i, \text{max}: \max_i v_i, \text{center}: \frac{\sum_i v_i}{n}\}
 ```
 
 **Categorical Property Integration**: String and categorical properties employ exact matching with intersection-based consolidation:
 
 ```math
-\text{Merge}(S_1, S_2, ..., S_n) = S_1 \cap S_2 \cap ... \cap S_n
+\operatorname{Merge}(S_1, S_2, \dots, S_n) = S_1 \cap S_2 \cap \dots \cap S_n
 ```
 
 **List Property Integration**: List-based properties are integrated through set intersection operations that preserve only common elements across all samples, ensuring that concept representations include only universally present features.

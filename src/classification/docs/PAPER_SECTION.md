@@ -10,7 +10,7 @@ The classification function represents a critical component in the NaturalAGI fr
 
 ##### 3.1.1 Graph-based Concept Matching Problem
 
-In the context of structural image analysis, the classification problem can be formally defined as follows: given an image graph G_image derived from contour analysis and a set of concept graphs {C_1, C_2, ..., C_n} representing previously learned patterns (Figure 1), the task is to identify which concepts, if any, are structurally present within the image. This problem transcends simple graph isomorphism, as it requires identifying partial structural matches that preserve essential topological and geometric relationships while allowing for variations in non-critical features.
+In the context of structural image analysis, the classification problem can be formally defined as follows: given an image graph G_image derived from contour analysis and a set of concept graphs {C_1, C_2, \dots, C_n} representing previously learned patterns (Figure 1), the task is to identify which concepts, if any, are structurally present within the image. This problem transcends simple graph isomorphism, as it requires identifying partial structural matches that preserve essential topological and geometric relationships while allowing for variations in non-critical features.
 
 <img src="concept_image_6.png" alt="Figure 1: Example of concept graph" width="600" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;" />
 
@@ -111,7 +111,7 @@ representing the total number of structural elements in the graph. This metric p
 
 **Monotonicity Principle**: If
 ```math
-complexity(C) > complexity(I)
+\operatorname{complexity}(C) > \operatorname{complexity}(I)
 ```
 then C cannot be a semantic minor of I. This principle provides the theoretical justification for early elimination of obviously incompatible concept-image pairs.
 
@@ -268,7 +268,7 @@ The overall node substitution cost is defined as:
 ```math
 C_{\text{node}}(n_i, n_c) =
 \begin{cases}
-  \infty, & \text{if } \text{labels}(n_c) \not\subseteq \text{labels}(n_i) \\
+  \infty, & \text{if } \operatorname{labels}(n_c) \not\subseteq \operatorname{labels}(n_i) \\
   C_{\text{props}}(n_i, n_c), & \text{otherwise}
 \end{cases}
 ```
@@ -317,7 +317,7 @@ String comparison employs case-insensitive categorical matching:
 ```math
 C_{\text{string}}(s_i, s_c) =
 \begin{cases}
-  0.0, & \text{if } \text{lowercase}(s_i) = \text{lowercase}(s_c) \\
+  0.0, & \text{if } \operatorname{lowercase}(s_i) = \operatorname{lowercase}(s_c) \\
   1.0, & \text{otherwise}
 \end{cases}
 ```
