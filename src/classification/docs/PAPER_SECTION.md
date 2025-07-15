@@ -111,7 +111,7 @@ representing the total number of structural elements in the graph. This metric p
 
 **Monotonicity Principle**: If
 ```math
-\operatorname{complexity}(C) > \operatorname{complexity}(I)
+\text{complexity}(C) > \text{complexity}(I)
 ```
 then C cannot be a semantic minor of I. This principle provides the theoretical justification for early elimination of obviously incompatible concept-image pairs.
 
@@ -268,7 +268,7 @@ The overall node substitution cost is defined as:
 ```math
 C_{\text{node}}(n_i, n_c) =
 \begin{cases}
-  \infty, & \text{if } \operatorname{labels}(n_c) \not\subseteq \operatorname{labels}(n_i) \\
+  \infty, & \text{if } \text{labels}(n_c) \not\subseteq \text{labels}(n_i) \\
   C_{\text{props}}(n_i, n_c), & \text{otherwise}
 \end{cases}
 ```
@@ -317,7 +317,7 @@ String comparison employs case-insensitive categorical matching:
 ```math
 C_{\text{string}}(s_i, s_c) =
 \begin{cases}
-  0.0, & \text{if } \operatorname{lowercase}(s_i) = \operatorname{lowercase}(s_c) \\
+  0.0, & \text{if } \text{lowercase}(s_i) = \text{lowercase}(s_c) \\
   1.0, & \text{otherwise}
 \end{cases}
 ```
