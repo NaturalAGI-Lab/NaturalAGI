@@ -7,15 +7,19 @@ NaturalAGI is a research project focused on developing a natural approach to Art
 NaturalAGI implements a cognitive architecture that processes visual input through several stages:
 
 1. **Pre-detection** - Initial processing of images to extract structural features
+   - Documentation section: [Skeletonization](src/skeletonization/docs/SKELETON_SECTION.md)
 2. **Contour Analysis** - Analysis of structural elements and their relationships
+   - Documentation section: [Contour Analysis](src/contour_analysis/docs/CONTOUR_ANALYSIS_SECTION.md)
 3. **Concept Formation** - Reduction to form abstract concepts
+   - Documentation section: [Concept Formation](src/concept_creator/docs/CONCEPT_CREATION_SECTION.md)
 4. **Classification** - Matching new inputs against formed concepts
+   - Documentation section: [Classification](src/classification/docs/PAPER_SECTION.md)
 
 Unlike traditional machine learning approaches that rely on backpropagation and gradient descent, NaturalAGI uses structural analysis and statistical reduction to form concepts. This approach is inspired by natural cognitive processes, where learning occurs through exposure to examples and statistical pattern recognition rather than explicit error correction.
 
 The project is implemented as a set of microservices orchestrated through a Makefile-based workflow. Each component runs as a Nuclio serverless function, communicating through Kafka topics and storing structural representations in a Neo4j graph database.
 
-![Architecture](AGI%20Arch.jpg)
+<img src="docs/system_diagram.png" alt="System Diagram" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;">
 
 ## Key Components
 
@@ -51,9 +55,11 @@ The structural elements are represented as a graph where:
     - Endpoints
     - Intersections
     - Angle points
-  - **Vector nodes** with properties:
-    - Length
-    - Start/end coordinates (x1, y1, x2, y2)
+  - **Vector nodes** with types:
+    - **Vector** (line that has been truncated to the angle points)
+    - **HorizontalVector** (vector with more of horizontal direction)
+    - **VerticalVector** (vector with more of vertical direction)
+
 - **Relationships** connect the elements:
   - Points are connected to vectors via `:CONNECTED_TO` relationships
   - This creates a bipartite graph structure where points connect to vectors and vectors connect to points
@@ -71,28 +77,6 @@ This graph-based representation enables:
 - Feature extraction based on graph properties
 - Comparison between different images using graph similarity algorithms
 - Statistical reduction for concept formation
-
-### 3. Classification
-
-The classification function compares input images with formed concepts using:
-- Structural similarity with Maximum Common Minor Graph (MCMG) as for now
-
-The classification process:
-1. Creates a graph representation of the input image
-2. Calculates similarity scores
-3. Returns the most similar concept
-
-Unlike traditional neural network classifiers, this approach doesn't require backpropagation or gradient descent. Instead, it relies on structural similarity and feature matching between the input and learned concepts.
-
-### 4. Concept Creation
-
-The concept creation process extracts stable structures and features across multiple images of the same type, forming abstract representations.
-
-The process involves:
-1. Running training script that create multiple graphs for each sample in the training set for that particular class
-2. Running post processing script that extract the most common graph across all the graphs for that class
-
-This statistical approach to concept formation is fundamentally different from supervised learning with backpropagation. Instead of adjusting weights to minimize error, the system identifies stable patterns across multiple examples through statistical analysis.
 
 ## System Architecture
 
@@ -170,10 +154,10 @@ NaturalAGI/
 
 ## Documentation
 
-- [Natural AGI Description](/docs/README.md) - Detailed project description
-- [Feature Extraction](/docs/FEATURES.md) - Documentation on feature extraction
-- [Simulation](/docs/SIMULATION.md) - Instructions for running the simulation
-- [Training Process](/docs/TRAINING.md) - Documentation on the training process
+- [Skeletonization](src/skeletonization/docs/SKELETON_SECTION.md)
+- [Contour Analysis](src/contour_analysis/docs/CONTOUR_ANALYSIS_SECTION.md)
+- [Concept Formation](src/concept_creator/docs/CONCEPT_CREATION_SECTION.md)
+- [Classification](src/classification/docs/PAPER_SECTION.md)
 
 ## Technologies Used
 
