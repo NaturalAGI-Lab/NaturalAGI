@@ -10,7 +10,40 @@ The system addresses the fundamental challenge of quantifying structural charact
 
 ### 3.2 Theoretical Foundation
 
-#### 3.2.1 Graph Preprocessing and Optimization
+#### 3.2.1 Детектування
+
+Детектор оброблює результат роботи алгоритму бінарізації та склетизації. Ми отримуємо список точок стурутури, які ми потім оброблюємо та перетворюємо в граф. Обробка заключається в створені проміжного класу - відрізок (в системі це клас `Vector`). 
+
+Точки можуть бути декількох типів:
+
+- `Point` - звичайна точнка, місце зʼєднання відрізків.
+- `EndPoint` - термінальна точка структури. Після цієї точки розвитку структури немає.
+- `CornerPoint` - кутова точка. Точка зʼєднання відрізків при якому ми маємо зміну звичайного напрямку розвитку структури.
+- `IntersectionPoint` - точка зʼєднання відрізків при якому ми маємо зʼєднання більше ніж двох відрізків.
+
+Редукція точок:
+
+1. Редукція точки перетину (`IntersectionPoint`) до кінцевої точки (`EndPoint`):
+
+<img src="./intersection_point_to_endpoint.png" alt="Редукція точки перетину до кінцевої точки" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;">
+
+*Якщо після структурної редукції кількість відрізків (`Vector`) для заданої точки дорівнює 1, то точка перетину спрощується до кінцевої точки (`EndPoint`).*
+
+2. Редукція точки перетину (`IntersectionPoint`) до точки кута (`CornerPoint`):
+
+<img src="./intersection_point_to_corner_point.png" alt="Редукція точки перетину до точки кута" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;">
+
+*Якщо після структурної редукції кількість відрізків (`Vector`) для заданої точки не відповідає визначеній кількості для точки перетину (`IntersectionPoint`), то точка перетину спрощується до кутової точки (`CornerPoint`).*
+
+3. Редукція кутової точки (`CornerPoint`) до кінцевої точки (`EndPoint`) робиться за тими ж правилами, що і для точки перетину (`IntersectionPoint`).
+
+Відрізки (`Vector`) можуть бути двох підтипів:
+
+- `HorizontalVector` - відрізок, який має більшу горизонтальну проекцію ніж вертикальну.
+- `VerticalVector` - відрізок, який має більшу вертикальну проекцію ніж горизонтальну.
+
+
+#### 3.2.2 Graph Optimization
 
 The analysis begins with graph preprocessing that consolidates redundant structural elements. The system implements intersection point merging based on spatial proximity criteria:
 
