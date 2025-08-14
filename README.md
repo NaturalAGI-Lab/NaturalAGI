@@ -4,6 +4,10 @@ NaturalAGI is a research project focused on developing a natural approach to Art
 
 # Project Overview
 
+## 0. Project Structure
+
+<img src="docs/system_diagram.png" alt="System Diagram" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;">
+
 ## 1. Попередня обробка зображень
 
 ### 1.1 Вступ та Постановка Проблеми
