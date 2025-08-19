@@ -6,7 +6,37 @@ NaturalAGI is a research project focused on developing a natural approach to Art
 
 ## 0. Project Structure
 
-<img src="docs/system_diagram.png" alt="System Diagram" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;">
+<img src="docs/images/basic_architecture.png" alt="System Diagram" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc;">
+
+### 1. Preprocessing
+
+- Skeletonization. Convert the input contour/image into a graph-like skeleton (nodes/edges) that preserves topology while removing thickness and noise.
+
+- Primary contour analysis (primary feature extraction). Compute basic, invariant descriptors from the skeleton (e.g., angles with Ox, length of the lines, coordinates, normalized coordinates, etc.)
+
+### 2. Concept creation
+
+- Secondary contour analysis (from an aggregated starting point). Start from the most stable start point and get secondary features (e.g. quadrant, half-plane, etc.)
+
+- Structural and feature-based reductions. Simplify two graphs by merging/removing nodes/edges and compress feature sets to canonical, low-variance representations while preserving discriminative structure.
+
+- Iterative concept composition. Repeatedly refine the concept until it stabilizes—a canonical prototype capturing the essential structure and statistics of the class.
+
+### 3. Classification (per concept)
+
+- Complexity check (if the concept is more complex than the image — fail). Early rejection: skip concepts whose minimal complexity exceeds the candidate image’s complexity.
+
+- Secondary contour analysis (from the concept’s starting point). Start from the closest point to the concept’s starting point and get secondary features (e.g. quadrant, half-plane, etc.)
+
+- Structural reduction. Reduce the inference graph to a comparable canonical form to enable fair structural matching against the concept.
+
+- Activation level calculation. Compute a match score (activation) from structural inclusion and feature similarity between the reduced sample and the concept.
+
+### 4. Decision
+
+- Activation level comparison. Compare activations across all concepts and select the highest, optionally applying thresholds or tie-break rules.
+
+- Classification result. Output the predicted class with the activation score/confidence.
 
 ## 1. Попередня обробка зображень
 
@@ -80,7 +110,7 @@ I_{\text{binary}}(x,y) = \begin{cases}
 
 де G_θ представляє граф, отриманий з бінарного зображення I_θ, а connectivity(G_θ) оцінює обмеження топологічної зв'язності.
 
-## 2. Детектування
+## 2. Предетектори
 
 ### 2.1 Вступ та Постановка Проблеми
 
