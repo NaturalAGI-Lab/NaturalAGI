@@ -20,7 +20,8 @@ COPY --from=uhttpc /home/nuclio/bin/uhttpc /usr/local/bin/uhttpc
 
 # Install system dependencies for multiprocessing and graphics
 RUN apt-get update && apt-get install -y \
-    libgl1-mesa-glx \
+    libgl1-mesa-dev \
+    libglib2.0-0 \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
