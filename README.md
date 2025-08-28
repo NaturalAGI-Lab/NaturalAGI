@@ -163,7 +163,29 @@ I_{\text{binary}}(x,y) = \begin{cases}
 
 ### 3.4 Структура первісного графу
 
+Після етапів скелетонізації та попереднього аналізу структура подається у вигляді графа, що містить точки, відрізки та їх параметри.
 
+<img src="docs/images/first_graph_sample.png" alt="Первісний граф" style="background-color: #f0f0f0; padding: 10px; border-radius: 10px; border: 1px solid #ccc; width: 100%; max-width: 900px;" />
+
+Граф складається з точок і відрізків; кожна точка належить принаймні одному відрізку.
+
+:::mermaid
+graph TD
+A(EndPoint) -- Належить до --> B(Line)
+C(EndPoint) -- Належить до --> B(Line)
+:::
+
+Точка може належати кільком відрізкам одночасно (точка перетину або кутова точка), тому вона може представлятися як `IntersectionPoint` або `CornerPoint`.
+
+:::mermaid
+graph TD
+A(EndPoint) -- Належить до --> B(Line)
+C(IntersectionPoint) -- Належить до --> B(Line)
+C(IntersectionPoint/CornerPoint) -- Належить до --> D(Line)
+E(EndPoint) -- Належить до --> D(Line)
+:::
+
+Сформований первісний граф є базовою структурою та моделлю постсинаптичних сигналів.
 
 ### 3.5 Системи координат
 
