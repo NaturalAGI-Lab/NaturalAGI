@@ -507,7 +507,29 @@ S_{ij} = \text{Similarity}(\text{endpoint}_i^{concept}, \text{endpoint}_j^{image
 
 ### 5.4.3 Приклад формування концепту для цифри 3
 
-<!-- TODO додати приклад формування концепту для цифри 3 -->
+<img src="docs/images/concept_formation/step_1.png" style="border-radius: 10px; border: 1px solid #ccc;" alt="Step 1" />
+
+*First step is getting the first image as the initial concept.*
+
+<br>
+
+<img src="docs/images/concept_formation/step_2.png" style="border-radius: 10px; border: 1px solid #ccc;" alt="Step 2" />
+
+*On the second iteration we see that the image has additional end point, so we remove the redundant endpoint branch and reduce the nearest IntersectionPoint to the CornerPoint. Then we update the concept graph properties with the new information obtained from the image graph.*
+
+<br>
+
+<img src="docs/images/concept_formation/step_3.png" style="border-radius: 10px; border: 1px solid #ccc;" alt="Step 3" />
+
+*Third iteration of concept formation. We have the redundant corner point in the lower half of the structure, we remove it and align the neighboring points, so we don't have the gap between the points. Then we update the concept graph properties with the new information obtained from the image graph.*
+
+<br>
+
+<img src="docs/images/concept_formation/step_4.png" style="border-radius: 10px; border: 1px solid #ccc;" alt="Step 4" />
+
+*Fourth iteration of concept formation. We see the noise in the graph, we identify that as the redundant substructure (Endpoint and Line till the nearest IntersectionPoint). Then we remove it and update the concept graph properties with the new information obtained from the image graph.*
+
+**We repeat this process until we have stable concept graph that represents the object class.**
 
 ## 5.5 Порівняльна таблиця для різної кількості аугментацій
 
@@ -522,3 +544,432 @@ S_{ij} = \text{Similarity}(\text{endpoint}_i^{concept}, \text{endpoint}_j^{image
 ### 5.5.3 Якісні характеристики
 
 <!-- TODO додати якісні характеристики -->
+
+# 6. Інференс і конкуренція реакцій (WTA)
+
+## 6.1 Інференс як редукція до аттрактора(ів)
+
+### Концептуальна основа інференсу
+
+В системі інференс розглядається як процес поступової редукції вхідного структурного представлення (графа зображення) до одного або кількох найближчих **аттракторів** - канонічних структурних паттернів, що зберігаються в репозиторії концептів. Цей процес ґрунтується на принципі, що кожен концепт представляє собою стабільний стан в просторі структурних конфігурацій, до якого можуть бути приведені схожі структури через послідовність операцій редукції.
+
+### Аттрактори як концепти
+
+**Аттрактори** в системі - це концепти, що зберігаються у Neo4j як графові структури з такими характеристиками:
+
+```
+Аттрактор = {
+    структурна_топологія: Graph(V, E),
+    критичні_точки: {intersection, endpoint, corner},
+    геометричні_властивості: {angles, directions, positions},
+    семантичні_мітки: {labels, types, features}
+}
+```
+
+Кожен аттрактор представляє "басейн притягання" для схожих структур - множину всіх графів зображень, які можуть бути приведені до цього концепту через допустимі операції редукції.
+
+### Оператори редукції
+
+Процес приведення до аттракторів здійснюється через послідовність **операторів редукції**, кожен з яких має специфічну роль:
+
+#### 1. Фільтр складності (Complexity Filter)
+
+```math
+\text{ComplexityFilter}(G_{\text{image}}, C) = 
+\begin{cases}
+\text{PASS}, & \text{if } \mathcal{C}(C) \leq \mathcal{C}(G_{\text{image}}) \\
+\text{REJECT}, & \text{otherwise}
+\end{cases}
+```
+
+де $\mathcal{C}(G) = |V(G)| + |E(G)|$ - структурна складність графа
+
+**Енергетична інтерпретація**: Відкидає аттрактори з вищою структурною складністю за принципом монотонності - складніша структура не може бути відновлена з простішої.
+
+#### 2. Стартова синхронізація (Start Point Alignment)
+
+**Псевдокод:**
+```
+АЛГОРИТМ StartPointAlignment(G_image, G_concept):
+    1. s_concept ← FindOptimalStart(G_concept)
+    2. s_image ← FindCorrespondingStart(G_image, s_concept)  
+    3. G_aligned ← ReorderTraversal(G_image, s_image)
+    4. ПОВЕРНУТИ G_aligned
+```
+
+**Роль**: Встановлює консистентну точку відліку для структурного порівняння, мінімізуючи варіативність в просторі можливих відповідностей.
+
+#### 3. Збагачення ознак (Feature Enhancement)
+Застосовує набір visitor-патернів для обчислення додаткових структурних властивостей:
+
+- **AngleVisitor**: обчислює кутові характеристики між сегментами
+- **QuadrantVisitor**: визначає просторове розташування елементів  
+- **DirectionVisitor**: аналізує напрямки структурного розвитку
+
+#### 4. Редукція критичних точок (Critical Point Reduction)
+
+Три спеціалізовані стратегії послідовно спрощують структуру:
+
+**a) Endpoint Reduction Strategy**
+
+**Псевдокод:**
+```
+АЛГОРИТМ EndpointReduction(G_image, G_concept):
+    1. E_image ← GetEndpoints(G_image)
+    2. E_concept ← GetEndpoints(G_concept)
+    3. S ← CalculateSimilarityMatrix(E_image, E_concept)
+    
+    4. // Фаза 1: видалення за порогом подібності
+    5. E_low ← {e ∈ E_image | max(S[e]) < θ_similarity}
+    6. FOREACH e ∈ E_low DO RemoveEndpointPath(G_image, e)
+    
+    7. // Фаза 2: балансування кількості
+    8. IF |E_image| > |E_concept| THEN
+    9.     Δ ← |E_image| - |E_concept|
+    10.    E_excess ← SelectLowestSimilarity(E_image, Δ)
+    11.    FOREACH e ∈ E_excess DO RemoveEndpointPath(G_image, e)
+    
+    12. ПОВЕРНУТИ G_image
+```
+
+**Енергетична роль**: Усуває "шум" в вигляді ізольованих сегментів, що не впливають на основну структуру.
+
+**b) Intersection Reduction Strategy**
+
+**Псевдокод:**
+```
+АЛГОРИТМ IntersectionReduction(G_image, G_concept):
+    1. I_image ← GetIntersectionPoints(G_image)
+    2. I_concept ← GetIntersectionPoints(G_concept)
+    3. S ← CalculateSimilarityMatrix(I_image, I_concept)
+    
+    4. IF |I_image| > |I_concept| THEN
+    5.     Δ ← |I_image| - |I_concept|
+    6.     I_excess ← SelectLowestSimilarity(I_image, Δ)
+    7.     
+    8.     FOREACH p ∈ I_excess DO
+    9.         path ← FindPathToNearestCritical(G_image, p)
+    10.        target ← GetTargetNode(path)
+    11.        MergeIntersectionPoints(G_image, path, target)
+    
+    12. ПОВЕРНУТИ G_image
+```
+
+**Енергетична роль**: Консолідує фрагментовані перетини в цілісні структурні вузли.
+
+**c) Corner Point Reduction Strategy**
+
+**Псевдокод:**
+```
+АЛГОРИТМ CornerPointReduction(G_image, G_concept):
+    1. P_concept ← FindCriticalPaths(G_concept)
+    2. P_image ← FindCriticalPaths(G_image)
+    3. 
+    4. FOREACH path_c ∈ P_concept DO
+    5.     path_i ← FindBestMatchingPath(path_c, P_image)
+    6.     C_concept ← GetCornerPoints(path_c)
+    7.     C_image ← GetCornerPoints(path_i)
+    8.     
+    9.     IF |C_image| > |C_concept| THEN
+    10.        Δ ← |C_image| - |C_concept|
+    11.        S ← CalculateSimilarityMatrix(C_image, C_concept)
+    12.        C_excess ← SelectLowestSimilarity(C_image, Δ)
+    13.        FOREACH c ∈ C_excess DO RemoveCornerPoint(G_image, c)
+    
+    14. ПОВЕРНУТИ G_image
+```
+
+**Енергетична роль**: Спрощує деталізовані фрагменти структури.
+
+### Оцінка близькості: Graph Edit Distance (GED)
+
+**Близькість** до аттрактора вимірюється через **Graph Edit Distance** - мінімальну кількість операцій редагування, необхідну для перетворення редукованого графа зображення в граф концепту.
+
+#### Енергетична інтерпретація GED
+
+В контексті аттракторів, GED інтерпретується як **енергія активації**, необхідна для переходу з поточного стану (редукований граф зображення) до цільового стану (концепт-аттрактор):
+
+```
+E_activation = GED(G_reduced, G_concept)
+Similarity = 1.0 - (E_activation / E_max)
+```
+
+де `E_max = |V_image| + |V_concept| + |E_image| + |E_concept|` - максимально можлива енергія.
+
+#### Операції редагування та їх енергетичні вартості
+
+**1. Вартості підстановки вершин (Node Substitution)**
+
+```math
+C_{\text{node}}(v_i, v_c) = \begin{cases}
+\infty, & \text{if } \mathcal{L}(v_c) \not\subseteq \mathcal{L}(v_i) \\
+\sum_{p \in P_{\text{common}}} \min\left(C_{\text{prop}}(v_i^p, v_c^p), \frac{1}{|P_{\text{common}}|}\right), & \text{otherwise}
+\end{cases}
+```
+
+де:
+- $\mathcal{L}(v)$ - множина лейблів вершини $v$
+- $P_{\text{common}} = P_i \cap P_c \cap F$ - спільні властивості для порівняння
+- $F$ - множина предвизначених ознак для порівняння
+
+**2. Спеціалізовані функції вартості властивостей**
+
+**Числові властивості** (координати, кути):
+```math
+C_{\text{numeric}}(v_i, v_c) = \begin{cases}
+0.0, & \text{if } |v_i - v_c| < \epsilon \\
+1.0, & \text{otherwise}
+\end{cases}
+```
+де $\epsilon = 10^{-10}$ - толерантність для числових порівнянь.
+
+**Діапазонові властивості** (flexible ranges):
+```math
+C_{\text{range}}(v_i, R_c) = \begin{cases}
+1.0, & \text{if } v_i \notin [R_{\min}, R_{\max}] \\
+0.0, & \text{if } R_{\max} = R_{\min} \\
+\frac{|v_i - R_{\text{center}}|}{R_{\text{width}}/2} \times C_{\max}, & \text{if } v_i \in [R_{\min}, R_{\max}]
+\end{cases}
+```
+де $R_{\text{width}} = R_{\max} - R_{\min}$, $R_{\text{center}} = \frac{R_{\max} + R_{\min}}{2}$.
+
+**Список властивостей** (підмножини):
+```math
+C_{\text{list}}(L_i, L_c) = \begin{cases}
+0.0, & \text{if } L_c \subseteq L_i \\
+1.0, & \text{otherwise}
+\end{cases}
+```
+
+**3. Операції з ребрами**
+
+```math
+\begin{align}
+C_{\text{edge\_del}}(e) &= 0.1 \\
+C_{\text{edge\_ins}}(e) &= 0.1 \\
+\text{EdgeMatch}(e_1, e_2) &= \text{TRUE}
+\end{align}
+```
+
+#### Процес обчислення близькості
+
+**Псевдокод:**
+```
+АЛГОРИТМ CalculateProximity(G_reduced, G_concept):
+    1. // Обчислення оптимального шляху редагування
+    2. (edit_path, E_total) ← OptimalEditPaths(
+         G_reduced, G_concept,
+         C_node, C_del=1.0, C_ins=1.0, 
+         EdgeMatch, C_edge_del, C_edge_ins
+       )
+    
+    3. // Нормалізація до similarity score  
+    4. E_max ← |V(G_reduced)| + |V(G_concept)| + 
+              |E(G_reduced)| + |E(G_concept)|
+    
+    5. // Перетворення енергії в similarity
+    6. similarity ← 1.0 - (E_total / E_max)
+    7. ПОВЕРНУТИ max(0.0, min(1.0, similarity))
+```
+
+**Математична формалізація:**
+```math
+\text{Similarity}(G_{\text{reduced}}, G_{\text{concept}}) = 1 - \frac{\text{GED}(G_{\text{reduced}}, G_{\text{concept}})}{E_{\max}}
+```
+
+де $E_{\max} = |V_{\text{reduced}}| + |V_{\text{concept}}| + |E_{\text{reduced}}| + |E_{\text{concept}}|$
+
+#### Інтерпретація результатів близькості
+
+- **Similarity = 1.0**: Ідеальне співпадіння (нульова енергія активації)
+- **Similarity ≥ 0.8**: Сильна структурна подібність (низька енергія)  
+- **Similarity ≥ 0.6**: Помірна подібність (середня енергія)
+- **Similarity < 0.4**: Слабка подібність (висока енергія)
+- **Similarity = 0.0**: Відсутність структурної подібності
+
+### Блок-схема процесу інференсу
+
+```mermaid
+graph TD
+    A["🖼️ Граф зображення<br/>(Вхідна структура)"] --> B{"🧮 Фільтр складності<br/>complexity(concept) ≤ complexity(image)"}
+    
+    B -->|Відкинуто| X1["❌ Concept занадто складний"]
+    B -->|Пройдено| C["📍 Синхронізація стартових точок<br/>find_optimal_start()"]
+    
+    C --> D["🔍 Збагачення ознак<br/>AngleVisitor + QuadrantVisitor + DirectionVisitor"]
+    
+    D --> E["⚙️ Редукція критичних точок"]
+    
+    E --> E1["🔴 Endpoint Reduction<br/>Усунення ізольованих сегментів"]
+    E1 --> E2["🔵 Intersection Reduction<br/>Консолідація перетинів"]  
+    E2 --> E3["🟡 Corner Point Reduction<br/>Спрощення деталізованих фрагментів структури"]
+    
+    E3 --> F["📊 Обчислення GED<br/>Graph Edit Distance"]
+    
+    F --> G["💯 Similarity Score<br/>1.0 - (GED / max_cost)"]
+    
+    subgraph "🎯 Репозиторій аттракторів"
+        H1["🧩 Концепт 1<br/>similarity: 0.95"]
+        H2["🧩 Концепт 2<br/>similarity: 0.73"]
+        H3["🧩 Концепт 3<br/>similarity: 0.41"]
+        H4["🧩 Концепт N<br/>similarity: 0.12"]
+    end
+    
+    G --> H1
+    G --> H2  
+    G --> H3
+    G --> H4
+    
+    H1 --> I["🏆 Найближчий аттрактор<br/>Концепт 1 (0.95)"]
+```
+
+### Загальний алгоритм інференсу
+
+Процес інференсу в NaturalAGI можна формалізувати як **енергетичну оптимізацію**:
+
+```
+Inference: G_input → argmin_{C∈Concepts} E_activation(G_input, C)
+
+де E_activation = GED(Reduce(G_input), C)
+```
+
+#### Етапи інференсу (згідно блок-схеми):
+
+**1. Пре-фільтрація (Energy Barriers)**
+- Відкидання концептів з вищою структурною складністю
+- Базується на принципі монотонності складності
+
+**2. Структурна підготовка (State Preparation)**  
+- Синхронізація стартових точок для консистентного порівняння
+- Збагачення ознак для повнішого структурного опису
+
+**3. Послідовна редукція (Descent to Attractors)**
+- Endpoint reduction: усунення структурного "шуму"
+- Intersection reduction: консолідація фрагментованих вузлів  
+- Corner point reduction: спрощення деталізованих фрагментів структури
+
+**4. Енергетичне оцінювання (Proximity Measurement)**
+- Обчислення GED між редукованим графом та кожним концептом
+- Перетворення в similarity score через нормалізацію
+
+**5. Селекція аттрактора (Attractor Selection)**
+- Ідентифікація концепту з найвищим similarity score
+- Класифікація за енергетичними рівнями
+
+Цей підхід забезпечує **робастну класифікацію** структурних паттернів через природну аналогію з фізичними системами, де стабільні конфігурації (концепти) діють як аттрактори для схожих структур в просторі можливих конфігурацій.
+
+## 6.2 Карти концепт-нейронів і WTA
+
+Система класифікації організована як **розподілена нейронна мережа**, де кожен концепт функціонує як спеціалізований нейрон з власною топологічною специфічністю. Ця архітектура забезпечує паралельну обробку та конкурентну селекцію через біологічно інспіровані механізми активації.
+
+### 6.2.1 Організація концепт-нейронів
+
+**Топологія мережі**: Концепт-репозиторій містить N концепт-нейронів, кожен з яких представляє унікальну структурну конфігурацію у просторі графових патернів. Паралельна архітектура дозволяє одночасну активацію всіх нейронів при надходженні вхідного сигналу (image graph).
+
+**Активаційна функція**: Кожен концепт-нейрон i обчислює рівень активації через нормалізовану схожість:
+
+```
+activation_i = max(0, min(1, 1 - GED(G_image, G_concept_i) / max_cost_i))
+```
+
+де max_cost_i = |V_image| + |V_concept_i| забезпечує розмірно-інваріантну нормалізацію.
+
+### 6.2.2 Механізми збудження та гальмування
+
+**Збудження (Excitation)**: Система застосовує градаційну активацію через тип-специфічні функції схожості. Висока структурна відповідність призводить до сильної активації нейрона, при цьому толерантність до мінорних геометричних варіацій забезпечує робастність розпізнавання.
+
+**Гальмування (Inhibition)**: Двоступенева система гальмування запобігає неправильним активаціям:
+
+1. **Complexity-based inhibition**: Концепт-нейрони з складністю, що перевищує складність вхідного зображення, автоматично блокуються:
+   ```
+   inhibition_i = 1 if complexity(G_concept_i) > complexity(G_image) else 0
+   ```
+
+2. **Label compatibility inhibition**: Семантична несумісність призводить до повного гальмування активації.
+
+### 6.2.3 Winner-Take-All механізм
+
+**Конкурентна селекція**: Система реалізує soft Winner-Take-All правило через багатокритеріальне ранжування активованих нейронів:
+
+```
+winner = argmax_i {similarity_i | similarity_i > θ}
+```
+
+**Ієрархічна конкуренція**: Первинна конкуренція відбувається за рівнем схожості, вторинна - за структурною складністю концепту. Це забезпечує селекцію найбільш специфічного та релевантного паттерну.
+
+### 6.2.4 Нормалізація відповідей
+
+**Адаптивна нормалізація**: Система використовує розмірно-залежну нормалізацію для забезпечення справедливої конкуренції між концептами різної складності:
+
+```
+normalized_response = (max_possible_cost - actual_cost) / max_possible_cost
+```
+
+**Стабілізація активації**: Обмеження діапазону [0,1] запобігає перенасиченню та забезпечує стабільну поведінку мережі при варіативних вхідних даних.
+
+Ця нейро-інспірована архітектура забезпечує **ефективну структурну класифікацію** через розподілену обробку, конкурентну селекцію та адаптивну нормалізацію, демонструючи високу точність (82.4%) та збалансованість (F1-score: 82.3%) у розпізнаванні графових патернів.
+
+## 6.3 Тай-брейки й допоміжні метрики
+
+### Єдиний метрик подібності: GED-базований score
+
+У системі класифікації подібність між концептом і зображенням обчислюється **виключно через Graph Edit Distance (GED)**:
+
+```math
+\text{similarity}(C_i) = 1.0 - \frac{\text{GED}(G_{\text{image}}, G_{C_i})}{\text{max\_possible\_cost}}
+```
+
+де:
+```math
+\text{max\_possible\_cost} = \max(|V_{\text{image}}| + |V_{C_i}|, 1)
+```
+
+### Простий тай-брейк механізм
+
+При ідентичних similarity scores система використовує **двокритеріальне сортування**:
+
+```
+ALGORITHM SimpleTieBreaking
+INPUT: classification_results[]
+OUTPUT: ranked_results[]
+
+1. FILTER results WHERE is_minor = true
+2. SORT results by:
+   a. similarity (descending)
+   b. concept_complexity (descending)
+3. RETURN sorted_results
+```
+
+### Метрика структурної складності
+
+**Складність концепту** обчислюється як проста сума:
+
+```math
+\text{complexity}(C_i) = |V_{C_i}| + |E_{C_i}|
+```
+
+Концепти з вищою складністю отримують пріоритет при однаковій подібності, оскільки складніші концепти вважаються більш специфічними та інформативними.
+
+### Приклад розв'язання нічиї
+
+**Сценарій:** Зображення класифікується проти трьох концептів з ідентичним similarity = 0.84:
+
+| Концепт               | Similarity | Nodes | Edges | Complexity | Ранг |
+| --------------------- | ---------- | ----- | ----- | ---------- | ---- |
+| $C_{\text{eight}}$    | 0.84       | 8     | 9     | 17         | 1    |
+| $C_{\text{zero}}$     | 0.84       | 6     | 7     | 13         | 3    |
+| $C_{\text{infinity}}$ | 0.84       | 7     | 8     | 15         | 2    |
+
+**Результат:** $C_{\text{eight}}$ перемагає завдяки найвищій структурній складності (17).
+
+### Обмеження поточного підходу
+
+**Недоліки простого тай-брейка:**
+- Відсутність семантичного аналізу при однаковій подібності
+- Складність не завжди корелює з семантичною релевантністю
+- Неможливість врахування додаткових структурних характеристик
+
+**Переваги:**
+- Детерміністичний результат
+- Мінімальні обчислювальні витрати
+- Простота реалізації та налагодження
