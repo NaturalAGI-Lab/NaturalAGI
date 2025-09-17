@@ -87,9 +87,9 @@ create_kafka_topics:
 
 list_kafka_topics:
 	@echo -e "${BLUE}Listing Kafka topics...${NC}"
-	@docker compose exec kafka kafka-topics --list --bootstrap-server ${HOST_IP}:29092 || echo -e "${RED}Failed to list Kafka
+	@docker compose exec kafka kafka-topics --list --bootstrap-server ${HOST_IP}:29092 || echo -e "${RED}Failed to list Kafka topics${NC}"
 	@echo -e "${BLUE}Expected topics:${NC}"
-	@cat $(TOPICS)
+	@for topic in $(TOPICS); do echo "  $$topic"; done
 
 # Main targets
 all: start_services create_kafka_topics deploy train
