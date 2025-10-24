@@ -1,3 +1,4 @@
+bibtexparser
 gspan-mining
 grakel
 kafka-python

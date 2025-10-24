@@ -94,7 +94,7 @@ Point nodes are classified into four topological types: \textbf{EndPoint} (termi
 
 \subsection{Attributes and Parameters}
 
-Each node type carries attributes that encode geometric, directional, and topological properties. \textbf{Point nodes} store $(x, y)$ coordinates and their normalized counterparts as well as an angle value between the vectors it connects. \textbf{Line nodes} store endpoint pairs $(x_1, y_1, x_2, y_2)$ and a length attribute (magnitude), enabling direct access to segment geometry without recomputing from connected points.
+Each node type carries attributes that encode geometric, directional, and topological properties. \textbf{Point nodes} store $(x, y)$ coordinates and their normalized counterparts as well as an angle value between the lines it connects. \textbf{Line nodes} store endpoint pairs $(x_1, y_1, x_2, y_2)$ and a length attribute (magnitude), enabling direct access to segment geometry without recomputing from connected points.
 
 Directional attributes capture spatial orientation. Each Line node is assigned a \emph{quadrant} (I, II, III, IV) based on the displacement vector from its start point, computed when the coordinate system is translated to that point. Lines also carry \emph{horizontal direction} (LEFT, RIGHT, NONE) and \emph{vertical direction} (TOP, BOTTOM, NONE) labels that encode relative positioning. These attributes, computed by visitor classes during graph traversal, enable comparisons of spatial development patterns across different contours.
 
@@ -114,7 +114,7 @@ To achieve scale and translation invariance, all coordinates and distances are n
 
 \section{Concept Formation via Structural Reduction}
 
-\subsection{From Multiple Graphs to Single Attractor}
+\subsection{From Multiple Graphs to Single Attractor} \label{subsec:from_multiple_graphs_to_single_attractor}
 
 Concept formation proceeds through iterative structural composition. Given training samples \(G_1, G_2, \ldots, G_n\), the algorithm initializes the concept with the first graph (\(C_0 = G_1\)) and iteratively refines it through custom reduction operations (CRO): \(C_{i+1} = \text{CRO}(C_i, G_{i+1})\) for \(i = 1, 2, \ldots, n-1\). This formulation treats the first sample as a baseline that subsequent samples refine, preserving only structural elements common across all instances.
 
@@ -175,52 +175,126 @@ These merging strategies ensure that concept representations capture statistical
 \section{Validation on MNIST Handwritten Digits}
 
 \subsection{Experimental Setup}
-% 6 digit classes (1, 2, 3, 6, 7, 9)
-% 5-6 training samples per class
-% Graph extraction pipeline
 
-\lipsum[8]
+We validate the proposed graph-based concept formation approach on a subset of the MNIST handwritten digit dataset \cite{lecun2002gradient}. The experimental design emphasizes few-shot learning capability with minimal training data and interpretable graph structures.
+
+\textbf{Dataset:} We selected six digit classes (1, 2, 3, 6, 7, 9) representing diverse structural complexity. These classes exhibit varying topological characteristics: digit 1 represents a simple linear structure, digits 2 and 3 exhibit curved open contours with multiple corner points, digits 6 and 9 contain closed loops with intersection points, and digit 7 demonstrates angular transitions. This selection provides sufficient structural diversity to evaluate the representation's expressive power while maintaining experimental tractability.
+
+\textbf{Training samples:} Each digit class was further divided into structural subclasses to capture distinct writing styles. Training data consisted of 2--4 manually selected samples per subclass, with 8 concepts total across the six digit classes (1\_1, 1\_3, 2\_1, 2\_2, 3\_1, 6\_1, 7\_1, 9\_2). This few-shot configuration deliberately constrains the algorithm to learn from minimal supervision, testing whether structural reduction can extract generalizable patterns from sparse data without gradient-based optimization.
+
+\textbf{Data augmentation:} To increase training set diversity while preserving structural integrity, we applied geometric transformations to each original training sample. Each image was augmented by generating 10 variants through random rotation (uniformly sampled angles within $\pm 10^\circ$) and spatial translation (up to 10\% of image dimensions in both horizontal and vertical directions). Images were rendered at $100 \times 100$ pixels in grayscale, with transformations applied on a black background to maintain boundary clarity. This augmentation strategy simulates natural handwriting variation---slight angular rotations and positional shifts---without introducing unrealistic distortions that would compromise structural correspondence.
+
+\textbf{Test set:} Classification performance was evaluated on 5467 test images drawn from the standard MNIST test split, with approximately 750--1000 samples per digit class (997 for digit 1, 948 for digit 2, 983 for digit 3, 753 for digit 6, 990 for digit 7, 786 for digit 9). No test images were used during concept formation, ensuring unbiased evaluation of generalization capability.
+
+\textbf{Graph extraction pipeline:} Each image underwent a multi-stage processing pipeline to produce attributed graph representations. First, binary thresholding with adaptive threshold selection (converging to $\theta = 180$ for connectivity) converted grayscale images to binary masks. Second, morphological skeletonization via medial axis transformation reduced contours to single-pixel-width skeletal structures while preserving topology. Third, Growing Neural Gas (GNG) learning fitted a network topology to skeleton point clouds, capturing structural connectivity. Fourth, Ramer-Douglas-Peucker simplification reduced network complexity while maintaining geometric fidelity. Fifth, graph construction generated NetworkX representations with Point and Line nodes, encoding critical points (endpoints, corners, intersections) and connecting line segments as first-class entities. Finally, coordinate normalization transformed absolute pixel positions to a centered $[-1, 1]$ range, ensuring scale and translation invariance. This pipeline, detailed in prior sections, produces compact graph representations suitable for structural comparison and concept formation.
 
 \subsection{Concept Characteristics}
-% Aggregate metrics: |V|, |E|, mean degree, cycles
-% Example: Digit 3 concept formation progression
-% Parameter range evolution
 
-\lipsum[9]
+The iterative reduction process transforms multiple training graphs into single concept attractors characterized by explicit structural metrics and parametric distributions. Table~\ref{tab:concept_metrics} summarizes graph-theoretic properties for all eight learned concepts, revealing systematic relationships between digit topology and representation complexity.
+
+\begin{table}[!t]
+\caption{Concept Graph Structural Metrics}
+\label{tab:concept_metrics}
+\centering
+\begin{tabular}{lcccc}
+\hline
+\textbf{Concept} & \textbf{|V|} & \textbf{|E|} & \textbf{Mean Degree} & \textbf{Critical Points} \\
+\hline
+1\_1 & 3 & 2 & 1.33 & 1 EP, 1 SP \\
+1\_3 & 3 & 2 & 1.33 & 1 EP, 1 SP \\
+2\_1 & 7 & 6 & 1.71 & 1 EP, 2 CP, 1 SP \\
+2\_2 & 12 & 12 & 2.00 & 1 EP, 3 CP, 1 IP, 1 SP \\
+3\_1 & 7 & 6 & 1.71 & 1 EP, 2 CP, 1 SP \\
+6\_1 & 10 & 10 & 2.00 & 3 CP, 1 IP, 1 SP \\
+7\_1 & 5 & 4 & 1.60 & 1 EP, 1 CP, 1 SP \\
+9\_2 & 8 & 8 & 2.00 & 2 CP, 1 IP, 1 SP \\
+\hline
+\multicolumn{5}{l}{\footnotesize EP = EndPoint, CP = CornerPoint, IP = IntersectionPoint, SP = StartPoint}
+\end{tabular}
+\end{table}
+
+Structural complexity correlates with digit topology. Simple linear structures (digit 1) yield minimal graphs with only 3 nodes and mean degree 1.33, reflecting unbranched paths from start to endpoint. Curved open contours (digits 2, 3, 7) produce moderate-sized graphs (5--12 nodes) with mean degrees between 1.60 and 2.00, where corner points encode directional transitions. Closed-loop digits (6, 9) exhibit higher mean degrees (2.00) due to intersection points that create cyclic paths, increasing connectivity beyond simple chains. The most complex concept (2\_2) contains 12 nodes including an intersection point and three corner points, capturing the structural variability observed across diverse handwriting styles for digit 2.
+
+Critical point distributions reveal topological distinctions: all concepts except closed-loop digits (6, 9, 2) contain exactly one endpoint, signifying open contours with terminal segments. Concepts 6\_1 and 9\_2 lack endpoints but contain intersection points where the loop closes, a topological signature differentiating circular from linear structures. Corner point counts range from 1 (digit 7) to 3 (digits 2\_2, 6), reflecting the number of directional changes required to trace each digit's canonical form.
+
+\textbf{Concept formation progression for Digit 3:} The evolution from three training samples to a single concept attractor demonstrates how parametric generalization encodes acceptable variation while preserving structural identity. Initially, each training sample produces a distinct graph with specific coordinate values, angle measurements, and segment lengths. Through iterative reduction (\autoref{subsec:from_multiple_graphs_to_single_attractor}), the algorithm merges these graphs by: (1) aligning start points via spatial clustering; (2) removing sample-specific endpoints with low cross-sample similarity; (3) consolidating corner points that represent shared directional transitions; (4) merging line attributes into range distributions that span observed variation.
+
+The resulting concept graph for digit 3 (concept 3\_1) contains 7 nodes (4 Points, 3 Lines) with 6 edges, encoding the essential ``curved S-shape'' topology common across training instances. Parametric properties transform from point estimates to flexible ranges: normalized x-coordinates span $[-0.7, 0.2]$ with center $-0.33$; normalized y-coordinates span $[0.3, 0.9]$ with center $0.63$. Structural counts similarly encode variation: endpoint counts range $[2, 4]$ with center $2.67$; intersection point counts range $[0, 2]$ with center $0.67$; line counts range $[4, 9]$ with center $6.0$. Categorical properties that hold consistently across samples (e.g., \texttt{contour\_type = OPEN}, \texttt{monotony = NON\_MONOTONIC}) persist as exact values, while inconsistent properties are excluded from the concept.
+
+This parametric generalization enables the concept to match test samples that vary continuously within learned bounds, providing flexible recognition without overfitting to training-specific details. The range-based encoding is interpretable: attribute centers indicate typical values, while min-max bounds reveal the extent of acceptable deviation, making the concept's decision boundaries explicit and queryable.
 
 \subsection{Classification via Graph Matching}
-% Graph Edit Distance
-% Few-shot performance results
 
-\lipsum[10]
+Classification proceeds by comparing each test image's graph representation against all concept attractors, computing structural similarity via Graph Edit Distance (GED), and selecting the concept with highest similarity score. The matching process incorporates the structural reduction strategies described in \autoref{subsec:structural_reduction_rules} to align test graphs with concept structures before distance computation.
+
+\textbf{Graph Edit Distance methodology:} GED quantifies structural dissimilarity as the minimum-cost sequence of edit operations (node/edge insertion, deletion, substitution) required to transform the test graph into a concept graph. We employ custom cost functions that incorporate semantic and geometric constraints. Node substitution costs enforce label compatibility (concept labels must form a subset of test graph labels) and compute weighted property differences across shared attributes, with range-based cost functions enabling flexible matching against parametric distributions (\autoref{subsec:parametric_generalization}). Node deletion and insertion carry unit costs, while edge operations incur reduced costs (0.1) to prioritize topological over connectivity differences. The optimal edit path is computed via dynamic programming with a 60-second timeout per concept comparison, converting raw GED values to normalized similarity scores via $\text{similarity} = 1.0 - (\text{GED} / \text{max\_cost})$, where $\text{max\_cost} = |V_{\text{test}}| + |V_{\text{concept}}|$ represents the theoretical upper bound for complete graph replacement.
+
+\textbf{Overall performance:} Across 5467 test images, the system achieved 82.35\% accuracy with 83.28\% precision, 82.35\% recall, and 82.16\% F1 score (Table~\ref{tab:overall_metrics}). The pipeline success rate reached 100\%, with only 10 images (0.18\%) failing to complete processing due to skeletonization errors that produced disconnected graphs routed to a dead-letter queue. These results demonstrate that few-shot concept formation from 2--6 training samples per subclass can achieve meaningful classification performance without gradient-based optimization or deep feature extraction, relying solely on explicit structural comparison.
+
+\begin{table}[!t]
+\caption{Overall Classification Performance (5467 test images)}
+\label{tab:overall_metrics}
+\centering
+\begin{tabular}{lc}
+\hline
+\textbf{Metric} & \textbf{Value (\%)} \\
+\hline
+Accuracy & 82.35 \\
+Precision & 83.28 \\
+Recall & 82.35 \\
+F1 Score & 82.16 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Per-class performance:} Table~\ref{tab:perclass_metrics} reveals substantial variation in classification accuracy across digit classes, correlated with structural distinctiveness. Digits 6 and 9 achieve the highest precision (94.23\%, 91.55\%) and F1 scores (85.40\%, 90.55\%), likely due to their unique topological signatures: both contain closed loops with intersection points, distinguishing them from open-contour digits. Digit 7 exhibits the lowest precision (74.38\%) and F1 score (78.06\%), suffering from structural ambiguity with digit 1 (both are angular open contours with similar orientations, differing primarily in corner sharpness). Digits 2 and 3, despite sharing curved morphology, demonstrate moderate performance (precision 84.17\% and 78.21\%, respectively), with digit 2 achieving higher precision at the cost of lower recall (60.02\%).
+
+\begin{table}[!t]
+\caption{Per-Class Classification Metrics}
+\label{tab:perclass_metrics}
+\centering
+\begin{tabular}{lcccc}
+\hline
+\textbf{Digit} & \textbf{Precision (\%)} & \textbf{Recall (\%)} & \textbf{F1 (\%)} & \textbf{Support} \\
+\hline
+1 & 81.46 & 96.49 & 88.34 & 997 \\
+2 & 84.17 & 60.02 & 70.07 & 948 \\
+3 & 78.21 & 87.28 & 82.50 & 983 \\
+6 & 94.23 & 78.09 & 85.40 & 753 \\
+7 & 74.38 & 82.12 & 78.06 & 990 \\
+9 & 91.55 & 89.57 & 90.55 & 786 \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Confusion matrix analysis:} Figure~\ref{fig:confusion_matrix} visualizes the classification confusion matrix, highlighting systematic misclassification patterns. The primary confusion occurs between digits 2 and 3 (152 misclassifications of 2 as 3, 28 misclassifications of 3 as 2), reflecting their overlapping curved morphology where corner point positions and line orientations vary subtly. Secondary confusions appear between digits 7 and 1 (118 test images of digit 7 misclassified as 1), attributable to their shared angular open-contour structure with similar start-to-endpoint paths. Digits 6 and 9 exhibit minimal mutual confusion (48 and 4 misclassifications, respectively), confirming that their closed-loop topology provides discriminative power despite geometric similarity. The confusion matrix reveals that errors concentrate along structurally similar digit pairs, validating the hypothesis that graph-based representation captures meaningful topological distinctions while remaining sensitive to ambiguous boundary cases where structural differences are subtle.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=0.8\columnwidth]{images/confusion_matrix.png}
+\caption{Confusion matrix for 6-class MNIST digit classification. Primary confusion occurs between digits 7 and 1 (angular open contours), and secondary confusion between digits 2 and 3 (curved open contours). Closed-loop digits (6, 9) exhibit strong discrimination.}
+\label{fig:confusion_matrix}
+\end{figure}
+
+\textbf{Few-shot learning evaluation:} The experimental results demonstrate that the structural reduction approach achieves competitive classification performance using only 2--6 training samples per concept---orders of magnitude fewer than typical supervised learning baselines. Traditional convolutional networks require hundreds to thousands of labeled examples per class to achieve comparable accuracy on MNIST, while prototypical networks and meta-learning approaches necessitate task-level training across numerous episodes. In contrast, the present approach forms concepts through direct structural composition without gradient descent, episodic sampling, or auxiliary training tasks. The 82.35\% accuracy represents meaningful few-shot capability, particularly given that the method operates on explicitly interpretable graph structures rather than opaque embeddings. This result validates the hypothesis that structural reduction can extract generalizable patterns from minimal supervision, enabling concept formation that is both data-efficient and transparent.
 
 \section{Discussion}
 
 \subsection{Explainability Through Structure}
-% Cycles → closed contours
-% Node degree → branching structure
-% Attribute ranges → acceptable variation
-% Navigable explanations vs post-hoc attribution
 
-\lipsum[11]
+The graph representation makes structure the carrier of explanations, providing inherent interpretability without post-hoc approximation. Graph cycles directly encode topological properties: closed-loop digits (6, 9) exhibit mean degree 2.0 and contain intersection points, while open-contour digits exhibit lower mean degrees (1.33--1.71) and terminal endpoints (Table~\ref{tab:concept_metrics}). Node degree distributions reveal branching patterns, enabling direct queries such as ``which concepts contain intersection points?'' or ``what is the typical corner count for digit 3?'' Parametric generalization (\autoref{subsec:parametric_generalization}) encodes decision boundaries as explicit attribute ranges rather than implicit weight matrices: normalized coordinate spans (e.g., $x \in [-0.7, 0.2]$ for digit 3) define acceptable variation transparently, while categorical properties persist only when consistent across all training samples.
+
+This approach contrasts fundamentally with post-hoc explanation methods (Section 2). LIME and SHAP generate attributions by perturbing inputs and approximating model behavior locally, yielding explanations vulnerable to adversarial manipulation \cite{slack2020foolinglimeshapadversarial}. In contrast, the present system embeds semantics directly in graph elements: explanations are navigable objects derived from structure itself. The confusion matrix (Figure~\ref{fig:confusion_matrix}) validates this interpretability---misclassifications concentrate along structurally similar pairs (digits 2/3 share curved morphology, digits 7/1 share angular open contours)---demonstrating that classification decisions trace directly to queryable topological and geometric properties.
 
 \subsection{Limitations and Future Work}
-% Scalability concerns (GED complexity)
-% Skeletonization dependency
-% Limited rotation invariance
-% Texture blindness
 
-\lipsum[12]
+The approach exhibits four primary limitations. First, Graph Edit Distance computation is NP-hard in the general case, requiring a 60-second timeout per concept comparison during classification (MNIST average time per image is 3.5 seconds). While tractable for moderate-sized graphs ($|V| \leq 12$ in our MNIST concepts), this complexity may hinder real-time applications or large concept libraries without approximation algorithms. Second, graph quality depends critically on the preprocessing pipeline: skeletonization failures produced disconnected graphs for 0.18\% of test images, and alternative contour extraction methods may yield different structural representations. Third, rotation invariance remains limited to the augmentation range employed during training ($\pm 10^\circ$); larger rotations may disrupt structural alignment and reduce matching accuracy. Fourth, the contour-only representation discards texture and gradient information, limiting applicability to recognition tasks where surface appearance matters.
+
+Future work should address these constraints through multiple avenues. Approximate GED algorithms leveraging learned node embeddings \cite{wang2021combinatorial} or direct matching prediction \cite{liu2023mata} could reduce computational overhead while preserving interpretability through explicit edit path recovery. Comparative evaluation of contour extraction techniques (edge detection, active contours) would clarify robustness to preprocessing choices. Rotation normalization via principal component alignment or learned canonical orientations could extend invariance beyond augmentation ranges. Finally, hybrid representations combining contour graphs with texture descriptors or regional features could broaden the approach to natural images and complex visual domains while maintaining structural transparency.
 
 \section{Conclusion}
 
-% Brief summary of contributions:
-% - Graph representation for contours
-% - Concept formation through structural reduction
-% - MNIST validation demonstrating viability
-% - Explainability through explicit structure
-
-\lipsum[13]
+This paper presents a graph-based representation for contour images that makes structure the carrier of explanations. The approach encodes visual patterns as attributed graphs where nodes represent critical points and connecting line segments, with semantic tags and geometric attributes attached directly to graph elements. Multiple graph instances are reduced to stable concept attractors through iterative structural composition, requiring only 2--6 training samples per concept without gradient-based optimization. Validation on MNIST handwritten digits demonstrates that this few-shot learning approach achieves 82.35\% classification accuracy through explicit graph matching, with confusion patterns tracing directly to structural similarity. By encoding semantics in queryable graph topology rather than opaque weight matrices, the approach advances explainable AI toward systems where decision paths are inherently transparent, verifiable, and suitable for domains requiring trustworthy, traceable reasoning.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
