@@ -1,0 +1,53 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[margin=2cm]{geometry}
+\usepackage{newtxtext}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{cite}
+
+\setlength{\parindent}{1cm}
+\linespread{1.0}
+
+\begin{document}
+
+\begin{center}
+\textbf{STRUCTURAL CONCEPT FORMATION VIA GRAPH REDUCTION: \\
+AN EXPLAINABLE APPROACH TO FEW-SHOT IMAGE CLASSIFICATION}
+
+\vspace{0.3cm}
+
+\textbf{Mykyta Lapin, Kostiantyn Bokhan, Kyrylo Perevoznyk}
+
+\textit{National Technical University ``Kharkiv Polytechnic Institute'', Kharkiv, Ukraine}
+
+\textbf{Yurii Parzhyn}
+
+\textit{Augusta University, Augusta, USA}
+\end{center}
+
+\vspace{0.5cm}
+
+\textbf{Introduction.} Modern perception systems achieve impressive accuracy yet operate as opaque pipelines. Post-hoc explanation techniques such as LIME and SHAP can be adversarially manipulated, undermining trust in domains requiring traceable decision paths \cite{ribeiro2016should,slack2020foolinglimeshapadversarial}. We propose making structure the carrier of explanations by encoding visual information using explicit graphs. For contour images, critical points (endpoints, corners, junctions) and line segments become graph nodes with attributes that preserve meaning directly, making explanations navigable: cycles justify closed contours, node degree reveals branching, attribute ranges encode variation.
+
+\textbf{Problem Statement.} Post-hoc XAI techniques suffer from fundamental vulnerabilities: adversarial manipulation and sensitivity to hyperparameters \cite{hooshyar2024problems}. Since explanations are generated after training, corroborating them against actual model reasoning is inherently difficult.
+
+Graph-based representations offer an alternative paradigm where structure itself carries semantic information. Vision GNNs treat images as graphs with content-based connectivity, enabling interpretable visual reasoning \cite{han2022vision}. Meanwhile, few-shot learning addresses concept formation from minimal data through meta-learning frameworks \cite{snell2017prototypical}. Graph-based contour representations and vectorization techniques provide foundations for encoding visual patterns using structural primitives \cite{parzhin2013principles,parzhin2022vectorization}. However, no existing approach combines structural explainability with few-shot capability through graph-based concept formation. This work addresses this gap by encoding visual patterns directly as attributed contour graphs and forming concepts through iterative structural reduction to stable attractors.
+
+\textbf{Main Material.} \textit{Graph Representation.} Image contours are encoded as graphs alternating between Point and Line nodes. Line segments are first-class nodes with attributes (length, direction, orientation) rather than edges. Point nodes classify into four types: EndPoint (terminals), CornerPoint (with angle attributes), IntersectionPoint (junctions), and StartPoint (traversal anchors). This separates topological structure from geometric properties. Nodes store $(x, y)$ coordinates, angles, and directional attributes. Coordinates normalize to $[-1, 1]$ via $\text{normalized}_x = (x - \text{center}_x) / \text{center}_x$ for scale and translation invariance.
+
+\textit{Concept Formation.} Concept formation follows principles of architectural information representation and energy-based neural network models \cite{parzhyn2025architecture,parzhyn2025energy}. Given training samples $G_1, \ldots, G_n$, the algorithm initializes $C_0 = G_1$ and iteratively refines via $C_{i+1} = \text{CRO}(C_i, G_{i+1})$ for $i = 1, \ldots, n-1$, preserving only common structural elements. The process: (1) align start points; (2) preprocess critical points; (3) generate traversal paths; (4) identify common structure via similarity; (5) merge properties. The CRO employs three strategies in hierarchy IntersectionPoint $\to$ CornerPoint $\to$ Point: endpoint removal, intersection merging (relabeling nodes with degree $\leq 2$), and path pruning via template matching. Parametric generalization: numeric properties become ranges $\{\text{min}, \text{max}, \text{center}\}$; categorical properties preserve consistent values; list properties use set intersection.
+
+\textit{Validation on MNIST.} We validated on six MNIST classes (1, 2, 3, 6, 7, 9) with 2-4 samples per subclass (8 concepts total). Samples were augmented with 10 variants via rotation ($\pm 10^\circ$) and translation (10\%). Processing pipeline: binary thresholding, skeletonization, Growing Neural Gas fitting, simplification, graph construction, and normalization. Simple structures (digit 1) yielded 3-node graphs with mean degree 1.33; curved contours (2, 3, 7) produced 5-12 nodes with degrees 1.60-2.00; closed loops (6, 9) exhibited degree 2.00 with intersection points.
+
+Classification via Graph Edit Distance (GED) with node substitution costs and range-based matching achieved 82.35\% accuracy, 83.28\% precision, 82.35\% recall, 82.16\% F1 across 5467 test images. Digits 6 and 9 achieved highest precision (94.23\%, 91.55\%) due to unique closed-loop topology. Digit 7 had lowest (74.38\%) from ambiguity with digit 1. Primary confusion: 2/3 (152 errors) and 7/1 (118 errors).
+
+\textbf{Conclusions.} This work presents a graph-based representation where structure carries explanations. Visual patterns are encoded as attributed graphs with critical points and line segments as nodes, semantic tags and geometric attributes attached directly. Multiple instances reduce to stable concept attractors through iterative composition, requiring only 2-6 training samples without gradient-based optimization, enabling few-shot learning with complete interpretability.
+
+MNIST validation shows concepts from 5-6 samples achieve 82.35\% accuracy through explicit graph matching. Confusion patterns trace to structural similarity (2/3 share curved morphology, 7/1 share angular contours), confirming decisions derive from queryable topological and geometric properties rather than opaque features. By encoding semantics in graph topology instead of weight matrices, the approach advances explainable AI toward transparent, verifiable systems suitable for domains requiring trustworthy reasoning.
+
+\bibliographystyle{IEEEtran}
+\bibliography{../explainable_attractors_2025_paper/references}
+
+\end{document}
+

@@ -8,20 +8,52 @@
 \usepackage{xcolor}
 \usepackage{url}
 \usepackage{hyperref} % TODO: remove before submission
+\usepackage{orcidlink} % ORCID icon (modern way)
 \usepackage{lipsum}
+
+\makeatletter
+\newcommand{\linebreakand}{%
+  \end{@IEEEauthorhalign}
+  \hfill\mbox{}\par
+  \mbox{}\hfill\begin{@IEEEauthorhalign}
+}
+\makeatother
 
 \begin{document}
 
 \title{Graph-Based Representation of Contour Images: A Step Toward Self-Describing Explainable AI}
 
 \author{
-    \IEEEauthorblockN{Mykyta Lapin\IEEEauthorrefmark{1}}
-    \IEEEauthorblockA{ORCID: \url{https://orcid.org/0009-0003-6307-1172}}
-    \and
-    \IEEEauthorblockN{Kostiantyn Bokhan\IEEEauthorrefmark{1}}
-    \IEEEauthorblockA{ORCID: \url{https://orcid.org/0000-0003-3375-2527}}
-    \and
-    \IEEEauthorblockA{\IEEEauthorrefmark{1}National Technical University "Kharkiv Polytechnic Institute", Kharkiv, Ukraine}
+\IEEEauthorblockN{Mykyta Lapin}
+\IEEEauthorblockA{\textit{Department of System Analysis and Information}\\
+\textit{and Analytical Technologies}\\
+\textit{of National Technical University}\\
+\textit{``Kharkiv Polytechnic Institute''}\\
+Kharkiv, Ukraine\\
+Mykyta.Lapin@cit.khpi.edu.ua}
+\and
+\IEEEauthorblockN{Kostiantyn Bokhan}
+\IEEEauthorblockA{\textit{Department of System Analysis and Information}\\
+\textit{and Analytical Technologies}\\
+\textit{of National Technical University}\\
+\textit{``Kharkiv Polytechnic Institute''}\\
+Kharkiv, Ukraine\\
+kostiantyn.bokhan@khpi.edu.ua}
+\linebreakand
+\IEEEauthorblockN{Yurii Parzhyn}
+\IEEEauthorblockA{\textit{Postdoctoral Fellow}\\
+\textit{School of Computer and Cyber Sciences}\\
+\textit{Augusta University}\\
+Augusta, USA\\
+yparzhyn@augusta.edu}
+\and
+\IEEEauthorblockN{Kyrylo Perevoznyk}
+\IEEEauthorblockA{\textit{Department of System Analysis and Information}\\
+\textit{and Analytical Technologies}\\
+\textit{of National Technical University}\\
+\textit{``Kharkiv Polytechnic Institute''}\\
+Kharkiv, Ukraine\\
+kyrylo.perevoznyk@cs.khpi.edu.ua}
 }
 
 \maketitle
@@ -68,7 +100,7 @@ Directional attributes capture spatial orientation. Each Line node is assigned a
 
 \subsection{Normalization}
 
-To achieve scale and translation invariance, all coordinates and distances are normalized. Point coordinates are transformed to a centered system ranging $[-1, 1]$ via the formula $\text{normalized}_x = (x - \text{center}_x) / \text{center}_x$, and similarly for $y$ (see Figure~\ref{fig:coordinate_systems}). This normalization ensures that concept attractors remain stable when the size, position, and proportions of the image change, allowing shapes to be recognized regardless of viewing conditions.
+To achieve scale and translation invariance, all coordinates and distances are normalized. Point coordinates are transformed to a centered system ranging $[-1, 1]$ via the formula $\text{normalized}_x = (x - \text{center}_x) / \text{center}_x$, and similarly for $y$ (see Figure~\ref{fig:coordinate_systems}). This normalization helps concept attractors remain stable when the size, position, and proportions of the image change, allowing shapes to be recognized despite variations in viewing conditions.
 
 \begin{figure}[!t]
     \centering
@@ -135,7 +167,7 @@ While structural reduction determines which nodes and edges persist in the conce
 
 \textbf{Categorical properties} preserve only values consistent across all samples. For strings \(s_1, s_2, \ldots, s_n\), the merged property is \(s_1\) if \(s_i = s_1\) for all \(i\), otherwise the property is removed entirely. This strict matching ensures that categorical attributes in the concept represent universal characteristics rather than incidental variations. For instance, \texttt{contour\_type} values \([\text{``OPEN''}, \text{``OPEN''}, \text{``OPEN''}]\) merge to \(\text{``OPEN''}\), while inconsistent \texttt{horizontal\_direction} values \([\text{``Left''}, \text{``Right''}, \text{``Right''}]\) cause the property to be excluded from the concept.
 
-\textbf{List properties} retain only elements present in all samples via set intersection: for lists \(L_1, L_2, \ldots, L_n\), the merged property is \(L_1 \cap L_2 \cap \cdots \cap L_n\). This strategy applies primarily to node \texttt{labels}, which encode multiple type classifications per node. For example, if three corresponding nodes have labels \([[\text{``Point''}, \text{``CornerPoint''}], [\text{``Point''}, \text{``EndPoint''}], [\text{``StartPoint''}, \text{``Point''}]]\), the merged labels become \([\text{``Point''}]\)---the sole label common to all instances. Empty intersections indicate that no universal list-based features exist for that property, and the property may be excluded or represented as an empty set depending on semantic requirements.
+\textbf{List properties} retain only elements present in all samples via set intersection: for lists \(L_1, L_2, \ldots, L_n\), the merged property is \(L_1 \cap L_2 \cap \cdots \cap L_n\). This strategy applies primarily to node \texttt{labels}, which encode multiple type classifications per node. For example, if three corresponding nodes have labels \([[\text{``Point''}, \text{``CornerPoint''}], [\text{``Point''}, \text{``EndPoint''}],\) \([\text{``StartPoint''}, \text{``Point''}]]\), the merged labels become \([\text{``Point''}]\)---the sole label common to all instances. Empty intersections indicate that no universal list-based features exist for that property, and the property may be excluded or represented as an empty set depending on semantic requirements.
 
 These merging strategies ensure that concept representations capture statistically coherent patterns: range-based merging preserves natural variation in continuous parameters, exact matching filters inconsistent categorical labels, and set intersection retains only universal structural classifications. The resulting concept graphs encode not point estimates but \emph{distributions} of acceptable values, enabling flexible matching during classification while maintaining interpretability through explicit parameter bounds.
 
