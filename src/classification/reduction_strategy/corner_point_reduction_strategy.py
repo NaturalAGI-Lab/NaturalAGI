@@ -10,7 +10,6 @@ from services.synced_traversal_service import SyncedTraversalService
 
 from .abstract_strategy import AbstractReductionStrategy
 
-
 class CornerPointReductionStrategy(AbstractReductionStrategy):
     """
     This is basically the same as the corner point reduction strategy in the concept creator,

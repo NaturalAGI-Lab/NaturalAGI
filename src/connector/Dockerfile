@@ -18,7 +18,7 @@ COPY --from=processor /home/nuclio/bin/processor /usr/local/bin/processor
 COPY --from=processor /home/nuclio/bin/py /opt/nuclio/
 COPY --from=uhttpc /home/nuclio/bin/uhttpc /usr/local/bin/uhttpc
 
-RUN apt-get update && apt-get install -y libgl1-mesa-glx
+RUN apt-get update && apt-get install -y libgl1-mesa-dev libglib2.0-0
 
 RUN pip install --upgrade pip
 RUN pip install msgpack nuclio_sdk pydantic pydantic-settings requests opencv-python neo4j Pillow

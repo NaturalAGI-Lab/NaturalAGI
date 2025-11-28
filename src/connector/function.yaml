@@ -11,9 +11,9 @@ spec:
   build:
     baseImage: "python:3.9"
     commands:
-      - 'apt-get update -y --fix-missing'
-      - 'apt-get install -y libgl1-mesa-glx'
-      - 'pip install requests pydantic-settings kafka-python'
+      - "apt-get update -y --fix-missing"
+      - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
+      - "pip install requests pydantic-settings kafka-python"
   triggers:
     default-http:
       kind: "http"

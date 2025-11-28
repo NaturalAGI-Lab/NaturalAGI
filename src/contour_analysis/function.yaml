@@ -27,7 +27,7 @@ spec:
     baseImage: "python:3.9"
     commands:
       - "apt-get update -y --fix-missing"
-      - "apt-get install -y libgl1-mesa-glx"
+      - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
       - "pip install --upgrade pip"
       - "pip install numpy opencv-python pydantic-settings neo4j scikit-learn kafka-python networkx scipy"
       - "pip install --upgrade natural-agi-common==0.1.36"

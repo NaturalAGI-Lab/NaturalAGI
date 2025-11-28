@@ -139,7 +139,7 @@ class StartPointPicker:
 
             elif self.clustering_algorithm == "optics":
                 # Perform OPTICS clustering
-                clusterer = OPTICS(min_samples=min_samples)
+                clusterer = OPTICS(min_samples=max(min_samples, 2))
                 labels = clusterer.fit_predict(coordinates)
 
         clusters = defaultdict(list)

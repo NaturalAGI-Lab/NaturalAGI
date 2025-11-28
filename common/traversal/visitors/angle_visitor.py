@@ -11,7 +11,7 @@ import networkx as nx
 class AngleVisitor(Visitor):
     def __init__(self, graph: nx.Graph):
         super().__init__(graph)
-        self.point_angles: Dict[str, set[float]] = {}
+        self.point_angles: Dict[str, List[float]] = {}
         self.line_angles: Dict[str, float] = {}
 
     def visit_point(self, point: Point) -> Dict[str, Any]:
@@ -20,10 +20,10 @@ class AngleVisitor(Visitor):
             angles = []
             for i in range(len(connected_lines)):
                 for j in range(i + 1, len(connected_lines)):
-                    angles = self._calculate_angle_between_lines(
+                    angle_pair = self._calculate_angle_between_lines(
                         connected_lines[i], connected_lines[j]
                     )
-                    angles.extend(angles)
+                    angles.extend(angle_pair)
             self.point_angles[point.id] = angles
             self.graph.nodes[point.id]["angles"] = angles
             return {"angles": angles, "point_id": point.id}
@@ -151,6 +151,10 @@ class AngleVisitor(Visitor):
         magnitude1 = math.sqrt(vector1[0] ** 2 + vector1[1] ** 2)
         magnitude2 = math.sqrt(vector2[0] ** 2 + vector2[1] ** 2)
 
+        # Handle zero-length vectors
+        if magnitude1 < 1e-10 or magnitude2 < 1e-10:
+            return [0.0, 0.0]
+
         cos_angle = dot_product / (magnitude1 * magnitude2)
         angle1 = math.degrees(math.acos(max(-1.0, min(1.0, cos_angle))))
         angle2 = 360 - angle1
@@ -169,6 +173,11 @@ class AngleVisitor(Visitor):
         vector = (end_coords[0] - start_coords[0], end_coords[1] - start_coords[1])
         dot_product = vector[0] * 1 + vector[1] * 0
         magnitude = math.sqrt(vector[0] ** 2 + vector[1] ** 2)
+
+        # Handle zero-length vectors
+        if magnitude < 1e-10:
+            return 0.0
+
         cos_angle = dot_product / magnitude
         angle = math.degrees(math.acos(max(-1.0, min(1.0, cos_angle))))
         return round(angle / 10) * 10
