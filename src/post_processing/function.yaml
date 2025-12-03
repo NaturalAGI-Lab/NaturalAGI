@@ -16,7 +16,7 @@ spec:
     commands:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
-      - "pip install numpy requests pydantic-settings neo4j"
+      - "pip install numpy requests pydantic-settings neo4j msgpack"
   triggers:
     default-http:
       kind: "http"
