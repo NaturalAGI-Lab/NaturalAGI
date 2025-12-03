@@ -123,10 +123,10 @@ celerybeat.pid
 *.sage.py
 
 # Environments
-
 .venv
 env/
 venv/
+natural-agi/
 ENV/
 env.bak/
 venv.bak/
@@ -174,3 +174,4 @@ neo4j/
 neo4j-data/
 neo4j-logs/
 neo4j-dumps/
+tests/archive/*

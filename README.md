@@ -2,6 +2,47 @@
 
 NaturalAGI is a research project focused on developing a natural approach to Artificial General Intelligence through image processing, pattern recognition, and concept formation. The project implements a pipeline for processing visual data, extracting structural features, and forming abstract concepts through defined reduction rules. **The core goal is to build a classification algorithm that learns from training data without using backpropagation or traditional neural network approaches.**
 
+## Getting Started
+
+### Prerequisites
+
+- Python 3.12+
+- [uv](https://docs.astral.sh/uv/) (recommended) or pip
+
+### Installation
+
+1. Clone the repository:
+```bash
+git clone https://github.com/your-org/NaturalAGI.git
+cd NaturalAGI
+```
+
+2. Install uv (if not already installed):
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+3. Create and activate the virtual environment:
+```bash
+uv venv natural-agi --python 3.12
+source natural-agi/bin/activate  # On Windows: natural-agi\Scripts\activate
+```
+
+4. Install dependencies:
+```bash
+uv sync              # Core dependencies only
+uv sync --all-extras # All dependencies including ML and dev tools
+```
+
+### Optional Dependency Groups
+
+| Group | Description | Install Command |
+|-------|-------------|-----------------|
+| dev | Jupyter notebooks, visualization, linting | `uv sync --extra dev` |
+| ml | PyTorch, torch-geometric, deep learning tools | `uv sync --extra ml` |
+
+
+
 # Project Overview
 
 ## 0 Аннотація
