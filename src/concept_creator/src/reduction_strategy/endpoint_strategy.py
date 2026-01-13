@@ -5,6 +5,7 @@ import networkx as nx
 from common.critical_point import CriticalPointType
 from common.graph_utils import GraphUtils
 from src.utils.distance_matrix_calculator import DistanceMatrixCalculator
+from src.utils.endpoint_direction_visitor import EndpointDirectionVisitor
 from src.node_similarity_calculator import NodeSimilarityCalculator
 
 from .abstract_strategy import AbstractReductionStrategy
@@ -12,14 +13,15 @@ from .abstract_strategy import AbstractReductionStrategy
 CONCEPT = "concept"
 IMAGE = "image"
 
-properties_to_compare = set(["normalized_x", "normalized_y"])
+properties_to_compare = set(["normalized_x", "normalized_y", "direction_x", "direction_y"])
 
 class EndpointReductionStrategy(AbstractReductionStrategy):
     def __init__(self, node_similarity_calculator: NodeSimilarityCalculator):
         super().__init__(node_similarity_calculator)
         self.logger = logging.getLogger(__name__)
-        self.distance_threshold = 0.6
+        self.distance_threshold = 0.9
         self.distance_matrix_calculator = DistanceMatrixCalculator()
+        self.endpoint_direction_visitor = EndpointDirectionVisitor()
 
     def reduce(
         self, concept_graph: nx.Graph, image_graph: nx.Graph
@@ -43,6 +45,9 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             self.logger.info("Image has no endpoints. Reducing all endpoints in concept.")
             concept_graph = self._apply_reduction(concept_graph, concept_endpoints)
             return concept_graph, image_graph        
+
+        self.endpoint_direction_visitor.visit(concept_graph)
+        self.endpoint_direction_visitor.visit(image_graph)
 
         distance_matrix = self.distance_matrix_calculator.calculate_distance_matrix(
             concept_graph,
@@ -98,20 +103,15 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             )
             return concept_graph, image_graph
 
-        # Determine which graph has more endpoints
         if len_concept_endpoints > len_image_endpoints:
-            graph_large = concept_graph
-            graph_small = image_graph
             points_large = concept_endpoints
-            points_small = image_endpoints
             graph_to_reduce = CONCEPT
         else:
-            graph_large = image_graph
-            graph_small = concept_graph
             points_large = image_endpoints
-            points_small = concept_endpoints
             graph_to_reduce = IMAGE
 
+        self.endpoint_direction_visitor.visit(concept_graph)
+        self.endpoint_direction_visitor.visit(image_graph)
 
         distance_matrix = self.distance_matrix_calculator.calculate_distance_matrix(
             concept_graph,
