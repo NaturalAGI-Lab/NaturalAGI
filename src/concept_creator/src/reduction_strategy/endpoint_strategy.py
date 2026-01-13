@@ -1,10 +1,10 @@
 import logging
-from typing import Tuple, List, Any, Dict
+from typing import Tuple, List, Any
 
-import numpy as np
 import networkx as nx
 from common.critical_point import CriticalPointType
 from common.graph_utils import GraphUtils
+from src.utils.distance_matrix_calculator import DistanceMatrixCalculator
 from src.node_similarity_calculator import NodeSimilarityCalculator
 
 from .abstract_strategy import AbstractReductionStrategy
@@ -12,11 +12,14 @@ from .abstract_strategy import AbstractReductionStrategy
 CONCEPT = "concept"
 IMAGE = "image"
 
+properties_to_compare = set(["normalized_x", "normalized_y"])
+
 class EndpointReductionStrategy(AbstractReductionStrategy):
     def __init__(self, node_similarity_calculator: NodeSimilarityCalculator):
         super().__init__(node_similarity_calculator)
         self.logger = logging.getLogger(__name__)
-        self.similarity_threshold = 0.2
+        self.distance_threshold = 0.6
+        self.distance_matrix_calculator = DistanceMatrixCalculator()
 
     def reduce(
         self, concept_graph: nx.Graph, image_graph: nx.Graph
@@ -41,34 +44,35 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             concept_graph = self._apply_reduction(concept_graph, concept_endpoints)
             return concept_graph, image_graph        
 
-        similarity_matrix = self.calculate_similarity_matrix(
+        distance_matrix = self.distance_matrix_calculator.calculate_distance_matrix(
             concept_graph,
             image_graph,
             concept_endpoints,
             image_endpoints,
+            properties_to_compare,
         )
 
-        concept_endpoints_below_threshold = self._find_endpoints_below_threshold(
-            similarity_matrix, concept_endpoints, axis=1
-        )
-        image_endpoints_below_threshold = self._find_endpoints_below_threshold(
-            similarity_matrix.T, image_endpoints, axis=1
+        concept_endpoints_above_threshold = self.distance_matrix_calculator.find_points_above_distance_threshold(
+            distance_matrix, concept_endpoints, self.distance_threshold, axis=1
+            )   
+        image_endpoints_above_threshold = self.distance_matrix_calculator.find_points_above_distance_threshold(
+            distance_matrix.T, image_endpoints, self.distance_threshold, axis=1
         )
 
-        if concept_endpoints_below_threshold:
+        if concept_endpoints_above_threshold:
             self.logger.info(
-                f"Concept endpoints below threshold ({len(concept_endpoints_below_threshold)}): {concept_endpoints_below_threshold}"
+                f"Concept endpoints below threshold ({len(concept_endpoints_above_threshold)}): {concept_endpoints_above_threshold}"
             )
             concept_graph = self._apply_reduction(
-                concept_graph, concept_endpoints_below_threshold
+                concept_graph, concept_endpoints_above_threshold
             )
 
-        if image_endpoints_below_threshold:
+        if image_endpoints_above_threshold:
             self.logger.info(
-                f"Image endpoints below threshold ({len(image_endpoints_below_threshold)}): {image_endpoints_below_threshold}"
+                f"Image endpoints below threshold ({len(image_endpoints_above_threshold)}): {image_endpoints_above_threshold}"
             )
             image_graph = self._apply_reduction(
-                image_graph, image_endpoints_below_threshold
+                image_graph, image_endpoints_above_threshold
             )
 
         # Second pass: handle count mismatch
@@ -77,6 +81,16 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
 
         len_concept_endpoints = len(concept_endpoints)
         len_image_endpoints = len(image_endpoints)
+
+        if len_concept_endpoints == 0 and len_image_endpoints > 0:
+            self.logger.info("Concept has no endpoints after first pass. Reducing all remaining endpoints in image.")
+            image_graph = self._apply_reduction(image_graph, image_endpoints)
+            return concept_graph, image_graph
+        
+        if len_image_endpoints == 0 and len_concept_endpoints > 0:
+            self.logger.info("Image has no endpoints after first pass. Reducing all remaining endpoints in concept.")
+            concept_graph = self._apply_reduction(concept_graph, concept_endpoints)
+            return concept_graph, image_graph
 
         if len_concept_endpoints == len_image_endpoints:
             self.logger.info(
@@ -99,14 +113,20 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             graph_to_reduce = IMAGE
 
 
-        similarity_matrix = self.calculate_similarity_matrix(
-            graph_large, graph_small, points_large, points_small
+        distance_matrix = self.distance_matrix_calculator.calculate_distance_matrix(
+            concept_graph,
+            image_graph,
+            concept_endpoints,
+            image_endpoints,
+            properties_to_compare,
         )
 
-        excess_endpoints_to_remove = self._identify_excess_endpoints_to_remove(
-            similarity_matrix,
+        axis = 0 if len_concept_endpoints < len_image_endpoints else 1
+        excess_endpoints_to_remove = self.distance_matrix_calculator.find_points_for_difference(
+            distance_matrix,
             points_large,
-            abs(len_concept_endpoints - len_image_endpoints)
+            abs(len_concept_endpoints - len_image_endpoints),
+            axis=axis
         )
 
         if excess_endpoints_to_remove:
@@ -155,22 +175,6 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             data["labels"].append("Point")
             
         return is_endpoint
-            
-    def _find_endpoints_below_threshold(
-        self, similarity_matrix: np.ndarray, endpoints: List[Any], axis: int
-    ) -> List[Any]:
-        enpoints_below_threshold = []
-        if similarity_matrix.size == 0:
-            self.logger.error("Similarity matrix is empty. Raising error.")
-            raise ValueError("Similarity matrix is empty.")
-
-        max_similarity = np.max(similarity_matrix, axis=axis)
-
-        for i, endpoint_id in enumerate(endpoints):
-            if max_similarity[i] < self.similarity_threshold:
-                self.logger.info(f"Endpoint {endpoint_id} has similarity {max_similarity[i]} below threshold {self.similarity_threshold}. Adding to list of endpoints to remove.")
-                enpoints_below_threshold.append(endpoint_id)
-        return enpoints_below_threshold
 
     def _apply_reduction(self, graph: nx.Graph, endpoints: List[Any]) -> nx.Graph:
         relink_edges: set[tuple[Any, Any]] = set()
@@ -230,39 +234,5 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             raise ValueError(f"No path found for endpoint {endpoint_id}.")
 
         return nodes_on_path
-
-    def _identify_excess_endpoints_to_remove(
-        self,
-        similarity_matrix: np.ndarray,
-        endpoints_large: List[Any],
-        difference: int,
-    ) -> List[Any]:
-        if difference <= 0:
-            self.logger.error("Difference is less than or equal to 0. Raising error.")
-            raise ValueError("Difference is less than or equal to 0.")
-
-        if similarity_matrix.size == 0:
-            self.logger.error("Similarity matrix is empty. Raising error.")
-            raise ValueError("Similarity matrix is empty.")
-
-        # Find the maximum similarity for each endpoint in the larger set (each row in the matrix)
-        max_similarities_per_large_endpoint = np.max(similarity_matrix, axis=1)
-
-        # Create a list of (index_in_large_list, max_similarity)
-        indexed_similarities = list(enumerate(max_similarities_per_large_endpoint))
-
-        # Sort by max_similarity in ascending order (lowest similarity first)
-        indexed_similarities.sort(key=lambda x: x[1])
-
-        # Get the indices of the 'difference' endpoints with the lowest max similarity
-        indices_to_remove = [idx for idx, sim in indexed_similarities[:difference]]
-
-        # Get the actual node IDs corresponding to these indices
-        nodes_to_remove = [endpoints_large[i] for i in indices_to_remove]
-
-        self.logger.debug(f"Indices identified for removal based on lowest max similarity: {indices_to_remove}")
-        self.logger.debug(f"Nodes identified for removal: {nodes_to_remove}")
-
-        return nodes_to_remove
             
             

@@ -25,7 +25,7 @@ class Neo4jToNetworkx:
                m.id as target_id
         """
         result = session.run(query, image_id=image_id)
-        return Neo4jToNetworkx._build_networkx_graph(result)
+        return Neo4jToNetworkx._build_networkx_graph(result, image_id)
 
     @staticmethod
     def extract_concept_graph(session: Session, concept_id: str) -> nx.Graph:
@@ -43,11 +43,12 @@ class Neo4jToNetworkx:
                m.id as target_id
         """
         result = session.run(query, concept_id=concept_id)
-        return Neo4jToNetworkx._build_networkx_graph(result)
+        return Neo4jToNetworkx._build_networkx_graph(result, concept_id)
 
     @staticmethod
-    def _build_networkx_graph(result) -> nx.Graph:
+    def _build_networkx_graph(result, graph_id: str) -> nx.Graph:
         G = nx.Graph()
+        G.graph["graph_id"] = graph_id
         nodes: Dict[int, Dict] = {}  # Store node data including degree
 
         # First pass: collect all nodes and their degrees

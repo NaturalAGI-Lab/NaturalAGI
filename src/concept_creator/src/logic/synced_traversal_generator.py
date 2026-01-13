@@ -366,9 +366,17 @@ class SyncedTraversalGenerator:
             )
 
             # Calculate similarity matrix between unmatched points
-            similarity_matrix = self.similarity_calculator.calculate_similarity_matrix(
-                G_c, G_i, unmatched_concept_points, unmatched_image_points
-            )
+            # Use coordinate-based similarity for better spatial matching
+            properties_to_compare = {"normalized_x", "normalized_y"}
+            similarity_matrix = []
+            for concept_cp in unmatched_concept_points:
+                row = []
+                for image_cp in unmatched_image_points:
+                    similarity = self.similarity_calculator.calculate_node_similarity(
+                        G_c, G_i, concept_cp, image_cp, include_properties=properties_to_compare
+                    )
+                    row.append(similarity)
+                similarity_matrix.append(row)
 
             # Match points greedily based on highest similarity
             while unmatched_concept_points and unmatched_image_points:
@@ -391,11 +399,8 @@ class SyncedTraversalGenerator:
                     unmatched_concept_points.remove(concept_cp)
                     unmatched_image_points.remove(image_cp)
 
-                    self.logger.debug(
-                        f"Matched critical points based on similarity ({max_similarity:.2f}): {concept_cp} -> {image_cp}"
-                    )
-                else:
-                    # No more good matches found
-                    break
+            self.logger.debug(
+                f"Matched critical points based on similarity ({max_similarity:.2f}): {concept_cp} -> {image_cp}"
+            )
 
         return critical_point_mapping
