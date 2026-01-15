@@ -19,7 +19,7 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
     def __init__(self, node_similarity_calculator: NodeSimilarityCalculator):
         super().__init__(node_similarity_calculator)
         self.logger = logging.getLogger(__name__)
-        self.distance_threshold = 0.9
+        self.distance_threshold = 0.44
         self.distance_matrix_calculator = DistanceMatrixCalculator()
         self.endpoint_direction_visitor = EndpointDirectionVisitor()
 
@@ -122,6 +122,7 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
         )
 
         axis = 0 if len_concept_endpoints < len_image_endpoints else 1
+        
         excess_endpoints_to_remove = self.distance_matrix_calculator.find_points_for_difference(
             distance_matrix,
             points_large,

@@ -31,6 +31,8 @@ class DistanceMatrixCalculator:
         points_large: List[Any],
         points_small: List[Any],
         properties_to_compare: Set[str],
+        position_weight: float = 0.8,
+        direction_weight: float = 0.2,
     ) -> np.ndarray:
         """Calculate Euclidean distance matrix based on coordinate properties.
 
@@ -75,11 +77,40 @@ class DistanceMatrixCalculator:
                     distance_matrix[i, j] = np.inf
                     continue
 
-                squared_diffs = [
-                    (coord_large - coord_small) ** 2
-                    for coord_large, coord_small in zip(coordinates_large, coordinates_small)
-                ]
-                distance = np.sqrt(sum(squared_diffs))
+                pos_props = ["normalized_x", "normalized_y"]
+                dir_props = ["direction_x", "direction_y"]
+                
+                has_position = any(prop in properties_to_compare for prop in pos_props)
+                has_direction = any(prop in properties_to_compare for prop in dir_props)
+                
+                if has_position and has_direction:
+                    pos_coords_large = [self.extract_coordinate_value(node_large_data.get(prop)) for prop in pos_props if prop in properties_to_compare and self.extract_coordinate_value(node_large_data.get(prop)) is not None]
+                    pos_coords_small = [self.extract_coordinate_value(node_small_data.get(prop)) for prop in pos_props if prop in properties_to_compare and self.extract_coordinate_value(node_small_data.get(prop)) is not None]
+                    dir_coords_large = [self.extract_coordinate_value(node_large_data.get(prop)) for prop in dir_props if prop in properties_to_compare and self.extract_coordinate_value(node_large_data.get(prop)) is not None]
+                    dir_coords_small = [self.extract_coordinate_value(node_small_data.get(prop)) for prop in dir_props if prop in properties_to_compare and self.extract_coordinate_value(node_small_data.get(prop)) is not None]
+                    
+                    pos_dist = 0.0
+                    dir_dist = 0.0
+                    
+                    if len(pos_coords_large) == len(pos_coords_small) and len(pos_coords_large) > 0:
+                        pos_squared_diffs = [(c1 - c2) ** 2 for c1, c2 in zip(pos_coords_large, pos_coords_small)]
+                        pos_max_dist = np.sqrt(len(pos_squared_diffs) * 4)
+                        pos_dist = np.sqrt(sum(pos_squared_diffs)) / pos_max_dist
+                    
+                    if len(dir_coords_large) == len(dir_coords_small) and len(dir_coords_large) > 0:
+                        dir_squared_diffs = [(c1 - c2) ** 2 for c1, c2 in zip(dir_coords_large, dir_coords_small)]
+                        dir_max_dist = np.sqrt(len(dir_squared_diffs) * 4)
+                        dir_dist = np.sqrt(sum(dir_squared_diffs)) / dir_max_dist
+                    
+                    distance = position_weight * pos_dist + direction_weight * dir_dist
+                else:
+                    squared_diffs = [
+                        (coord_large - coord_small) ** 2
+                        for coord_large, coord_small in zip(coordinates_large, coordinates_small)
+                    ]
+                    max_distance = np.sqrt(len(squared_diffs) * 4)
+                    distance = np.sqrt(sum(squared_diffs)) / max_distance
+                
                 distance_matrix[i, j] = distance
 
         return distance_matrix
@@ -123,16 +154,16 @@ class DistanceMatrixCalculator:
         difference: int,
         axis: int = 1,
     ) -> List[Any]:
-        """Find points for a difference in the distance matrix.
+        """Find points with worst match quality to remove.
 
         Args:
             distance_matrix (np.ndarray): Distance matrix
             points (List[Any]): List of point IDs corresponding to the rows/columns of the distance matrix
-            difference (int): Difference in number of points
+            difference (int): Number of points to remove
             axis (int, optional): 0 for columns, 1 for rows
 
         Returns:
-            List[Any]: List of point IDs for the difference
+            List[Any]: List of point IDs with worst match quality
         """
         if difference <= 0:
             return []
@@ -142,16 +173,43 @@ class DistanceMatrixCalculator:
             raise ValueError("Distance matrix is empty.")
             
         row_ind, col_ind = linear_sum_assignment(distance_matrix)
-    
+        matched_distances = distance_matrix[row_ind, col_ind]
+        
+        point_qualities = []
+        
         if axis == 0:
             matched_indices = set(col_ind)
             all_indices = set(range(distance_matrix.shape[1]))
+            unmatched_indices = all_indices - matched_indices
+            
+            for idx in matched_indices:
+                col_position = np.where(col_ind == idx)[0][0]
+                distance = matched_distances[col_position]
+                point_qualities.append((idx, distance))
+            
+            for idx in unmatched_indices:
+                min_distance = np.min(distance_matrix[:, idx])
+                point_qualities.append((idx, min_distance))
         else:
             matched_indices = set(row_ind)
             all_indices = set(range(distance_matrix.shape[0]))
+            unmatched_indices = all_indices - matched_indices
+            
+            for idx in matched_indices:
+                row_position = np.where(row_ind == idx)[0][0]
+                distance = matched_distances[row_position]
+                point_qualities.append((idx, distance))
+            
+            for idx in unmatched_indices:
+                min_distance = np.min(distance_matrix[idx, :])
+                point_qualities.append((idx, min_distance))
         
-        unmatched_indices = all_indices - matched_indices
-        points_for_difference = [points[i] for i in unmatched_indices]
+        point_qualities.sort(key=lambda x: x[1], reverse=True)
+        worst_indices = [idx for idx, _ in point_qualities[:difference]]
+        points_for_difference = [points[i] for i in worst_indices]
         
-        self.logger.debug(f"Points identified for difference: {points_for_difference}")
+        self.logger.info(f"Points identified for removal (worst match quality): {points_for_difference}")
+        for idx, dist in point_qualities[:difference]:
+            self.logger.info(f"  Point {points[idx]}: distance={dist:.4f}")
+        
         return points_for_difference
