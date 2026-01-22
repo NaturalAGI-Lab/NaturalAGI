@@ -19,7 +19,7 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
     def __init__(self, node_similarity_calculator: NodeSimilarityCalculator):
         super().__init__(node_similarity_calculator)
         self.logger = logging.getLogger(__name__)
-        self.distance_threshold = 0.44
+        self.distance_threshold = 0.3
         self.distance_matrix_calculator = DistanceMatrixCalculator()
         self.endpoint_direction_visitor = EndpointDirectionVisitor()
 
