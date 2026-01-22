@@ -2,7 +2,8 @@ import logging
 import numpy as np
 import networkx as nx
 from skan import Skeleton, summarize
-from skimage.morphology import closing, square, remove_small_objects, skeletonize
+from skimage.morphology import remove_small_objects, skeletonize
+from skimage.filters import threshold_otsu
 import gng
 from settings import Settings
 from network_simplification import NetworkSimplification
@@ -33,62 +34,54 @@ class SkeletonGNGMapper:
     def process_image(self, image):
         try:
             self.logger.info(
-                f"Processing image with skeletonization threshold: {self.skeletonization_threshold} "
+                f"Processing image with Otsu threshold (improved) "
                 f"and simplification epsilon: {self.simplification_epsilon}"
             )
-            current_threshold = self.skeletonization_threshold
 
-            while current_threshold >= self.min_threshold:
-                try:
-                    skeleton = self.skeletonize(image, threshold=current_threshold)
-                    self.logger.debug(
-                        f"Skeleton created with threshold {current_threshold}"
-                    )
+            # Use Otsu threshold (improved skeletonization)
+            skeleton = self.skeletonize(image, threshold=None)
+            self.logger.debug("Skeleton created with Otsu threshold")
 
-                    points = self.skeleton_to_points(skeleton)
-                    self.logger.debug(f"Extracted {len(points)} points from skeleton")
+            points = self.skeleton_to_points(skeleton)
+            self.logger.debug(f"Extracted {len(points)} points from skeleton")
 
-                    net = self.fit_gng(points)
-                    self.logger.debug("GNG network fitted")
+            net = self.fit_gng(points)
+            self.logger.debug("GNG network fitted")
 
-                    simplified_network = NetworkSimplification.simplify_network(
-                        net, self.simplification_epsilon
-                    )
-                    self.logger.debug(
-                        f"Network simplified into {len(simplified_network)} segments"
-                    )
+            simplified_network = NetworkSimplification.simplify_network(
+                net, self.simplification_epsilon
+            )
+            self.logger.debug(
+                f"Network simplified into {len(simplified_network)} segments"
+            )
 
-                    graph = Converter.convert_simplified_network_to_networkx(
-                        simplified_network
-                    )
-                    graph = normalize_graph(graph)
-                    self.logger.debug(
-                        f"Created graph with {graph.number_of_nodes()} nodes and {graph.number_of_edges()} edges"
-                    )
+            graph = Converter.convert_simplified_network_to_networkx(
+                simplified_network
+            )
+            graph = normalize_graph(graph)
+            self.logger.debug(
+                f"Created graph with {graph.number_of_nodes()} nodes and {graph.number_of_edges()} edges"
+            )
 
-                    if nx.is_connected(graph):
-                        return graph, current_threshold
+            if nx.is_connected(graph):
+                return graph, threshold_otsu(image)
 
-                    current_threshold -= self.threshold_step
-
-                except Exception as e:
-                    self.logger.error(
-                        f"Error processing with threshold {current_threshold}: {str(e)}"
-                    )
-                    current_threshold -= self.threshold_step
-                    continue
-
-            raise Exception("Could not create connected graph with any threshold")
+            raise Exception("Could not create connected graph")
 
         except Exception as e:
             self.logger.error(f"Failed to process image: {str(e)}")
             raise
 
     @timed(label="binary_image")
-    def binary_image(self, image, threshold):
+    def binary_image(self, image, threshold=None):
+        # Use Otsu threshold if not specified (improved skeletonization)
+        if threshold is None:
+            threshold = threshold_otsu(image)
+            self.logger.info(f"Using Otsu threshold: {threshold}")
+
         binary = image > threshold
         binary = remove_small_objects(binary, min_size=10)
-        binary = closing(binary, square(3))
+        # NO closing - it destroys thin structures and loops
         return binary
 
     @timed(label="skeletonize")
