@@ -54,8 +54,8 @@ def kafka_handler(context, event):
         image_width = image.shape[1]
         image_height = image.shape[0]
 
-        parameters["image_width"] = image_width
-        parameters["image_height"] = image_height
+        parameters["image_width"] = int(image_width)
+        parameters["image_height"] = int(image_height)
 
         settings = Settings()
         skeletonization_threshold = parameters.get(
@@ -67,8 +67,8 @@ def kafka_handler(context, event):
         net, threshold = SkeletonGNGMapper(
             settings, skeletonization_threshold, simplification_epsilon
         ).process_image(image)
-        data["parameters"]["skeletonization_threshold"] = threshold
-        data["parameters"]["simplification_epsilon"] = simplification_epsilon
+        data["parameters"]["skeletonization_threshold"] = float(threshold)
+        data["parameters"]["simplification_epsilon"] = float(simplification_epsilon)
 
         json_net = GraphSerializer.serialize(net)
         context.logger.info_with(f"Net: {json_net}", handler=HANDLER_NAME)
