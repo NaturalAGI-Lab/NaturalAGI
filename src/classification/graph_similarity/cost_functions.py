@@ -177,6 +177,12 @@ def _calculate_property_similarity_cost(
         elif _is_list(concept_value) and _is_list(image_value):
             return _calculate_list_similarity_cost(concept_value, image_value)
 
+        elif _is_number(concept_value) and isinstance(image_value, enum.Enum):
+            return _calculate_number_similarity_cost(concept_value, image_value.value)
+
+        elif isinstance(concept_value, enum.Enum) and _is_number(image_value):
+            return _calculate_number_similarity_cost(concept_value.value, image_value)
+
         elif _is_string(concept_value) and isinstance(image_value, enum.Enum):
             return _calculate_string_similarity_cost(concept_value, image_value.value)
 

@@ -175,3 +175,6 @@ neo4j-data/
 neo4j-logs/
 neo4j-dumps/
 tests/archive/*
+
+# Claude Code MCP config (contains credentials)
+.mcp.json

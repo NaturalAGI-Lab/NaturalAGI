@@ -26,7 +26,7 @@ class LengthComparisonVisitor(Visitor):
                 comparison = LengthComparisonResult.SHORTER
             else:
                 comparison = LengthComparisonResult.EQUAL
-        self.length_comparisons[line.id] = comparison
+        self.length_comparisons[line.id] = comparison.value
         self.previous_length = line.length
         self.line_ids.append(line.id)
 
@@ -34,7 +34,7 @@ class LengthComparisonVisitor(Visitor):
             return None
 
         return {
-            "length_comparison": comparison,
+            "length_comparison": comparison.value,
             "line1_id": self.line_ids[-2],
             "line2_id": self.line_ids[-1],
         }
@@ -70,7 +70,7 @@ class LengthComparisonVisitor(Visitor):
             query,
             line1_id=result["line1_id"],
             line2_id=result["line2_id"],
-            comparison=result["length_comparison"].value,
+            comparison=result["length_comparison"],
             image_id=image_id,
             session_id=session_id,
         )

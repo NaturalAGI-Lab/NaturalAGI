@@ -141,7 +141,7 @@ class DistanceMatrixCalculator:
         
         points_above_threshold = []
         for i, point in enumerate(points):
-            if min_distances[i] > threshold:
+            if round(min_distances[i], 2) > threshold:
                 self.logger.info(f"Point {point} has minimum distance {min_distances[i]} above threshold {threshold}. Adding to list of points to remove.")
                 points_above_threshold.append(point)
                 

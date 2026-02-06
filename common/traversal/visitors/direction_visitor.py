@@ -69,8 +69,8 @@ class DirectionVisitor(Visitor):
 
         # Store the direction for this vector
         self.directions[line.id] = {"horizontal": h_direction, "vertical": v_direction}
-        self.graph.nodes[line.id]["horizontal_direction"] = h_direction
-        self.graph.nodes[line.id]["vertical_direction"] = v_direction
+        self.graph.nodes[line.id]["horizontal_direction"] = h_direction.value
+        self.graph.nodes[line.id]["vertical_direction"] = v_direction.value
         self.graph.nodes[line.id][
             "direction_sequence_index"
         ] = self.current_sequence_index
@@ -78,8 +78,8 @@ class DirectionVisitor(Visitor):
         sequence_info = {
             "index": self.current_sequence_index,
             "line_id": line.id,
-            "horizontal_direction": h_direction,
-            "vertical_direction": v_direction,
+            "horizontal_direction": h_direction.value,
+            "vertical_direction": v_direction.value,
             "x1": line.x1,
             "y1": line.y1,
             "x2": line.x2,
@@ -91,8 +91,8 @@ class DirectionVisitor(Visitor):
 
         return {
             "line_id": line.id,
-            "horizontal_direction": h_direction,
-            "vertical_direction": v_direction,
+            "horizontal_direction": h_direction.value,
+            "vertical_direction": v_direction.value,
             "sequence_index": self.current_sequence_index - 1,
         }
 

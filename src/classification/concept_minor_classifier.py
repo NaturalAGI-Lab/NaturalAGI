@@ -1,5 +1,6 @@
 import logging
 import copy
+import math
 import networkx as nx
 from services.pre_processing.critical_point_preprocessor import (
     CriticalPointPreprocessor,
@@ -117,32 +118,43 @@ class ConceptMinorClassifier:
                     DirectionVisitor(image_graph),
                 ],
             ).analyze()
-            preprocessed_image_graph, _ = (
+            preprocessed_image_graph, preprocessed_concept_graph = (
                 self.critical_point_preprocessor.preprocess_graphs(
                     inference_graph=image_graph,
                     concept_graph=concept_graph,
                 )
             )
             similarity = GraphEditDistanceComparator.compare_graphs_ged(
-                image_graph=image_graph,
-                concept_graph=concept_graph,
+                image_graph=preprocessed_image_graph,
+                concept_graph=preprocessed_concept_graph,
                 concept_name=concept_id,
                 ged_timeout=self.ged_timeout,
             )
+
+            concept_complexity = self.graph_complexity_service.get_default_graph_complexity(
+                concept_graph
+            )
+            image_complexity = self.graph_complexity_service.get_default_graph_complexity(
+                image_graph
+            )
+
+            # Weight similarity by concept coverage: how much of the image's
+            # structure the concept explains. Simpler concepts that match a small
+            # substructure of a complex image get penalized.
+            coverage = min(concept_complexity / max(image_complexity, 1), 1.0)
+            adjusted_similarity = round(similarity * math.sqrt(coverage), 2)
+
             logging.info(
-                f"Similarity between image and concept {concept_id}: {similarity}"
+                f"Similarity between image and concept {concept_id}: {adjusted_similarity} "
+                f"(raw_ged_similarity={similarity}, coverage={coverage:.2f})"
             )
             return ClassificationResult(
                 concept_id=concept_id,
                 is_minor=True,
-                message=f"Similarity between image and concept {concept_id}: {similarity}",
-                similarity=similarity,
-                concept_complexity=self.graph_complexity_service.get_default_graph_complexity(
-                    concept_graph
-                ),
-                image_complexity=self.graph_complexity_service.get_default_graph_complexity(
-                    image_graph
-                ),
+                message=f"Similarity between image and concept {concept_id}: {adjusted_similarity}",
+                similarity=adjusted_similarity,
+                concept_complexity=concept_complexity,
+                image_complexity=image_complexity,
             )
         except Exception as e:
             logging.warning(
