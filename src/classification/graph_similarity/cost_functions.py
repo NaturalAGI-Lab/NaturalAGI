@@ -12,17 +12,11 @@ class NodeCost(enum.Enum):
     IMPOSSIBLE = 100.0
 
 features = [
-    "segments",
     "normalized_x",
     "normalized_y",
     "horizontal_direction",
     "vertical_direction",
-    # "quadrant"
-    # "angle_with_ox",
-    # "angle",
-    # "quadrant_change_count",
-    # "intersection_points_count",
-    # "endpoints_count",
+    "cycle_count",
 ]
 
 

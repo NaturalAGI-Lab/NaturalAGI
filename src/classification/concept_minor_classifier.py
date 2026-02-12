@@ -142,7 +142,7 @@ class ConceptMinorClassifier:
             # structure the concept explains. Simpler concepts that match a small
             # substructure of a complex image get penalized.
             coverage = min(concept_complexity / max(image_complexity, 1), 1.0)
-            adjusted_similarity = round(similarity * math.sqrt(coverage), 2)
+            adjusted_similarity = round(similarity * (coverage ** 0.25), 4)
 
             logging.info(
                 f"Similarity between image and concept {concept_id}: {adjusted_similarity} "
