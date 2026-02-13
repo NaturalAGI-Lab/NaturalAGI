@@ -3,7 +3,7 @@ from typing import Tuple
 
 from neo4j import ManagedTransaction
 from .base_analyzer import BaseAnalyzer
-from common.models import ContourDevelopment
+from common.model import ContourDevelopment
 
 
 class MonotonyAnalyzer(BaseAnalyzer):
@@ -57,4 +57,4 @@ class MonotonyAnalyzer(BaseAnalyzer):
             WHERE n:Point or n:Vector
             SET n.monotony = $result
         """
-        mx.run(query, session_id=session_id, result=result.name)
+        mx.run(query, session_id=session_id, result=result.value)

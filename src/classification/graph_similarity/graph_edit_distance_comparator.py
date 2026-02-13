@@ -138,7 +138,7 @@ class GraphEditDistanceComparator:
             # Convert GED to similarity score (inverse and normalize)
             max_possible_cost = max(len(image_graph) + len(concept_graph), 1)
             similarity = 1.0 - (cost / max_possible_cost)
-            similarity = round(similarity, 2)
+            similarity = round(similarity, 4)
             logging.info(
                 f"GED: {cost}, max_possible_cost: {max_possible_cost}, similarity: {similarity}"
             )

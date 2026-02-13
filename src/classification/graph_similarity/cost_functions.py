@@ -12,17 +12,11 @@ class NodeCost(enum.Enum):
     IMPOSSIBLE = 100.0
 
 features = [
-    "segments",
     "normalized_x",
     "normalized_y",
     "horizontal_direction",
     "vertical_direction",
-    # "quadrant"
-    # "angle_with_ox",
-    # "angle",
-    # "quadrant_change_count",
-    # "intersection_points_count",
-    # "endpoints_count",
+    "cycle_count",
 ]
 
 
@@ -176,6 +170,12 @@ def _calculate_property_similarity_cost(
 
         elif _is_list(concept_value) and _is_list(image_value):
             return _calculate_list_similarity_cost(concept_value, image_value)
+
+        elif _is_number(concept_value) and isinstance(image_value, enum.Enum):
+            return _calculate_number_similarity_cost(concept_value, image_value.value)
+
+        elif isinstance(concept_value, enum.Enum) and _is_number(image_value):
+            return _calculate_number_similarity_cost(concept_value.value, image_value)
 
         elif _is_string(concept_value) and isinstance(image_value, enum.Enum):
             return _calculate_string_similarity_cost(concept_value, image_value.value)

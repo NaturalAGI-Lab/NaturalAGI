@@ -1,7 +1,7 @@
 import logging
 from neo4j import ManagedTransaction
 from .base_analyzer import BaseAnalyzer
-from common.models import ContourType
+from common.model import ContourType
 
 
 class ContourTypeAnalyzer(BaseAnalyzer):
@@ -40,4 +40,4 @@ class ContourTypeAnalyzer(BaseAnalyzer):
             WHERE n:Point or n:Vector
             SET n.contour_type = $result
         """
-        mx.run(query, session_id=session_id, result=result.name)
+        mx.run(query, session_id=session_id, result=result.value)

@@ -22,7 +22,7 @@ spec:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
       - "pip install numpy pydantic-settings kafka-python rdp scikit-image networkx ypstruct opencv-python skan msgpack"
-      - "pip install --upgrade natural-agi-common==0.1.36"
+      - "pip install --upgrade natural-agi-common==0.1.39"
   triggers:
     kafka-trigger:
       kind: kafka-cluster

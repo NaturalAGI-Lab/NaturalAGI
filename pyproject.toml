@@ -1,6 +1,6 @@
 [project]
 name = "natural-agi"
-version = "0.1.0"
+version = "0.1.39"
 description = "Components of reduction neural networks concept"
 authors = [
     {name = "koboh", email = "konstboh@gmail.com"},
@@ -37,6 +37,7 @@ dev = [
     "seaborn>=0.13.0",
     "python-dotenv>=1.0.0",
     "bibtexparser>=1.4.0",
+    "pyvis>=0.3.0",
 ]
 ml = [
     "torch>=2.0.0",
@@ -61,4 +62,5 @@ dev = [
     "seaborn>=0.13.0",
     "python-dotenv>=1.0.0",
     "bibtexparser>=1.4.0",
+    "pyvis>=0.3.0",
 ]

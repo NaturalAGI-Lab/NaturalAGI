@@ -59,10 +59,11 @@ USE_ENERGY_MINIMIZATION ?= true
 
 lib:
 	@echo -e "${BLUE}Building common library...${NC}"
-	@python setup.py sdist bdist_wheel
+	@rm -rf dist build *.egg-info
+	@python -m build
 	@pip install twine
 	@twine upload dist/* --verbose
-	@rm -rf dist
+	@rm -rf dist build *.egg-info
 	@echo -e "${GREEN}Library built and uploaded.${NC}"
 	@pip install --upgrade natural-agi-common
 	@echo -e "${GREEN}Library installed.${NC}"

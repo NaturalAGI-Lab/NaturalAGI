@@ -2,6 +2,8 @@ import logging
 from typing import Any, List, Tuple, Set, FrozenSet, Dict
 import networkx as nx
 import collections
+import numpy as np
+from scipy.optimize import linear_sum_assignment
 from common.critical_point import CriticalPointType
 from common.graph_utils import GraphUtils
 from src.node_similarity_calculator import NodeSimilarityCalculator
@@ -365,37 +367,55 @@ class SyncedTraversalGenerator:
                 f"Matching remaining critical points of type {cp_type}: {len(unmatched_concept_points)} concept points, {len(unmatched_image_points)} image points"
             )
 
-            # Calculate similarity matrix between unmatched points
-            similarity_matrix = self.similarity_calculator.calculate_similarity_matrix(
-                G_c, G_i, unmatched_concept_points, unmatched_image_points
-            )
+            # Calculate distance matrix between unmatched points using Euclidean distance
+            # This provides better spatial matching than averaging coordinate similarities
+            distance_matrix = []
+            for concept_cp in unmatched_concept_points:
+                row = []
+                for image_cp in unmatched_image_points:
+                    # Extract coordinates from both nodes
+                    concept_data = G_c.nodes[concept_cp]
+                    image_data = G_i.nodes[image_cp]
 
-            # Match points greedily based on highest similarity
-            while unmatched_concept_points and unmatched_image_points:
-                # Find the highest similarity score
-                max_similarity = -1
-                best_match = None
+                    # Get normalized coordinates (handle both range and scalar values)
+                    concept_x = concept_data.get('normalized_x', {})
+                    concept_y = concept_data.get('normalized_y', {})
+                    image_x = image_data.get('normalized_x', 0)
+                    image_y = image_data.get('normalized_y', 0)
 
-                for i, concept_cp in enumerate(unmatched_concept_points):
-                    for j, image_cp in enumerate(unmatched_image_points):
-                        if similarity_matrix[i][j] > max_similarity:
-                            max_similarity = similarity_matrix[i][j]
-                            best_match = (concept_cp, image_cp, i, j)
+                    # Extract center values from ranges, or use scalar
+                    if isinstance(concept_x, dict) and 'center' in concept_x:
+                        concept_x = concept_x['center']
+                    if isinstance(concept_y, dict) and 'center' in concept_y:
+                        concept_y = concept_y['center']
 
-                # If we found a match with reasonable similarity
-                if best_match:
-                    concept_cp, image_cp, _, _ = best_match
-                    critical_point_mapping[concept_cp] = image_cp
+                    # Calculate Euclidean distance
+                    euclidean_dist = np.sqrt((concept_x - image_x)**2 + (concept_y - image_y)**2)
+                    row.append(euclidean_dist)
+                distance_matrix.append(row)
 
-                    # Remove from our local lists too
-                    unmatched_concept_points.remove(concept_cp)
-                    unmatched_image_points.remove(image_cp)
+            # Convert distance matrix to similarity (invert distance)
+            # Normalize by max possible distance (sqrt(2) for normalized coords in [-1, 1])
+            max_distance = np.sqrt(2 * (2**2))  # sqrt(8) ≈ 2.83
+            similarity_matrix = 1.0 - (np.array(distance_matrix) / max_distance)
 
-                    self.logger.debug(
-                        f"Matched critical points based on similarity ({max_similarity:.2f}): {concept_cp} -> {image_cp}"
-                    )
-                else:
-                    # No more good matches found
-                    break
+            # Convert similarity to cost matrix (higher similarity = lower cost)
+            # Hungarian algorithm minimizes cost, so we negate similarity
+            cost_matrix = -similarity_matrix
+
+            # Use Hungarian algorithm for optimal matching
+            row_ind, col_ind = linear_sum_assignment(cost_matrix)
+
+            # Create mappings from the optimal assignment
+            for i, j in zip(row_ind, col_ind):
+                concept_cp = unmatched_concept_points[i]
+                image_cp = unmatched_image_points[j]
+                similarity = similarity_matrix[i, j]
+
+                critical_point_mapping[concept_cp] = image_cp
+
+                self.logger.debug(
+                    f"Matched critical points of type {cp_type} based on optimal assignment (similarity={similarity:.2f}): {concept_cp} -> {image_cp}"
+                )
 
         return critical_point_mapping
