@@ -312,7 +312,16 @@ class StartPointPicker:
                 CriticalPointType.INTERSECTION_POINT.value,
             ]
 
-        # Find the closest point of the appropriate type
+        # Use projection onto centroid direction to find the most extreme
+        # endpoint in the centroid's direction, rather than the closest by
+        # Euclidean distance. This avoids selecting branch endpoints that
+        # happen to sit closer to the centroid than true curve endpoints.
+        centroid_norm = np.linalg.norm(centroid)
+        if centroid_norm > 0:
+            centroid_direction = centroid / centroid_norm
+        else:
+            centroid_direction = np.array([0.0, 0.0])
+
         candidates = []
 
         for node_id, data in graph.nodes(data=True):
@@ -323,21 +332,18 @@ class StartPointPicker:
             if norm_x is None or norm_y is None:
                 continue
 
-            # Check if node has any of the appropriate labels for this structure type
             if any(label in appropriate_labels for label in node_labels):
-                # Calculate distance to centroid
                 node_coords = np.array([norm_x, norm_y])
-                distance = np.linalg.norm(node_coords - centroid)
-                candidates.append((node_id, distance))
+                projection = np.dot(node_coords, centroid_direction)
+                candidates.append((node_id, projection))
 
-        # Sort by distance (closest first)
-        candidates.sort(key=lambda x: x[1])
+        # Sort by projection descending (most extreme in centroid direction first)
+        candidates.sort(key=lambda x: x[1], reverse=True)
 
-        # Return the closest appropriate point
         if candidates:
             return candidates[0][0]
 
-        # Fallback: just find the closest critical point of any type
+        # Fallback: find the most extreme critical point of any type
         fallback_candidates = []
         for node_id, data in graph.nodes(data=True):
             node_labels = data.get("labels", [])
@@ -346,10 +352,10 @@ class StartPointPicker:
                 norm_y = data.get("normalized_y")
                 if norm_x is not None and norm_y is not None:
                     node_coords = np.array([norm_x, norm_y])
-                    distance = np.linalg.norm(node_coords - centroid)
-                    fallback_candidates.append((node_id, distance))
+                    projection = np.dot(node_coords, centroid_direction)
+                    fallback_candidates.append((node_id, projection))
 
-        fallback_candidates.sort(key=lambda x: x[1])
+        fallback_candidates.sort(key=lambda x: x[1], reverse=True)
         if fallback_candidates:
             print(
                 f"Warning: No points with appropriate labels found. Using any critical point."
