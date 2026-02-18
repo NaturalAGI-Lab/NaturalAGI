@@ -114,9 +114,15 @@ class CriticalPointConceptService:
 
             # Find the intersection graph between current concept and new image
             try:
-                concept_graph = self.graph_minor_finder.find_max_common_minor(
+                result_graph = self.graph_minor_finder.find_max_common_minor(
                     copy.deepcopy(concept_old), copy.deepcopy(image_graph)
                 )
+                if len(result_graph.nodes) == 0:
+                    self.logger.warning(
+                        f"Skipping image {image_id}: common minor is empty, keeping previous concept"
+                    )
+                else:
+                    concept_graph = result_graph
             except Exception:
                 # Log full stack trace for easier debugging
                 error_occurred = True

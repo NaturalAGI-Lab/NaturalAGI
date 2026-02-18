@@ -159,16 +159,17 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
 
                 if start_c == end_c and start_i == end_i:
                     self.logger.info(
-                        f"Self-loop detected at ({start_c},{start_i}). Finding cycle paths."
+                        f"Self-loop detected at ({start_c},{start_i}). Finding all cycles."
                     )
-                    cycle_paths_c = list(nx.find_cycle(concept_graph, start_c, end_c))
-                    cycle_paths_i = list(nx.find_cycle(image_graph, start_i, end_i))
+                    all_cycles_c = nx.cycle_basis(concept_graph, root=start_c)
+                    all_cycles_i = nx.cycle_basis(image_graph, root=start_i)
 
-                    if not cycle_paths_c or not cycle_paths_i:
-                        self.logger.warning("No cycle paths found")
+                    concept_paths = [c for c in all_cycles_c if start_c in c]
+                    image_paths = [c for c in all_cycles_i if start_i in c]
+
+                    if not concept_paths or not image_paths:
+                        self.logger.warning("No cycle paths found through intersection")
                         continue
-                    concept_paths = [[edge[0] for edge in cycle_paths_c]]
-                    image_paths = [[edge[0] for edge in cycle_paths_i]]
                 else:
                     concept_paths = list(
                         nx.all_simple_paths(concept_graph, start_c, end_c)
