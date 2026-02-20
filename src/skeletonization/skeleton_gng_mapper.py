@@ -95,14 +95,25 @@ class SkeletonGNGMapper:
     def skeletonize(self, image, threshold):
         binary = self.binary_image(image, threshold)
         skeleton = skeletonize(binary)
-        MIN_BRANCH_LEN = 7  # pixels; adjust to taste
         sk = Skeleton(skeleton, source_image=binary)
         summary = summarize(sk, separator="_")  # use '_' for nicer column names
 
-        # junction-to-endpoint branches shorter than MIN_BRANCH_LEN
+        # Adaptive pruning: remove branches shorter than X% of total skeleton length
+        PRUNE_PERCENT = 0.08  # 5% of total skeleton length
+        MIN_ABSOLUTE = 5  # minimum threshold in pixels (safety floor)
+
+        total_length = summary["branch_distance"].sum()
+        adaptive_threshold = max(total_length * PRUNE_PERCENT, MIN_ABSOLUTE)
+
+        self.logger.debug(
+            f"Adaptive pruning: total_length={total_length:.1f}, "
+            f"threshold={adaptive_threshold:.1f}px ({PRUNE_PERCENT*100}%)"
+        )
+
+        # junction-to-endpoint branches shorter than adaptive threshold
         short_branches = summary[
             (summary.branch_type == 1)  # 1 = junction → endpoint
-            & (summary.branch_distance < MIN_BRANCH_LEN)
+            & (summary.branch_distance < adaptive_threshold)
         ].index  # <- the row index *is* the branch id
 
         sk = sk.prune_paths(short_branches)  # same as delete_paths(...) in ≤0.11
