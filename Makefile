@@ -259,6 +259,8 @@ dep_classification:
 	@echo -e "${GREEN}Classification deployed.${NC}"
 
 dep_all: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification
+	@echo -e "${BLUE}Pruning dangling Docker images...${NC}"
+	@docker image prune -f
 	@echo -e "${GREEN}All functions deployed.${NC}"
 
 # Update the existing deploy target to use dep_all

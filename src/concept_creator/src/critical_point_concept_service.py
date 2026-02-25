@@ -2,7 +2,6 @@ import logging
 import networkx as nx
 from typing import Dict, Optional
 import uuid
-import traceback
 import copy
 
 import numpy as np
@@ -79,8 +78,7 @@ class CriticalPointConceptService:
             for image_id, graph in image_graphs.items()
         }
         steps_debug = []
-        error_occurred = False
-        error_message = None
+        skipped_images = []
 
         if not image_ids:
             raise ValueError(f"No images found for session {session_id}")
@@ -124,42 +122,57 @@ class CriticalPointConceptService:
                 else:
                     concept_graph = result_graph
             except Exception:
-                # Log full stack trace for easier debugging
-                error_occurred = True
-                error_message = traceback.format_exc()
-                self.logger.exception("Error finding max common minor", exc_info=True)
-            finally:
+                self.logger.exception(
+                    "Error finding max common minor for image %s, skipping", image_id
+                )
+                skipped_images.append(image_id)
+                self.repository.remove_image_data(image_id)
                 steps_debug.append(
                     ConceptFormationStep(
                         current_concept=concept_old,
                         current_image=image_graph,
                         current_image_id=image_id,
                         current_step=i,
-                        current_step_description=f"Processing image {i}/{len(image_ids)}: {image_id}",
-                        resulted_concept=None if error_occurred else concept_graph,
+                        current_step_description=f"SKIPPED image {i}/{len(image_ids)}: {image_id}",
+                        resulted_concept=concept_graph,
                     )
                 )
+                continue
 
-            if error_occurred:
-                break
-
+            steps_debug.append(
+                ConceptFormationStep(
+                    current_concept=concept_old,
+                    current_image=image_graph,
+                    current_image_id=image_id,
+                    current_step=i,
+                    current_step_description=f"Processing image {i}/{len(image_ids)}: {image_id}",
+                    resulted_concept=concept_graph,
+                )
+            )
             self.logger.info(
                 f"Updated concept after image {image_id}. Nodes: {len(concept_graph.nodes)}"
             )
 
+        if skipped_images:
+            self.logger.warning(
+                "Skipped %d images during concept formation: %s",
+                len(skipped_images),
+                skipped_images,
+            )
+
         # Save the final concept
-        if not debug_mode and not error_occurred:
+        if not debug_mode:
             self.repository.save_concept(concept_id, concept_graph)
             for image_id in image_ids:
-                self.repository.remove_image_data(image_id)
+                if image_id not in skipped_images:
+                    self.repository.remove_image_data(image_id)
 
         return ConceptResult(
             concept_id,
             concept_graph,
             image_graphs,
             steps_debug,
-            is_error=error_occurred,
-            error_message=error_message,
+            skipped_images=skipped_images or None,
         )
 
     def _determine_start_point(
@@ -198,7 +211,10 @@ class CriticalPointConceptService:
             self.logger.error("Could not determine start point characteristic")
             raise ValueError("Could not determine start point characteristic")
 
-        start_point_modifier = StartPointModifier(start_point_characteristic)
+        start_point_modifier = StartPointModifier(
+            start_point_characteristic,
+            expected_start_degree=start_point_picker.expected_start_degree,
+        )
         for image_id, image_graph in image_graphs.items():
             self.logger.info(f"Determining start point for image {image_id}")
             start_point = start_point_picker.get_start_point_for_graph(image_graph)
