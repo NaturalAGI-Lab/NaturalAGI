@@ -240,30 +240,11 @@ class ClassificationOrchestrator:
 
         # Sort by raw similarity descending
         filtered_results.sort(
-            key=lambda x: (x.similarity or 0, x.concept_complexity or 0),
+            key=lambda x: (x.similarity or 0),
             reverse=True,
         )
 
-        # Tiebreaker: among concepts within threshold of the best,
-        # prefer higher coverage (concept_complexity / image_complexity)
-        threshold = 0.05
-        best_sim = filtered_results[0].similarity or 0
-
-        tied = [r for r in filtered_results if (best_sim - (r.similarity or 0)) <= threshold]
-        rest = [r for r in filtered_results if (best_sim - (r.similarity or 0)) > threshold]
-
-        if len(tied) > 1:
-            tied.sort(
-                key=lambda x: (x.concept_complexity or 0),
-                reverse=True,
-            )
-            logging.info(
-                f"Tiebreaker applied: {len(tied)} concepts within {threshold} of best "
-                f"({best_sim:.4f}), winner: {tied[0].concept_id} "
-                f"(complexity={tied[0].concept_complexity})"
-            )
-
-        sorted_results = tied + rest
+        sorted_results = filtered_results
 
         logging.info(
             f"Found {len(sorted_results)} matching concepts out of {len(results)} processed"

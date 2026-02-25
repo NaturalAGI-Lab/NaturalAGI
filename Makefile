@@ -13,10 +13,17 @@ POST_PROCESSING_SCRIPT := run_post_processing.sh
 CONCEPT_ID ?= default_concept
 IMAGE_ID ?= default_image
 
-# Number of replicas for each service
-REPLICAS_SKEL ?= 3
-REPLICAS_CONTOUR ?= 3
-REPLICAS_CLASSIFICATION ?= 3
+# Number of instances for each service
+INSTANCES_SKEL ?= 3
+INSTANCES_CONTOUR ?= 2
+INSTANCES_CLASSIFICATION ?= 3
+
+# Kafka partition counts per topic
+PARTITIONS_CONNECTOR ?= 8
+PARTITIONS_SKEL ?= 8
+PARTITIONS_CONTOUR ?= 4
+PARTITIONS_CLASSIFICATION ?= 1
+PARTITIONS_DLQ ?= 1
 
 # Colors for output
 BLUE := \033[0;34m
@@ -52,7 +59,7 @@ SUBCLASS ?= default_subclass
 USE_ENERGY_MINIMIZATION ?= true
 
 # Phony targets
-.PHONY: all deploy train post_process classify send_random_image clean help start_services create_kafka_topics list_kafka_topics send_to_connector
+.PHONY: all deploy train post_process classify send_random_image clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
 
 # Kafka-related targets
 .PHONY: create_kafka_topics list_kafka_topics
@@ -72,6 +79,7 @@ start_services:
 	@echo -e "${BLUE}Starting Docker services...${NC}"
 	@HOST_IP=${HOST_IP} docker compose up -d
 	@echo -e "${GREEN}Docker services started.${NC}"
+	@make create_neo4j_indexes
 
 create_kafka_topics:
 	@echo -e "${BLUE}Waiting for Kafka to be ready...${NC}"
@@ -80,17 +88,55 @@ create_kafka_topics:
 		sleep 5; \
 	done
 	@echo -e "${BLUE}Creating Kafka topics...${NC}"
-	@for topic in $(TOPICS); do \
-		echo "Creating topic: $$topic"; \
-		docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "$$topic" --partitions 1 --replication-factor 1 || echo "Failed to create topic: $$topic"; \
-	done
+	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CONNECTOR_KAFKA_TOPIC}" --partitions $(PARTITIONS_CONNECTOR) --replication-factor 1 || echo "Failed to create topic: ${CONNECTOR_KAFKA_TOPIC}"
+	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${SKELETONIZATION_KAFKA_TOPIC}" --partitions $(PARTITIONS_SKEL) --replication-factor 1 || echo "Failed to create topic: ${SKELETONIZATION_KAFKA_TOPIC}"
+	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CONTOUR_ANALYSIS_KAFKA_TOPIC}" --partitions $(PARTITIONS_CONTOUR) --replication-factor 1 || echo "Failed to create topic: ${CONTOUR_ANALYSIS_KAFKA_TOPIC}"
+	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CLASSIFICATION_KAFKA_TOPIC}" --partitions $(PARTITIONS_CLASSIFICATION) --replication-factor 1 || echo "Failed to create topic: ${CLASSIFICATION_KAFKA_TOPIC}"
+	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${DLQ_TOPIC}" --partitions $(PARTITIONS_DLQ) --replication-factor 1 || echo "Failed to create topic: ${DLQ_TOPIC}"
+	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${LINE_DETECTOR_TOPIC}" --partitions 1 --replication-factor 1 || echo "Failed to create topic: ${LINE_DETECTOR_TOPIC}"
+	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${ANGLE_POINT_DETECTOR_KAFKA_TOPIC}" --partitions 1 --replication-factor 1 || echo "Failed to create topic: ${ANGLE_POINT_DETECTOR_KAFKA_TOPIC}"
 	@echo -e "${GREEN}Kafka topics creation attempt completed.${NC}"
+
+recreate_kafka_topics:
+	@echo -e "${BLUE}Deleting all Kafka topics...${NC}"
+	@for topic in $(TOPICS); do \
+		echo "Deleting topic: $$topic"; \
+		docker compose exec -T kafka kafka-topics --delete --bootstrap-server ${HOST_IP}:29092 --topic "$$topic" 2>/dev/null || echo "  Topic $$topic does not exist"; \
+	done
+	@echo -e "${BLUE}Waiting for topics to be fully deleted...${NC}"
+	@for topic in $(TOPICS); do \
+		while docker compose exec -T kafka kafka-topics --list --bootstrap-server ${HOST_IP}:29092 2>/dev/null | grep -qx "$$topic"; do \
+			sleep 1; \
+		done; \
+	done
+	@echo -e "${BLUE}Resetting consumer group offsets...${NC}"
+	@for group in skeletonization-group contour-analysis-group classification-group; do \
+		echo "  Deleting group $$group..."; \
+		docker compose exec -T kafka kafka-consumer-groups --bootstrap-server ${HOST_IP}:29092 --group "$$group" --delete 2>/dev/null || true; \
+	done
+	@make create_kafka_topics
 
 list_kafka_topics:
 	@echo -e "${BLUE}Listing Kafka topics...${NC}"
 	@docker compose exec kafka kafka-topics --list --bootstrap-server ${HOST_IP}:29092 || echo -e "${RED}Failed to list Kafka topics${NC}"
 	@echo -e "${BLUE}Expected topics:${NC}"
 	@for topic in $(TOPICS); do echo "  $$topic"; done
+
+create_neo4j_indexes:
+	@echo -e "${BLUE}Waiting for Neo4j to be ready...${NC}"
+	@until docker compose exec -T server1 cypher-shell -u neo4j -p ${NEO4J_PASS} "RETURN 1" &> /dev/null; do \
+		echo "Waiting for Neo4j Bolt to be ready..."; \
+		sleep 3; \
+	done
+	@echo -e "${BLUE}Creating Neo4j property indexes...${NC}"
+	@docker compose exec -T server1 cypher-shell -u neo4j -p ${NEO4J_PASS} < scripts/neo4j_indexes.cypher
+	@echo -e "${GREEN}Neo4j indexes created.${NC}"
+
+list_neo4j_indexes:
+	@echo -e "${BLUE}Listing Neo4j indexes...${NC}"
+	@docker compose exec -T server1 cypher-shell -u neo4j -p ${NEO4J_PASS} \
+		"SHOW INDEXES YIELD name, type, labelsOrTypes, properties, state" \
+		|| echo -e "${RED}Failed to list Neo4j indexes${NC}"
 
 # Main targets
 all: start_services create_kafka_topics deploy train
@@ -132,6 +178,8 @@ help:
 	@echo "  deploy             - Deploy Nuclio functions"
 	@echo "  create_kafka_topics - Create Kafka topics"
 	@echo "  list_kafka_topics  - List existing Kafka topics"
+	@echo "  create_neo4j_indexes - Create property indexes in Neo4j (idempotent)"
+	@echo "  list_neo4j_indexes   - List existing Neo4j indexes"
 	@echo "  train              - Run training script"
 	@echo "  post_process       - Run post-processing script"
 	@echo "  send_random_image  - Send a random image to the line detector"
@@ -141,12 +189,12 @@ help:
 	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
 	@echo ""
 	@echo "Configuration options:"
-	@echo "  REPLICAS_SKEL      - Number of replicas for skeletonization service (default: 3)"
-	@echo "  REPLICAS_CONTOUR   - Number of replicas for contour analysis service (default: 3)"
-	@echo "  REPLICAS_CLASSIFICATION - Number of replicas for classification service (default: 3)"
-	@echo "  USE_ENERGY_MINIMIZATION - Use energy minimization for concept formation (default: false)"
+	@echo "  INSTANCES_SKEL      - Number of skeletonization instances (default: 3)"
+	@echo "  INSTANCES_CONTOUR   - Number of contour analysis instances (default: 2)"
+	@echo "  INSTANCES_CLASSIFICATION - Number of classification instances (default: 3)"
+	@echo "  USE_ENERGY_MINIMIZATION - Use energy minimization for concept formation (default: true)"
 	@echo ""
-	@echo "Example: make deploy REPLICAS_SKEL=5 REPLICAS_CONTOUR=3 REPLICAS_CLASSIFICATION=2 USE_ENERGY_MINIMIZATION=true"
+	@echo "Example: make deploy INSTANCES_SKEL=4 INSTANCES_CONTOUR=2 INSTANCES_CLASSIFICATION=3"
 
 train_prepared_samples_%:
 	$(eval subclass := $(filter-out $@,$(MAKECMDGOALS)))
@@ -179,7 +227,40 @@ send_to_connector:
 	@echo -e "\n${GREEN}Data sent to connector successfully.${NC}"
 
 # Function deployment targets
-.PHONY: dep_conn dep_skel dep_contour dep_post dep_concept dep_all
+.PHONY: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification dep_all
+.PHONY: undep_skel undep_contour undep_classification undep_all
+
+# Common env/trigger fragments
+SKEL_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
+	-e DLQ_TOPIC="${DLQ_TOPIC}" \
+	-e SIMPLIFICATION_EPSILON=5 \
+	-e SKELETONIZATION_THRESHOLD=160 \
+	-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}"
+
+SKEL_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}'
+
+CONTOUR_ENV = -e NEO4J_DSN=bolt://${HOST_IP}:7687 \
+	-e NEO4J_USER=neo4j \
+	-e NEO4J_PASS=${NEO4J_PASS} \
+	-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
+	-e DLQ_TOPIC="${DLQ_TOPIC}" \
+	-e KAFKA_TOPIC="${CONTOUR_ANALYSIS_KAFKA_TOPIC}"
+
+CONTOUR_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${SKELETONIZATION_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "contour-analysis-group"}}}'
+
+CLASS_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
+	-e DLQ_TOPIC="${DLQ_TOPIC}" \
+	-e KAFKA_TOPIC="${CLASSIFICATION_KAFKA_TOPIC}" \
+	-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
+	-e NEO4J_USER=neo4j \
+	-e NEO4J_PASS=${NEO4J_PASS} \
+	-e GED_TIMEOUT=15
+
+CLASS_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${CONTOUR_ANALYSIS_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "classification-group"}}}'
+
+SKEL_IMAGE = nuclio/processor-skeletonization:latest
+CONTOUR_IMAGE = nuclio/processor-contour-analysis:latest
+CLASS_IMAGE = nuclio/processor-classification:latest
 
 dep_conn:
 	@echo -e "${BLUE}Deploying connector...${NC}"
@@ -192,34 +273,40 @@ dep_conn:
 	@echo -e "${GREEN}Connector deployed.${NC}"
 
 dep_skel:
-	@echo -e "${BLUE}Deploying skeletonization...${NC}"
-	@nuctl deploy --path src/skeletonization \
+	@echo -e "${BLUE}Deploying skeletonization ($(INSTANCES_SKEL) instances)...${NC}"
+	@echo -e "${BLUE}  Instance 1 (building image)...${NC}"
+	@nuctl deploy skeletonization --path src/skeletonization \
 		--platform local \
-		--replicas $(REPLICAS_SKEL) \
-		--platform-config '{"attributes": {"platformConfig": {"kind": "local", "attributes": {"enableReplicasOnLocal": true}}}}' \
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
-		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
-		-e DLQ_TOPIC="${DLQ_TOPIC}" \
-		-e SIMPLIFICATION_EPSILON=5 \
-		-e SKELETONIZATION_THRESHOLD=160 \
-		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}' \
-		-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}"
-	@echo -e "${GREEN}Skeletonization deployed.${NC}"
+		$(SKEL_ENV) $(SKEL_TRIGGERS)
+	@for i in $$(seq 2 $(INSTANCES_SKEL)); do \
+		echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
+		nuctl deploy skeletonization-$$i \
+			--run-image $(SKEL_IMAGE) \
+			--runtime python:3.9 \
+			--handler nuclio_handler:handler \
+			--platform local \
+			--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
+			$(SKEL_ENV) $(SKEL_TRIGGERS); \
+	done
+	@echo -e "${GREEN}Skeletonization deployed ($(INSTANCES_SKEL) instances).${NC}"
 
 dep_contour:
-	@echo -e "${BLUE}Deploying contour analysis...${NC}"
-	@nuctl deploy --path src/contour_analysis \
+	@echo -e "${BLUE}Deploying contour analysis ($(INSTANCES_CONTOUR) instances)...${NC}"
+	@echo -e "${BLUE}  Instance 1 (building image)...${NC}"
+	@nuctl deploy contour-analysis --path src/contour_analysis \
 		--platform local \
-		--replicas $(REPLICAS_CONTOUR) \
-		--platform-config '{"attributes": {"platformConfig": {"kind": "local", "attributes": {"enableReplicasOnLocal": true}}}}' \
-		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${SKELETONIZATION_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "contour-analysis-group"}}}' \
-		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
-		-e NEO4J_USER=neo4j \
-		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
-		-e DLQ_TOPIC="${DLQ_TOPIC}" \
-		-e KAFKA_TOPIC="${CONTOUR_ANALYSIS_KAFKA_TOPIC}" \
-		-e NEO4J_PASS=${NEO4J_PASS}
-	@echo -e "${GREEN}Contour analysis deployed.${NC}"
+		$(CONTOUR_ENV) $(CONTOUR_TRIGGERS)
+	@for i in $$(seq 2 $(INSTANCES_CONTOUR)); do \
+		echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
+		nuctl deploy contour-analysis-$$i \
+			--run-image $(CONTOUR_IMAGE) \
+			--runtime python:3.9 \
+			--handler nuclio_handler:handler \
+			--platform local \
+			$(CONTOUR_ENV) $(CONTOUR_TRIGGERS); \
+	done
+	@echo -e "${GREEN}Contour analysis deployed ($(INSTANCES_CONTOUR) instances).${NC}"
 
 dep_post:
 	@echo -e "${BLUE}Deploying post processing...${NC}"
@@ -241,22 +328,54 @@ dep_concept:
 	@echo -e "${GREEN}Concept creator deployed.${NC}"
 
 dep_classification:
-	@echo -e "${BLUE}Deploying classification...${NC}"
-	@export NUCLIO_TEST_MODE=true
-	@nuctl deploy --path src/classification \
+	@echo -e "${BLUE}Deploying classification ($(INSTANCES_CLASSIFICATION) instances)...${NC}"
+	@echo -e "${BLUE}  Instance 1 (building image)...${NC}"
+	@nuctl deploy classification --path src/classification \
 		--platform local \
-		--replicas $(REPLICAS_CLASSIFICATION) \
 		--volume "${LOCAL_MODEL_PATH}:${NUCLIO_STORAGE}" \
-		--platform-config '{"attributes": {"platformConfig": {"kind": "local", "attributes": {"enableReplicasOnLocal": true}}}}' \
-		--triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONTOUR_ANALYSIS_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "classification-group"}}}' \
-		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
-		-e DLQ_TOPIC="${DLQ_TOPIC}" \
-		-e KAFKA_TOPIC="${CLASSIFICATION_KAFKA_TOPIC}" \
-		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
-		-e NEO4J_USER=neo4j \
-		-e NEO4J_PASS=${NEO4J_PASS} \
-		-e GED_TIMEOUT=15
-	@echo -e "${GREEN}Classification deployed.${NC}"
+		$(CLASS_ENV) $(CLASS_TRIGGERS)
+	@for i in $$(seq 2 $(INSTANCES_CLASSIFICATION)); do \
+		echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
+		nuctl deploy classification-$$i \
+			--run-image $(CLASS_IMAGE) \
+			--runtime python:3.9 \
+			--handler nuclio_handler:handler \
+			--platform local \
+			--volume "${LOCAL_MODEL_PATH}:${NUCLIO_STORAGE}" \
+			$(CLASS_ENV) $(CLASS_TRIGGERS); \
+	done
+	@echo -e "${GREEN}Classification deployed ($(INSTANCES_CLASSIFICATION) instances).${NC}"
+
+# Cleanup targets for multi-instance functions
+undep_skel:
+	@echo -e "${BLUE}Removing skeletonization instances...${NC}"
+	@nuctl delete function skeletonization --platform local 2>/dev/null || true
+	@for i in $$(seq 2 10); do \
+		nuctl delete function skeletonization-$$i --platform local 2>/dev/null || true; \
+	done
+	@echo -e "${GREEN}Skeletonization instances removed.${NC}"
+
+undep_contour:
+	@echo -e "${BLUE}Removing contour analysis instances...${NC}"
+	@nuctl delete function contour-analysis --platform local 2>/dev/null || true
+	@for i in $$(seq 2 10); do \
+		nuctl delete function contour-analysis-$$i --platform local 2>/dev/null || true; \
+	done
+	@echo -e "${GREEN}Contour analysis instances removed.${NC}"
+
+undep_classification:
+	@echo -e "${BLUE}Removing classification instances...${NC}"
+	@nuctl delete function classification --platform local 2>/dev/null || true
+	@for i in $$(seq 2 10); do \
+		nuctl delete function classification-$$i --platform local 2>/dev/null || true; \
+	done
+	@echo -e "${GREEN}Classification instances removed.${NC}"
+
+undep_all: undep_skel undep_contour undep_classification
+	@nuctl delete function connector --platform local 2>/dev/null || true
+	@nuctl delete function post-processing --platform local 2>/dev/null || true
+	@nuctl delete function concept-creator --platform local 2>/dev/null || true
+	@echo -e "${GREEN}All functions removed.${NC}"
 
 dep_all: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification
 	@echo -e "${BLUE}Pruning dangling Docker images...${NC}"

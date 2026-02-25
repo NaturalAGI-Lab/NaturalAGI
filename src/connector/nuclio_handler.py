@@ -30,6 +30,12 @@ def init_context(context):
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
     setattr(context.user_data, "kafka_bootstrap_servers", settings.kafka_bootstrap_servers)
 
+    producer = KafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
+    setattr(context.user_data, "kafka_producer", producer)
+
 
 def http_handler(context, event):
     """Handles HTTP requests"""
@@ -71,7 +77,8 @@ def http_handler(context, event):
                 send_to_kafka(context, operation, parameters)
             else:
                 raise ValueError(f"Invalid dataset_path: {dataset_path}")
-            
+
+            context.user_data.kafka_producer.flush()
             return context.Response(
                 body="Images processed and sent to Kafka",
                 headers={},
@@ -111,21 +118,15 @@ def http_handler(context, event):
         )
 
 def send_to_kafka(context, operation: str, parameters: dict):
-    producer = KafkaProducer(
-        bootstrap_servers=context.user_data.kafka_bootstrap_servers.split(","),
-        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-    )
     kafka_message = {
         "operation": operation,
         "parameters": parameters
     }
-    
-    producer.send(
+    context.user_data.kafka_producer.send(
         context.user_data.kafka_topic,
         value=kafka_message
     )
     context.logger.info_with(f"Image path sent to Kafka: {parameters['image_path']}", handler=HANDLER_NAME)
-    producer.close()
 
 def handler(context, event):
     """Nuclio main handler"""

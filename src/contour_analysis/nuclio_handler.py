@@ -72,6 +72,12 @@ def init_context(context):
     setattr(context.user_data, "settings", settings)
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
 
+    producer = KafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
+    setattr(context.user_data, "kafka_producer", producer)
+
 
 def kafka_handler(context, event):
     """Handles Kafka messages"""
@@ -117,16 +123,10 @@ def kafka_handler(context, event):
             image_id, session_id
         )
 
-        producer = KafkaProducer(
-            bootstrap_servers=context.user_data.settings.kafka_bootstrap_servers.split(
-                ","
-            ),
-            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        )
         profiling["contour_analysis_time_ms"] = (
             time.time_ns() - start_time
         ) / 1_000_000
-        producer.send(
+        context.user_data.kafka_producer.send(
             context.user_data.kafka_topic,
             value={
                 "operation": operation,
@@ -153,8 +153,6 @@ def kafka_handler(context, event):
             error_details=error_json,
         )
         send_to_dlq(context, input_data, error_info)
-    finally:
-        producer.close()
 
 
 def handler(context, event):

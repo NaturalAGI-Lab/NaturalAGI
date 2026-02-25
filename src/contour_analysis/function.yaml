@@ -7,8 +7,6 @@ spec:
   handler: "nuclio_handler:handler"
   runtime: "python:3.9"
   resources: {}
-  minReplicas: 1
-  maxReplicas: 1
   env:
     - name: MERGE_THRESHOLD
       value: "10.0"

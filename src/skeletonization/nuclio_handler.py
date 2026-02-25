@@ -29,12 +29,17 @@ def init_context(context):
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
 
+    producer = KafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
+    setattr(context.user_data, "kafka_producer", producer)
+
 
 def kafka_handler(context, event):
     """Handles Kafka messages"""
 
     data = json.loads(event.body)
-    producer = None
 
     try:
         start_time = time.time_ns()
@@ -82,33 +87,20 @@ def kafka_handler(context, event):
             time.time_ns() - start_time
         ) / 1_000_000
 
-        producer = KafkaProducer(
-            bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
-            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        )
-        producer.send(context.user_data.kafka_topic, value=data)
+        context.user_data.kafka_producer.send(context.user_data.kafka_topic, value=data)
 
     except Exception as e:
         context.logger.warn_with(f"Error: {e}", handler=HANDLER_NAME)
         traceback.print_exc()
 
-        settings = Settings()
         dlq_model = DLQModel(
             source=HANDLER_NAME,
             error={"error": str(e), "traceback": traceback.format_exc()},
             value=data,
         )
-
-        dlq_producer = KafkaProducer(
-            bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
-            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+        context.user_data.kafka_producer.send(
+            context.user_data.dlq_topic, value=dataclasses.asdict(dlq_model)
         )
-        dlq_producer.send(context.user_data.dlq_topic, value=dataclasses.asdict(dlq_model))
-        dlq_producer.close()
-
-    finally:
-        if producer:
-            producer.close()
 
 
 def handler(context, event):
