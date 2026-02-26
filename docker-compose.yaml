@@ -27,6 +27,9 @@ services:
     environment:
       - NEO4J_AUTH
       - NEO4J_PLUGINS=["graph-data-science", "apoc"]
+      - NEO4J_server_memory_heap_initial__size=1500m
+      - NEO4J_server_memory_heap_max__size=1500m
+      - NEO4J_server_memory_pagecache_size=1500m
       - NEO4J_dbms_memory_transaction_total_max=512M
       - NEO4J_dbms.security.procedures.unrestricted=apoc.*
 
@@ -43,8 +46,8 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '3.0'
-          memory: 2048M
+          cpus: '4.0'
+          memory: 4096M
 
   nuclio-dashboard:
 
@@ -96,7 +99,7 @@ services:
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
       KAFKA_DELETE_TOPIC_ENABLE: 'true'
     networks:
       - neo4j-internal

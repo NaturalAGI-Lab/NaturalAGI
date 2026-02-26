@@ -32,12 +32,18 @@ def init_context(context):
         context: Nuclio context
     """
 
-    context.logger.debug_with(
-        f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
-    )
     settings = Settings()
+    context.logger.debug_with(
+        f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
+    )
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
+
+    producer = KafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
+    setattr(context.user_data, "kafka_producer", producer)
 
     # Initialize multiprocessing settings
     try:
@@ -100,11 +106,6 @@ def kafka_handler(context, event):
         use_multiprocessing=use_multiprocessing,
     )
 
-    producer = KafkaProducer(
-        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
-        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-    )
-
     try:
         if not image_id:
             raise ValueError("image_id must be provided in the request body")
@@ -118,7 +119,7 @@ def kafka_handler(context, event):
         )
 
         profiling["classification_time_ms"] = (time.time_ns() - start_time) / 1_000_000
-        producer.send(
+        context.user_data.kafka_producer.send(
             context.user_data.kafka_topic,
             value={
                 "status": "success",
@@ -136,7 +137,7 @@ def kafka_handler(context, event):
         context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)
         logging.error(f"Error: {e}", exc_info=True, stack_info=True)
 
-        producer.send(
+        context.user_data.kafka_producer.send(
             context.user_data.dlq_topic,
             value={"error": str(e), "source": HANDLER_NAME, "value": data},
         )
@@ -150,7 +151,6 @@ def kafka_handler(context, event):
             )
             image_repository.remove_image_nodes(image_id)
             image_repository.close()
-        producer.close()
 
 
 def handler(context, event):

@@ -1,19 +1,25 @@
 import logging
-from typing import Set
+from typing import Optional, Set
 import numpy as np
 import networkx as nx
 
 from common.critical_point import CriticalPointType
-from common.graph_utils import GraphUtils
 
 
 class StartPointService:
+    TYPE_PRIORITY = {
+        CriticalPointType.INTERSECTION_POINT.value: 2,
+        CriticalPointType.CORNER_POINT.value: 1,
+    }
+
     def __init__(
         self,
         centroid: np.ndarray,
+        expected_start_degree: Optional[int] = None,
         logger: logging.Logger = logging.getLogger(__name__),
     ):
         self.centroid = centroid
+        self.expected_start_degree = expected_start_degree
         self.logger = logger
         self.critical_point_labels: Set[str] = {
             CriticalPointType.END_POINT.value,
@@ -23,38 +29,30 @@ class StartPointService:
         }
 
     def get_start_point(self, graph: nx.Graph) -> int:
-        """
-        Returns the node_id of the most appropriate starting point in the given graph.
-        Simply finds the closest point of the appropriate type to the characteristic centroid.
-
-        For open contours: Uses StartPoint or EndPoint
-        For closed contours: Uses CornerPoint or IntersectionPoint
-
-        Args:
-            graph: The graph to analyze
-
-        Returns:
-            The node_id of the selected start point or None if no suitable point found
-        """
         if self.centroid is None:
             raise ValueError("Centroid not set.")
 
         structure_type = self._determine_structure_type(graph)
 
-        # Define appropriate labels based on structure type
         appropriate_labels = []
         if structure_type == "Open":
             appropriate_labels = [
                 CriticalPointType.END_POINT.value,
                 CriticalPointType.START_POINT.value,
             ]
-        else:  # Closed structure
+        else:
             appropriate_labels = [
                 CriticalPointType.CORNER_POINT.value,
                 CriticalPointType.INTERSECTION_POINT.value,
             ]
 
-        # Find the closest point of the appropriate type
+        centroid_norm = np.linalg.norm(self.centroid)
+        if centroid_norm > 0:
+            centroid_direction = self.centroid / centroid_norm
+        else:
+            centroid_direction = np.array([0.0, 0.0])
+
+        node_type_map = {}
         candidates = []
 
         for node_id, data in graph.nodes(data=True):
@@ -65,32 +63,50 @@ class StartPointService:
             if norm_x is None or norm_y is None:
                 continue
 
-            # Check if node has any of the appropriate labels for this structure type
             if any(label in appropriate_labels for label in node_labels):
-                # Calculate distance to centroid
                 node_coords = np.array([norm_x, norm_y])
-                distance = np.linalg.norm(node_coords - self.centroid)
-                candidates.append((node_id, distance))
+                projection = np.dot(node_coords, centroid_direction)
+                node_type = None
+                for label_type in [
+                    CriticalPointType.INTERSECTION_POINT.value,
+                    CriticalPointType.CORNER_POINT.value,
+                    CriticalPointType.END_POINT.value,
+                    CriticalPointType.START_POINT.value,
+                ]:
+                    if label_type in node_labels:
+                        node_type = label_type
+                        break
+                node_type_map[node_id] = node_type
+                candidates.append((node_id, projection))
 
-        # Sort by distance (closest first)
-        candidates.sort(key=lambda x: x[1])
+        if structure_type == "Closed":
+            exp_deg = self.expected_start_degree
+            candidates.sort(
+                key=lambda x: (
+                    self.TYPE_PRIORITY.get(node_type_map.get(x[0]), 0),
+                    -abs(graph.degree(x[0]) - exp_deg) if exp_deg is not None else 0,
+                    x[1],
+                ),
+                reverse=True,
+            )
+        else:
+            candidates.sort(key=lambda x: x[1], reverse=True)
 
-        # Return the closest appropriate point
         if candidates:
             return candidates[0][0]
 
-        # Fallback: just find the closest critical point of any type
         fallback_candidates = []
         for node_id, data in graph.nodes(data=True):
-            if GraphUtils.is_critical_point(data):
+            node_labels = data.get("labels", [])
+            if any(label in self.critical_point_labels for label in node_labels):
                 norm_x = data.get("normalized_x")
                 norm_y = data.get("normalized_y")
                 if norm_x is not None and norm_y is not None:
                     node_coords = np.array([norm_x, norm_y])
-                    distance = np.linalg.norm(node_coords - self.centroid)
-                    fallback_candidates.append((node_id, distance))
+                    projection = np.dot(node_coords, centroid_direction)
+                    fallback_candidates.append((node_id, projection))
 
-        fallback_candidates.sort(key=lambda x: x[1])
+        fallback_candidates.sort(key=lambda x: x[1], reverse=True)
         if fallback_candidates:
             self.logger.warning(
                 "No points with appropriate labels found. Using any critical point."

@@ -78,6 +78,9 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
         len_concept_endpoints = len(concept_endpoints)
         len_image_endpoints = len(image_endpoints)
 
+        len_concept_endpoints = len(concept_endpoints)
+        len_image_endpoints = len(image_endpoints)
+
         if len_concept_endpoints == len_image_endpoints:
             self.logger.info(
                 "Concept and image have the same number of endpoints. No reduction needed."

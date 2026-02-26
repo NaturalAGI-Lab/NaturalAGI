@@ -36,11 +36,11 @@ class Neo4jToNetworkx:
         WITH n, labels(n) as node_labels, properties(n) as node_properties
         OPTIONAL MATCH (n)-[r]-(m {concept_id: $concept_id})
         WITH n, node_labels, node_properties, r, m
-        RETURN n.id as node_id, 
-               node_labels, 
+        RETURN n.uuid as node_id,
+               node_labels,
                node_properties,
-               type(r) as rel_type, 
-               m.id as target_id
+               type(r) as rel_type,
+               m.uuid as target_id
         """
         result = session.run(query, concept_id=concept_id)
         return Neo4jToNetworkx._build_networkx_graph(result, concept_id)

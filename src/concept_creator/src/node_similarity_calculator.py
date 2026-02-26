@@ -25,6 +25,7 @@ class NodeSimilarityCalculator:
         "y2",
         "length",
         "centroid",
+        "expected_start_degree",
     ]
 
     def __init__(self, logger=None):

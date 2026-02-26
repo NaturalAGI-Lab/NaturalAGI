@@ -53,8 +53,13 @@ class MonotonyAnalyzer(BaseAnalyzer):
         # """
         # mx.run(query, session_id=session_id, result=result.name, image_id=image_id)
         query = """
-            MATCH (n {session_id: $session_id})
-            WHERE n:Point or n:Vector
-            SET n.monotony = $result
+            CALL {
+                MATCH (n:Point {session_id: $session_id})
+                SET n.monotony = $result
+            }
+            CALL {
+                MATCH (n:Vector {session_id: $session_id})
+                SET n.monotony = $result
+            }
         """
         mx.run(query, session_id=session_id, result=result.value)

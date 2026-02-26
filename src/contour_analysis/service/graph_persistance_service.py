@@ -54,8 +54,10 @@ class GraphPersistenceService:
 
             tx.run(
                 """
-                MATCH (a:Point {id: $u, image_id: $image_id}), (b:Point {id: $v, image_id: $image_id})
-                CREATE (v:Vector {
+                MATCH (a:Point {id: $u, image_id: $image_id})
+                WITH a
+                MATCH (b:Point {id: $v, image_id: $image_id})
+                CREATE (vec:Vector {
                     id: $vector_id,
                     x1: a.x, y1: a.y,
                     x2: b.x, y2: b.y,
@@ -63,8 +65,8 @@ class GraphPersistenceService:
                     image_id: $image_id,
                     session_id: $session_id
                 })
-                MERGE (a)-[:CONNECTED_TO]->(v)
-                MERGE (v)<-[:CONNECTED_TO]-(b)            
+                CREATE (a)-[:CONNECTED_TO]->(vec)
+                CREATE (vec)<-[:CONNECTED_TO]-(b)
                 """,
                 u=u,
                 v=v,

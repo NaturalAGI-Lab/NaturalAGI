@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Set
 import numpy as np
 import networkx as nx
 import logging
@@ -29,7 +29,9 @@ class AbstractReductionStrategy(ABC):
         image_graph: nx.Graph,
         concept_nodes: List[Any],
         image_nodes: List[Any],
+        properties_to_compare: Set[str] = None,
     ) -> np.ndarray:
+        props = properties_to_compare if properties_to_compare is not None else self.properties_to_compare
         similarity_matrix = np.zeros((len(concept_nodes), len(image_nodes)))
         for i, concept_node in enumerate(concept_nodes):
             for j, image_node in enumerate(image_nodes):
@@ -38,7 +40,7 @@ class AbstractReductionStrategy(ABC):
                     image_graph,
                     concept_node,
                     image_node,
-                    self.properties_to_compare,
+                    props,
                 )
                 self.logger.debug(f"Similarity between {concept_node} and {image_node}: {similarity}")
                 similarity_matrix[i, j] = similarity

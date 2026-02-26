@@ -23,27 +23,31 @@ class ConceptRepository:
     def get_all_concept_ids(self) -> List[str]:
         with self.driver.session() as session:
             concept_query = """
-            MATCH (c)
-            WITH DISTINCT c.concept_id AS concept_id
-            RETURN concept_id
+            MATCH (c:Point)
+            WHERE c.concept_id IS NOT NULL
+            RETURN DISTINCT c.concept_id AS concept_id
             """
             return [
                 record["concept_id"]
                 for record in session.run(concept_query)
-                if record["concept_id"] is not None
             ]
 
     def get_concept_graph(self, concept_id: str) -> nx.Graph:
         query = """
-            MATCH (n {concept_id: $concept_id})
-            WHERE n:Point OR n:Vector OR n:StartPoint
+            CALL {
+                MATCH (n:Point {concept_id: $concept_id}) RETURN n
+                UNION ALL
+                MATCH (n:Vector {concept_id: $concept_id}) RETURN n
+                UNION ALL
+                MATCH (n:StartPoint {concept_id: $concept_id}) RETURN n
+            }
             WITH n, labels(n) AS node_labels, properties(n) as node_props
             OPTIONAL MATCH (n)-[r]-(m {concept_id: $concept_id})
             WITH n, node_labels, r, m, node_props
-            RETURN elementId(n) AS node_id, 
+            RETURN elementId(n) AS node_id,
                 node_labels,
                 node_props,
-                type(r) AS rel_type, 
+                type(r) AS rel_type,
                 elementId(r) AS rel_id,
                 elementId(m) AS target_id
         """
