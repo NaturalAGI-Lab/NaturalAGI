@@ -147,7 +147,7 @@ create_concept:
 	$(eval CC_SESSION_ID := $(word 1,$(SESSION_ARGS)))
 	$(eval CC_CONCEPT_NAME := $(word 2,$(SESSION_ARGS)))
 	@echo -e "${BLUE}Creating concept (session_id=$(CC_SESSION_ID), concept_name=$(CC_CONCEPT_NAME))...${NC}"
-	@nuctl invoke concept-creator --platform local --method POST \
+	@nuctl invoke concept_creator --platform local --method POST \
 		--body '{"session_id": "$(CC_SESSION_ID)", "concept_name": "$(CC_CONCEPT_NAME)", "concept_id": "$(CC_SESSION_ID)"}'
 	@echo -e "${GREEN}Concept creation invoked.${NC}"
 

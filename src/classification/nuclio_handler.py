@@ -1,13 +1,13 @@
 """Generic Nuclio Handler Template"""
 
 import logging
-import multiprocessing as mp
 import time
 from kafka import KafkaProducer
 import json
 from pydantic_settings import BaseSettings
 from common import ClassificationParams
 from classification_orchestrator import ClassificationOrchestrator
+from repository.concept_repository import ConceptRepository
 from repository.image_repository import ImageRepository
 
 HANDLER_NAME = "classification"
@@ -45,16 +45,19 @@ def init_context(context):
     )
     setattr(context.user_data, "kafka_producer", producer)
 
-    # Initialize multiprocessing settings
-    try:
-        mp.set_start_method("fork", force=True)
-        context.logger.info_with(
-            "Multiprocessing start method set to 'fork'", handler=HANDLER_NAME
-        )
-    except Exception as e:
-        context.logger.warning_with(
-            f"Could not set multiprocessing start method: {e}", handler=HANDLER_NAME
-        )
+    concept_repo = ConceptRepository(
+        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
+    )
+    concept_ids = concept_repo.get_all_concept_ids()
+    concept_graphs = {
+        cid: concept_repo.get_concept_graph(cid) for cid in concept_ids
+    }
+    concept_repo.close()
+    setattr(context.user_data, "concept_graphs", concept_graphs)
+    context.logger.info_with(
+        f"Cached {len(concept_graphs)} concept graphs at startup",
+        handler=HANDLER_NAME,
+    )
 
 
 def kafka_handler(context, event):
@@ -92,26 +95,20 @@ def kafka_handler(context, event):
         f"Classification params: {classification_params}", handler=HANDLER_NAME
     )
 
-    # Get orchestrator parameters
-    use_multiprocessing = data["parameters"].get("use_multiprocessing", True)
-    max_workers_override = data["parameters"].get("max_workers")
-
-    # Create the classification orchestrator
     orchestrator = ClassificationOrchestrator(
         neo4j_dsn=settings.neo4j_dsn,
         neo4j_user=settings.neo4j_user,
         neo4j_pass=settings.neo4j_pass,
         ged_timeout=classification_params.ged_timeout,
-        max_workers_override=max_workers_override,
-        use_multiprocessing=use_multiprocessing,
     )
 
     try:
         if not image_id:
             raise ValueError("image_id must be provided in the request body")
 
-        # Perform classification using orchestrator
-        comparison_results = orchestrator.classify_image(image_id)
+        comparison_results = orchestrator.classify_image(
+            image_id, context.user_data.concept_graphs
+        )
 
         context.logger.info_with(
             f"Classification results: {len(comparison_results)} matches found",
