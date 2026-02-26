@@ -20,7 +20,7 @@ INSTANCES_CLASSIFICATION ?= 3
 # Kafka partition counts per topic
 PARTITIONS_CONNECTOR ?= 8
 PARTITIONS_SKEL ?= 8
-PARTITIONS_CONTOUR ?= 4
+PARTITIONS_CONTOUR ?= 6
 PARTITIONS_CLASSIFICATION ?= 1
 PARTITIONS_DLQ ?= 1
 
@@ -140,6 +140,17 @@ list_neo4j_indexes:
 # Main targets
 all: start_services create_kafka_topics deploy train
 
+# Create concept: invoke concept_creator with session_id and concept_name
+# Usage: make create_concept <session_id> <concept_name>
+create_concept:
+	$(eval SESSION_ARGS := $(wordlist 2,3,$(MAKECMDGOALS)))
+	$(eval CC_SESSION_ID := $(word 1,$(SESSION_ARGS)))
+	$(eval CC_CONCEPT_NAME := $(word 2,$(SESSION_ARGS)))
+	@echo -e "${BLUE}Creating concept (session_id=$(CC_SESSION_ID), concept_name=$(CC_CONCEPT_NAME))...${NC}"
+	@nuctl invoke concept-creator --platform local --method POST \
+		--body '{"session_id": "$(CC_SESSION_ID)", "concept_name": "$(CC_CONCEPT_NAME)", "concept_id": "$(CC_SESSION_ID)"}'
+	@echo -e "${GREEN}Concept creation invoked.${NC}"
+
 # Special target to allow passing arguments to other targets
 %:
 	@:
@@ -168,6 +179,7 @@ help:
 	@echo "  create_neo4j_indexes - Create property indexes in Neo4j (idempotent)"
 	@echo "  list_neo4j_indexes   - List existing Neo4j indexes"
 	@echo "  train              - Run training script"
+	@echo "  create_concept     - Invoke concept creator (usage: make create_concept <session_id> <concept_name>)"
 	@echo "  send_random_image  - Send a random image to the line detector"
 	@echo "  classify           - Run classification with given concept_id and image_id"
 	@echo "  clean              - Clean up training results"
