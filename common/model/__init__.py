@@ -13,8 +13,6 @@ from .point import (
     StartPoint,
 )
 from .vector import Vector
-from .half_plane import HalfPlane
-from .length_comparison_result import LengthComparisonResult
 
 __all__ = [
     "DLQModel",
@@ -28,6 +26,4 @@ __all__ = [
     "EndPoint",
     "StartPoint",
     "Vector",
-    "HalfPlane",
-    "LengthComparisonResult",
 ]

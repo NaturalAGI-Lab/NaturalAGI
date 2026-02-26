@@ -178,3 +178,8 @@ tests/archive/*
 
 # Claude Code MCP config (contains credentials)
 .mcp.json
+
+/plans
+/researches
+
+.claude/

@@ -60,21 +60,9 @@ class AngleVisitor(Visitor):
         query = """
             MATCH (p:Point {id: $point_id})
             UNWIND $angles as angle
-            MERGE (a:PointAngle:Feature {value: angle, session_id: $session_id})
-            ON CREATE SET a.samples = [$image_id], p.angle = angle
-            ON MATCH SET a.samples = CASE
-                WHEN NOT $image_id IN a.samples THEN a.samples + $image_id
-                ELSE a.samples
-            END, p.angle = angle
-            MERGE (p)-[:HAS_ANGLE]->(a)
+            SET p.angle = angle
         """
-        tx.run(
-            query,
-            point_id=result["point_id"],
-            angles=result["angles"],
-            session_id=session_id,
-            image_id=image_id,
-        )
+        tx.run(query, point_id=result["point_id"], angles=result["angles"])
 
     def _save_line_angle(
         self,
@@ -85,21 +73,12 @@ class AngleVisitor(Visitor):
     ) -> None:
         query = """
         MATCH (l:Vector {id: $line_id})
-        MERGE (a:LineAngle:Feature {line_id: $line_id, session_id: $session_id})
-        ON CREATE SET a.angle_with_ox = $angle_with_ox, a.samples = [$image_id], l.angle_with_ox = $angle_with_ox
-        ON MATCH SET a.angle_with_ox = $angle_with_ox, 
-                     a.samples = CASE
-                         WHEN NOT $image_id IN a.samples THEN a.samples + $image_id
-                         ELSE a.samples
-                     END, l.angle_with_ox = $angle_with_ox
-        MERGE (l)-[:HAS_ANGLE]->(a)
+        SET l.angle_with_ox = $angle_with_ox
         """
         tx.run(
             query,
             line_id=result["line_id"],
             angle_with_ox=result["angle_with_ox"],
-            session_id=session_id,
-            image_id=image_id,
         )
 
     def get_results(self) -> Dict[str, Any]:

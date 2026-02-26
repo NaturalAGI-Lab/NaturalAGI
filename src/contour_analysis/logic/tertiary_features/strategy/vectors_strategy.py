@@ -8,10 +8,7 @@ from logic.tertiary_features.strategy.tertiary_feature_extraction_strategy impor
 
 
 class VectorsStrategy(TertiaryFeatureStrategy):
-    """Strategy for extracting vectors.
-    This class counts the number of vectors per sample (image) and creates a new node
-    named VectorsCount:Feature. With the count as a property.
-    """
+    """Strategy for counting vectors per sample and storing count as a node property."""
 
     def __init__(self, session_id: str):
         self.session_id = session_id

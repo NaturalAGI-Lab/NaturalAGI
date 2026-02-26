@@ -33,8 +33,8 @@ spec:
     commands:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
-      - "pip install numpy==1.26.4 requests pydantic-settings neo4j kafka-python networkx scipy grakel torch torch-geometric msgpack"
-      - "pip install --upgrade natural-agi-common==0.1.39"
+      - "pip install numpy==1.26.4 requests pydantic-settings neo4j kafka-python networkx scipy msgpack"
+      - "pip install --upgrade natural-agi-common==0.1.42"
   triggers:
     default-http:
       kind: "http"

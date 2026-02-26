@@ -7,7 +7,6 @@ export
 
 # Variables
 SHELL := /bin/bash
-POST_PROCESSING_SCRIPT := run_post_processing.sh
 
 # Default values for classification
 CONCEPT_ID ?= default_concept
@@ -41,13 +40,11 @@ LOCAL_MODEL_PATH=./src/training/latest_model
 
 DLQ_TOPIC = dlq-topic
 CONNECTOR_KAFKA_TOPIC = connector-output-topic
-LINE_DETECTOR_TOPIC = line-detector-output-topic
-ANGLE_POINT_DETECTOR_KAFKA_TOPIC = angle-point-detector-output-topic
 SKELETONIZATION_KAFKA_TOPIC = skeletonization-output-topic
 CONTOUR_ANALYSIS_KAFKA_TOPIC = contour-analysis-output-topic
 CLASSIFICATION_KAFKA_TOPIC = classification-output-topic
 
-TOPICS = $(CONNECTOR_KAFKA_TOPIC) $(LINE_DETECTOR_TOPIC) $(ANGLE_POINT_DETECTOR_KAFKA_TOPIC) $(DLQ_TOPIC) $(SKELETONIZATION_KAFKA_TOPIC) $(CONTOUR_ANALYSIS_KAFKA_TOPIC) $(CLASSIFICATION_KAFKA_TOPIC)
+TOPICS = $(CONNECTOR_KAFKA_TOPIC) $(DLQ_TOPIC) $(SKELETONIZATION_KAFKA_TOPIC) $(CONTOUR_ANALYSIS_KAFKA_TOPIC) $(CLASSIFICATION_KAFKA_TOPIC)
 
 # Add these variables near the top of the Makefile, after other variable definitions
 OPERATION ?= train
@@ -59,20 +56,24 @@ SUBCLASS ?= default_subclass
 USE_ENERGY_MINIMIZATION ?= true
 
 # Phony targets
-.PHONY: all deploy train post_process classify send_random_image clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
+.PHONY: all deploy train classify send_random_image clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
 
 # Kafka-related targets
 .PHONY: create_kafka_topics list_kafka_topics
 
+VENV := natural-agi/bin
+PYTHON := $(VENV)/python
+PIP := $(VENV)/pip3
+
 lib:
 	@echo -e "${BLUE}Building common library...${NC}"
 	@rm -rf dist build *.egg-info
-	@python -m build
-	@pip install twine
-	@twine upload dist/* --verbose
+	@$(PYTHON) setup.py sdist bdist_wheel
+	@$(PIP) install twine
+	@$(VENV)/twine upload dist/* --verbose || { rm -rf dist build *.egg-info; exit 1; }
 	@rm -rf dist build *.egg-info
 	@echo -e "${GREEN}Library built and uploaded.${NC}"
-	@pip install --upgrade natural-agi-common
+	@$(PIP) install --upgrade natural-agi-common
 	@echo -e "${GREEN}Library installed.${NC}"
 
 start_services:
@@ -93,8 +94,6 @@ create_kafka_topics:
 	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CONTOUR_ANALYSIS_KAFKA_TOPIC}" --partitions $(PARTITIONS_CONTOUR) --replication-factor 1 || echo "Failed to create topic: ${CONTOUR_ANALYSIS_KAFKA_TOPIC}"
 	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CLASSIFICATION_KAFKA_TOPIC}" --partitions $(PARTITIONS_CLASSIFICATION) --replication-factor 1 || echo "Failed to create topic: ${CLASSIFICATION_KAFKA_TOPIC}"
 	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${DLQ_TOPIC}" --partitions $(PARTITIONS_DLQ) --replication-factor 1 || echo "Failed to create topic: ${DLQ_TOPIC}"
-	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${LINE_DETECTOR_TOPIC}" --partitions 1 --replication-factor 1 || echo "Failed to create topic: ${LINE_DETECTOR_TOPIC}"
-	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${ANGLE_POINT_DETECTOR_KAFKA_TOPIC}" --partitions 1 --replication-factor 1 || echo "Failed to create topic: ${ANGLE_POINT_DETECTOR_KAFKA_TOPIC}"
 	@echo -e "${GREEN}Kafka topics creation attempt completed.${NC}"
 
 recreate_kafka_topics:
@@ -141,18 +140,6 @@ list_neo4j_indexes:
 # Main targets
 all: start_services create_kafka_topics deploy train
 
-# Post-process target: Runs the post-processing script with provided arguments
-# Usage: make post_process <arg1> <arg2> ...
-# Example: make post_process 2b8ffbca-5dd1-419a-b689-0bb27fbbaa42 mnist-1
-post_process:
-	@echo -e "${BLUE}Running post-processing...${NC}"
-	@if sh $(POST_PROCESSING_SCRIPT) $(filter-out $@,$(MAKECMDGOALS)); then \
-		echo -e "${GREEN}Post-processing completed successfully.${NC}"; \
-	else \
-		echo -e "${RED}Post-processing failed.${NC}"; \
-		exit 1; \
-	fi
-
 # Special target to allow passing arguments to other targets
 %:
 	@:
@@ -174,14 +161,13 @@ clean:
 
 help:
 	@echo "Available targets:"
-	@echo "  all                - Deploy functions, create Kafka topics, run training, send data to connector, and post-process (default)"
+	@echo "  all                - Deploy functions, create Kafka topics, and run training (default)"
 	@echo "  deploy             - Deploy Nuclio functions"
 	@echo "  create_kafka_topics - Create Kafka topics"
 	@echo "  list_kafka_topics  - List existing Kafka topics"
 	@echo "  create_neo4j_indexes - Create property indexes in Neo4j (idempotent)"
 	@echo "  list_neo4j_indexes   - List existing Neo4j indexes"
 	@echo "  train              - Run training script"
-	@echo "  post_process       - Run post-processing script"
 	@echo "  send_random_image  - Send a random image to the line detector"
 	@echo "  classify           - Run classification with given concept_id and image_id"
 	@echo "  clean              - Clean up training results"
@@ -227,7 +213,7 @@ send_to_connector:
 	@echo -e "\n${GREEN}Data sent to connector successfully.${NC}"
 
 # Function deployment targets
-.PHONY: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification dep_all
+.PHONY: dep_conn dep_skel dep_contour dep_concept dep_classification dep_all
 .PHONY: undep_skel undep_contour undep_classification undep_all
 
 # Common env/trigger fragments
@@ -308,15 +294,6 @@ dep_contour:
 	done
 	@echo -e "${GREEN}Contour analysis deployed ($(INSTANCES_CONTOUR) instances).${NC}"
 
-dep_post:
-	@echo -e "${BLUE}Deploying post processing...${NC}"
-	@nuctl deploy --path src/post_processing \
-		--platform local \
-		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
-		-e NEO4J_USER=neo4j \
-		-e NEO4J_PASS=${NEO4J_PASS}
-	@echo -e "${GREEN}Post processing deployed.${NC}"
-
 dep_concept:
 	@echo -e "${BLUE}Deploying concept creator...${NC}"
 	@nuctl deploy --path src/concept_creator \
@@ -373,11 +350,10 @@ undep_classification:
 
 undep_all: undep_skel undep_contour undep_classification
 	@nuctl delete function connector --platform local 2>/dev/null || true
-	@nuctl delete function post-processing --platform local 2>/dev/null || true
 	@nuctl delete function concept-creator --platform local 2>/dev/null || true
 	@echo -e "${GREEN}All functions removed.${NC}"
 
-dep_all: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification
+dep_all: dep_conn dep_skel dep_contour dep_concept dep_classification
 	@echo -e "${BLUE}Pruning dangling Docker images...${NC}"
 	@docker image prune -f
 	@echo -e "${GREEN}All functions deployed.${NC}"

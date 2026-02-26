@@ -1,13 +1,13 @@
 [project]
-name = "natural-agi"
-version = "0.1.39"
+name = "natural-agi-common"
+version = "0.1.42"
 description = "Components of reduction neural networks concept"
 authors = [
     {name = "koboh", email = "konstboh@gmail.com"},
     {name = "nlapin", email = "nlapin.java@gmail.com"}
 ]
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.9"
 dependencies = [
     "neo4j>=5.13.0",
     "opencv-python>=4.8.1",
