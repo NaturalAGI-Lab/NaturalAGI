@@ -33,7 +33,7 @@ class QuadrantChangeStrategy(TertiaryFeatureStrategy):
         # Count quadrant changes
         query = """
             MATCH (quad_change:QuadrantChange {image_id: $image_id})
-            WITH COUNT(quad_change) AS count, collect(quad_change) AS quad_changes
+            WITH COUNT(quad_change) AS count, collect(elementId(quad_change)) AS quad_change_ids
             MERGE (quadrant_change_count:QuadrantChangeCount:Feature {
                 session_id: $session_id,
                 value: count
@@ -44,11 +44,18 @@ class QuadrantChangeStrategy(TertiaryFeatureStrategy):
                 THEN quadrant_change_count.samples + $image_id
                 ELSE quadrant_change_count.samples
             END
-            WITH count, quad_changes
-            MATCH (n)
-            WHERE n.image_id = $image_id
-            SET n.quadrant_change_count = count
-            RETURN count, [quad_change IN quad_changes | id(quad_change)] AS quad_change_ids
+            WITH count, quad_change_ids
+            CALL {
+                WITH count
+                MATCH (n:Point {image_id: $image_id})
+                SET n.quadrant_change_count = count
+            }
+            CALL {
+                WITH count
+                MATCH (n:Vector {image_id: $image_id})
+                SET n.quadrant_change_count = count
+            }
+            RETURN count, quad_change_ids
         """
         result = tx.run(query, image_id=image_id, session_id=self.session_id)
         result_data = result.single()
@@ -57,7 +64,7 @@ class QuadrantChangeStrategy(TertiaryFeatureStrategy):
         # Remove the quadrant changes after counting
         delete_query = """
             UNWIND $quad_change_ids AS quad_change_id
-            MATCH (quad_change) WHERE id(quad_change) = quad_change_id
+            MATCH (quad_change) WHERE elementId(quad_change) = quad_change_id
             DETACH DELETE quad_change
         """
         tx.run(delete_query, quad_change_ids=result_data["quad_change_ids"])
