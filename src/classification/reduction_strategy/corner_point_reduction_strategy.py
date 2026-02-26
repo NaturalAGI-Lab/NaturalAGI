@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple, List, Any, Dict, Set
+from typing import Tuple, List, Any
 
 import numpy as np
 import networkx as nx
@@ -7,8 +7,12 @@ from node_similarity_calculator import NodeSimilarityCalculator
 from common.graph_utils import GraphUtils
 from common.critical_point import CriticalPointType
 from services.synced_traversal_service import SyncedTraversalService
+from optimal_path_matcher import OptimalPathMatcher, PathCandidate
 
 from .abstract_strategy import AbstractReductionStrategy
+
+PROPERTIES_TO_COMPARE = set(["normalized_x", "normalized_y"])
+
 
 class CornerPointReductionStrategy(AbstractReductionStrategy):
     """
@@ -64,10 +68,8 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
     def _subpath_based_reduction(
         self, image_graph: nx.Graph, concept_graph: nx.Graph
     ) -> Tuple[nx.Graph, nx.Graph]:
-        """Reduces corner points based on matched subpaths between critical points."""
         self.logger.info("Starting subpath-based corner point reduction")
 
-        # Generate critical point matching between graphs
         sync_list = self.traversal_service.generate_synced_traversal(
             G_c=concept_graph, G_i=image_graph
         )
@@ -76,14 +78,58 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
             self.logger.warning("No synchronized subpaths found between graphs")
             return image_graph, concept_graph
 
-        # Process each subpath between matched critical points
+        segments_data = self._collect_segments_data(
+            concept_graph, image_graph, sync_list
+        )
+
+        if not segments_data:
+            self.logger.warning("No segments with paths found")
+            return image_graph, concept_graph
+
+        candidates = self._build_path_candidates(
+            concept_graph, image_graph, segments_data
+        )
+
+        matcher = OptimalPathMatcher()
+        matched = matcher.find_optimal_matches(candidates)
+
+        self.logger.info(f"Optimal matching found {len(matched)} path pairs")
+
+        for concept_path_tuple, image_path_tuple in matched.items():
+            concept_path = list(concept_path_tuple)
+            image_path = list(image_path_tuple)
+
+            concept_corner_points = self._get_corner_points_in_path(
+                concept_graph, concept_path
+            )
+            image_corner_points = self._get_corner_points_in_path(
+                image_graph, image_path
+            )
+
+            self._reduce_corner_points_in_subpath(
+                image_graph=image_graph,
+                concept_graph=concept_graph,
+                image_corner_points=image_corner_points,
+                concept_corner_points=concept_corner_points,
+            )
+
+        return image_graph, concept_graph
+
+    def _collect_segments_data(
+        self,
+        concept_graph: nx.Graph,
+        image_graph: nx.Graph,
+        sync_list: List,
+    ) -> List[Tuple[int, List[List[Any]], List[List[Any]]]]:
+        segments_data = []
+        segment_id = 0
+
         for subpath in sync_list:
-            if len(subpath) < 2:  # Need at least two critical points for a path
+            if len(subpath) < 2:
                 continue
 
             self.logger.info(f"Processing subpath: {subpath}")
 
-            # Process each segment between consecutive critical points
             for i in range(len(subpath) - 1):
                 start_c, end_c = subpath[i][0], subpath[i + 1][0]
                 start_i, end_i = subpath[i][1], subpath[i + 1][1]
@@ -94,101 +140,82 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
 
                 if start_c == end_c and start_i == end_i:
                     self.logger.info(
-                        f"Self-loop detected between: ({start_c},{start_i}) and ({end_c},{end_i}). Trying to find cycle paths."
+                        f"Self-loop detected at ({start_c},{start_i}). Finding all cycles."
                     )
-                    cycle_paths_c = list(nx.find_cycle(concept_graph, start_c, end_c))
-                    cycle_paths_i = list(nx.find_cycle(image_graph, start_i, end_i))
+                    all_cycles_c = nx.cycle_basis(concept_graph, root=start_c)
+                    all_cycles_i = nx.cycle_basis(image_graph, root=start_i)
 
-                    if not cycle_paths_c or not cycle_paths_i:
+                    concept_paths = [c for c in all_cycles_c if start_c in c]
+                    image_paths = [c for c in all_cycles_i if start_i in c]
+
+                    if not concept_paths or not image_paths:
                         self.logger.warning(
-                            f"No cycle paths found between critical points"
+                            "No cycle paths found through intersection"
                         )
                         continue
-                    concept_paths = [[edge[0] for edge in cycle_paths_c]]
-                    image_paths = [[edge[0] for edge in cycle_paths_i]]
                 else:
-                    # Get all paths between these critical points
                     concept_paths = list(
                         nx.all_simple_paths(concept_graph, start_c, end_c)
                     )
-                    image_paths = list(nx.all_simple_paths(image_graph, start_i, end_i))
+                    image_paths = list(
+                        nx.all_simple_paths(image_graph, start_i, end_i)
+                    )
 
                     if not concept_paths or not image_paths:
-                        self.logger.warning(f"No paths found between critical points")
+                        self.logger.warning(
+                            f"No paths found between critical points"
+                        )
                         continue
 
-                # Find best matching paths
-                best_concept_path, best_image_path = self._find_best_matching_paths(
-                    concept_graph=concept_graph,
-                    image_graph=image_graph,
-                    concept_paths=concept_paths,
-                    image_paths=image_paths,
-                )
+                segments_data.append((segment_id, concept_paths, image_paths))
+                segment_id += 1
 
-                # Extract corner points from these paths
-                concept_corner_points = self._get_corner_points_in_path(
-                    concept_graph, best_concept_path
-                )
-                image_corner_points = self._get_corner_points_in_path(
-                    image_graph, best_image_path
-                )
+        return segments_data
 
-                # Reduce excess corner points in the subpath with more corner points
-                self._reduce_corner_points_in_subpath(
-                    image_graph=image_graph,
-                    concept_graph=concept_graph,
-                    image_corner_points=image_corner_points,
-                    concept_corner_points=concept_corner_points,
-                )
-
-        return image_graph, concept_graph
-
-    def _find_best_matching_paths(
+    def _build_path_candidates(
         self,
         concept_graph: nx.Graph,
         image_graph: nx.Graph,
-        concept_paths: List[List[Any]],
-        image_paths: List[List[Any]],
-    ) -> Tuple[List[Any], List[Any]]:
-        """Find the best matching paths between two sets of paths using node similarity."""
-        best_score = -1
-        best_pair = (concept_paths[0], image_paths[0])  # Default to first paths
+        segments_data: List[Tuple[int, List[List[Any]], List[List[Any]]]],
+    ) -> List[PathCandidate]:
+        candidates = []
 
-        # Compare each path pair and find the one with highest similarity
-        for path_c in concept_paths:
-            for path_i in image_paths:
-                # Calculate similarity matrix between the paths
-                similarity_matrix = self.calculate_similarity_matrix(
-                    concept_graph=concept_graph,
-                    image_graph=image_graph,
-                    concept_nodes=path_c,
-                    image_nodes=path_i,
-                )
-
-                # Calculate overall path similarity score (average of maximum similarities per row)
-                path_score = self._calculate_path_similarity_score(similarity_matrix)
-
-                if path_score > best_score:
-                    best_score = path_score
-                    best_pair = (path_c, path_i)
-                    self.logger.debug(
-                        f"New best path pair found with score {best_score:.3f}"
+        for segment_id, concept_paths, image_paths in segments_data:
+            for path_c in concept_paths:
+                for path_i in image_paths:
+                    similarity_matrix = self.calculate_similarity_matrix(
+                        concept_graph,
+                        image_graph,
+                        path_c,
+                        path_i,
+                        properties_to_compare=PROPERTIES_TO_COMPARE,
+                    )
+                    similarity = self._calculate_path_similarity_score(
+                        similarity_matrix
+                    )
+                    candidates.append(
+                        PathCandidate(
+                            segment_id=segment_id,
+                            concept_path=tuple(path_c),
+                            image_path=tuple(path_i),
+                            similarity=similarity,
+                        )
                     )
 
-        self.logger.info(f"Best path pair found with score {best_score:.3f}")
-        return best_pair
+        return candidates
 
-    def _calculate_path_similarity_score(self, similarity_matrix: np.ndarray) -> float:
-        """Calculate path similarity score based on node similarity matrix."""
+    def _calculate_path_similarity_score(
+        self, similarity_matrix: np.ndarray
+    ) -> float:
         if similarity_matrix.size == 0:
             return 0.0
 
-        # Average the maximum similarities for each node
         max_similarities = np.max(similarity_matrix, axis=1)
         return float(np.mean(max_similarities))
 
-    def _get_corner_points_in_path(self, graph: nx.Graph, path: List[Any]) -> List[Any]:
-        """Extract corner points from a path."""
+    def _get_corner_points_in_path(
+        self, graph: nx.Graph, path: List[Any]
+    ) -> List[Any]:
         return [
             node
             for node in path
@@ -201,8 +228,7 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
         concept_graph: nx.Graph,
         image_corner_points: List[Any],
         concept_corner_points: List[Any],
-    ) -> Tuple[nx.Graph, nx.Graph]:
-        """Reduce excess corner points in the subpath with more corners."""
+    ) -> None:
         len_concept_corner_points = len(concept_corner_points)
         len_image_corner_points = len(image_corner_points)
 
@@ -214,21 +240,20 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
             self.logger.info(
                 "Concept and image have the same number of corner points in this subpath. No reduction needed."
             )
-            return image_graph, concept_graph
+            return
 
-        # Handle empty graph cases
         if not concept_corner_points and not image_corner_points:
             self.logger.info(
                 "No corner points found in either graph. Returning original graphs."
             )
-            return image_graph, concept_graph
+            return
 
         if not concept_corner_points and image_corner_points:
             self.logger.info(
                 "No corner points found in concept graph. Reducing all corner points in image graph."
             )
-            image_graph = self._apply_reduction(image_graph, image_corner_points)
-            return image_graph, concept_graph
+            self._apply_reduction(image_graph, image_corner_points)
+            return
 
         if concept_corner_points and not image_corner_points:
             raise ValueError("Concept has corner points but image does not.")
@@ -241,15 +266,12 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
             points_large = image_corner_points
             points_small = concept_corner_points
 
-        # Calculate similarity only between corner points of the two subpaths
         similarity_matrix = self.calculate_similarity_matrix(
             graph_large, graph_small, points_large, points_small
         )
 
-        # Calculate how many corner points to remove
         difference = abs(len_concept_corner_points - len_image_corner_points)
 
-        # Identify which corner points to remove
         points_to_remove = self._identify_corner_points_to_remove(
             similarity_matrix, points_large, difference
         )
@@ -258,41 +280,30 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
             self.logger.info(
                 f"Removing {len(points_to_remove)} corner points from image graph in subpath"
             )
-
-            # Apply the reduction
-            image_graph = self._apply_reduction(image_graph, points_to_remove)
+            self._apply_reduction(image_graph, points_to_remove)
 
     def _identify_corner_points_to_remove(
         self, similarity_matrix: np.ndarray, nodes: List[Any], difference: int
     ) -> List[Any]:
-        """Identify corner points to remove based on similarity scores."""
         if difference <= 0:
             return []
 
         if similarity_matrix.size == 0:
-            self.logger.error("Similarity matrix is empty. Raising error.", exc_info=True)
+            self.logger.error(
+                "Similarity matrix is empty. Raising error.", exc_info=True
+            )
             raise ValueError("Similarity matrix is empty.")
 
-        # Find the maximum similarity for each corner point in the larger set
         max_similarities_per_large_point = np.max(similarity_matrix, axis=1)
-
-        # Create a list of (index_in_large_list, max_similarity)
         indexed_similarities = list(enumerate(max_similarities_per_large_point))
-
-        # Sort by max_similarity in ascending order (lowest similarity first)
         indexed_similarities.sort(key=lambda x: x[1])
-
-        # Get the indices of the 'difference' points with the lowest similarity
         indices_to_remove = [idx for idx, sim in indexed_similarities[:difference]]
-
-        # Get the actual node IDs corresponding to these indices
         nodes_to_remove = [nodes[i] for i in indices_to_remove]
 
         self.logger.debug(f"Nodes identified for removal: {nodes_to_remove}")
         return nodes_to_remove
 
     def _get_corner_points(self, graph: nx.Graph) -> List[Any]:
-        """Get all corner points in a graph."""
         return [
             node
             for node, data in graph.nodes(data=True)
@@ -300,7 +311,6 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
         ]
 
     def _apply_reduction(self, graph: nx.Graph, nodes: List[Any]) -> nx.Graph:
-        """Remove the corner point label from specified nodes."""
         for node in nodes:
             if node in graph:
                 labels = graph.nodes[node]["labels"]
