@@ -1,6 +1,9 @@
 import numpy as np
 from ypstruct import structure
-from settings import Settings
+try:
+    from skeletonization.settings import Settings
+except ModuleNotFoundError:
+    from settings import Settings
 
 # Fit a Growing Neural Gas Network
 def fit(data, params: Settings):
