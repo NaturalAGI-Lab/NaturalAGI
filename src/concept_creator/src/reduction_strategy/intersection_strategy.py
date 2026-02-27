@@ -1,7 +1,8 @@
 import logging
+import math
 import numpy as np
 import networkx as nx
-from typing import Any, List, Tuple
+from typing import Any, List, Optional, Tuple
 
 from common.critical_point import CriticalPointType
 from common.graph_utils import GraphUtils
@@ -127,8 +128,75 @@ class IntersectionPointReductionStrategy(AbstractReductionStrategy):
                         labels.append(CriticalPointType.END_POINT.value)
                     else:
                         labels.append(CriticalPointType.CORNER_POINT.value)
+                        self._compute_and_store_corner_angle(graph, node)
                     graph.nodes[node]["labels"] = labels
         return graph
+
+    def _extract_center(self, value: Any) -> Optional[float]:
+        if isinstance(value, dict) and "center" in value:
+            return float(value["center"])
+        if isinstance(value, (int, float)):
+            return float(value)
+        return None
+
+    def _compute_and_store_corner_angle(self, graph: nx.Graph, node: Any) -> None:
+        try:
+            neighbors = list(graph.neighbors(node))
+            if len(neighbors) != 2:
+                graph.nodes[node]["angle"] = 90.0
+                graph.nodes[node]["normalized_angle"] = 0.0
+                return
+
+            far_points = []
+            for nbr in neighbors:
+                nbr_data = graph.nodes[nbr]
+                if "labels" in nbr_data and any(
+                    lbl in str(nbr_data["labels"]) for lbl in ["Vector"]
+                ):
+                    other_neighbors = [n for n in graph.neighbors(nbr) if n != node]
+                    if other_neighbors:
+                        far_points.append(graph.nodes[other_neighbors[0]])
+                    else:
+                        far_points.append(nbr_data)
+                else:
+                    far_points.append(nbr_data)
+
+            if len(far_points) != 2:
+                graph.nodes[node]["angle"] = 90.0
+                graph.nodes[node]["normalized_angle"] = 0.0
+                return
+
+            node_data = graph.nodes[node]
+            px = self._extract_center(node_data.get("normalized_x"))
+            py = self._extract_center(node_data.get("normalized_y"))
+            f1x = self._extract_center(far_points[0].get("normalized_x"))
+            f1y = self._extract_center(far_points[0].get("normalized_y"))
+            f2x = self._extract_center(far_points[1].get("normalized_x"))
+            f2y = self._extract_center(far_points[1].get("normalized_y"))
+
+            if any(v is None for v in [px, py, f1x, f1y, f2x, f2y]):
+                graph.nodes[node]["angle"] = 90.0
+                graph.nodes[node]["normalized_angle"] = 0.0
+                return
+
+            d1x, d1y = f1x - px, f1y - py
+            d2x, d2y = f2x - px, f2y - py
+            mag1 = math.sqrt(d1x ** 2 + d1y ** 2)
+            mag2 = math.sqrt(d2x ** 2 + d2y ** 2)
+
+            if mag1 == 0 or mag2 == 0:
+                graph.nodes[node]["angle"] = 90.0
+                graph.nodes[node]["normalized_angle"] = 0.0
+                return
+
+            cos_angle = (d1x * d2x + d1y * d2y) / (mag1 * mag2)
+            cos_angle = max(-1.0, min(1.0, cos_angle))
+            angle = math.degrees(math.acos(cos_angle))
+            graph.nodes[node]["angle"] = angle
+            graph.nodes[node]["normalized_angle"] = (angle / 90.0) - 1.0
+        except Exception:
+            graph.nodes[node]["angle"] = 90.0
+            graph.nodes[node]["normalized_angle"] = 0.0
 
     def _get_intersection_points(self, graph: nx.Graph) -> List[Any]:
         return [

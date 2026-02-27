@@ -14,7 +14,7 @@ CONCEPT = "concept"
 IMAGE = "image"
 
 properties_to_compare = set(
-    ["normalized_x", "normalized_y", "direction_x", "direction_y"]
+    ["normalized_x", "normalized_y", "direction_x", "direction_y", "branch_corner_density"]
 )
 
 
@@ -64,6 +64,9 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             concept_endpoints,
             image_endpoints,
             properties_to_compare,
+            position_weight=0.7,
+            direction_weight=0.15,
+            structural_weight=0.15,
         )
 
         concept_endpoints_above_threshold = (
@@ -136,6 +139,9 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             concept_endpoints,
             image_endpoints,
             properties_to_compare,
+            position_weight=0.7,
+            direction_weight=0.15,
+            structural_weight=0.15,
         )
 
         axis = 0 if len_concept_endpoints < len_image_endpoints else 1
