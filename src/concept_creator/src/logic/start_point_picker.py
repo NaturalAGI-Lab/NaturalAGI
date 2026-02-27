@@ -23,7 +23,7 @@ class StartPointPicker:
     ):
         if not sample_graphs:
             raise ValueError("Sample graphs list cannot be empty.")
-        self.sample_graphs: List[nx.Graph] = sample_graphs
+        self.sample_graphs: List[nx.Graph] = list(sample_graphs)
         self.num_samples: int = len(sample_graphs)
         self.start_point_characteristic: Optional[Tuple[str, np.ndarray]] = None
         self.critical_point_labels: Set[str] = {
@@ -38,6 +38,8 @@ class StartPointPicker:
         self.final_cluster_points: Optional[List[CriticalPoint]] = None
         self.expected_start_degree: Optional[int] = None
         self.degree_map: Dict[tuple, int] = {}
+        self._uuid_to_graph_index: Dict[uuid.UUID, int] = {}
+        self._sample_start_nodes: Dict[int, Any] = {}
 
         # Set the clustering algorithm
         self.clustering_algorithm = clustering_algorithm.lower()
@@ -56,6 +58,7 @@ class StartPointPicker:
         critical_points = []
         for i, graph in enumerate(self.sample_graphs):
             graph_id = uuid.uuid4()
+            self._uuid_to_graph_index[graph_id] = i
             for node_id, data in graph.nodes(data=True):
                 node_labels = data.get("labels", [])
                 is_critical = any(
@@ -323,6 +326,15 @@ class StartPointPicker:
             cluster_degrees = [d for d in cluster_degrees if d is not None]
             if cluster_degrees:
                 self.expected_start_degree = Counter(cluster_degrees).most_common(1)[0][0]
+
+            graph_points: Dict[int, List[CriticalPoint]] = defaultdict(list)
+            for p in self.final_cluster_points:
+                graph_idx = self._uuid_to_graph_index[p.graph_id]
+                graph_points[graph_idx].append(p)
+            for graph_idx, points in graph_points.items():
+                best = min(points, key=lambda p: np.linalg.norm(p.coordinates - centroid))
+                self._sample_start_nodes[graph_idx] = best.node_id
+
             print(
                 f"Determined start point characteristic: Label='{dominant_label}', Centroid={centroid}, ExpectedDegree={self.expected_start_degree}"
             )
@@ -362,6 +374,10 @@ class StartPointPicker:
         if self.start_point_characteristic is None:
             print("Warning: Start point characteristic not determined yet.")
             return None
+
+        for i, sample_graph in enumerate(self.sample_graphs):
+            if graph is sample_graph and i in self._sample_start_nodes:
+                return self._sample_start_nodes[i]
 
         _, centroid = self.start_point_characteristic
         structure_type = self._determine_structure_type()

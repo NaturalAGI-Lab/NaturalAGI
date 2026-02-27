@@ -65,7 +65,8 @@ def visualize_graph(graph: nx.Graph, ax: plt.Axes=None, image_id: str = None, ti
         if 'labels' in node_data:
             labels = node_data['labels']
             
-        labels_for_nodes[node_id] = ', '.join(str(label) for label in labels) + ' ' + str(node_id.split(':')[-1])
+        node_id_str = str(node_id)
+        labels_for_nodes[node_id] = ', '.join(str(label) for label in labels) + ' ' + node_id_str.split(':')[-1]
         
         # Check if any label matches our color mapping
         color = 'lightblue'  # Default color
