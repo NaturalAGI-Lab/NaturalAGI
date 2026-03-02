@@ -1,5 +1,6 @@
 import json
 import dataclasses
+import os
 import traceback
 import time
 
@@ -7,6 +8,7 @@ from kafka import KafkaProducer
 from pydantic_settings import BaseSettings
 
 from common.model import DLQModel
+from common.tracing import init_tracer, inject_trace_headers, extract_trace_context, SpanKind
 from service.graph_persistance_service import GraphPersistenceService
 from converter.graph_serializer import GraphDeserializer
 from data_preprocessing_service import DataPreprocessingService
@@ -78,6 +80,10 @@ def init_context(context):
     )
     setattr(context.user_data, "kafka_producer", producer)
 
+    otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
+    tracer = init_tracer(HANDLER_NAME, otlp_endpoint)
+    setattr(context.user_data, "tracer", tracer)
+
 
 def kafka_handler(context, event):
     """Handles Kafka messages"""
@@ -88,56 +94,69 @@ def kafka_handler(context, event):
         )
         input_data = json.loads(event.body)
 
-        operation = input_data["operation"]
-        parameters = input_data["parameters"]
-        profiling = input_data["profiling"]
-        session_id = parameters["session_id"]
-        image_id = parameters["image_id"]
+        parent_ctx = extract_trace_context(event.headers)
+        tracer = context.user_data.tracer
 
-        context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
-        context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
+        with tracer.start_as_current_span(
+            "contour_analysis.process", context=parent_ctx, kind=SpanKind.SERVER
+        ) as span:
+            operation = input_data["operation"]
+            parameters = input_data["parameters"]
+            profiling = input_data["profiling"]
+            session_id = parameters["session_id"]
+            image_id = parameters["image_id"]
 
-        network = GraphDeserializer.deserialize(input_data["skeleton"])
+            span.set_attribute("image_id", image_id)
+            span.set_attribute("session_id", session_id)
 
-        # Create NetworkxGraphAnalysis instance
-        networkx_graph_analysis = NetworkxGraphAnalysis(
-            network,
-            analysis_result_persistence_service=context.user_data.analysis_result_persistence_service,
-            merge_threshold=context.user_data.settings.merge_threshold,
-        )
+            context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
+            context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
 
-        # Apply reduction rules first
-        networkx_graph_analysis.merge_close_intersection_points()
+            network = GraphDeserializer.deserialize(input_data["skeleton"])
 
-        # Now persist the graph AFTER merging operations
-        context.user_data.data_preprocessing_service.persist_graph(
-            network, image_id, parameters["session_id"]
-        )
+            # Create NetworkxGraphAnalysis instance
+            networkx_graph_analysis = NetworkxGraphAnalysis(
+                network,
+                analysis_result_persistence_service=context.user_data.analysis_result_persistence_service,
+                merge_threshold=context.user_data.settings.merge_threshold,
+            )
 
-        networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
-        networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
-        networkx_graph_analysis.add_analyzer(CycleCountAnalyzer)
-        networkx_graph_analysis.analyze_graph(image_id, session_id)
+            # Apply reduction rules first
+            networkx_graph_analysis.merge_close_intersection_points()
 
-        context.user_data.tertiary_features_service.create_tertiary_features(
-            image_id, session_id
-        )
+            # Now persist the graph AFTER merging operations
+            context.user_data.data_preprocessing_service.persist_graph(
+                network, image_id, parameters["session_id"]
+            )
 
-        profiling["contour_analysis_time_ms"] = (
-            time.time_ns() - start_time
-        ) / 1_000_000
-        context.user_data.kafka_producer.send(
-            context.user_data.kafka_topic,
-            value={
-                "operation": operation,
-                "parameters": parameters,
-                "profiling": profiling,
-            },
-        )
+            networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
+            networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
+            networkx_graph_analysis.add_analyzer(CycleCountAnalyzer)
+            networkx_graph_analysis.analyze_graph(image_id, session_id)
 
-        context.logger.info_with(
-            f"Analysis complete for image_id: {image_id}", handler=HANDLER_NAME
-        )
+            context.user_data.tertiary_features_service.create_tertiary_features(
+                image_id, session_id
+            )
+
+            profiling["contour_analysis_time_ms"] = (
+                time.time_ns() - start_time
+            ) / 1_000_000
+            span.set_attribute("duration_ms", profiling["contour_analysis_time_ms"])
+
+            headers = inject_trace_headers()
+            context.user_data.kafka_producer.send(
+                context.user_data.kafka_topic,
+                value={
+                    "operation": operation,
+                    "parameters": parameters,
+                    "profiling": profiling,
+                },
+                headers=headers,
+            )
+
+            context.logger.info_with(
+                f"Analysis complete for image_id: {image_id}", handler=HANDLER_NAME
+            )
 
     except Exception as error:
         error_info = {

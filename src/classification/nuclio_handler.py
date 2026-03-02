@@ -1,11 +1,14 @@
 """Generic Nuclio Handler Template"""
 
 import logging
+import os
 import time
 from kafka import KafkaProducer
 import json
 from pydantic_settings import BaseSettings
+from opentelemetry import trace as otel_trace
 from common import ClassificationParams
+from common.tracing import init_tracer, extract_trace_context
 from classification_orchestrator import ClassificationOrchestrator
 from repository.concept_repository import ConceptRepository
 from repository.image_repository import ImageRepository
@@ -59,6 +62,10 @@ def init_context(context):
         handler=HANDLER_NAME,
     )
 
+    otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
+    tracer = init_tracer(HANDLER_NAME, otlp_endpoint)
+    setattr(context.user_data, "tracer", tracer)
+
 
 def kafka_handler(context, event):
     """Handles HTTP requests"""
@@ -95,59 +102,78 @@ def kafka_handler(context, event):
         f"Classification params: {classification_params}", handler=HANDLER_NAME
     )
 
-    orchestrator = ClassificationOrchestrator(
-        neo4j_dsn=settings.neo4j_dsn,
-        neo4j_user=settings.neo4j_user,
-        neo4j_pass=settings.neo4j_pass,
-        ged_timeout=classification_params.ged_timeout,
-    )
+    parent_ctx = extract_trace_context(event.headers)
+    tracer = context.user_data.tracer
 
-    try:
-        if not image_id:
-            raise ValueError("image_id must be provided in the request body")
+    with tracer.start_as_current_span(
+        "classification.process", context=parent_ctx, kind=otel_trace.SpanKind.SERVER
+    ) as span:
+        span.set_attribute("image_id", image_id)
 
-        comparison_results = orchestrator.classify_image(
-            image_id, context.user_data.concept_graphs
+        orchestrator = ClassificationOrchestrator(
+            neo4j_dsn=settings.neo4j_dsn,
+            neo4j_user=settings.neo4j_user,
+            neo4j_pass=settings.neo4j_pass,
+            ged_timeout=classification_params.ged_timeout,
+            tracer=tracer,
         )
 
-        context.logger.info_with(
-            f"Classification results: {len(comparison_results)} matches found",
-            handler=HANDLER_NAME,
-        )
+        try:
+            if not image_id:
+                raise ValueError("image_id must be provided in the request body")
 
-        profiling["classification_time_ms"] = (time.time_ns() - start_time) / 1_000_000
-        context.user_data.kafka_producer.send(
-            context.user_data.kafka_topic,
-            value={
-                "status": "success",
-                "classification_results": [
-                    result.__dict__ for result in comparison_results
-                ],
-                "image_id": image_id,
-                "image_path": data["parameters"]["image_path"],
-                "parameters": {**params, **data["parameters"]},
-                "profiling": profiling,
-            },
-        )
-
-    except Exception as e:
-        context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)
-        logging.error(f"Error: {e}", exc_info=True, stack_info=True)
-
-        context.user_data.kafka_producer.send(
-            context.user_data.dlq_topic,
-            value={"error": str(e), "source": HANDLER_NAME, "value": data},
-        )
-
-    finally:
-        if delete_image_nodes:
-            image_repository = ImageRepository(
-                settings.neo4j_dsn,
-                settings.neo4j_user,
-                settings.neo4j_pass,
+            comparison_results = orchestrator.classify_image(
+                image_id, context.user_data.concept_graphs
             )
-            image_repository.remove_image_nodes(image_id)
-            image_repository.close()
+
+            context.logger.info_with(
+                f"Classification results: {len(comparison_results)} matches found",
+                handler=HANDLER_NAME,
+            )
+
+            span.set_attribute("results_count", len(comparison_results))
+            matching = [r for r in comparison_results if r.is_minor]
+            if matching:
+                span.set_attribute("predicted_concept", matching[0].concept_id)
+                span.set_attribute("top_similarity", matching[0].similarity or 0)
+
+            profiling["classification_time_ms"] = (time.time_ns() - start_time) / 1_000_000
+            span.set_attribute("duration_ms", profiling["classification_time_ms"])
+
+            context.user_data.kafka_producer.send(
+                context.user_data.kafka_topic,
+                value={
+                    "status": "success",
+                    "classification_results": [
+                        result.__dict__ for result in comparison_results
+                    ],
+                    "image_id": image_id,
+                    "image_path": data["parameters"]["image_path"],
+                    "parameters": {**params, **data["parameters"]},
+                    "profiling": profiling,
+                },
+            )
+
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(otel_trace.StatusCode.ERROR)
+            context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)
+            logging.error(f"Error: {e}", exc_info=True, stack_info=True)
+
+            context.user_data.kafka_producer.send(
+                context.user_data.dlq_topic,
+                value={"error": str(e), "source": HANDLER_NAME, "value": data},
+            )
+
+        finally:
+            if delete_image_nodes:
+                image_repository = ImageRepository(
+                    settings.neo4j_dsn,
+                    settings.neo4j_user,
+                    settings.neo4j_pass,
+                )
+                image_repository.remove_image_nodes(image_id)
+                image_repository.close()
 
 
 def handler(context, event):

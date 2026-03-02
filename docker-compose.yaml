@@ -118,3 +118,32 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${HOST_IP}:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+
+  jaeger:
+    image: jaegertracing/jaeger:latest
+    networks:
+      - neo4j-internal
+    ports:
+      - "16686:16686"
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+    volumes:
+      - ./jaeger-data:/badger
+      - ./jaeger-config.yaml:/etc/jaeger/config.yaml
+      - ./jaeger-ui-config.json:/etc/jaeger/jaeger-ui-config.json
+      - ./jaeger-ui-patched:/etc/jaeger/ui
+    command: ["--config", "/etc/jaeger/config.yaml"]
+    depends_on:
+      - prometheus
+
+  prometheus:
+    image: prom/prometheus:latest
+    networks:
+      - neo4j-internal
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus-recording-rules.yml:/etc/prometheus/recording_rules.yml
+      - ./prometheus-data:/prometheus

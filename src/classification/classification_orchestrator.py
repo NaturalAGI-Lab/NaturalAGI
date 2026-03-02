@@ -1,7 +1,8 @@
 import logging
-from typing import List, Dict
+from typing import List, Dict, Optional
 
 import networkx as nx
+from opentelemetry import trace as otel_trace
 
 from concept_minor_classifier import ConceptMinorClassifier
 from repository.image_repository import ImageRepository
@@ -19,12 +20,14 @@ class ClassificationOrchestrator:
         neo4j_user: str,
         neo4j_pass: str,
         ged_timeout: float = 15,
+        tracer: Optional[otel_trace.Tracer] = None,
     ):
         self.neo4j_dsn = neo4j_dsn
         self.neo4j_user = neo4j_user
         self.neo4j_pass = neo4j_pass
         self.ged_timeout = ged_timeout
         self.graph_complexity_service = GraphComplexityService()
+        self._tracer = tracer
 
     def classify_image(
         self,
@@ -70,10 +73,24 @@ class ClassificationOrchestrator:
 
         for concept_id, concept_graph in eligible.items():
             try:
-                result = classifier.check_single_concept(
-                    image_graph, concept_id, concept_graph
-                )
-                results.append(result)
+                if self._tracer:
+                    with self._tracer.start_as_current_span("ged.compare") as span:
+                        span.set_attribute("concept_id", concept_id)
+                        concept_complexity = self.graph_complexity_service.get_default_graph_complexity(
+                            concept_graph
+                        )
+                        span.set_attribute("concept_complexity", concept_complexity)
+                        result = classifier.check_single_concept(
+                            image_graph, concept_id, concept_graph
+                        )
+                        span.set_attribute("similarity", result.similarity or 0)
+                        span.set_attribute("is_minor", result.is_minor)
+                        results.append(result)
+                else:
+                    result = classifier.check_single_concept(
+                        image_graph, concept_id, concept_graph
+                    )
+                    results.append(result)
             except Exception as e:
                 logging.error(
                     f"Error processing concept {concept_id}: {str(e)}",
@@ -97,16 +114,13 @@ class ClassificationOrchestrator:
             logging.warning(f"No classification results for image {image_id}")
             return []
 
-        filtered_results = [result for result in results if result.is_minor]
-        if not filtered_results:
-            return []
-
-        filtered_results.sort(
-            key=lambda x: (x.similarity or 0),
+        results.sort(
+            key=lambda x: (x.is_minor, x.similarity or 0),
             reverse=True,
         )
 
+        matching = sum(1 for r in results if r.is_minor)
         logging.info(
-            f"Found {len(filtered_results)} matching concepts out of {len(results)} processed"
+            f"Found {matching} matching concepts out of {len(results)} processed"
         )
-        return filtered_results
+        return results

@@ -18,8 +18,11 @@ spec:
     commands:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
-      - "pip install numpy pydantic-settings kafka-python rdp scikit-image networkx ypstruct opencv-python skan msgpack"
-      - "pip install --upgrade natural-agi-common==0.1.42"
+      - "pip install numpy pydantic-settings kafka-python rdp scikit-image networkx ypstruct opencv-python skan msgpack opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc"
+      - "pip install --upgrade natural-agi-common==0.1.45"
+  env:
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://jaeger:4317"
   triggers:
     kafka-trigger:
       kind: kafka-cluster

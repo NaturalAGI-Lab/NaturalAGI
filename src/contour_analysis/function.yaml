@@ -10,6 +10,8 @@ spec:
   env:
     - name: MERGE_THRESHOLD
       value: "10.0"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://jaeger:4317"
   triggers:
     kafka-trigger:
       kind: kafka-cluster
@@ -27,8 +29,8 @@ spec:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
       - "pip install --upgrade pip"
-      - "pip install numpy opencv-python pydantic-settings neo4j scikit-learn kafka-python networkx scipy msgpack"
-      - "pip install --upgrade natural-agi-common==0.1.42"
+      - "pip install numpy opencv-python pydantic-settings neo4j scikit-learn kafka-python networkx scipy msgpack opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc"
+      - "pip install --upgrade natural-agi-common==0.1.45"
   loggerSinks:
     - level: debug
   platform:

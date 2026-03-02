@@ -51,12 +51,13 @@ OPERATION ?= train
 CONCEPT_NAME ?= default_concept
 SESSION_ID ?= default_session
 SUBCLASS ?= default_subclass
+PARAMS ?= {}
 
 # Energy minimization option (default: true)
 USE_ENERGY_MINIMIZATION ?= true
 
 # Phony targets
-.PHONY: all deploy train classify send_random_image clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
+.PHONY: all deploy train classify send_random_image clean docker_clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
 
 # Kafka-related targets
 .PHONY: create_kafka_topics list_kafka_topics
@@ -161,14 +162,39 @@ classify:
 	@echo -e "${BLUE}Classifying image: $(IMAGE_PATH)${NC}"
 	@curl -X POST http://localhost:5002 \
 		-H "Content-Type: application/json" \
-		-d "{\"operation\": \"classify\", \"parameters\": $(PARAMS)}" || \
+		-d "{\"operation\": \"classify\", \"parameters\": {\"image_path\": \"$(IMAGE_PATH)\"}}" || \
 		(echo -e "${RED}Classification failed.${NC}" && exit 1)
 	@echo -e "${GREEN}Classification request sent to connector.${NC}"
 
 clean:
-	@echo -e "${BLUE}Cleaning up...${NC}"
+	@echo -e "${BLUE}Cleaning up training results...${NC}"
 	@rm -rf ./training_results/*
 	@echo -e "${GREEN}Cleanup completed.${NC}"
+
+docker_clean:
+	@echo -e "${BLUE}Docker cleanup — before:${NC}"
+	@docker system df
+	@echo ""
+	@echo -e "${BLUE}Removing dangling volumes...${NC}"
+	@docker volume prune -f
+	@echo -e "${BLUE}Removing build cache older than 48h (keeps recent layers for fast rebuilds)...${NC}"
+	@docker builder prune -f --filter "until=48h"
+	@echo -e "${BLUE}Removing stale Nuclio processor images (not used by any container)...${NC}"
+	@for img in $$(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'nuclio/processor-'); do \
+		if [ "$$(docker ps -q --filter ancestor=$$img 2>/dev/null | wc -l)" -eq 0 ]; then \
+			echo "  Removing unused: $$img"; \
+			docker rmi $$img 2>/dev/null || true; \
+		fi; \
+	done
+	@echo ""
+	@echo -e "${GREEN}Docker cleanup — after:${NC}"
+	@docker system df
+
+mlflow_ui:
+	cd src/training && mlflow ui --backend-store-uri file:./mlruns --host 0.0.0.0 --port 5050
+
+dashboard:
+	cd src/training && streamlit run dashboard.py --server.port 8501
 
 help:
 	@echo "Available targets:"
@@ -183,6 +209,7 @@ help:
 	@echo "  send_random_image  - Send a random image to the line detector"
 	@echo "  classify           - Run classification with given concept_id and image_id"
 	@echo "  clean              - Clean up training results"
+	@echo "  docker_clean       - Remove dangling volumes, build cache, and stale Nuclio images"
 	@echo "  help               - Show this help message"
 	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
 	@echo ""
@@ -229,11 +256,14 @@ send_to_connector:
 .PHONY: undep_skel undep_contour undep_classification undep_all
 
 # Common env/trigger fragments
+OTEL_ENDPOINT = http://${HOST_IP}:4317
+
 SKEL_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e DLQ_TOPIC="${DLQ_TOPIC}" \
 	-e SIMPLIFICATION_EPSILON=5 \
 	-e SKELETONIZATION_THRESHOLD=160 \
-	-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}"
+	-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}" \
+	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 
 SKEL_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}'
 
@@ -242,7 +272,8 @@ CONTOUR_ENV = -e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 	-e NEO4J_PASS=${NEO4J_PASS} \
 	-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e DLQ_TOPIC="${DLQ_TOPIC}" \
-	-e KAFKA_TOPIC="${CONTOUR_ANALYSIS_KAFKA_TOPIC}"
+	-e KAFKA_TOPIC="${CONTOUR_ANALYSIS_KAFKA_TOPIC}" \
+	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 
 CONTOUR_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${SKELETONIZATION_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "contour-analysis-group"}}}'
 
@@ -252,7 +283,8 @@ CLASS_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 	-e NEO4J_USER=neo4j \
 	-e NEO4J_PASS=${NEO4J_PASS} \
-	-e GED_TIMEOUT=15
+	-e GED_TIMEOUT=15 \
+	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 
 CLASS_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${CONTOUR_ANALYSIS_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "classification-group"}}}'
 
@@ -267,7 +299,8 @@ dep_conn:
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 		-e DLQ_TOPIC="${DLQ_TOPIC}" \
-		-e KAFKA_TOPIC="${CONNECTOR_KAFKA_TOPIC}"
+		-e KAFKA_TOPIC="${CONNECTOR_KAFKA_TOPIC}" \
+		-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 	@echo -e "${GREEN}Connector deployed.${NC}"
 
 dep_skel:
@@ -366,8 +399,9 @@ undep_all: undep_skel undep_contour undep_classification
 	@echo -e "${GREEN}All functions removed.${NC}"
 
 dep_all: dep_conn dep_skel dep_contour dep_concept dep_classification
-	@echo -e "${BLUE}Pruning dangling Docker images...${NC}"
+	@echo -e "${BLUE}Pruning dangling Docker images and volumes...${NC}"
 	@docker image prune -f
+	@docker volume prune -f
 	@echo -e "${GREEN}All functions deployed.${NC}"
 
 # Update the existing deploy target to use dep_all
