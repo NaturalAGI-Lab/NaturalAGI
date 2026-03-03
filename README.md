@@ -4,7 +4,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Docker](https://img.shields.io/badge/docker-ready-brightgreen.svg)](https://www.docker.com/)
 
-> 🇬🇧 English version (this file) | [🇺🇦 Українська](README.uk.md)
+> [🇺🇦 Українська] (this file) | [En English](README.en.md)
 
 NaturalAGI is a research project focused on developing a natural approach to Artificial General Intelligence through image processing, pattern recognition, and concept formation. The project implements a pipeline for processing visual data, extracting structural features, and forming abstract concepts through defined reduction rules. **The core goal is to build a classification algorithm that learns from training data without using backpropagation or traditional neural network approaches.**
 
@@ -19,7 +19,7 @@ NaturalAGI is a research project focused on developing a natural approach to Art
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/your-org/NaturalAGI.git
+git clone https://github.com/kbokh/NaturalAG.git
 cd NaturalAGI
 ```
 
@@ -151,7 +151,7 @@ NaturalAGI — дослідницька система класифікації 
 4. Перевірити систему на датасеті MNIST та виміряти точність, прецизійність і повноту
 
 Очікувані результати:
-- Точність класифікації ≥ 70% на 6 класах MNIST без використання нейронних мереж
+- Точність класифікації ≥ 70% на всіх класах MNIST без використання нейронних мереж
 - Повністю інтерпретована модель, де кожен концепт-граф можна візуалізувати та пояснити
 - Масштабована мікросервісна архітектура на базі Nuclio та Kafka
 
@@ -438,7 +438,7 @@ E(EndPoint) -- Належить до --> D(Line)
 ##### 4.1.2.2 Списки значень (множинні параметри)
 
 **Стратегія перетину множин:**
-- **��ищий рівень енергії**: конкретне значення зі списку
+- **Виищий рівень енергії**: конкретне значення зі списку
 - **Нижчий рівень енергії**: перетин множин усіх тренувальних даних
 
 *Застосовується для:* сегменти (`segments`), які можуть містити декілька значень ["TOP", "BOTTOM", "LEFT", "RIGHT"]
@@ -481,7 +481,7 @@ E(EndPoint) -- Належить до --> D(Line)
 
 ## 5.1 Вступ та Постановка Проблеми
 
-Етап формування концепту представляє центральний компонент системи NaturalAGI, який відрізняється від традиційних підходів машинного навчання відсутністю градієнтного спуску та нейронних мереж. Замість цього система використовує структурний аналіз графів ��а ітеративне знаходження спільних підструктур для створення абстрактних представлень класів об'єктів.
+Етап формування концепту представляє центральний компонент системи NaturalAGI, який відрізняється від традиційних підходів машинного навчання відсутністю градієнтного спуску та нейронних мереж. Замість цього система використовує структурний аналіз графів та ітеративне знаходження спільних підструктур для створення абстрактних представлень класів об'єктів.
 
 **Фундаментальна проблема** полягає в необхідності навчитися розпізнавати абстрактні структурні шаблони з колекції графових представлень зображень, що належать до одного класу, при збереженні лише найбільш значущих топологічних та геометричних характеристик, спільних для всіх навчальних зразків.
 
