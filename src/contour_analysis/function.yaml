@@ -30,7 +30,7 @@ spec:
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
       - "pip install --upgrade pip"
       - "pip install numpy opencv-python pydantic-settings neo4j scikit-learn kafka-python networkx scipy msgpack opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc"
-      - "pip install --upgrade natural-agi-common==0.1.45"
+      - "pip install --upgrade natural-agi-common==0.1.46"
   loggerSinks:
     - level: debug
   platform:

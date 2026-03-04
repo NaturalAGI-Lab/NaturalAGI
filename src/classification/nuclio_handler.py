@@ -1,15 +1,18 @@
 """Generic Nuclio Handler Template"""
 
+import json
 import logging
 import os
 import time
+from contextlib import contextmanager
+from typing import Optional
+
 from kafka import KafkaProducer
-import json
 from pydantic_settings import BaseSettings
 from opentelemetry import trace as otel_trace
-from common import ClassificationParams
 from common.tracing import init_tracer, extract_trace_context
 from classification_orchestrator import ClassificationOrchestrator
+from graph_similarity import cost_functions as _cf
 from repository.concept_repository import ConceptRepository
 from repository.image_repository import ImageRepository
 
@@ -26,6 +29,29 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str
     dlq_topic: str
     ged_timeout: float
+    skeletonization_threshold: float = 180.0
+    simplification_epsilon: Optional[float] = None
+
+
+@contextmanager
+def _cost_config_override(features=None, normalizers=None, costs=None):
+    orig_features = _cf.features
+    orig_normalizers = _cf.PROPERTY_NORMALIZERS
+    orig_costs = {k: v for k, v in vars(_cf.NodeCost).items() if not k.startswith("_")}
+    try:
+        if features is not None:
+            _cf.features = features
+        if normalizers is not None:
+            _cf.PROPERTY_NORMALIZERS = normalizers
+        if costs is not None:
+            for k, v in costs.items():
+                setattr(_cf.NodeCost, k.upper(), float(v))
+        yield
+    finally:
+        _cf.features = orig_features
+        _cf.PROPERTY_NORMALIZERS = orig_normalizers
+        for k, v in orig_costs.items():
+            setattr(_cf.NodeCost, k, v)
 
 
 def init_context(context):
@@ -66,6 +92,18 @@ def init_context(context):
     tracer = init_tracer(HANDLER_NAME, otlp_endpoint)
     setattr(context.user_data, "tracer", tracer)
 
+    # Apply env-var defaults for cost config (overridden per-message at runtime)
+    features_env = os.environ.get("CLASSIFICATION_FEATURES")
+    if features_env:
+        _cf.features = json.loads(features_env)
+    normalizers_env = os.environ.get("CLASSIFICATION_PROPERTY_NORMALIZERS")
+    if normalizers_env:
+        _cf.PROPERTY_NORMALIZERS = json.loads(normalizers_env)
+    costs_env = os.environ.get("CLASSIFICATION_NODE_COSTS")
+    if costs_env:
+        for k, v in json.loads(costs_env).items():
+            setattr(_cf.NodeCost, k.upper(), float(v))
+
 
 def kafka_handler(context, event):
     """Handles HTTP requests"""
@@ -83,20 +121,14 @@ def kafka_handler(context, event):
     delete_image_nodes = data["parameters"].get("delete_image_nodes", True)
     settings = Settings()
 
-    classification_params_fields = {
-        "ged_timeout",
-    }
-
-    params = {
+    classification_params = {
         key: value
         for key, value in {
             **settings.model_dump(),
             **data["parameters"],
         }.items()
-        if key in classification_params_fields
+        if key in {"ged_timeout", "skeletonization_threshold", "simplification_epsilon"}
     }
-
-    classification_params = ClassificationParams(**params)
 
     context.logger.info_with(
         f"Classification params: {classification_params}", handler=HANDLER_NAME
@@ -114,7 +146,7 @@ def kafka_handler(context, event):
             neo4j_dsn=settings.neo4j_dsn,
             neo4j_user=settings.neo4j_user,
             neo4j_pass=settings.neo4j_pass,
-            ged_timeout=classification_params.ged_timeout,
+            ged_timeout=classification_params["ged_timeout"],
             tracer=tracer,
         )
 
@@ -122,9 +154,14 @@ def kafka_handler(context, event):
             if not image_id:
                 raise ValueError("image_id must be provided in the request body")
 
-            comparison_results = orchestrator.classify_image(
-                image_id, context.user_data.concept_graphs
-            )
+            msg_features = data["parameters"].get("features")
+            msg_normalizers = data["parameters"].get("property_normalizers")
+            msg_costs = data["parameters"].get("node_costs")
+
+            with _cost_config_override(msg_features, msg_normalizers, msg_costs):
+                comparison_results = orchestrator.classify_image(
+                    image_id, context.user_data.concept_graphs
+                )
 
             context.logger.info_with(
                 f"Classification results: {len(comparison_results)} matches found",
@@ -149,7 +186,7 @@ def kafka_handler(context, event):
                     ],
                     "image_id": image_id,
                     "image_path": data["parameters"]["image_path"],
-                    "parameters": {**params, **data["parameters"]},
+                    "parameters": {**classification_params, **data["parameters"]},
                     "profiling": profiling,
                 },
             )

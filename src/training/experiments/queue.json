@@ -1,0 +1,268 @@
+{
+  "baseline_accuracy": 73.0,
+  "promising_threshold": 70.0,
+  "experiments": [
+    {
+      "id": "exp_002",
+      "name": "simplification_epsilon_5",
+      "description": "Light graph simplification \u2014 targets noise in closed-curve classes (0,6,9)",
+      "params": {
+        "ged_timeout": 5,
+        "skeletonization_threshold": 180,
+        "simplification_epsilon": 5
+      },
+      "classes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "status": "skipped",
+      "quick_accuracy": 66.86,
+      "quick_run_id": "run_20260304_000849",
+      "full_accuracy": null,
+      "full_run_id": null,
+      "notes": ""
+    },
+    {
+      "id": "exp_003",
+      "name": "lower_skel_threshold",
+      "description": "skeletonization_threshold=160 \u2014 captures more detail in thin strokes (classes 1,7)",
+      "params": {
+        "ged_timeout": 5,
+        "skeletonization_threshold": 160
+      },
+      "classes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "status": "skipped",
+      "quick_accuracy": 69.32,
+      "quick_run_id": "run_20260304_001544",
+      "full_accuracy": null,
+      "full_run_id": null,
+      "notes": ""
+    },
+    {
+      "id": "exp_004",
+      "name": "baseline_normalizers",
+      "description": "Control: restore baseline normalizers (spatial=2.0, cycle=4.0) via per-request override. Code currently has regressed 3.0/3.0/1.0 from run_20260303. Measures normalizer regression in isolation.",
+      "params": {
+        "ged_timeout": 5,
+        "skeletonization_threshold": 180,
+        "property_normalizers": {
+          "normalized_x": 2.0,
+          "normalized_y": 2.0,
+          "horizontal_direction": 2.0,
+          "vertical_direction": 2.0,
+          "cycle_count": 4.0
+        }
+      },
+      "classes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "status": "skipped",
+      "quick_accuracy": 68.79,
+      "quick_run_id": "run_20260304_002124",
+      "full_accuracy": null,
+      "full_run_id": null,
+      "notes": "Expected: ~73% if normalizers are the primary regression factor"
+    },
+    {
+      "id": "exp_005",
+      "name": "tighter_spatial",
+      "description": "Spatial normalizers 2.0\u21921.5. Lower normalizer = higher cost for same position difference. Targets 9\u21924 confusion (164 errors, margin=0.005): loop of 9 sits higher than bend of 4; also helps 2\u21927 (92 errors) where 2's bottom stroke is lower.",
+      "params": {
+        "ged_timeout": 5,
+        "skeletonization_threshold": 180,
+        "property_normalizers": {
+          "normalized_x": 1.5,
+          "normalized_y": 1.5,
+          "horizontal_direction": 2.0,
+          "vertical_direction": 2.0,
+          "cycle_count": 4.0
+        }
+      },
+      "classes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "status": "skipped",
+      "quick_accuracy": 68.52,
+      "quick_run_id": "run_20260304_002636",
+      "full_accuracy": null,
+      "full_run_id": null,
+      "notes": "Risk: may hurt classes with high spatial variance (0, 8). Compare 9\u21924 and 2\u21927 rates vs exp_004."
+    },
+    {
+      "id": "exp_006",
+      "name": "cycle_count_balanced",
+      "description": "cycle_count normalizer 4.0\u21922.0. Baseline (4.0) was too permissive for 0\u21946\u21949 closed-curve confusion; run_20260303 (1.0) destroyed class 8 (-45pp recall). 2.0 is the midpoint \u2014 small cycle differences still cost, but not catastrophically.",
+      "params": {
+        "ged_timeout": 5,
+        "skeletonization_threshold": 180,
+        "property_normalizers": {
+          "normalized_x": 2.0,
+          "normalized_y": 2.0,
+          "horizontal_direction": 2.0,
+          "vertical_direction": 2.0,
+          "cycle_count": 2.0
+        }
+      },
+      "classes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "status": "skipped",
+      "quick_accuracy": 69.29,
+      "quick_run_id": "run_20260304_003156",
+      "full_accuracy": null,
+      "full_run_id": null,
+      "notes": "Key metric: class 8 recall (baseline 51.1%) and 0\u21926 errors (baseline 150). Must not regress class 8."
+    },
+    {
+      "id": "exp_007",
+      "name": "direction_sensitivity",
+      "description": "Direction normalizers 2.0\u21921.5. Targets 3\u21927 (152 errors) and 2\u21927 (94 errors): digit 3 has horizontal strokes that 7 lacks; digit 2 has a horizontal base. Tighter direction tolerance amplifies these stroke-direction differences.",
+      "params": {
+        "ged_timeout": 5,
+        "skeletonization_threshold": 180,
+        "property_normalizers": {
+          "normalized_x": 2.0,
+          "normalized_y": 2.0,
+          "horizontal_direction": 1.5,
+          "vertical_direction": 1.5,
+          "cycle_count": 4.0
+        }
+      },
+      "classes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "status": "skipped",
+      "quick_accuracy": 69.47,
+      "quick_run_id": "run_20260304_003723",
+      "full_accuracy": null,
+      "full_run_id": null,
+      "notes": "Only Point nodes lack direction features (silently skipped). Effect concentrated on Vector nodes. Compare 3\u21927 and 2\u21927 rates vs exp_004."
+    },
+    {
+      "id": "exp_008",
+      "name": "finite_node_insertion",
+      "description": "node_ins_cost IMPOSSIBLE(100)\u2192SEVERE(0.65). Currently unmatched concept nodes cost 100.0, making any structural mismatch fatal. SEVERE allows the GED algorithm to tolerate a few missing matches. Targets class 8 (89 not-classified, concept 8_1=19 too rigid) and 0_1/6_1 topology mismatches.",
+      "params": {
+        "ged_timeout": 0.5,
+        "skeletonization_threshold": 180,
+        "property_normalizers": {
+          "normalized_x": 2.0,
+          "normalized_y": 2.0,
+          "horizontal_direction": 2.0,
+          "vertical_direction": 2.0,
+          "cycle_count": 4.0
+        },
+        "node_costs": {
+          "IMPOSSIBLE": 0.65
+        }
+      },
+      "classes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "status": "running_full",
+      "quick_accuracy": 78.12,
+      "quick_run_id": "run_20260304_004311",
+      "full_accuracy": null,
+      "full_run_id": null,
+      "notes": "Risk: may let incorrect concepts match more easily (false positives increase). Key metric: not-classified count and class 8 recall. Compare total FP vs exp_004. FULL RUN IN PROGRESS: ~4.6 results/min with 3 classification instances. IMPOSSIBLE=0.65 disables complexity pre-filter, forcing GED evaluation against all 13 concepts per image (many hitting 2s timeout). Estimated ~28h for 7814 images."
+    },
+    {
+      "id": "exp_009",
+      "name": "combined_tuning",
+      "description": "Best hypothesis combo: spatial=1.5, directions=1.5, cycle=2.0. Tests whether individual normalizer improvements compound. Run AFTER exp_005/006/007 to validate \u2014 if any individual experiment regresses, remove that component.",
+      "params": {
+        "ged_timeout": 5,
+        "skeletonization_threshold": 180,
+        "property_normalizers": {
+          "normalized_x": 1.5,
+          "normalized_y": 1.5,
+          "horizontal_direction": 1.5,
+          "vertical_direction": 1.5,
+          "cycle_count": 2.0
+        }
+      },
+      "classes": [
+        0,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9
+      ],
+      "status": "skipped",
+      "quick_accuracy": null,
+      "quick_run_id": null,
+      "full_accuracy": null,
+      "full_run_id": null,
+      "notes": "Skipped: exp_005/006/007 all below threshold, no components to combine."
+    }
+  ]
+}

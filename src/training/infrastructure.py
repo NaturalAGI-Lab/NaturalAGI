@@ -8,6 +8,16 @@ import logging
 import time
 from typing import Dict
 
+TOPIC_PARTITIONS = {
+    "connector-output-topic": 8,
+    "skeletonization-output-topic": 8,
+    "contour-analysis-output-topic": 6,
+    "classification-output-topic": 1,
+    "dlq-topic": 1,
+    "line-detector-output-topic": 1,
+    "angle-point-detector-output-topic": 1,
+}
+
 import networkx as nx
 from kafka import KafkaConsumer
 from neo4j import GraphDatabase, Session
@@ -142,7 +152,10 @@ def clean_kafka_topics(
 
     time.sleep(5)
 
-    topic_list = [NewTopic(name=t, num_partitions=1, replication_factor=1) for t in topics]
+    topic_list = [
+        NewTopic(name=t, num_partitions=TOPIC_PARTITIONS.get(t, 1), replication_factor=1)
+        for t in topics
+    ]
     for topic in topic_list:
         try:
             admin_client.create_topics([topic])
@@ -173,6 +186,23 @@ def clean_neo4j_db(
                 break
     driver.close()
     print("Neo4j DB cleaned.")
+
+
+def verify_concept_created(
+    concept_id: str,
+    uri: str = "bolt://localhost:7687",
+    user: str = "neo4j",
+    password: str = "111122223333",
+) -> bool:
+    driver = GraphDatabase.driver(uri, auth=(user, password))
+    with driver.session() as session:
+        result = session.run(
+            "MATCH (n {concept_id: $concept_id}) RETURN count(n) as count",
+            concept_id=concept_id,
+        )
+        count = result.single()["count"]
+    driver.close()
+    return count > 0
 
 
 def delete_test_neo4j_nodes(

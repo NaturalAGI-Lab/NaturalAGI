@@ -10,14 +10,23 @@ spec:
   runtime: "python:3.9"
   resources:
     limits:
-      cpu: "6"
-      memory: "8Gi"
-    requests:
-      cpu: "4"
+      cpu: "2"
       memory: "4Gi"
+    requests:
+      cpu: "1"
+      memory: "2Gi"
   env:
     - name: OTEL_EXPORTER_OTLP_ENDPOINT
       value: "http://jaeger:4317"
+    # Feature list override (JSON array). Uncomment to activate:
+    # - name: CLASSIFICATION_FEATURES
+    #   value: '["normalized_x","normalized_y","horizontal_direction","vertical_direction","cycle_count"]'
+    # Property normalizers override (JSON object). Uncomment to activate:
+    # - name: CLASSIFICATION_PROPERTY_NORMALIZERS
+    #   value: '{"normalized_x":3.0,"normalized_y":3.0,"horizontal_direction":2.0,"vertical_direction":2.0,"cycle_count":1.0}'
+    # Node cost values override (JSON object). Uncomment to activate:
+    # - name: CLASSIFICATION_NODE_COSTS
+    #   value: '{"NO_COST":0.0,"MINOR":0.25,"GENERAL":0.4,"SEVERE":0.65,"NO_MATCH":1.0,"IMPOSSIBLE":100.0}'
     - name: OMP_NUM_THREADS
       value: "1"
     - name: OPENBLAS_NUM_THREADS
@@ -34,7 +43,7 @@ spec:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
       - "pip install numpy==1.26.4 requests pydantic-settings neo4j kafka-python networkx scipy msgpack opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc"
-      - "pip install --upgrade natural-agi-common==0.1.45"
+      - "pip install --upgrade natural-agi-common==0.1.46"
   triggers:
     default-http:
       kind: "http"

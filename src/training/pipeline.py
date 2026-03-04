@@ -12,14 +12,16 @@ import subprocess
 from torchvision import datasets, transforms
 from PIL import Image
 
-from training.infrastructure import wait_for_kafka_idle
+from infrastructure import wait_for_kafka_idle, verify_concept_created
+
+_PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
 
 def generate_mnist_samples(
     number: int,
     max_samples: int = 100,
     test_fraction: float = 0.2,
-    output_dir: str = "../../tests/generated_samples",
+    output_dir: str = os.path.join(_PROJECT_ROOT, "tests", "generated_samples"),
     randomize: bool = True,
 ) -> None:
     """
@@ -42,7 +44,7 @@ def generate_mnist_samples(
     os.makedirs(test_dir, exist_ok=True)
 
     transform = transforms.Compose([transforms.ToTensor()])
-    mnist_train = datasets.MNIST(root="./data", train=True, download=True, transform=transform)
+    mnist_train = datasets.MNIST(root=os.path.join(_PROJECT_ROOT, "data"), train=True, download=True, transform=transform)
 
     filtered = [(img, label) for img, label in mnist_train if label == number]
     filtered = (
@@ -71,7 +73,7 @@ def train_mnist(
     subclass: int | None = None,
     samples: int | None = None,
     is_prepared_samples: bool = False,
-    with_post_process: bool = True,
+    with_concept_creation: bool = True,
     kafka_topic: str = "contour-analysis-output-topic",
     kafka_bootstrap_servers: str = "localhost:29092",
     kafka_idle_timeout: int = 10,
@@ -99,7 +101,7 @@ def train_mnist(
         generate_mnist_samples(class_number, max_samples=samples)
         cmd = ["make", f"train_mnist_{class_number}"]
 
-    subprocess.run(cmd, cwd=".")
+    subprocess.run(cmd, cwd=_PROJECT_ROOT)
 
     wait_for_kafka_idle(
         topic=kafka_topic,
@@ -107,9 +109,13 @@ def train_mnist(
         bootstrap_servers=kafka_bootstrap_servers,
     )
 
-    if with_post_process:
-        post_process_id = str(class_number) + (f"_{subclass}" if subclass is not None else "")
-        subprocess.run(["make", "post_process", post_process_id, f"mnist-{class_number}"], cwd=".")
+    if with_concept_creation:
+        concept_id = str(class_number) + (f"_{subclass}" if subclass is not None else "")
+        subprocess.run(["make", "create_concept", concept_id, f"mnist-{class_number}"], cwd=_PROJECT_ROOT)
+        if not verify_concept_created(concept_id):
+            raise RuntimeError(
+                f"Concept creation failed: concept '{concept_id}' not found in Neo4j after training."
+            )
 
 
 def remove_concept(
@@ -119,7 +125,7 @@ def remove_concept(
     password: str = "111122223333",
 ) -> None:
     """Remove a concept and all its nodes from Neo4j."""
-    from neo4j import GraphDatabase
+    from neo4j import GraphDatabase  # noqa: PLC0415 — optional import
 
     driver = GraphDatabase.driver(uri, auth=(user, password))
     with driver.session() as session:
@@ -134,7 +140,7 @@ def remove_concept(
 def retrain_concept(
     number: int,
     subclass: int,
-    with_post_process: bool = True,
+    with_concept_creation: bool = True,
     uri: str = "bolt://localhost:7687",
     user: str = "neo4j",
     password: str = "111122223333",
@@ -145,5 +151,5 @@ def retrain_concept(
         class_number=number,
         subclass=subclass,
         is_prepared_samples=True,
-        with_post_process=with_post_process,
+        with_concept_creation=with_concept_creation,
     )
