@@ -15,7 +15,7 @@ from .abstract_strategy import AbstractReductionStrategy
 CONCEPT = "concept"
 IMAGE = "image"
 
-PROPERTIES_TO_COMPARE = set(["normalized_x", "normalized_y"])
+PROPERTIES_TO_COMPARE = set(["normalized_x", "normalized_y", "normalized_angle"])
 
 class CornerPointReductionStrategy(AbstractReductionStrategy):
     """Reduces corner points in concept and image graphs to align them.
@@ -293,8 +293,8 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
         # Calculate how many corner points to remove
         difference = abs(len_concept_corner_points - len_image_corner_points)
 
-        # Identify which corner points to remove using Hungarian algorithm
-        points_to_remove = self.distance_matrix_calculator.find_points_for_difference(
+        # Identify which corner points to remove using order-preserving DP matching
+        points_to_remove = self.distance_matrix_calculator.find_ordered_points_for_difference(
             distance_matrix, points_large, difference
         )
 

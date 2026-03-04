@@ -7,7 +7,6 @@ export
 
 # Variables
 SHELL := /bin/bash
-POST_PROCESSING_SCRIPT := run_post_processing.sh
 
 # Default values for classification
 CONCEPT_ID ?= default_concept
@@ -21,7 +20,7 @@ INSTANCES_CLASSIFICATION ?= 3
 # Kafka partition counts per topic
 PARTITIONS_CONNECTOR ?= 8
 PARTITIONS_SKEL ?= 8
-PARTITIONS_CONTOUR ?= 4
+PARTITIONS_CONTOUR ?= 6
 PARTITIONS_CLASSIFICATION ?= 1
 PARTITIONS_DLQ ?= 1
 
@@ -41,38 +40,41 @@ LOCAL_MODEL_PATH=./src/training/latest_model
 
 DLQ_TOPIC = dlq-topic
 CONNECTOR_KAFKA_TOPIC = connector-output-topic
-LINE_DETECTOR_TOPIC = line-detector-output-topic
-ANGLE_POINT_DETECTOR_KAFKA_TOPIC = angle-point-detector-output-topic
 SKELETONIZATION_KAFKA_TOPIC = skeletonization-output-topic
 CONTOUR_ANALYSIS_KAFKA_TOPIC = contour-analysis-output-topic
 CLASSIFICATION_KAFKA_TOPIC = classification-output-topic
 
-TOPICS = $(CONNECTOR_KAFKA_TOPIC) $(LINE_DETECTOR_TOPIC) $(ANGLE_POINT_DETECTOR_KAFKA_TOPIC) $(DLQ_TOPIC) $(SKELETONIZATION_KAFKA_TOPIC) $(CONTOUR_ANALYSIS_KAFKA_TOPIC) $(CLASSIFICATION_KAFKA_TOPIC)
+TOPICS = $(CONNECTOR_KAFKA_TOPIC) $(DLQ_TOPIC) $(SKELETONIZATION_KAFKA_TOPIC) $(CONTOUR_ANALYSIS_KAFKA_TOPIC) $(CLASSIFICATION_KAFKA_TOPIC)
 
 # Add these variables near the top of the Makefile, after other variable definitions
 OPERATION ?= train
 CONCEPT_NAME ?= default_concept
 SESSION_ID ?= default_session
 SUBCLASS ?= default_subclass
+PARAMS ?= {}
 
 # Energy minimization option (default: true)
 USE_ENERGY_MINIMIZATION ?= true
 
 # Phony targets
-.PHONY: all deploy train post_process classify send_random_image clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
+.PHONY: all deploy train classify send_random_image clean docker_clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
 
 # Kafka-related targets
 .PHONY: create_kafka_topics list_kafka_topics
 
+VENV := natural-agi/bin
+PYTHON := $(VENV)/python
+PIP := $(VENV)/pip3
+
 lib:
 	@echo -e "${BLUE}Building common library...${NC}"
 	@rm -rf dist build *.egg-info
-	@python -m build
-	@pip install twine
-	@twine upload dist/* --verbose
+	@$(PYTHON) setup.py sdist bdist_wheel
+	@$(PIP) install twine
+	@$(VENV)/twine upload dist/* --verbose || { rm -rf dist build *.egg-info; exit 1; }
 	@rm -rf dist build *.egg-info
 	@echo -e "${GREEN}Library built and uploaded.${NC}"
-	@pip install --upgrade natural-agi-common
+	@$(PIP) install --upgrade natural-agi-common
 	@echo -e "${GREEN}Library installed.${NC}"
 
 start_services:
@@ -93,8 +95,6 @@ create_kafka_topics:
 	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CONTOUR_ANALYSIS_KAFKA_TOPIC}" --partitions $(PARTITIONS_CONTOUR) --replication-factor 1 || echo "Failed to create topic: ${CONTOUR_ANALYSIS_KAFKA_TOPIC}"
 	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CLASSIFICATION_KAFKA_TOPIC}" --partitions $(PARTITIONS_CLASSIFICATION) --replication-factor 1 || echo "Failed to create topic: ${CLASSIFICATION_KAFKA_TOPIC}"
 	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${DLQ_TOPIC}" --partitions $(PARTITIONS_DLQ) --replication-factor 1 || echo "Failed to create topic: ${DLQ_TOPIC}"
-	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${LINE_DETECTOR_TOPIC}" --partitions 1 --replication-factor 1 || echo "Failed to create topic: ${LINE_DETECTOR_TOPIC}"
-	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${ANGLE_POINT_DETECTOR_KAFKA_TOPIC}" --partitions 1 --replication-factor 1 || echo "Failed to create topic: ${ANGLE_POINT_DETECTOR_KAFKA_TOPIC}"
 	@echo -e "${GREEN}Kafka topics creation attempt completed.${NC}"
 
 recreate_kafka_topics:
@@ -141,17 +141,16 @@ list_neo4j_indexes:
 # Main targets
 all: start_services create_kafka_topics deploy train
 
-# Post-process target: Runs the post-processing script with provided arguments
-# Usage: make post_process <arg1> <arg2> ...
-# Example: make post_process 2b8ffbca-5dd1-419a-b689-0bb27fbbaa42 mnist-1
-post_process:
-	@echo -e "${BLUE}Running post-processing...${NC}"
-	@if sh $(POST_PROCESSING_SCRIPT) $(filter-out $@,$(MAKECMDGOALS)); then \
-		echo -e "${GREEN}Post-processing completed successfully.${NC}"; \
-	else \
-		echo -e "${RED}Post-processing failed.${NC}"; \
-		exit 1; \
-	fi
+# Create concept: invoke concept_creator with session_id and concept_name
+# Usage: make create_concept <session_id> <concept_name>
+create_concept:
+	$(eval SESSION_ARGS := $(wordlist 2,3,$(MAKECMDGOALS)))
+	$(eval CC_SESSION_ID := $(word 1,$(SESSION_ARGS)))
+	$(eval CC_CONCEPT_NAME := $(word 2,$(SESSION_ARGS)))
+	@echo -e "${BLUE}Creating concept (session_id=$(CC_SESSION_ID), concept_name=$(CC_CONCEPT_NAME))...${NC}"
+	@nuctl invoke concept_creator --platform local --method POST \
+		--body '{"session_id": "$(CC_SESSION_ID)", "concept_name": "$(CC_CONCEPT_NAME)", "concept_id": "$(CC_SESSION_ID)"}'
+	@echo -e "${GREEN}Concept creation invoked.${NC}"
 
 # Special target to allow passing arguments to other targets
 %:
@@ -163,28 +162,54 @@ classify:
 	@echo -e "${BLUE}Classifying image: $(IMAGE_PATH)${NC}"
 	@curl -X POST http://localhost:5002 \
 		-H "Content-Type: application/json" \
-		-d "{\"operation\": \"classify\", \"parameters\": $(PARAMS)}" || \
+		-d "{\"operation\": \"classify\", \"parameters\": {\"image_path\": \"$(IMAGE_PATH)\"}}" || \
 		(echo -e "${RED}Classification failed.${NC}" && exit 1)
 	@echo -e "${GREEN}Classification request sent to connector.${NC}"
 
 clean:
-	@echo -e "${BLUE}Cleaning up...${NC}"
+	@echo -e "${BLUE}Cleaning up training results...${NC}"
 	@rm -rf ./training_results/*
 	@echo -e "${GREEN}Cleanup completed.${NC}"
 
+docker_clean:
+	@echo -e "${BLUE}Docker cleanup — before:${NC}"
+	@docker system df
+	@echo ""
+	@echo -e "${BLUE}Removing dangling volumes...${NC}"
+	@docker volume prune -f
+	@echo -e "${BLUE}Removing build cache older than 48h (keeps recent layers for fast rebuilds)...${NC}"
+	@docker builder prune -f --filter "until=48h"
+	@echo -e "${BLUE}Removing stale Nuclio processor images (not used by any container)...${NC}"
+	@for img in $$(docker images --format '{{.Repository}}:{{.Tag}}' | grep 'nuclio/processor-'); do \
+		if [ "$$(docker ps -q --filter ancestor=$$img 2>/dev/null | wc -l)" -eq 0 ]; then \
+			echo "  Removing unused: $$img"; \
+			docker rmi $$img 2>/dev/null || true; \
+		fi; \
+	done
+	@echo ""
+	@echo -e "${GREEN}Docker cleanup — after:${NC}"
+	@docker system df
+
+mlflow_ui:
+	cd src/training && mlflow ui --backend-store-uri file:./mlruns --host 0.0.0.0 --port 5050
+
+dashboard:
+	cd src/training && streamlit run dashboard.py --server.port 8501
+
 help:
 	@echo "Available targets:"
-	@echo "  all                - Deploy functions, create Kafka topics, run training, send data to connector, and post-process (default)"
+	@echo "  all                - Deploy functions, create Kafka topics, and run training (default)"
 	@echo "  deploy             - Deploy Nuclio functions"
 	@echo "  create_kafka_topics - Create Kafka topics"
 	@echo "  list_kafka_topics  - List existing Kafka topics"
 	@echo "  create_neo4j_indexes - Create property indexes in Neo4j (idempotent)"
 	@echo "  list_neo4j_indexes   - List existing Neo4j indexes"
 	@echo "  train              - Run training script"
-	@echo "  post_process       - Run post-processing script"
+	@echo "  create_concept     - Invoke concept creator (usage: make create_concept <session_id> <concept_name>)"
 	@echo "  send_random_image  - Send a random image to the line detector"
 	@echo "  classify           - Run classification with given concept_id and image_id"
 	@echo "  clean              - Clean up training results"
+	@echo "  docker_clean       - Remove dangling volumes, build cache, and stale Nuclio images"
 	@echo "  help               - Show this help message"
 	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
 	@echo ""
@@ -227,15 +252,18 @@ send_to_connector:
 	@echo -e "\n${GREEN}Data sent to connector successfully.${NC}"
 
 # Function deployment targets
-.PHONY: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification dep_all
+.PHONY: dep_conn dep_skel dep_contour dep_concept dep_classification dep_all
 .PHONY: undep_skel undep_contour undep_classification undep_all
 
 # Common env/trigger fragments
+OTEL_ENDPOINT = http://${HOST_IP}:4317
+
 SKEL_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e DLQ_TOPIC="${DLQ_TOPIC}" \
 	-e SIMPLIFICATION_EPSILON=5 \
 	-e SKELETONIZATION_THRESHOLD=160 \
-	-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}"
+	-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}" \
+	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 
 SKEL_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}'
 
@@ -244,7 +272,8 @@ CONTOUR_ENV = -e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 	-e NEO4J_PASS=${NEO4J_PASS} \
 	-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e DLQ_TOPIC="${DLQ_TOPIC}" \
-	-e KAFKA_TOPIC="${CONTOUR_ANALYSIS_KAFKA_TOPIC}"
+	-e KAFKA_TOPIC="${CONTOUR_ANALYSIS_KAFKA_TOPIC}" \
+	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 
 CONTOUR_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${SKELETONIZATION_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "contour-analysis-group"}}}'
 
@@ -254,7 +283,8 @@ CLASS_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 	-e NEO4J_USER=neo4j \
 	-e NEO4J_PASS=${NEO4J_PASS} \
-	-e GED_TIMEOUT=15
+	-e GED_TIMEOUT=15 \
+	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 
 CLASS_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${CONTOUR_ANALYSIS_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "classification-group"}}}'
 
@@ -269,7 +299,8 @@ dep_conn:
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 		-e DLQ_TOPIC="${DLQ_TOPIC}" \
-		-e KAFKA_TOPIC="${CONNECTOR_KAFKA_TOPIC}"
+		-e KAFKA_TOPIC="${CONNECTOR_KAFKA_TOPIC}" \
+		-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 	@echo -e "${GREEN}Connector deployed.${NC}"
 
 dep_skel:
@@ -307,15 +338,6 @@ dep_contour:
 			$(CONTOUR_ENV) $(CONTOUR_TRIGGERS); \
 	done
 	@echo -e "${GREEN}Contour analysis deployed ($(INSTANCES_CONTOUR) instances).${NC}"
-
-dep_post:
-	@echo -e "${BLUE}Deploying post processing...${NC}"
-	@nuctl deploy --path src/post_processing \
-		--platform local \
-		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
-		-e NEO4J_USER=neo4j \
-		-e NEO4J_PASS=${NEO4J_PASS}
-	@echo -e "${GREEN}Post processing deployed.${NC}"
 
 dep_concept:
 	@echo -e "${BLUE}Deploying concept creator...${NC}"
@@ -373,13 +395,13 @@ undep_classification:
 
 undep_all: undep_skel undep_contour undep_classification
 	@nuctl delete function connector --platform local 2>/dev/null || true
-	@nuctl delete function post-processing --platform local 2>/dev/null || true
 	@nuctl delete function concept-creator --platform local 2>/dev/null || true
 	@echo -e "${GREEN}All functions removed.${NC}"
 
-dep_all: dep_conn dep_skel dep_contour dep_post dep_concept dep_classification
-	@echo -e "${BLUE}Pruning dangling Docker images...${NC}"
+dep_all: dep_conn dep_skel dep_contour dep_concept dep_classification
+	@echo -e "${BLUE}Pruning dangling Docker images and volumes...${NC}"
 	@docker image prune -f
+	@docker volume prune -f
 	@echo -e "${GREEN}All functions deployed.${NC}"
 
 # Update the existing deploy target to use dep_all

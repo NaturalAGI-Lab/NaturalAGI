@@ -72,33 +72,11 @@ class QuadrantVisitor(Visitor):
         session_id: str,
         result: Dict[str, Any],
     ) -> None:
-        # First query to set the vector type label
-        set_type_query = f"""
+        query = f"""
         MATCH (v:Vector {{id: $id}})
-        SET v:{result['vector_type']}
+        SET v:{result['vector_type']}, v.quadrant = $quadrant
         """
-
-        # Second query to handle quadrant relationship
-        quadrant_query = """
-        MATCH (v:Vector {id: $id})
-        MERGE (q:Quadrant:Feature {value: $quadrant, session_id: $session_id})
-        ON CREATE SET q.samples = [$image_id], v.quadrant = $quadrant
-        ON MATCH SET q.samples = CASE
-            WHEN NOT $image_id IN q.samples THEN q.samples + $image_id
-            ELSE q.samples
-        END, v.quadrant = $quadrant
-        MERGE (v)-[:IS_IN_QUADRANT]->(q)
-        """
-
-        # Execute both queries
-        tx.run(set_type_query, id=result["line_id"])
-        tx.run(
-            quadrant_query,
-            id=result["line_id"],
-            quadrant=result["quadrant"],
-            session_id=session_id,
-            image_id=image_id,
-        )
+        tx.run(query, id=result["line_id"], quadrant=result["quadrant"])
 
     @staticmethod
     def determine_quadrant(dx: float, dy: float) -> int:

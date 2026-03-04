@@ -174,7 +174,22 @@ neo4j/
 neo4j-data/
 neo4j-logs/
 neo4j-dumps/
+
+# Jaeger
+jaeger-data/
+
+# Prometheus
+prometheus-data/
+
+# MLflow
+mlruns/
 tests/archive/*
 
 # Claude Code MCP config (contains credentials)
 .mcp.json
+CLAUDE.md
+
+/plans
+/researches
+
+.claude/

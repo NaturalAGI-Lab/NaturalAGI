@@ -15,12 +15,14 @@ class EndpointDirectionVisitor:
         for endpoint_id in endpoints:
             try:
                 direction_x, direction_y = self._calculate_direction(graph, endpoint_id)
-                
                 graph.nodes[endpoint_id]['direction_x'] = direction_x
                 graph.nodes[endpoint_id]['direction_y'] = direction_y
-                
+
+                density = self._calculate_branch_corner_density(graph, endpoint_id)
+                graph.nodes[endpoint_id]['branch_corner_density'] = density
+
                 self.logger.debug(
-                    f"Endpoint {endpoint_id}: direction=({direction_x:.4f}, {direction_y:.4f})"
+                    f"Endpoint {endpoint_id}: direction=({direction_x:.4f}, {direction_y:.4f}), density={density:.4f}"
                 )
             except Exception as e:
                 self.logger.error(
@@ -28,6 +30,7 @@ class EndpointDirectionVisitor:
                 )
                 graph.nodes[endpoint_id]['direction_x'] = 0.0
                 graph.nodes[endpoint_id]['direction_y'] = 0.0
+                graph.nodes[endpoint_id]['branch_corner_density'] = 0.0
     
     def _get_endpoints(self, graph: nx.Graph) -> list:
         endpoints = []
@@ -86,6 +89,54 @@ class EndpointDirectionVisitor:
         
         return None
     
+    def _calculate_branch_corner_density(self, graph: nx.Graph, endpoint_id: Any) -> float:
+        corner_count = 0
+        point_hops = 0
+        current = endpoint_id
+        visited = {endpoint_id}
+
+        while True:
+            neighbors = [n for n in graph.neighbors(current) if n not in visited]
+            if not neighbors:
+                break
+
+            for vector_node in neighbors:
+                visited.add(vector_node)
+                next_points = [n for n in graph.neighbors(vector_node) if n not in visited]
+
+                if not next_points:
+                    continue
+
+                next_point = next_points[0]
+                visited.add(next_point)
+                point_hops += 1
+
+                next_data = graph.nodes[next_point]
+
+                if GraphUtils.is_corner_point(next_data):
+                    corner_count += 1
+
+                is_intersection = (
+                    GraphUtils.is_intersection_point(next_data)
+                    or graph.degree(next_point) > 2
+                )
+                is_terminal = (
+                    GraphUtils.is_endpoint(next_data)
+                    or "StartPoint" in next_data.get("labels", [])
+                )
+
+                if is_intersection or is_terminal:
+                    if point_hops == 0:
+                        return 0.0
+                    return corner_count / point_hops
+
+                current = next_point
+                break
+
+        if point_hops == 0:
+            return 0.0
+        return corner_count / point_hops
+
     def _extract_coord(self, coord_value: Any) -> float:
         if coord_value is None:
             raise ValueError("Coordinate value is None")

@@ -122,44 +122,6 @@ class DirectionVisitor(Visitor):
             sequence_index=result["sequence_index"],
         )
 
-        # # Create DirectionFeature nodes and relationships
-        # create_h_direction_feature = """
-        # MATCH (v:Vector {id: $id})
-        # MERGE (f:HorizontalDirection:Feature {value: $direction, session_id: $session_id})
-        # ON CREATE SET f.samples = [$image_id]
-        # ON MATCH SET f.samples = CASE
-        #     WHEN NOT $image_id IN f.samples THEN f.samples + $image_id
-        #     ELSE f.samples
-        # END
-        # MERGE (v)-[:HAS_HORIZONTAL_DIRECTION]->(f)
-        # """
-
-        # create_v_direction_feature = """
-        # MATCH (v:Vector {id: $id})
-        # MERGE (f:VerticalDirection:Feature {value: $direction, session_id: $session_id})
-        # ON CREATE SET f.samples = CASE
-        #     WHEN NOT $image_id IN f.samples THEN f.samples + $image_id
-        #     ELSE f.samples
-        # END
-        # MERGE (v)-[:HAS_VERTICAL_DIRECTION]->(f)
-        # """
-
-        # tx.run(
-        #     create_h_direction_feature,
-        #     id=result["line_id"],
-        #     direction=result["horizontal_direction"],
-        #     session_id=session_id,
-        #     image_id=image_id,
-        # )
-
-        # tx.run(
-        #     create_v_direction_feature,
-        #     id=result["line_id"],
-        #     direction=result["vertical_direction"],
-        #     session_id=session_id,
-        #     image_id=image_id,
-        # )
-
     def get_results(self) -> Dict[str, Any]:
         return {"directions": self.directions, "sequence": self.directions_sequence}
 

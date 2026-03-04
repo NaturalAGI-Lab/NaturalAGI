@@ -6,10 +6,7 @@ from logic.tertiary_features.strategy.tertiary_feature_extraction_strategy impor
 
 
 class EndPointsStrategy(TertiaryFeatureStrategy):
-    """Strategy for extracting end points.
-    This class counts number of end points per sample (image) and creates a new node
-    named EndPointsCount:Feature. With the count as a property.
-    """
+    """Strategy for counting end points per sample and storing count as a node property."""
     
     def __init__(self, session_id: str):
         self.session_id = session_id

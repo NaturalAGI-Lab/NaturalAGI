@@ -8,9 +8,7 @@ from logic.tertiary_features.strategy.tertiary_feature_extraction_strategy impor
 
 
 class CornerPointsStrategy(TertiaryFeatureStrategy):
-    """Strategy for extracting corner points.
-    This class counts number of corner points + intersection points per sample (image) and creates a new node
-    named CornerPointsCount:Feature. With the count as a property.
+    """Strategy for counting corner points + intersection points per sample and storing count as a node property.
 
     Note: Intersection points are included in the count as they can functionally replace corner points.
     """

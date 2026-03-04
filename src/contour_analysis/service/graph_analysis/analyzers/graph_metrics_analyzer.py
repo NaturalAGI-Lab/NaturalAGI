@@ -49,6 +49,17 @@ class GraphMetricsAnalyzer(BaseAnalyzer):
             logging.error(f"Error calculating metrics: {str(e)}")
             return {}
 
+    METRIC_NAME_TO_PROPERTY = {
+        "GraphDensity": "graph_density",
+        "AverageClusteringCoefficient": "avg_clustering_coeff",
+        "AveragePathLength": "avg_path_length",
+        "GraphDiameter": "graph_diameter",
+        "GraphRadius": "graph_radius",
+        "AverageDegree": "avg_degree",
+        "AverageBetweenness": "avg_betweenness",
+        "AverageCloseness": "avg_closeness",
+    }
+
     def persist(
         self,
         mx: ManagedTransaction,
@@ -57,16 +68,15 @@ class GraphMetricsAnalyzer(BaseAnalyzer):
         result: Dict[str, float],
     ) -> None:
         for metric_name, value in result.items():
+            prop = self.METRIC_NAME_TO_PROPERTY[metric_name]
             query = f"""
-                MERGE (metric:{metric_name}:Feature {{
-                    session_id: $session_id,
-                    value: $value
-                }})
-                ON CREATE SET metric.samples = [$image_id]
-                ON MATCH SET metric.samples = CASE
-                    WHEN NOT $image_id IN metric.samples THEN metric.samples + $image_id
-                    ELSE metric.samples
-                END
+                CALL {{
+                    MATCH (n:Point {{image_id: $image_id}})
+                    SET n.{prop} = $value
+                }}
+                CALL {{
+                    MATCH (n:Vector {{image_id: $image_id}})
+                    SET n.{prop} = $value
+                }}
             """
-
-            mx.run(query, session_id=session_id, value=value, image_id=image_id)
+            mx.run(query, image_id=image_id, value=value)

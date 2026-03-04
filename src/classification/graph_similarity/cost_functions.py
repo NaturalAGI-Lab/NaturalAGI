@@ -19,6 +19,14 @@ features = [
     "cycle_count",
 ]
 
+PROPERTY_NORMALIZERS = {
+    "normalized_x": 2.0,
+    "normalized_y": 2.0,
+    "horizontal_direction": 2.0,
+    "vertical_direction": 2.0,
+    "cycle_count": 4.0,
+}
+
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -158,7 +166,7 @@ def _calculate_property_similarity_cost(
 
     try:
         if _is_number(concept_value) and _is_number(image_value):
-            return _calculate_number_similarity_cost(concept_value, image_value)
+            return _calculate_number_similarity_cost(concept_value, image_value, property_name)
 
         elif _is_range(concept_value) and _is_number(image_value):
             return _calculate_range_similarity_cost(
@@ -172,10 +180,10 @@ def _calculate_property_similarity_cost(
             return _calculate_list_similarity_cost(concept_value, image_value)
 
         elif _is_number(concept_value) and isinstance(image_value, enum.Enum):
-            return _calculate_number_similarity_cost(concept_value, image_value.value)
+            return _calculate_number_similarity_cost(concept_value, image_value.value, property_name)
 
         elif isinstance(concept_value, enum.Enum) and _is_number(image_value):
-            return _calculate_number_similarity_cost(concept_value.value, image_value)
+            return _calculate_number_similarity_cost(concept_value.value, image_value, property_name)
 
         elif _is_string(concept_value) and isinstance(image_value, enum.Enum):
             return _calculate_string_similarity_cost(concept_value, image_value.value)
@@ -210,13 +218,12 @@ def _is_list(value: Any) -> bool:
 
 
 def _calculate_number_similarity_cost(
-    concept_num: Union[int, float], image_num: Union[int, float]
+    concept_num: Union[int, float],
+    image_num: Union[int, float],
+    property_name: str = None,
 ) -> float:
-    tolerance = 1e-10
-    if abs(concept_num - image_num) < tolerance:
-        return NodeCost.NO_COST.value
-    else:
-        return NodeCost.NO_MATCH.value
+    normalizer = PROPERTY_NORMALIZERS.get(property_name, 1.0)
+    return min(abs(concept_num - image_num) / normalizer, 1.0)
 
 
 def _calculate_range_similarity_cost(

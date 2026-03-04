@@ -48,13 +48,6 @@ class ImageRepository:
                 MATCH (n:Vector {image_id: $image_id})
                 DETACH DELETE n
             }
-            CALL {
-                MATCH (n:Feature)
-                WHERE $image_id IN n.samples
-                SET n.samples = [s IN n.samples WHERE s <> $image_id]
-                WITH n WHERE size(n.samples) = 0
-                DETACH DELETE n
-            }
         """
         with self.driver.session() as session:
             session.run(query, image_id=image_id)

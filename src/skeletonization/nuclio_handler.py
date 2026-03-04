@@ -2,11 +2,13 @@
 
 import dataclasses
 import json
+import os
 import time
 import cv2
 from kafka import KafkaProducer
 import traceback
 from common.model.dlq import DLQModel
+from common.tracing import init_tracer, inject_trace_headers, extract_span_link, SpanKind
 from settings import Settings
 from skeleton_gng_mapper import SkeletonGNGMapper
 from graph_serializer import GraphSerializer
@@ -35,6 +37,10 @@ def init_context(context):
     )
     setattr(context.user_data, "kafka_producer", producer)
 
+    otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
+    tracer = init_tracer(HANDLER_NAME, otlp_endpoint)
+    setattr(context.user_data, "tracer", tracer)
+
 
 def kafka_handler(context, event):
     """Handles Kafka messages"""
@@ -45,49 +51,66 @@ def kafka_handler(context, event):
         start_time = time.time_ns()
         context.logger.info_with(f"Received request: {data}", handler=HANDLER_NAME)
 
-        operation = data.get("operation")
-        parameters = data.get("parameters", {})
+        links = extract_span_link(event.headers)
+        tracer = context.user_data.tracer
 
-        context.logger.info_with(
-            f"Received request: {event.trigger.kind}", handler=HANDLER_NAME
-        )
-        context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
-        context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
+        with tracer.start_as_current_span(
+            "skeletonization.process", links=links, kind=SpanKind.SERVER
+        ) as span:
+            operation = data.get("operation")
+            parameters = data.get("parameters", {})
+            span.set_attribute("image_id", parameters.get("image_id", ""))
+            span.set_attribute("operation", operation or "")
 
-        image = cv2.imread(parameters["image_path"], 0)
+            context.logger.info_with(
+                f"Received request: {event.trigger.kind}", handler=HANDLER_NAME
+            )
+            context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
+            context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
 
-        image_width = image.shape[1]
-        image_height = image.shape[0]
+            image = cv2.imread(parameters["image_path"], 0)
 
-        parameters["image_width"] = image_width
-        parameters["image_height"] = image_height
+            image_width = image.shape[1]
+            image_height = image.shape[0]
+            span.set_attribute("image_width", image_width)
+            span.set_attribute("image_height", image_height)
 
-        settings = Settings()
-        skeletonization_threshold = parameters.get(
-            "skeletonization_threshold", settings.skeletonization_threshold
-        )
-        simplification_epsilon = parameters.get(
-            "simplification_epsilon", settings.simplification_epsilon
-        )
-        net, threshold = SkeletonGNGMapper(
-            settings, skeletonization_threshold, simplification_epsilon
-        ).process_image(image)
-        data["parameters"]["skeletonization_threshold"] = threshold
-        data["parameters"]["simplification_epsilon"] = simplification_epsilon
+            parameters["image_width"] = image_width
+            parameters["image_height"] = image_height
 
-        json_net = GraphSerializer.serialize(net)
-        context.logger.info_with(f"Net: {json_net}", handler=HANDLER_NAME)
+            settings = Settings()
+            skeletonization_threshold = parameters.get(
+                "skeletonization_threshold", settings.skeletonization_threshold
+            )
+            simplification_epsilon = parameters.get(
+                "simplification_epsilon", settings.simplification_epsilon
+            )
+            graph, threshold = SkeletonGNGMapper(
+                settings, skeletonization_threshold, simplification_epsilon
+            ).process_image(image)
+            data["parameters"]["skeletonization_threshold"] = threshold
+            data["parameters"]["simplification_epsilon"] = simplification_epsilon
+            span.set_attribute("final_threshold", threshold)
 
-        context.logger.info_with("Processed request successfully", handler=HANDLER_NAME)
-        data["skeleton"] = json_net
+            json_net = GraphSerializer.serialize(graph)
+            context.logger.info_with(f"Net: {json_net}", handler=HANDLER_NAME)
 
-        if "profiling" not in data:
-            data["profiling"] = {}
-        data["profiling"]["skeletonization_time_ms"] = (
-            time.time_ns() - start_time
-        ) / 1_000_000
+            context.logger.info_with("Processed request successfully", handler=HANDLER_NAME)
+            data["skeleton"] = json_net
 
-        context.user_data.kafka_producer.send(context.user_data.kafka_topic, value=data)
+            if "profiling" not in data:
+                data["profiling"] = {}
+            data["profiling"]["skeletonization_time_ms"] = (
+                time.time_ns() - start_time
+            ) / 1_000_000
+            span.set_attribute(
+                "duration_ms", data["profiling"]["skeletonization_time_ms"]
+            )
+
+            headers = inject_trace_headers()
+            context.user_data.kafka_producer.send(
+                context.user_data.kafka_topic, value=data, headers=headers
+            )
 
     except Exception as e:
         context.logger.warn_with(f"Error: {e}", handler=HANDLER_NAME)

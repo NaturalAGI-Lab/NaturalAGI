@@ -1,10 +1,7 @@
 import json
-import logging
 from typing import Dict
 import networkx as nx
 from neo4j import Result
-
-logging.basicConfig(level=logging.INFO)
 
 exposition_properties = [
     "cycle_count",
