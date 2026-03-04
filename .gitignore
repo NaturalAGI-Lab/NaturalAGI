@@ -182,6 +182,9 @@ jaeger-data/
 mlflow-data/
 **/mlruns/
 
+# Experiment queue (contains run-specific state)
+src/training/experiments/queue.json
+
 # Prometheus
 prometheus-data/
 
