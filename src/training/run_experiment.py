@@ -17,7 +17,7 @@ except ImportError:
     pass
 
 from sklearn.metrics import accuracy_score
-from evaluation import test_mnist_all, compare_against_best
+from evaluation import test_mnist_all, compare_against_best, MLFLOW_EXPERIMENT, MLFLOW_DEFAULT_URI
 
 QUEUE_PATH = os.path.join(_HERE, "experiments", "queue.json")
 
@@ -52,8 +52,8 @@ def run(exp_id: str, fraction: float) -> None:
     queue = _load_queue()
     exp = _find_experiment(queue, exp_id)
 
-    is_quick = exp["quick_run_id"] is None
-    if not is_quick and exp["full_run_id"] is not None:
+    needs_quick_run = exp["quick_run_id"] is None
+    if not needs_quick_run and exp["full_run_id"] is not None:
         print(json.dumps({
             "run_id": exp["full_run_id"],
             "accuracy": exp["full_accuracy"],
@@ -61,15 +61,15 @@ def run(exp_id: str, fraction: float) -> None:
         }))
         return
 
-    exp["status"] = "running_quick" if is_quick else "running_full"
+    exp["status"] = "running_quick" if needs_quick_run else "running_full"
     _save_queue(queue)
 
     description = _build_description(exp)
 
     try:
         import mlflow
-        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5050"))
-        mlflow.set_experiment("naturalagi-classification")
+        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", MLFLOW_DEFAULT_URI))
+        mlflow.set_experiment(MLFLOW_EXPERIMENT)
     except ImportError:
         mlflow = None
 
@@ -81,7 +81,7 @@ def run(exp_id: str, fraction: float) -> None:
 
     if mlflow is not None:
         parent_run_id = exp.get("mlflow_parent_run_id")
-        if is_quick:
+        if needs_quick_run:
             with mlflow.start_run(run_name=f"{exp_id}_{exp['name']}") as parent:
                 exp["mlflow_parent_run_id"] = parent.info.run_id
                 _save_queue(queue)
@@ -98,7 +98,7 @@ def run(exp_id: str, fraction: float) -> None:
     run_id = os.path.basename(run_dir)
     accuracy = round(accuracy_score(y_true, y_pred) * 100, 2) if y_true else 0.0
 
-    if is_quick:
+    if needs_quick_run:
         exp["quick_run_id"] = run_id
         exp["quick_accuracy"] = accuracy
         exp["status"] = "quick_done"

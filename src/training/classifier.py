@@ -25,6 +25,10 @@ MAX_SUBMIT_WORKERS = 8
 IDLE_TIMEOUT_SECS = 600
 
 
+def extract_class_from_concept_id(concept_id: str) -> str:
+    return concept_id.split("_")[0]
+
+
 def classify_image(
     image_path: str,
     expected_name: Optional[str] = None,
@@ -99,7 +103,7 @@ def classify_image(
                                 result["expected"] = expected_name
                                 class_results = kafka_result.get("classification_results", [])
                                 if class_results:
-                                    predicted = class_results[0]["concept_id"].split("_")[0]
+                                    predicted = extract_class_from_concept_id(class_results[0]["concept_id"])
                                     result["predicted"] = predicted
                                     result["correct"] = predicted == expected_name
                                 else:

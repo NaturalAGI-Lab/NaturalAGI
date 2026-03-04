@@ -12,7 +12,7 @@ import subprocess
 from torchvision import datasets, transforms
 from PIL import Image
 
-from infrastructure import wait_for_kafka_idle, verify_concept_created
+from infrastructure import wait_for_kafka_idle, verify_concept_created, _NEO4J_URI, _NEO4J_USER, _NEO4J_PASS
 
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -120,9 +120,9 @@ def train_mnist(
 
 def remove_concept(
     concept_id: str,
-    uri: str = "bolt://localhost:7687",
-    user: str = "neo4j",
-    password: str = "111122223333",
+    uri: str = _NEO4J_URI,
+    user: str = _NEO4J_USER,
+    password: str = _NEO4J_PASS,
 ) -> None:
     """Remove a concept and all its nodes from Neo4j."""
     from neo4j import GraphDatabase  # noqa: PLC0415 — optional import
@@ -141,9 +141,9 @@ def retrain_concept(
     number: int,
     subclass: int,
     with_concept_creation: bool = True,
-    uri: str = "bolt://localhost:7687",
-    user: str = "neo4j",
-    password: str = "111122223333",
+    uri: str = _NEO4J_URI,
+    user: str = _NEO4J_USER,
+    password: str = _NEO4J_PASS,
 ) -> None:
     """Remove and retrain a single concept."""
     remove_concept(f"{number}_{subclass}", uri=uri, user=user, password=password)

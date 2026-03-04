@@ -52,7 +52,7 @@ class _PrintProgress:
     def close(self) -> None:
         pass
 
-from classifier import classify_images_stream
+from classifier import classify_images_stream, extract_class_from_concept_id
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +60,13 @@ _TRAINING_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.abspath(os.path.join(_TRAINING_DIR, "..", ".."))
 
 CONFUSION_MATRIX_FIGSIZE = (10, 7)
+
+MLFLOW_EXPERIMENT = "naturalagi-classification"
+MLFLOW_DEFAULT_URI = "http://localhost:5050"
+
+_NEO4J_URI = os.environ.get("NEO4J_DSN", "bolt://localhost:7687")
+_NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
+_NEO4J_PASS = os.environ.get("NEO4J_PASSWORD", "111122223333")
 
 
 def save_confusion_matrix(cm: np.ndarray, classes: List[str], run_dir: str) -> None:
@@ -95,9 +102,9 @@ def test_mnist_all(
     nuclio_volume_path_template: str = "/opt/nuclio/shared_storage/generated_samples/mnist_{cls}/test",
     local_path_template: str = os.path.join(_TRAINING_DIR, "../../tests/generated_samples/mnist_{cls}/test"),
     kafka_bootstrap_servers: str = "localhost:29092",
-    neo4j_uri: str = "bolt://localhost:7687",
-    neo4j_user: str = "neo4j",
-    neo4j_password: str = "111122223333",
+    neo4j_uri: str = _NEO4J_URI,
+    neo4j_user: str = _NEO4J_USER,
+    neo4j_password: str = _NEO4J_PASS,
 ) -> Tuple[Dict[str, Any], List[str], List[str], str]:
     """
     Test MNIST classification for all given classes and compute overall metrics.
@@ -153,128 +160,138 @@ def test_mnist_all(
     id_to_expected = {img_id: expected for _, img_id, expected, _ in all_images}
     id_to_path = {img_id: path for path, img_id, _, _ in all_images}
 
-    if _is_notebook():
-        from tqdm.notebook import tqdm
-        pbar = tqdm(total=total_images, desc="Classifying", leave=True)
-    else:
-        pbar = _PrintProgress(total=total_images, desc="Classifying")
-    stream_input = [(path, img_id, img_params) for path, img_id, _, img_params in all_images]
-    stream_results = classify_images_stream(
-        stream_input,
-        on_result=lambda img_id, _r: pbar.update(1),
-        kafka_bootstrap_servers=kafka_bootstrap_servers,
-    )
-    pbar.close()
+    # MLflow: start run BEFORE classification so duration reflects actual work
+    mlflow_run_ctx = None
+    try:
+        import mlflow
+        import mlflow.data
+        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", MLFLOW_DEFAULT_URI))
+        mlflow.set_experiment(MLFLOW_EXPERIMENT)
 
-    for img_id, result in stream_results.items():
-        expected_name = id_to_expected[img_id]
-        image_path = id_to_path[img_id]
-        result["image_path"] = image_path
-        result["expected"] = expected_name
-        all_results[image_path] = result
+        _has_psutil = importlib.util.find_spec("psutil") is not None
+        parent_active = mlflow.active_run() is not None
+        mlflow_run_ctx = mlflow.start_run(
+            run_name=f"run_{timestamp}",
+            nested=parent_active,
+            log_system_metrics=_has_psutil,
+        )
+        mlflow_run_ctx.__enter__()
+    except ImportError:
+        mlflow = None
+    except Exception:
+        mlflow = None
 
-        if result["status"] == "success":
-            class_results = result.get("classification_results", [])
-            if class_results and class_results[0].get("is_minor", False):
-                predicted = class_results[0]["concept_id"].split("_")[0]
-                result["predicted"] = predicted
-                result["correct"] = predicted == expected_name
-            else:
-                result["correct"] = False
-                result["predicted"] = "not classified"
-            all_y_true.append(expected_name)
-            all_y_pred.append(result["predicted"])
-            if not result["correct"]:
-                incorrect_results.append({
-                    **result,
-                    "classification_results": json.dumps(result.get("classification_results", [])),
-                })
+    try:
+        if mlflow is not None:
+            mlflow.log_params({
+                "ged_timeout": params.get("ged_timeout", 5),
+                "skeletonization_threshold": params.get("skeletonization_threshold", 180),
+                "simplification_epsilon": params.get("simplification_epsilon"),
+                "sample_fraction": sample_fraction,
+                "num_classes": len(classes),
+                "classes": str(sorted(classes)),
+                "total_images": total_images,
+                "common_lib_version": run_config.get("common_lib_version", "unknown"),
+                "git_commit": run_config.get("git", {}).get("commit", "unknown")[:8],
+                "git_branch": run_config.get("git", {}).get("branch", "unknown"),
+                "features": str(run_config.get("features", {}).get("features", [])),
+            })
+
+            feature_config = run_config.get("features", {})
+            normalizers = feature_config.get("property_normalizers", {})
+            if normalizers:
+                mlflow.log_params({f"normalizer.{k}": v for k, v in normalizers.items()})
+            node_costs = feature_config.get("node_costs", {})
+            if node_costs:
+                mlflow.log_params({f"node_cost.{k}": v for k, v in node_costs.items()})
+
+            mlflow.set_tag("researcher", os.environ.get("USER", "unknown"))
+            mlflow.set_tag("git_dirty", str(run_config.get("git", {}).get("dirty", False)))
+            if description:
+                mlflow.set_tag("mlflow.note.content", description)
+
+            try:
+                dataset_df = pd.DataFrame([
+                    {"image_path": path, "expected_class": expected}
+                    for path, _, expected, _ in all_images
+                ])
+                dataset = mlflow.data.from_pandas(
+                    dataset_df,
+                    name=f"mnist_test_{len(classes)}cls_{total_images}img",
+                    targets="expected_class",
+                )
+                mlflow.log_input(dataset, context="evaluation")
+            except Exception:
+                logger.debug("dataset tracking failed, continuing")
+
+        if _is_notebook():
+            from tqdm.notebook import tqdm
+            pbar = tqdm(total=total_images, desc="Classifying", leave=True)
         else:
-            incorrect_results.append({**result, "classification_results": json.dumps([])})
-
-    failed_dlq = sum(1 for r in incorrect_results if r.get("error") == "DLQ")
-    successful = len(all_y_true)
-
-    if incorrect_results:
-        pd.DataFrame(incorrect_results).to_csv(
-            os.path.join(run_dir, "incorrect_results.csv"), index=False
+            pbar = _PrintProgress(total=total_images, desc="Classifying")
+        stream_input = [(path, img_id, img_params) for path, img_id, _, img_params in all_images]
+        stream_results = classify_images_stream(
+            stream_input,
+            on_result=lambda img_id, _r: pbar.update(1),
+            kafka_bootstrap_servers=kafka_bootstrap_servers,
         )
+        pbar.close()
 
-    if successful > 0:
-        labels = sorted(set(all_y_true + all_y_pred))
-        overall_precision, overall_recall, overall_f1, _ = precision_recall_fscore_support(
-            all_y_true, all_y_pred, labels=labels, average="weighted"
-        )
-        overall_accuracy = accuracy_score(all_y_true, all_y_pred)
-        class_precision, class_recall, class_f1, support = precision_recall_fscore_support(
-            all_y_true, all_y_pred, labels=labels, average=None
-        )
+        for img_id, result in stream_results.items():
+            expected_name = id_to_expected[img_id]
+            image_path = id_to_path[img_id]
+            result["image_path"] = image_path
+            result["expected"] = expected_name
+            all_results[image_path] = result
 
-        _save_metrics(
-            run_dir, total_images, failed_dlq, successful,
-            overall_accuracy, overall_precision, overall_recall, overall_f1,
-            labels, class_precision, class_recall, class_f1, support,
-        )
+            if result["status"] == "success":
+                class_results = result.get("classification_results", [])
+                if class_results and class_results[0].get("is_minor", False):
+                    predicted = extract_class_from_concept_id(class_results[0]["concept_id"])
+                    result["predicted"] = predicted
+                    result["correct"] = predicted == expected_name
+                else:
+                    result["correct"] = False
+                    result["predicted"] = "not classified"
+                all_y_true.append(expected_name)
+                all_y_pred.append(result["predicted"])
+                if not result["correct"]:
+                    incorrect_results.append({
+                        **result,
+                        "classification_results": json.dumps(result.get("classification_results", [])),
+                    })
+            else:
+                incorrect_results.append({**result, "classification_results": json.dumps([])})
 
-        cm = confusion_matrix(all_y_true, all_y_pred, labels=labels)
-        save_confusion_matrix(cm, labels, run_dir)
-        print(f"\nResults saved to: {run_dir}")
+        failed_dlq = sum(1 for r in incorrect_results if r.get("error") == "DLQ")
+        successful = len(all_y_true)
 
-        # MLflow experiment tracking (optional)
-        try:
-            import mlflow
-            import mlflow.data
-            mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5050"))
-            mlflow.set_experiment("naturalagi-classification")
+        if incorrect_results:
+            pd.DataFrame(incorrect_results).to_csv(
+                os.path.join(run_dir, "incorrect_results.csv"), index=False
+            )
 
-            _has_psutil = importlib.util.find_spec("psutil") is not None
-            parent_active = mlflow.active_run() is not None
-            with mlflow.start_run(
-                run_name=f"run_{timestamp}",
-                nested=parent_active,
-                log_system_metrics=_has_psutil,
-            ):
-                mlflow.log_params({
-                    "ged_timeout": params.get("ged_timeout", 5),
-                    "skeletonization_threshold": params.get("skeletonization_threshold", 180),
-                    "simplification_epsilon": params.get("simplification_epsilon"),
-                    "sample_fraction": sample_fraction,
-                    "num_classes": len(classes),
-                    "classes": str(sorted(classes)),
-                    "total_images": total_images,
-                    "common_lib_version": run_config.get("common_lib_version", "unknown"),
-                    "git_commit": run_config.get("git", {}).get("commit", "unknown")[:8],
-                    "git_branch": run_config.get("git", {}).get("branch", "unknown"),
-                    "features": str(run_config.get("features", {}).get("features", [])),
-                })
+        if successful > 0:
+            labels = sorted(set(all_y_true + all_y_pred))
+            overall_precision, overall_recall, overall_f1, _ = precision_recall_fscore_support(
+                all_y_true, all_y_pred, labels=labels, average="weighted"
+            )
+            overall_accuracy = accuracy_score(all_y_true, all_y_pred)
+            class_precision, class_recall, class_f1, support = precision_recall_fscore_support(
+                all_y_true, all_y_pred, labels=labels, average=None
+            )
 
-                feature_config = run_config.get("features", {})
-                normalizers = feature_config.get("property_normalizers", {})
-                if normalizers:
-                    mlflow.log_params({f"normalizer.{k}": v for k, v in normalizers.items()})
-                node_costs = feature_config.get("node_costs", {})
-                if node_costs:
-                    mlflow.log_params({f"node_cost.{k}": v for k, v in node_costs.items()})
+            _save_metrics(
+                run_dir, total_images, failed_dlq, successful,
+                overall_accuracy, overall_precision, overall_recall, overall_f1,
+                labels, class_precision, class_recall, class_f1, support,
+            )
 
-                mlflow.set_tag("researcher", os.environ.get("USER", "unknown"))
-                mlflow.set_tag("git_dirty", str(run_config.get("git", {}).get("dirty", False)))
-                if description:
-                    mlflow.set_tag("mlflow.note.content", description)
+            cm = confusion_matrix(all_y_true, all_y_pred, labels=labels)
+            save_confusion_matrix(cm, labels, run_dir)
+            print(f"\nResults saved to: {run_dir}")
 
-                try:
-                    dataset_df = pd.DataFrame([
-                        {"image_path": path, "expected_class": expected}
-                        for path, _, expected, _ in all_images
-                    ])
-                    dataset = mlflow.data.from_pandas(
-                        dataset_df,
-                        name=f"mnist_test_{len(classes)}cls_{total_images}img",
-                        targets="expected_class",
-                    )
-                    mlflow.log_input(dataset, context="evaluation")
-                except Exception:
-                    logger.debug("dataset tracking failed, continuing")
-
+            if mlflow is not None:
                 mlflow.log_metrics({
                     "accuracy": overall_accuracy,
                     "precision": overall_precision,
@@ -293,10 +310,11 @@ def test_mnist_all(
                 mlflow.log_artifact(os.path.join(run_dir, "per_class_metrics.csv"))
                 if incorrect_results:
                     mlflow.log_artifact(os.path.join(run_dir, "incorrect_results.csv"))
-        except ImportError:
-            logger.info("mlflow not installed, skipping experiment tracking")
-    else:
-        logger.warning("No successful classifications to calculate metrics.")
+        else:
+            logger.warning("No successful classifications to calculate metrics.")
+    finally:
+        if mlflow_run_ctx is not None:
+            mlflow_run_ctx.__exit__(None, None, None)
 
     return all_results, all_y_true, all_y_pred, run_dir
 
@@ -410,13 +428,13 @@ def _save_metrics(
 
 
 def search_best_run(
-    experiment_name: str = "naturalagi-classification",
+    experiment_name: str = MLFLOW_EXPERIMENT,
     metric: str = "accuracy",
     filter_string: str = "",
 ) -> Dict[str, Any] | None:
     try:
         import mlflow
-        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", "http://localhost:5050"))
+        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", MLFLOW_DEFAULT_URI))
         runs = mlflow.search_runs(
             experiment_names=[experiment_name],
             filter_string=filter_string,

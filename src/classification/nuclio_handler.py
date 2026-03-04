@@ -65,6 +65,7 @@ def init_context(context):
     context.logger.debug_with(
         f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
     )
+    setattr(context.user_data, "settings", settings)
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
 
@@ -119,7 +120,7 @@ def kafka_handler(context, event):
     image_id = data["parameters"]["image_id"]
     profiling = data["profiling"]
     delete_image_nodes = data["parameters"].get("delete_image_nodes", True)
-    settings = Settings()
+    settings = context.user_data.settings
 
     classification_params = {
         key: value
