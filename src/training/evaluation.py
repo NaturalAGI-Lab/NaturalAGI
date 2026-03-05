@@ -11,10 +11,12 @@ import os
 import random
 import re
 import subprocess
+import sys
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Tuple
 
+import networkx as nx
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -24,6 +26,9 @@ from sklearn.metrics import (
     confusion_matrix,
     precision_recall_fscore_support,
 )
+
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
+from classification.repository.neo4j_to_networkx import Neo4jToNetworkX
 
 def _is_notebook() -> bool:
     try:
@@ -67,6 +72,70 @@ MLFLOW_DEFAULT_URI = "http://localhost:5050"
 _NEO4J_URI = os.environ.get("NEO4J_DSN", "bolt://localhost:7687")
 _NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
 _NEO4J_PASS = os.environ.get("NEO4J_PASSWORD", "111122223333")
+
+_CONCEPT_GRAPH_QUERY = """
+CALL {
+    MATCH (n:Point {concept_id: $concept_id}) RETURN n
+    UNION ALL
+    MATCH (n:Vector {concept_id: $concept_id}) RETURN n
+    UNION ALL
+    MATCH (n:StartPoint {concept_id: $concept_id}) RETURN n
+}
+WITH n, labels(n) AS node_labels, properties(n) as node_props
+OPTIONAL MATCH (n)-[r]-(m {concept_id: $concept_id})
+WITH n, node_labels, r, m, node_props
+RETURN elementId(n) AS node_id,
+    node_labels,
+    node_props,
+    type(r) AS rel_type,
+    elementId(r) AS rel_id,
+    elementId(m) AS target_id
+"""
+
+
+def _json_default(obj: Any) -> Any:
+    if isinstance(obj, set):
+        return list(obj)
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+
+def _load_concept_graphs(driver) -> Dict[str, nx.Graph]:
+    concept_ids: list[str] = []
+    with driver.session() as session:
+        result = session.run("""
+            MATCH (c:Point)
+            WHERE c.concept_id IS NOT NULL
+            RETURN DISTINCT c.concept_id AS concept_id
+        """)
+        concept_ids = [r["concept_id"] for r in result]
+
+    graphs: Dict[str, nx.Graph] = {}
+    for cid in concept_ids:
+        with driver.session() as session:
+            result = session.run(_CONCEPT_GRAPH_QUERY, concept_id=cid)
+            graphs[cid] = Neo4jToNetworkX.build_networkx_graph(result, is_concept=True)
+    return graphs
+
+
+def export_concept_snapshot(concept_graphs: Dict[str, nx.Graph], path: str) -> str:
+    snapshot = {cid: nx.node_link_data(g) for cid, g in concept_graphs.items()}
+    filepath = os.path.join(path, "concept_graphs.json")
+    with open(filepath, "w") as f:
+        json.dump(snapshot, f, default=_json_default)
+    return filepath
+
+
+def restore_concept_snapshot(path: str) -> Dict[str, nx.Graph]:
+    with open(path) as f:
+        snapshot = json.load(f)
+    graphs: Dict[str, nx.Graph] = {}
+    for cid, data in snapshot.items():
+        g = nx.node_link_graph(data)
+        for _, node_data in g.nodes(data=True):
+            if "labels" in node_data:
+                node_data["labels"] = set(node_data["labels"])
+        graphs[cid] = g
+    return graphs
 
 
 def save_confusion_matrix(cm: np.ndarray, classes: List[str], run_dir: str) -> None:
@@ -134,7 +203,10 @@ def test_mnist_all(
         """)
         for record in result:
             concept_complexities[record["cid"]] = record["node_count"]
+    concept_graphs = _load_concept_graphs(driver)
     driver.close()
+
+    snapshot_path = export_concept_snapshot(concept_graphs, run_dir)
 
     run_config = _build_run_config(classes, params, sample_fraction, concept_complexities)
     with open(os.path.join(run_dir, "run_config.json"), "w") as f:
@@ -187,6 +259,8 @@ def test_mnist_all(
                 "ged_timeout": params.get("ged_timeout", 5),
                 "skeletonization_threshold": params.get("skeletonization_threshold", 180),
                 "simplification_epsilon": params.get("simplification_epsilon"),
+                "comparison_method": params.get("comparison_method", "ged"),
+                "fgw_alpha": params.get("fgw_alpha", 0.5),
                 "sample_fraction": sample_fraction,
                 "num_classes": len(classes),
                 "classes": str(sorted(classes)),
@@ -308,6 +382,7 @@ def test_mnist_all(
                 mlflow.log_artifact(os.path.join(run_dir, "confusion_matrix.png"))
                 mlflow.log_artifact(os.path.join(run_dir, "metrics.csv"))
                 mlflow.log_artifact(os.path.join(run_dir, "per_class_metrics.csv"))
+                mlflow.log_artifact(snapshot_path)
                 if incorrect_results:
                     mlflow.log_artifact(os.path.join(run_dir, "incorrect_results.csv"))
         else:

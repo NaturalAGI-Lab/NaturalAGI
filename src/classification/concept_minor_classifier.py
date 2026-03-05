@@ -1,3 +1,4 @@
+from __future__ import annotations
 import logging
 import copy
 import networkx as nx
@@ -13,9 +14,8 @@ from reduction_strategy.corner_point_reduction_strategy import (
     CornerPointReductionStrategy,
 )
 from node_similarity_calculator import NodeSimilarityCalculator
-from graph_similarity.graph_edit_distance_comparator import (
-    GraphEditDistanceComparator,
-)
+from graph_similarity.comparator_protocol import GraphComparator
+from graph_similarity.ged_comparator import GEDComparator
 from common.decorator import timed
 from services.graph_analyzer import GraphAnalyzer
 from common.traversal.visitors import AngleVisitor, QuadrantVisitor, DirectionVisitor
@@ -28,6 +28,7 @@ class ConceptMinorClassifier:
     def __init__(
         self,
         ged_timeout: float = 15,
+        comparator: GraphComparator | None = None,
         critical_point_preprocessor: CriticalPointPreprocessor = CriticalPointPreprocessor(
             endpoint_reduction_strategy=EndpointReductionStrategy(
                 node_similarity_calculator=NodeSimilarityCalculator()
@@ -41,10 +42,10 @@ class ConceptMinorClassifier:
         ),
         start_point_preprocessor: StartPointPreprocessor = StartPointPreprocessor(),
     ):
+        self.comparator = comparator if comparator is not None else GEDComparator(timeout=ged_timeout)
         self.critical_point_preprocessor = critical_point_preprocessor
         self.graph_complexity_service = GraphComplexityService()
         self.start_point_preprocessor = start_point_preprocessor
-        self.ged_timeout = ged_timeout
 
     @timed(label="check_single_concept")
     def check_single_concept(
@@ -76,11 +77,10 @@ class ConceptMinorClassifier:
                     concept_graph=concept_graph,
                 )
             )
-            similarity = GraphEditDistanceComparator.compare_graphs_ged(
+            similarity = self.comparator.compare(
                 image_graph=preprocessed_image_graph,
                 concept_graph=preprocessed_concept_graph,
                 concept_name=concept_id,
-                ged_timeout=self.ged_timeout,
             )
 
             concept_complexity = self.graph_complexity_service.get_default_graph_complexity(

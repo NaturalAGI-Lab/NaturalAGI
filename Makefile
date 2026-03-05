@@ -12,10 +12,11 @@ SHELL := /bin/bash
 CONCEPT_ID ?= default_concept
 IMAGE_ID ?= default_image
 
-# Number of instances for each service
-INSTANCES_SKEL ?= 5
-INSTANCES_CONTOUR ?= 1
-INSTANCES_CLASSIFICATION ?= 2
+# Number of instances for each service (balanced for post-Numba latencies:
+# skel ~39ms, contour ~83ms, classification ~192ms)
+INSTANCES_SKEL ?= 1
+INSTANCES_CONTOUR ?= 2
+INSTANCES_CLASSIFICATION ?= 6
 
 # Kafka partition counts per topic
 PARTITIONS_CONNECTOR ?= 8
@@ -211,12 +212,12 @@ help:
 	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
 	@echo ""
 	@echo "Configuration options:"
-	@echo "  INSTANCES_SKEL      - Number of skeletonization instances (default: 3)"
+	@echo "  INSTANCES_SKEL      - Number of skeletonization instances (default: 1)"
 	@echo "  INSTANCES_CONTOUR   - Number of contour analysis instances (default: 2)"
-	@echo "  INSTANCES_CLASSIFICATION - Number of classification instances (default: 3)"
+	@echo "  INSTANCES_CLASSIFICATION - Number of classification instances (default: 5)"
 	@echo "  USE_ENERGY_MINIMIZATION - Use energy minimization for concept formation (default: true)"
 	@echo ""
-	@echo "Example: make deploy INSTANCES_SKEL=4 INSTANCES_CONTOUR=2 INSTANCES_CLASSIFICATION=3"
+	@echo "Example: make deploy INSTANCES_SKEL=1 INSTANCES_CONTOUR=2 INSTANCES_CLASSIFICATION=5"
 
 train_prepared_samples_%:
 	$(eval subclass := $(filter-out $@,$(MAKECMDGOALS)))
@@ -307,16 +308,18 @@ dep_skel:
 		--platform local \
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		$(SKEL_ENV) $(SKEL_TRIGGERS)
-	@for i in $$(seq 2 $(INSTANCES_SKEL)); do \
-		echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
-		nuctl deploy skeletonization-$$i \
-			--run-image $(SKEL_IMAGE) \
-			--runtime python:3.9 \
-			--handler nuclio_handler:handler \
-			--platform local \
-			--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
-			$(SKEL_ENV) $(SKEL_TRIGGERS); \
-	done
+	@if [ $(INSTANCES_SKEL) -gt 1 ]; then \
+		for i in $$(seq 2 $(INSTANCES_SKEL)); do \
+			echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
+			nuctl deploy skeletonization-$$i \
+				--run-image $(SKEL_IMAGE) \
+				--runtime python:3.9 \
+				--handler nuclio_handler:handler \
+				--platform local \
+				--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
+				$(SKEL_ENV) $(SKEL_TRIGGERS); \
+		done; \
+	fi
 	@echo -e "${GREEN}Skeletonization deployed ($(INSTANCES_SKEL) instances).${NC}"
 
 dep_contour:
@@ -325,15 +328,17 @@ dep_contour:
 	@nuctl deploy contour-analysis --path src/contour_analysis \
 		--platform local \
 		$(CONTOUR_ENV) $(CONTOUR_TRIGGERS)
-	@for i in $$(seq 2 $(INSTANCES_CONTOUR)); do \
-		echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
-		nuctl deploy contour-analysis-$$i \
-			--run-image $(CONTOUR_IMAGE) \
-			--runtime python:3.9 \
-			--handler nuclio_handler:handler \
-			--platform local \
-			$(CONTOUR_ENV) $(CONTOUR_TRIGGERS); \
-	done
+	@if [ $(INSTANCES_CONTOUR) -gt 1 ]; then \
+		for i in $$(seq 2 $(INSTANCES_CONTOUR)); do \
+			echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
+			nuctl deploy contour-analysis-$$i \
+				--run-image $(CONTOUR_IMAGE) \
+				--runtime python:3.9 \
+				--handler nuclio_handler:handler \
+				--platform local \
+				$(CONTOUR_ENV) $(CONTOUR_TRIGGERS); \
+		done; \
+	fi
 	@echo -e "${GREEN}Contour analysis deployed ($(INSTANCES_CONTOUR) instances).${NC}"
 
 dep_concept:
@@ -353,16 +358,18 @@ dep_classification:
 		--platform local \
 		--volume "${LOCAL_MODEL_PATH}:${NUCLIO_STORAGE}" \
 		$(CLASS_ENV) $(CLASS_TRIGGERS)
-	@for i in $$(seq 2 $(INSTANCES_CLASSIFICATION)); do \
-		echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
-		nuctl deploy classification-$$i \
-			--run-image $(CLASS_IMAGE) \
-			--runtime python:3.9 \
-			--handler nuclio_handler:handler \
-			--platform local \
-			--volume "${LOCAL_MODEL_PATH}:${NUCLIO_STORAGE}" \
-			$(CLASS_ENV) $(CLASS_TRIGGERS); \
-	done
+	@if [ $(INSTANCES_CLASSIFICATION) -gt 1 ]; then \
+		for i in $$(seq 2 $(INSTANCES_CLASSIFICATION)); do \
+			echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
+			nuctl deploy classification-$$i \
+				--run-image $(CLASS_IMAGE) \
+				--runtime python:3.9 \
+				--handler nuclio_handler:handler \
+				--platform local \
+				--volume "${LOCAL_MODEL_PATH}:${NUCLIO_STORAGE}" \
+				$(CLASS_ENV) $(CLASS_TRIGGERS); \
+		done; \
+	fi
 	@echo -e "${GREEN}Classification deployed ($(INSTANCES_CLASSIFICATION) instances).${NC}"
 
 # Cleanup targets for multi-instance functions

@@ -57,6 +57,7 @@ class QuadrantVisitor(Visitor):
         self.graph.nodes[line.id]["labels"].append(vector_type)
         self.graph.nodes[line.id]["dx"] = dx
         self.graph.nodes[line.id]["dy"] = dy
+        self._compute_vector_midpoint(line.id)
         return {
             "quadrant": quadrant,
             "line_id": line.id,
@@ -64,6 +65,21 @@ class QuadrantVisitor(Visitor):
             "dx": dx,
             "dy": dy,
         }
+
+    def _compute_vector_midpoint(self, line_id: str) -> None:
+        point_neighbors = [
+            n for n in self.graph.neighbors(line_id)
+            if "Point" in self.graph.nodes[n].get("labels", [])
+        ]
+        if len(point_neighbors) != 2:
+            return
+        d1 = self.graph.nodes[point_neighbors[0]]
+        d2 = self.graph.nodes[point_neighbors[1]]
+        nx1, ny1 = d1.get("normalized_x"), d1.get("normalized_y")
+        nx2, ny2 = d2.get("normalized_x"), d2.get("normalized_y")
+        if all(v is not None for v in (nx1, ny1, nx2, ny2)):
+            self.graph.nodes[line_id]["normalized_x"] = round((nx1 + nx2) / 2.0, 1)
+            self.graph.nodes[line_id]["normalized_y"] = round((ny1 + ny2) / 2.0, 1)
 
     def save_result(
         self,

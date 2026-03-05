@@ -125,13 +125,8 @@ class SkeletonGNGMapper:
     @_tracer.start_as_current_span("skeletonization.skeleton_to_points")
     @timed(label="skeleton_to_points")
     def skeleton_to_points(self, skeleton: np.ndarray):
-        points = []
-        h, w = skeleton.shape
-        for y in range(h):
-            for x in range(w):
-                if skeleton[y, x] > 0:
-                    points.append([x, y])
-        result = np.array(points)
+        # argwhere returns [row, col] = [y, x]; reverse to get [x, y]
+        result = np.argwhere(skeleton > 0)[:, ::-1]
         span = trace.get_current_span()
         span.set_attribute("point_count", len(result))
         return result

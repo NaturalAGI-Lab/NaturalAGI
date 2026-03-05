@@ -8,8 +8,19 @@ from concept_minor_classifier import ConceptMinorClassifier
 from repository.image_repository import ImageRepository
 from models import ClassificationResult
 from services.graph_complexity_service import GraphComplexityService
+from graph_similarity.comparator_protocol import GraphComparator
+from graph_similarity.ged_comparator import GEDComparator
 
 logging.basicConfig(level=logging.DEBUG)
+
+
+def _build_comparator(
+    method: str, ged_timeout: float, fgw_alpha: float
+) -> GraphComparator:
+    if method == "fgw":
+        from graph_similarity.fgw_comparator import FGWComparator
+        return FGWComparator(alpha=fgw_alpha)
+    return GEDComparator(timeout=ged_timeout)
 
 
 class ClassificationOrchestrator:
@@ -20,12 +31,15 @@ class ClassificationOrchestrator:
         neo4j_user: str,
         neo4j_pass: str,
         ged_timeout: float = 15,
+        comparison_method: str = "ged",
+        fgw_alpha: float = 0.5,
         tracer: Optional[otel_trace.Tracer] = None,
     ):
         self.neo4j_dsn = neo4j_dsn
         self.neo4j_user = neo4j_user
         self.neo4j_pass = neo4j_pass
         self.ged_timeout = ged_timeout
+        self.comparator = _build_comparator(comparison_method, ged_timeout, fgw_alpha)
         self.graph_complexity_service = GraphComplexityService()
         self._tracer = tracer
 
@@ -68,7 +82,7 @@ class ClassificationOrchestrator:
             f"(image_complexity={image_complexity})"
         )
 
-        classifier = ConceptMinorClassifier(ged_timeout=self.ged_timeout)
+        classifier = ConceptMinorClassifier(comparator=self.comparator)
         results = []
 
         for concept_id, concept_graph in eligible.items():

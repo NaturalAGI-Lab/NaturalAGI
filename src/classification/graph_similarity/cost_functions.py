@@ -16,6 +16,7 @@ features = [
     "horizontal_direction",
     "vertical_direction",
     "cycle_count",
+    "angle_with_ox",
 ]
 
 PROPERTY_NORMALIZERS = {
@@ -24,6 +25,7 @@ PROPERTY_NORMALIZERS = {
     "horizontal_direction": 2.0,
     "vertical_direction": 2.0,
     "cycle_count": 1.0,
+    "angle_with_ox": 180.0,
 }
 
 
