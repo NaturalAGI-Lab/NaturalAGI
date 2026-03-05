@@ -45,6 +45,7 @@ dev = [
     "mlflow>=2.15.0",
     "psutil>=5.9.0",
     "streamlit>=1.35.0",
+    "optuna>=3.6.0",
 ]
 ml = [
     "torch>=2.0.0",
@@ -74,4 +75,5 @@ dev = [
     "mlflow>=2.15.0",
     "psutil>=5.9.0",
     "streamlit>=1.35.0",
+    "optuna>=3.6.0",
 ]

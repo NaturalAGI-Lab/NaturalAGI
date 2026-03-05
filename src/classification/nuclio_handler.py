@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     ged_timeout: float
     skeletonization_threshold: float = 180.0
     simplification_epsilon: Optional[float] = None
+    comparison_method: str = "ged"
+    fgw_alpha: float = 0.5
 
 
 @contextmanager
@@ -128,7 +130,7 @@ def kafka_handler(context, event):
             **settings.model_dump(),
             **data["parameters"],
         }.items()
-        if key in {"ged_timeout", "skeletonization_threshold", "simplification_epsilon"}
+        if key in {"ged_timeout", "skeletonization_threshold", "simplification_epsilon", "comparison_method", "fgw_alpha"}
     }
 
     context.logger.info_with(
@@ -148,6 +150,8 @@ def kafka_handler(context, event):
             neo4j_user=settings.neo4j_user,
             neo4j_pass=settings.neo4j_pass,
             ged_timeout=classification_params["ged_timeout"],
+            comparison_method=classification_params.get("comparison_method", "ged"),
+            fgw_alpha=float(classification_params.get("fgw_alpha", 0.5)),
             tracer=tracer,
         )
 

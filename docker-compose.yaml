@@ -101,6 +101,11 @@ services:
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
       KAFKA_DELETE_TOPIC_ENABLE: 'true'
+      KAFKA_LOG_RETENTION_HOURS: 1
+      KAFKA_LOG_RETENTION_BYTES: 536870912          # 512 MB per partition
+      KAFKA_LOG_SEGMENT_BYTES: 67108864             # 64 MB segments (faster cleanup)
+      KAFKA_LOG_CLEANUP_POLICY: delete
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 60000  # check every 60s
     networks:
       - neo4j-internal
     depends_on:
