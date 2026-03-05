@@ -1,9 +1,8 @@
-import enum
 import logging
 from typing import Any, Union
 
 
-class NodeCost(enum.Enum):
+class NodeCost:
     NO_COST = 0.0
     MINOR = 0.25
     GENERAL = 0.4
@@ -20,11 +19,11 @@ features = [
 ]
 
 PROPERTY_NORMALIZERS = {
-    "normalized_x": 2.0,
-    "normalized_y": 2.0,
+    "normalized_x": 3.0,
+    "normalized_y": 3.0,
     "horizontal_direction": 2.0,
     "vertical_direction": 2.0,
-    "cycle_count": 4.0,
+    "cycle_count": 1.0,
 }
 
 
@@ -43,7 +42,7 @@ def edge_del_cost(edge_data: Any) -> float:
     """
     Cost function for edge deletion.
     """
-    return NodeCost.MINOR.value
+    return NodeCost.MINOR
 
 
 def edge_ins_cost(edge_data: Any) -> float:
@@ -52,7 +51,7 @@ def edge_ins_cost(edge_data: Any) -> float:
     When the node is removed, the edge to connect neighbors should be created.
     This is a special case of edge substitution.
     """
-    return NodeCost.NO_COST.value
+    return NodeCost.NO_COST
 
 
 def node_subst_cost(image_node_data: Any, concept_node_data: Any) -> float:
@@ -62,7 +61,7 @@ def node_subst_cost(image_node_data: Any, concept_node_data: Any) -> float:
     try:
         is_compatible_labels = _check_labels_match(image_node_data, concept_node_data)
         if not is_compatible_labels:
-            return NodeCost.IMPOSSIBLE.value
+            return NodeCost.IMPOSSIBLE
 
         properties_cost = _calculate_properties_similarity_cost(
             image_node_data, concept_node_data
@@ -79,21 +78,21 @@ def node_subst_cost(image_node_data: Any, concept_node_data: Any) -> float:
 
     except Exception as e:
         logger.error("Error calculating node substitution cost: %s", e, exc_info=True)
-        return NodeCost.NO_MATCH.value
+        return NodeCost.NO_MATCH
 
 
 def node_del_cost(node_data: Any) -> float:
     """
     Cost function for node deletion.
     """
-    return NodeCost.MINOR.value
+    return NodeCost.MINOR
 
 
 def node_ins_cost(_: Any) -> float:
     """
     Cost function for node insertion.
     """
-    return NodeCost.IMPOSSIBLE.value
+    return NodeCost.IMPOSSIBLE
 
 
 def _check_labels_match(image_node_data: Any, concept_node_data: Any) -> bool:
@@ -124,7 +123,7 @@ def _calculate_properties_similarity_cost(
     common_properties = set(concept_node_data.keys()) & set(image_node_data.keys())
     common_properties_to_check = common_properties.intersection(properties_to_check)
     if not common_properties_to_check:
-        return NodeCost.NO_MATCH.value
+        return NodeCost.NO_MATCH
 
     max_prop_penalty = 1.0 / len(common_properties_to_check)
     logger.debug(
@@ -152,17 +151,17 @@ def _calculate_properties_similarity_cost(
         total_cost += min(property_cost, max_prop_penalty)
         properties_checked += 1
 
-    return total_cost if properties_checked > 0 else NodeCost.NO_COST.value
+    return total_cost if properties_checked > 0 else NodeCost.NO_COST
 
 
 def _calculate_property_similarity_cost(
     concept_value: Any,
     image_value: Any,
     property_name: str = None,
-    max_cost: float = NodeCost.NO_MATCH.value,
+    max_cost: float = NodeCost.NO_MATCH,
 ) -> float:
     if concept_value == image_value:
-        return NodeCost.NO_COST.value
+        return NodeCost.NO_COST
 
     try:
         if _is_number(concept_value) and _is_number(image_value):
@@ -178,15 +177,6 @@ def _calculate_property_similarity_cost(
 
         elif _is_list(concept_value) and _is_list(image_value):
             return _calculate_list_similarity_cost(concept_value, image_value)
-
-        elif _is_number(concept_value) and isinstance(image_value, enum.Enum):
-            return _calculate_number_similarity_cost(concept_value, image_value.value, property_name)
-
-        elif isinstance(concept_value, enum.Enum) and _is_number(image_value):
-            return _calculate_number_similarity_cost(concept_value.value, image_value, property_name)
-
-        elif _is_string(concept_value) and isinstance(image_value, enum.Enum):
-            return _calculate_string_similarity_cost(concept_value, image_value.value)
 
         else:
             raise ValueError(
@@ -241,14 +231,14 @@ def _calculate_range_similarity_cost(
             raise ValueError(f"Invalid range: min ({min_val}) > max ({max_val})")
 
         if not (min_val <= image_num <= max_val):
-            return NodeCost.NO_MATCH.value
+            return NodeCost.NO_MATCH
 
         # Value is within range - calculate distance-based cost
         range_width = max_val - min_val
 
         # Handle single point range
         if range_width == 0:
-            return NodeCost.NO_COST.value
+            return NodeCost.NO_COST
 
         # Calculate distance from range center
         distance_from_center = abs(image_num - center)
@@ -261,7 +251,7 @@ def _calculate_range_similarity_cost(
         cost_factor = normalized_distance  # Linear factor from 0 to 1
 
         # Scale between NO_COST and MINOR based on position
-        graduated_cost = NodeCost.NO_COST.value + (max_cost * cost_factor)
+        graduated_cost = NodeCost.NO_COST + (max_cost * cost_factor)
 
         return min(graduated_cost, max_cost)
 
@@ -272,25 +262,25 @@ def _calculate_range_similarity_cost(
 
 def _calculate_string_similarity_cost(concept_str: str, image_str: str) -> float:
     if concept_str.lower() == image_str.lower():
-        return NodeCost.NO_COST.value
+        return NodeCost.NO_COST
     else:
-        return NodeCost.NO_MATCH.value
+        return NodeCost.NO_MATCH
 
 
 def _calculate_list_similarity_cost(concept_list: list, image_list: list) -> float:
     if concept_list == image_list:
-        return NodeCost.NO_COST.value
+        return NodeCost.NO_COST
 
     if not concept_list and not image_list:
-        return NodeCost.NO_COST.value
+        return NodeCost.NO_COST
 
     if not concept_list and image_list:
-        return NodeCost.NO_MATCH.value
+        return NodeCost.NO_MATCH
 
     concept_set = set(concept_list)
     image_set = set(image_list)
 
     if concept_set.issubset(image_set):
-        return NodeCost.NO_COST.value
+        return NodeCost.NO_COST
     else:
-        return NodeCost.NO_MATCH.value
+        return NodeCost.NO_MATCH

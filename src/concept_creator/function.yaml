@@ -23,7 +23,7 @@ spec:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
       - "pip install numpy requests pydantic-settings neo4j networkx scikit-learn msgpack"
-      - "pip install --upgrade natural-agi-common==0.1.45"
+      - "pip install --upgrade natural-agi-common==0.1.46"
   triggers:
     default-http:
       kind: "http"

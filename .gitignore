@@ -178,11 +178,16 @@ neo4j-dumps/
 # Jaeger
 jaeger-data/
 
+# MLflow
+mlflow-data/
+**/mlruns/
+
+# Experiment queue (contains run-specific state)
+src/training/experiments/queue.json
+
 # Prometheus
 prometheus-data/
 
-# MLflow
-mlruns/
 tests/archive/*
 
 # Claude Code MCP config (contains credentials)

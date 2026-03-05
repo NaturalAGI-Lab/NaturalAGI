@@ -5,14 +5,29 @@ Extracted from training.ipynb.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from typing import Dict
+
+TOPIC_PARTITIONS = {
+    "connector-output-topic": 8,
+    "skeletonization-output-topic": 8,
+    "contour-analysis-output-topic": 6,
+    "classification-output-topic": 1,
+    "dlq-topic": 1,
+    "line-detector-output-topic": 1,
+    "angle-point-detector-output-topic": 1,
+}
 
 import networkx as nx
 from kafka import KafkaConsumer
 from neo4j import GraphDatabase, Session
 
 logger = logging.getLogger(__name__)
+
+_NEO4J_URI = os.environ.get("NEO4J_DSN", "bolt://localhost:7687")
+_NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
+_NEO4J_PASS = os.environ.get("NEO4J_PASSWORD", "111122223333")
 
 
 # ---------------------------------------------------------------------------
@@ -121,34 +136,27 @@ def clean_kafka_topics(
     from kafka.errors import TopicAlreadyExistsError, UnknownTopicOrPartitionError
 
     if topics is None:
-        topics = [
-            "connector-output-topic",
-            "line-detector-output-topic",
-            "angle-point-detector-output-topic",
-            "skeletonization-output-topic",
-            "contour-analysis-output-topic",
-            "classification-output-topic",
-            "dlq-topic",
-        ]
+        topics = list(TOPIC_PARTITIONS.keys())
 
     admin_client = KafkaAdminClient(bootstrap_servers=bootstrap_servers)
 
-    for topic in topics:
-        try:
-            admin_client.delete_topics([topic])
-            logger.info(f"Deleted topic: {topic}")
-        except UnknownTopicOrPartitionError:
-            logger.info(f"Topic {topic} does not exist")
+    try:
+        admin_client.delete_topics(topics)
+        logger.info(f"Deleted topics: {topics}")
+    except UnknownTopicOrPartitionError:
+        logger.info("Some topics did not exist")
 
     time.sleep(5)
 
-    topic_list = [NewTopic(name=t, num_partitions=1, replication_factor=1) for t in topics]
-    for topic in topic_list:
-        try:
-            admin_client.create_topics([topic])
-            logger.info(f"Created topic: {topic.name}")
-        except TopicAlreadyExistsError:
-            logger.warning(f"Topic {topic.name} already exists")
+    topic_list = [
+        NewTopic(name=t, num_partitions=TOPIC_PARTITIONS.get(t, 1), replication_factor=1)
+        for t in topics
+    ]
+    try:
+        admin_client.create_topics(topic_list)
+        logger.info(f"Created {len(topic_list)} topics")
+    except TopicAlreadyExistsError:
+        logger.warning("Some topics already exist")
 
     admin_client.close()
 
@@ -158,9 +166,9 @@ def clean_kafka_topics(
 # ---------------------------------------------------------------------------
 
 def clean_neo4j_db(
-    uri: str = "bolt://localhost:7687",
-    user: str = "neo4j",
-    password: str = "111122223333",
+    uri: str = _NEO4J_URI,
+    user: str = _NEO4J_USER,
+    password: str = _NEO4J_PASS,
 ) -> None:
     """Delete all nodes from Neo4j in batches."""
     driver = GraphDatabase.driver(uri, auth=(user, password))
@@ -175,10 +183,27 @@ def clean_neo4j_db(
     print("Neo4j DB cleaned.")
 
 
+def verify_concept_created(
+    concept_id: str,
+    uri: str = _NEO4J_URI,
+    user: str = _NEO4J_USER,
+    password: str = _NEO4J_PASS,
+) -> bool:
+    driver = GraphDatabase.driver(uri, auth=(user, password))
+    with driver.session() as session:
+        result = session.run(
+            "MATCH (n {concept_id: $concept_id}) RETURN count(n) as count",
+            concept_id=concept_id,
+        )
+        count = result.single()["count"]
+    driver.close()
+    return count > 0
+
+
 def delete_test_neo4j_nodes(
-    uri: str = "bolt://localhost:7687",
-    user: str = "neo4j",
-    password: str = "111122223333",
+    uri: str = _NEO4J_URI,
+    user: str = _NEO4J_USER,
+    password: str = _NEO4J_PASS,
 ) -> None:
     """Delete only nodes with session_id='test'."""
     driver = GraphDatabase.driver(uri, auth=(user, password))

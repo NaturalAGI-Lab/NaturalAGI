@@ -13,9 +13,9 @@ CONCEPT_ID ?= default_concept
 IMAGE_ID ?= default_image
 
 # Number of instances for each service
-INSTANCES_SKEL ?= 3
-INSTANCES_CONTOUR ?= 2
-INSTANCES_CLASSIFICATION ?= 3
+INSTANCES_SKEL ?= 5
+INSTANCES_CONTOUR ?= 1
+INSTANCES_CLASSIFICATION ?= 2
 
 # Kafka partition counts per topic
 PARTITIONS_CONNECTOR ?= 8
@@ -189,9 +189,6 @@ docker_clean:
 	@echo ""
 	@echo -e "${GREEN}Docker cleanup — after:${NC}"
 	@docker system df
-
-mlflow_ui:
-	cd src/training && mlflow ui --backend-store-uri file:./mlruns --host 0.0.0.0 --port 5050
 
 dashboard:
 	cd src/training && streamlit run dashboard.py --server.port 8501

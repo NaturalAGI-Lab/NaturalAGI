@@ -119,6 +119,23 @@ services:
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${HOST_IP}:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
 
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.21.3
+    networks:
+      - neo4j-internal
+    ports:
+      - "5050:5000"
+    volumes:
+      - ./mlflow-data:/mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri sqlite:///mlflow/mlflow.db
+      --default-artifact-root mlflow-artifacts:/
+      --serve-artifacts
+      --artifacts-destination /mlflow/artifacts
+
   jaeger:
     image: jaegertracing/jaeger:latest
     networks:
