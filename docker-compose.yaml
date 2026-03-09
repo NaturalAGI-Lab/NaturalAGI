@@ -1,3 +1,10 @@
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "3"
+
 networks:
   neo4j-internal:
     driver: bridge
@@ -32,6 +39,7 @@ services:
       - NEO4J_server_memory_pagecache_size=1500m
       - NEO4J_dbms_memory_transaction_total_max=512M
       - NEO4J_dbms.security.procedures.unrestricted=apoc.*
+      - NEO4J_db_tx__log_rotation_retention__policy=1 days
 
     volumes:
       - ./neo4j-data:/data
@@ -48,6 +56,7 @@ services:
         limits:
           cpus: '4.0'
           memory: 4096M
+    <<: *default-logging
 
   nuclio-dashboard:
 
@@ -73,6 +82,7 @@ services:
     
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+    <<: *default-logging
 
   zookeeper:
     image: confluentinc/cp-zookeeper:latest
@@ -81,6 +91,7 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    <<: *default-logging
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
@@ -102,14 +113,16 @@ services:
       KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
       KAFKA_DELETE_TOPIC_ENABLE: 'true'
       KAFKA_LOG_RETENTION_HOURS: 1
-      KAFKA_LOG_RETENTION_BYTES: 536870912          # 512 MB per partition
-      KAFKA_LOG_SEGMENT_BYTES: 67108864             # 64 MB segments (faster cleanup)
+      KAFKA_LOG_RETENTION_BYTES: 104857600          # 100 MB per partition (was 512 MB)
+      KAFKA_LOG_SEGMENT_BYTES: 16777216             # 16 MB segments (was 64 MB — faster rollover → faster cleanup)
+      KAFKA_LOG_INDEX_SIZE_MAX_BYTES: 1048576       # 1 MB index pre-alloc (was 10 MB default — 80 partitions × 20 MB = 1.6 GB saved)
       KAFKA_LOG_CLEANUP_POLICY: delete
-      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 60000  # check every 60s
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 30000  # check every 30s (was 60s)
     networks:
       - neo4j-internal
     depends_on:
       - zookeeper
+    <<: *default-logging
 
   kafka-ui:
     image: provectuslabs/kafka-ui:latest
@@ -123,6 +136,7 @@ services:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${HOST_IP}:29092
       KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    <<: *default-logging
 
   mlflow:
     image: ghcr.io/mlflow/mlflow:v2.21.3
@@ -140,6 +154,7 @@ services:
       --default-artifact-root mlflow-artifacts:/
       --serve-artifacts
       --artifacts-destination /mlflow/artifacts
+    <<: *default-logging
 
   jaeger:
     image: jaegertracing/jaeger:latest
@@ -158,6 +173,7 @@ services:
     command: ["--config", "/etc/jaeger/config.yaml"]
     depends_on:
       - prometheus
+    <<: *default-logging
 
   prometheus:
     image: prom/prometheus:latest
@@ -169,3 +185,8 @@ services:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - ./prometheus-recording-rules.yml:/etc/prometheus/recording_rules.yml
       - ./prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=2d'
+      - '--storage.tsdb.retention.size=200MB'
+    <<: *default-logging
