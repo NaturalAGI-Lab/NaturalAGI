@@ -1,0 +1,30 @@
+{
+  "comparison_method": "fgw",
+  "fgw_alpha": 0.7547682873477692,
+  "ged_timeout": 12.142711211642451,
+  "skeletonization_threshold": 150,
+  "simplification_epsilon": 3.515345146311371,
+  "features": [
+    "normalized_x",
+    "normalized_y",
+    "horizontal_direction",
+    "cycle_count",
+    "angle_with_ox"
+  ],
+  "property_normalizers": {
+    "normalized_x": 2.8252972445504887,
+    "normalized_y": 3.0345796198351116,
+    "horizontal_direction": 1.2478698070156153,
+    "vertical_direction": 1.6766784307796383,
+    "cycle_count": 3.8064525617616427,
+    "angle_with_ox": 175.49620667076383
+  },
+  "node_costs": {
+    "NO_COST": 0.0,
+    "MINOR": 0.07629802546425762,
+    "GENERAL": 0.2464275803630267,
+    "SEVERE": 0.3827831039236203,
+    "NO_MATCH": 1.6227144198615209,
+    "IMPOSSIBLE": 23.974602952038392
+  }
+}

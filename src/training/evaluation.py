@@ -167,6 +167,7 @@ def test_mnist_all(
     params: Dict[str, Any],
     sample_fraction: float = 1.0,
     description: str = "",
+    quiet: bool = False,
     results_dir: str = os.path.join(_TRAINING_DIR, "training_results"),
     nuclio_volume_path_template: str = "/opt/nuclio/shared_storage/generated_samples/mnist_{cls}/test",
     local_path_template: str = os.path.join(_TRAINING_DIR, "../../tests/generated_samples/mnist_{cls}/test"),
@@ -185,6 +186,26 @@ def test_mnist_all(
     all_y_true: List[str] = []
     all_y_pred: List[str] = []
     incorrect_results: List[Dict[str, Any]] = []
+
+    _quiet_state: Dict[str, Any] = {}
+    if quiet:
+        import warnings
+        _quiet_state["warn_ctx"] = warnings.catch_warnings()
+        _quiet_state["warn_ctx"].__enter__()
+        warnings.filterwarnings("ignore", category=UserWarning, module="sklearn")
+        warnings.filterwarnings("ignore", message=".*UndefinedMetric.*")
+        _noisy_loggers = {
+            "neo4j": logging.ERROR,
+            "neo4j.notifications": logging.ERROR,
+            "neo4j.io": logging.ERROR,
+            "mlflow": logging.WARNING,
+            "mlflow.system_metrics": logging.ERROR,
+            "mlflow.tracking": logging.WARNING,
+        }
+        for _name, _target_level in _noisy_loggers.items():
+            _log = logging.getLogger(_name)
+            _quiet_state.setdefault("log_levels", {})[_name] = _log.level
+            _log.setLevel(_target_level)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     run_dir = os.path.join(results_dir, f"run_{timestamp}")
@@ -226,7 +247,7 @@ def test_mnist_all(
             all_images.append((os.path.join(nuclio_folder, fname), image_id, str(cls), image_params))
 
     total_images = len(all_images)
-    if sample_fraction < 1.0:
+    if sample_fraction < 1.0 and not quiet:
         print(f"Fast mode: {sample_fraction*100:.0f}% of data ({total_images} images)")
 
     id_to_expected = {img_id: expected for _, img_id, expected, _ in all_images}
@@ -245,7 +266,7 @@ def test_mnist_all(
         mlflow_run_ctx = mlflow.start_run(
             run_name=f"run_{timestamp}",
             nested=parent_active,
-            log_system_metrics=_has_psutil,
+            log_system_metrics=_has_psutil and not quiet,
         )
         mlflow_run_ctx.__enter__()
     except ImportError:
@@ -300,7 +321,7 @@ def test_mnist_all(
 
         if _is_notebook():
             from tqdm.notebook import tqdm
-            pbar = tqdm(total=total_images, desc="Classifying", leave=True)
+            pbar = tqdm(total=total_images, desc="Classifying", leave=not quiet)
         else:
             pbar = _PrintProgress(total=total_images, desc="Classifying")
         stream_input = [(path, img_id, img_params) for path, img_id, _, img_params in all_images]
@@ -359,11 +380,13 @@ def test_mnist_all(
                 run_dir, total_images, failed_dlq, successful,
                 overall_accuracy, overall_precision, overall_recall, overall_f1,
                 labels, class_precision, class_recall, class_f1, support,
+                quiet=quiet,
             )
 
             cm = confusion_matrix(all_y_true, all_y_pred, labels=labels)
             save_confusion_matrix(cm, labels, run_dir)
-            print(f"\nResults saved to: {run_dir}")
+            if not quiet:
+                print(f"\nResults saved to: {run_dir}")
 
             if mlflow is not None:
                 mlflow.log_metrics({
@@ -390,6 +413,11 @@ def test_mnist_all(
     finally:
         if mlflow_run_ctx is not None:
             mlflow_run_ctx.__exit__(None, None, None)
+        if _quiet_state:
+            for _name, _lvl in _quiet_state.get("log_levels", {}).items():
+                logging.getLogger(_name).setLevel(_lvl)
+            if "warn_ctx" in _quiet_state:
+                _quiet_state["warn_ctx"].__exit__(None, None, None)
 
     return all_results, all_y_true, all_y_pred, run_dir
 
@@ -418,7 +446,18 @@ def _build_run_config(
         "sample_fraction": sample_fraction,
         "classes": sorted(classes),
         "concepts": concept_complexities,
-        "features": _read_feature_config(),
+        "features": {
+            **_read_feature_config(),
+            **({
+                "features": params["features"],
+            } if "features" in params else {}),
+            **({
+                "property_normalizers": params["property_normalizers"],
+            } if "property_normalizers" in params else {}),
+            **({
+                "node_costs": params["node_costs"],
+            } if "node_costs" in params else {}),
+        },
     }
 
 
@@ -470,6 +509,7 @@ def _save_metrics(
     class_recall: np.ndarray,
     class_f1: np.ndarray,
     support: np.ndarray,
+    quiet: bool = False,
 ) -> None:
     pd.DataFrame({
         "Metric": ["Total Images", "Failed (DLQ)", "Successfully Classified",
@@ -493,13 +533,14 @@ def _save_metrics(
     ]
     pd.DataFrame(per_class).to_csv(os.path.join(run_dir, "per_class_metrics.csv"), index=False)
 
-    print(f"\n{'='*50}")
-    print(f"Total: {total}  |  DLQ: {failed_dlq}  |  Success: {successful}")
-    print(f"Accuracy:  {overall_accuracy*100:.2f}%")
-    print(f"Precision: {overall_precision*100:.2f}%")
-    print(f"Recall:    {overall_recall*100:.2f}%")
-    print(f"F1:        {overall_f1*100:.2f}%")
-    print(f"{'='*50}")
+    if not quiet:
+        print(f"\n{'='*50}")
+        print(f"Total: {total}  |  DLQ: {failed_dlq}  |  Success: {successful}")
+        print(f"Accuracy:  {overall_accuracy*100:.2f}%")
+        print(f"Precision: {overall_precision*100:.2f}%")
+        print(f"Recall:    {overall_recall*100:.2f}%")
+        print(f"F1:        {overall_f1*100:.2f}%")
+        print(f"{'='*50}")
 
 
 def search_best_run(

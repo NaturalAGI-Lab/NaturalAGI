@@ -1,0 +1,14 @@
+parameter,importance
+cost_minor,0.9255
+gap_minor_general,0.0307
+skel_threshold,0.0300
+simplification_epsilon,0.0033
+ged_timeout,0.0024
+cost_no_match,0.0016
+gap_general_severe,0.0013
+norm_cycle,0.0012
+norm_y,0.0011
+norm_x,0.0010
+norm_angle,0.0009
+norm_hdir,0.0008
+cost_impossible,0.0003

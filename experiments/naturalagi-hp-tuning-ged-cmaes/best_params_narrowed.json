@@ -1,0 +1,34 @@
+{
+  "trial": 167,
+  "accuracy_quick": 0.7841726618705036,
+  "params": {
+    "ged_timeout": 8.720353894823917,
+    "skel_threshold": 140,
+    "simplification_epsilon": 4.550370424971302,
+    "cost_minor": 0.2535723953516123,
+    "gap_minor_general": 0.1958611927512517,
+    "gap_general_severe": 0.2758112027903235,
+    "cost_no_match": 1.3043171985545639,
+    "cost_impossible": 6.681133820253906,
+    "norm_x": 3.7497392706006782,
+    "norm_y": 3.671397788443077,
+    "norm_hdir": 3.105773306665678,
+    "norm_cycle": 3.276716866412356,
+    "norm_angle": 279.36159731282885
+  },
+  "derived_costs": {
+    "NO_COST": 0.0,
+    "MINOR": 0.2535723953516123,
+    "GENERAL": 0.449433588102864,
+    "SEVERE": 0.7252447908931875,
+    "NO_MATCH": 1.3043171985545639,
+    "IMPOSSIBLE": 6.681133820253906
+  },
+  "features": [
+    "normalized_x",
+    "normalized_y",
+    "horizontal_direction",
+    "cycle_count",
+    "angle_with_ox"
+  ]
+}
