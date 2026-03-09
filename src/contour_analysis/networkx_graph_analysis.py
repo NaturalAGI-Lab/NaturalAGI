@@ -226,17 +226,10 @@ class NetworkxGraphAnalysis:
             )
 
     def analyze_graph(self, image_id: str, session_id: str):
-        print(
-            "Starting graph analysis with analyzers: ",
-            [type(analyzer).__name__ for analyzer in self.analyzers],
+        analyzer_results = [(a, a.analyze()) for a in self.analyzers]
+        self.analysis_result_persistence_service.save_all_results(
+            analyzer_results, image_id, session_id
         )
-
-        # Graph exposition analysis
-        for analyzer in self.analyzers:
-            result = analyzer.analyze()
-            self.analysis_result_persistence_service.save_analysis_result(
-                analyzer, result, image_id, session_id
-            )
 
     def calculate_length(
         self, coordinates1: Tuple[float, float], coordinates2: Tuple[float, float]

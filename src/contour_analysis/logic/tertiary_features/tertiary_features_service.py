@@ -1,4 +1,4 @@
-from neo4j import GraphDatabase, ManagedTransaction
+from neo4j import Driver, ManagedTransaction
 from logic.tertiary_features.strategy.vectors_strategy import VectorsStrategy
 from logic.tertiary_features.strategy.end_points_strategy import EndPointsStrategy
 from logic.tertiary_features.strategy.intersection_points_strategy import IntersectionPointsStrategy
@@ -7,8 +7,8 @@ from logic.tertiary_features.strategy.quadrant_change_strategy import QuadrantCh
 
 
 class TertiaryFeaturesService:
-    def __init__(self, uri: str, user: str, password: str):
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+    def __init__(self, driver: Driver):
+        self.driver = driver
         
     def create_tertiary_features(self, image_id: str, session_id: str):
         with self.driver.session() as session:
