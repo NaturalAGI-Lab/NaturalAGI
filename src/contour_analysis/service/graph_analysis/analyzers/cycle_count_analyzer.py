@@ -33,12 +33,12 @@ class CycleCountAnalyzer(BaseAnalyzer):
     ) -> None:
         query = """
             CALL {
-                MATCH (n:Point {session_id: $session_id})
+                MATCH (n:Point {image_id: $image_id})
                 SET n.cycle_count = $result
             }
             CALL {
-                MATCH (n:Vector {session_id: $session_id})
+                MATCH (n:Vector {image_id: $image_id})
                 SET n.cycle_count = $result
             }
         """
-        mx.run(query, session_id=session_id, result=result)
+        mx.run(query, image_id=image_id, result=result)

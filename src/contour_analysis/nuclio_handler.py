@@ -5,6 +5,7 @@ import traceback
 import time
 
 from kafka import KafkaProducer
+from neo4j import GraphDatabase
 from pydantic_settings import BaseSettings
 
 from common.model import DLQModel
@@ -48,16 +49,13 @@ def init_context(context):
         f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
     )
 
-    graph_persistence_service = GraphPersistenceService(
-        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
+    driver = GraphDatabase.driver(
+        settings.neo4j_dsn, auth=(settings.neo4j_user, settings.neo4j_pass)
     )
+    graph_persistence_service = GraphPersistenceService(driver)
     data_preprocessing_service = DataPreprocessingService(graph_persistence_service)
-    tertiary_features_service = TertiaryFeaturesService(
-        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
-    )
-    analysis_result_persistence_service = AnalysisResultPersistenceService(
-        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
-    )
+    tertiary_features_service = TertiaryFeaturesService(driver)
+    analysis_result_persistence_service = AnalysisResultPersistenceService(driver)
 
     setattr(
         context.user_data, "kafka_bootstrap_servers", settings.kafka_bootstrap_servers
