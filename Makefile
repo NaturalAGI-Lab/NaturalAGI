@@ -12,16 +12,16 @@ SHELL := /bin/bash
 CONCEPT_ID ?= default_concept
 IMAGE_ID ?= default_image
 
-# Number of instances for each service (balanced for post-Numba latencies:
-# skel ~39ms, contour ~83ms, classification ~192ms)
-INSTANCES_SKEL ?= 1
-INSTANCES_CONTOUR ?= 2
-INSTANCES_CLASSIFICATION ?= 6
+# Number of instances for each service (balanced for post-IO-optimization latencies:
+# skel ~40ms, contour ~50ms, classification ~243ms)
+INSTANCES_SKEL ?= 2
+INSTANCES_CONTOUR ?= 4
+INSTANCES_CLASSIFICATION ?= 12
 
-# Kafka partition counts per topic
-PARTITIONS_CONNECTOR ?= 8
+# Kafka partition counts per topic (2 × instances for even distribution)
+PARTITIONS_CONNECTOR ?= 4
 PARTITIONS_SKEL ?= 8
-PARTITIONS_CONTOUR ?= 6
+PARTITIONS_CONTOUR ?= 24
 PARTITIONS_CLASSIFICATION ?= 1
 PARTITIONS_DLQ ?= 1
 
@@ -289,11 +289,13 @@ CLASS_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWor
 SKEL_IMAGE = nuclio/processor-skeletonization:latest
 CONTOUR_IMAGE = nuclio/processor-contour-analysis:latest
 CLASS_IMAGE = nuclio/processor-classification:latest
+NUCLIO_LOGGER_LEVEL ?= warning
 
 dep_conn:
 	@echo -e "${BLUE}Deploying connector...${NC}"
 	@nuctl deploy --path src/connector \
 		--platform local \
+		--logger-level $(NUCLIO_LOGGER_LEVEL) \
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 		-e DLQ_TOPIC="${DLQ_TOPIC}" \
@@ -306,6 +308,7 @@ dep_skel:
 	@echo -e "${BLUE}  Instance 1 (building image)...${NC}"
 	@nuctl deploy skeletonization --path src/skeletonization \
 		--platform local \
+		--logger-level $(NUCLIO_LOGGER_LEVEL) \
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		$(SKEL_ENV) $(SKEL_TRIGGERS)
 	@if [ $(INSTANCES_SKEL) -gt 1 ]; then \
@@ -316,6 +319,7 @@ dep_skel:
 				--runtime python:3.9 \
 				--handler nuclio_handler:handler \
 				--platform local \
+				--logger-level $(NUCLIO_LOGGER_LEVEL) \
 				--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 				$(SKEL_ENV) $(SKEL_TRIGGERS); \
 		done; \
@@ -327,6 +331,7 @@ dep_contour:
 	@echo -e "${BLUE}  Instance 1 (building image)...${NC}"
 	@nuctl deploy contour-analysis --path src/contour_analysis \
 		--platform local \
+		--logger-level $(NUCLIO_LOGGER_LEVEL) \
 		$(CONTOUR_ENV) $(CONTOUR_TRIGGERS)
 	@if [ $(INSTANCES_CONTOUR) -gt 1 ]; then \
 		for i in $$(seq 2 $(INSTANCES_CONTOUR)); do \
@@ -336,6 +341,7 @@ dep_contour:
 				--runtime python:3.9 \
 				--handler nuclio_handler:handler \
 				--platform local \
+				--logger-level $(NUCLIO_LOGGER_LEVEL) \
 				$(CONTOUR_ENV) $(CONTOUR_TRIGGERS); \
 		done; \
 	fi
@@ -345,6 +351,7 @@ dep_concept:
 	@echo -e "${BLUE}Deploying concept creator...${NC}"
 	@nuctl deploy --path src/concept_creator \
 		--platform local \
+		--logger-level $(NUCLIO_LOGGER_LEVEL) \
 		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 		-e NEO4J_USER=neo4j \
 		-e NEO4J_PASS=${NEO4J_PASS} \
@@ -356,6 +363,7 @@ dep_classification:
 	@echo -e "${BLUE}  Instance 1 (building image)...${NC}"
 	@nuctl deploy classification --path src/classification \
 		--platform local \
+		--logger-level $(NUCLIO_LOGGER_LEVEL) \
 		--volume "${LOCAL_MODEL_PATH}:${NUCLIO_STORAGE}" \
 		$(CLASS_ENV) $(CLASS_TRIGGERS)
 	@if [ $(INSTANCES_CLASSIFICATION) -gt 1 ]; then \
@@ -366,11 +374,17 @@ dep_classification:
 				--runtime python:3.9 \
 				--handler nuclio_handler:handler \
 				--platform local \
+				--logger-level $(NUCLIO_LOGGER_LEVEL) \
 				--volume "${LOCAL_MODEL_PATH}:${NUCLIO_STORAGE}" \
 				$(CLASS_ENV) $(CLASS_TRIGGERS); \
 		done; \
 	fi
 	@echo -e "${GREEN}Classification deployed ($(INSTANCES_CLASSIFICATION) instances).${NC}"
+
+clean_logs:
+	@echo -e "${BLUE}Truncating all container log files...${NC}"
+	@docker run --rm -v /var/lib/docker:/docker alpine sh -c "find /docker/containers -name '*-json.log' -exec truncate -s 0 {} +"
+	@echo -e "${GREEN}Done.${NC}"
 
 # Cleanup targets for multi-instance functions
 undep_skel:

@@ -38,8 +38,9 @@ extensions:
             keys: /badger/key
             values: /badger/data
           ephemeral: false
+          maintenance_interval: 5m
           ttl:
-            spans: 72h
+            spans: 1h
     metric_backends:
       prometheus_store:
         prometheus:

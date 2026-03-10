@@ -198,3 +198,4 @@ CLAUDE.md
 /researches
 
 .claude/
+src/training/experiments/*
