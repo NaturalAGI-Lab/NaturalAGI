@@ -1,0 +1,31 @@
+{
+  "trial_number": 442,
+  "accuracy_quick_25pct": 0.7756,
+  "comparison_method": "ged",
+  "skeletonization_threshold": 110,
+  "simplification_epsilon": 4.616,
+  "ged_timeout": 6.2467,
+  "features": [
+    "normalized_x",
+    "normalized_y",
+    "horizontal_direction",
+    "cycle_count",
+    "angle_with_ox"
+  ],
+  "property_normalizers": {
+    "normalized_x": 3.3763,
+    "normalized_y": 2.2627,
+    "horizontal_direction": 2.6997,
+    "vertical_direction": 3.0585,
+    "cycle_count": 2.6599,
+    "angle_with_ox": 252.3331
+  },
+  "node_costs": {
+    "NO_COST": 0.0,
+    "MINOR": 0.2303,
+    "GENERAL": 0.4681,
+    "SEVERE": 0.7543,
+    "NO_MATCH": 1.1806,
+    "IMPOSSIBLE": 7.3775
+  }
+}
