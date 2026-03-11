@@ -37,7 +37,6 @@ NEO4J_PASS=111122223333
 
 LOCAL_STORAGE=./tests/
 NUCLIO_STORAGE=/opt/nuclio/shared_storage/
-LOCAL_MODEL_PATH=./src/training/latest_model
 
 DLQ_TOPIC = dlq-topic
 CONNECTOR_KAFKA_TOPIC = connector-output-topic
@@ -378,7 +377,6 @@ dep_classification:
 	@nuctl deploy classification --path src/classification \
 		--platform local \
 		--logger-level $(NUCLIO_LOGGER_LEVEL) \
-		--volume "${LOCAL_MODEL_PATH}:${NUCLIO_STORAGE}" \
 		$(CLASS_ENV) $(CLASS_TRIGGERS)
 	@if [ $(INSTANCES_CLASSIFICATION) -gt 1 ]; then \
 		for i in $$(seq 2 $(INSTANCES_CLASSIFICATION)); do \
@@ -389,7 +387,6 @@ dep_classification:
 				--handler nuclio_handler:handler \
 				--platform local \
 				--logger-level $(NUCLIO_LOGGER_LEVEL) \
-				--volume "${LOCAL_MODEL_PATH}:${NUCLIO_STORAGE}" \
 				$(CLASS_ENV) $(CLASS_TRIGGERS); \
 		done; \
 	fi
