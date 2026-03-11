@@ -86,7 +86,7 @@ class SkeletonGNGMapper:
         span = trace.get_current_span()
         span.set_attribute("threshold", threshold)
         binary = image > threshold
-        binary = remove_small_objects(binary, min_size=10)
+        binary = remove_small_objects(binary, max_size=9)
         binary = closing(binary, square(3))
         return binary
 
@@ -101,7 +101,7 @@ class SkeletonGNGMapper:
         summary = summarize(sk, separator="_")
 
         # Adaptive pruning: remove branches shorter than X% of total skeleton length
-        PRUNE_PERCENT = 0.08  # 5% of total skeleton length
+        PRUNE_PERCENT = 0.08  # 8% of total skeleton length
         MIN_ABSOLUTE = 5  # minimum threshold in pixels (safety floor)
 
         total_length = summary["branch_distance"].sum()

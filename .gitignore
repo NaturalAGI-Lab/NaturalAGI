@@ -175,18 +175,12 @@ neo4j-data/
 neo4j-logs/
 neo4j-dumps/
 
-# Jaeger
-jaeger-data/
-
 # MLflow
 mlflow-data/
 **/mlruns/
 
 # Experiment queue (contains run-specific state)
 src/training/experiments/queue.json
-
-# Prometheus
-prometheus-data/
 
 tests/archive/*
 

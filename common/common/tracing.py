@@ -7,7 +7,7 @@ from opentelemetry.trace import SpanKind
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 logger = logging.getLogger(__name__)
@@ -16,37 +16,40 @@ _propagator = TraceContextTextMapPropagator()
 
 TRACING_ENABLED = os.environ.get("OTEL_TRACING_ENABLED", "true").lower() == "true"
 
+_tracer_cache: dict[str, trace.Tracer] = {}
 
-def init_tracer(service_name: str, otlp_endpoint: str = "http://jaeger:4317") -> trace.Tracer:
+
+def init_tracer(service_name: str, experiment_id: str | None = None) -> trace.Tracer:
     if not TRACING_ENABLED:
         return trace.get_tracer(service_name)
 
+    if experiment_id is None:
+        experiment_id = os.environ.get("MLFLOW_EXPERIMENT_ID", "0")
+
+    cache_key = f"{service_name}:{experiment_id}"
+    if cache_key in _tracer_cache:
+        return _tracer_cache[cache_key]
+
+    otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://mlflow:5000")
     resource = Resource.create({"service.name": service_name})
     provider = TracerProvider(resource=resource)
     provider.add_span_processor(
         BatchSpanProcessor(
-            OTLPSpanExporter(endpoint=otlp_endpoint, insecure=True)
+            OTLPSpanExporter(
+                endpoint=f"{otlp_endpoint}/v1/traces",
+                headers={"x-mlflow-experiment-id": experiment_id},
+            )
         )
     )
-    trace.set_tracer_provider(provider)
-    return trace.get_tracer(service_name)
+    tracer = provider.get_tracer(service_name)
+    _tracer_cache[cache_key] = tracer
+    return tracer
 
 
 def inject_trace_headers() -> list:
     carrier = {}
     _propagator.inject(carrier)
     return [(k, v.encode("utf-8")) for k, v in carrier.items()]
-
-
-def extract_span_link(event_headers) -> list:
-    parent_ctx = extract_trace_context(event_headers)
-    if parent_ctx is None:
-        return []
-    parent_span = trace.get_current_span(parent_ctx)
-    span_ctx = parent_span.get_span_context()
-    if not span_ctx.is_valid:
-        return []
-    return [trace.Link(span_ctx)]
 
 
 def extract_trace_context(event_headers) -> Optional[object]:

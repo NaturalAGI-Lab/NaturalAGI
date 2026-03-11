@@ -15,8 +15,6 @@ TOPIC_PARTITIONS = {
     "contour-analysis-output-topic": 6,
     "classification-output-topic": 1,
     "dlq-topic": 1,
-    "line-detector-output-topic": 1,
-    "angle-point-detector-output-topic": 1,
 }
 
 import networkx as nx

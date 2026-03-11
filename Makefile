@@ -67,16 +67,30 @@ VENV := natural-agi/bin
 PYTHON := $(VENV)/python
 PIP := $(VENV)/pip3
 
+COMMON_DIR := common
+COMMON_VENV := $(COMMON_DIR)/.venv/bin
+
 lib:
 	@echo -e "${BLUE}Building common library...${NC}"
-	@rm -rf dist build *.egg-info
-	@$(PYTHON) setup.py sdist bdist_wheel
-	@$(PIP) install twine
-	@$(VENV)/twine upload dist/* --verbose || { rm -rf dist build *.egg-info; exit 1; }
-	@rm -rf dist build *.egg-info
+	@# Ensure dedicated venv exists
+	@test -d $(COMMON_DIR)/.venv || python3 -m venv $(COMMON_DIR)/.venv
+	@$(COMMON_VENV)/pip install -q build twine
+	@# Auto-increment patch version
+	@cd $(COMMON_DIR) && \
+		OLD_VER=$$(grep '^version' pyproject.toml | sed 's/.*"\(.*\)"/\1/') && \
+		PATCH=$$(echo $$OLD_VER | awk -F. '{print $$3}') && \
+		NEW_PATCH=$$((PATCH + 1)) && \
+		NEW_VER=$$(echo $$OLD_VER | awk -F. -v p=$$NEW_PATCH '{print $$1"."$$2"."p}') && \
+		sed -i '' "s/version = \"$$OLD_VER\"/version = \"$$NEW_VER\"/" pyproject.toml && \
+		echo -e "${BLUE}Version: $$OLD_VER → $$NEW_VER${NC}"
+	@# Build and upload from common/ directory
+	@rm -rf $(COMMON_DIR)/dist
+	@$(COMMON_VENV)/python -m build $(COMMON_DIR) --outdir $(COMMON_DIR)/dist || { rm -rf $(COMMON_DIR)/dist; exit 1; }
+	@$(COMMON_VENV)/twine upload $(COMMON_DIR)/dist/* --verbose || { rm -rf $(COMMON_DIR)/dist; exit 1; }
+	@rm -rf $(COMMON_DIR)/dist
 	@echo -e "${GREEN}Library built and uploaded.${NC}"
 	@$(PIP) install --upgrade natural-agi-common
-	@echo -e "${GREEN}Library installed.${NC}"
+	@echo -e "${GREEN}Library installed in project venv.${NC}"
 
 start_services:
 	@echo -e "${BLUE}Starting Docker services...${NC}"
@@ -254,7 +268,7 @@ send_to_connector:
 .PHONY: undep_skel undep_contour undep_classification undep_all
 
 # Common env/trigger fragments
-OTEL_ENDPOINT = http://${HOST_IP}:4317
+OTEL_ENDPOINT = http://${HOST_IP}:5050
 
 SKEL_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e DLQ_TOPIC="${DLQ_TOPIC}" \
@@ -263,7 +277,7 @@ SKEL_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}" \
 	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 
-SKEL_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}'
+SKEL_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}'
 
 CONTOUR_ENV = -e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 	-e NEO4J_USER=neo4j \
@@ -273,7 +287,7 @@ CONTOUR_ENV = -e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 	-e KAFKA_TOPIC="${CONTOUR_ANALYSIS_KAFKA_TOPIC}" \
 	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 
-CONTOUR_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${SKELETONIZATION_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "contour-analysis-group"}}}'
+CONTOUR_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${SKELETONIZATION_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "contour-analysis-group"}}}'
 
 CLASS_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e DLQ_TOPIC="${DLQ_TOPIC}" \
@@ -284,7 +298,7 @@ CLASS_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e GED_TIMEOUT=15 \
 	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 
-CLASS_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "maxWorkers": 1, "attributes": {"initialOffset": "earliest", "topics": ["${CONTOUR_ANALYSIS_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "classification-group"}}}'
+CLASS_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONTOUR_ANALYSIS_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "classification-group"}}}'
 
 SKEL_IMAGE = nuclio/processor-skeletonization:latest
 CONTOUR_IMAGE = nuclio/processor-contour-analysis:latest
@@ -316,7 +330,7 @@ dep_skel:
 			echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
 			nuctl deploy skeletonization-$$i \
 				--run-image $(SKEL_IMAGE) \
-				--runtime python:3.9 \
+				--runtime python:3.12 \
 				--handler nuclio_handler:handler \
 				--platform local \
 				--logger-level $(NUCLIO_LOGGER_LEVEL) \
@@ -338,7 +352,7 @@ dep_contour:
 			echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
 			nuctl deploy contour-analysis-$$i \
 				--run-image $(CONTOUR_IMAGE) \
-				--runtime python:3.9 \
+				--runtime python:3.12 \
 				--handler nuclio_handler:handler \
 				--platform local \
 				--logger-level $(NUCLIO_LOGGER_LEVEL) \
@@ -371,7 +385,7 @@ dep_classification:
 			echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
 			nuctl deploy classification-$$i \
 				--run-image $(CLASS_IMAGE) \
-				--runtime python:3.9 \
+				--runtime python:3.12 \
 				--handler nuclio_handler:handler \
 				--platform local \
 				--logger-level $(NUCLIO_LOGGER_LEVEL) \
