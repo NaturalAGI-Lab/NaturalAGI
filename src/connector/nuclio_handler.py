@@ -37,8 +37,7 @@ def init_context(context):
     )
     setattr(context.user_data, "kafka_producer", producer)
 
-    otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
-    tracer = init_tracer(HANDLER_NAME, otlp_endpoint)
+    tracer = init_tracer(HANDLER_NAME)
     setattr(context.user_data, "tracer", tracer)
 
 
@@ -103,10 +102,17 @@ def http_handler(context, event):
 
             parameters["image_id"] = parameters.get("image_id", str(uuid.uuid4()))
 
-            with context.user_data.tracer.start_as_current_span("connector.classify") as span:
+            experiment_id = parameters.get("mlflow_experiment_id")
+            if experiment_id:
+                context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
+            tracer = context.user_data.tracer
+
+            with tracer.start_as_current_span("connector.classify") as span:
                 span.set_attribute("image_id", parameters["image_id"])
                 span.set_attribute("image_path", image_path)
                 span.set_attribute("session_id", parameters.get("session_id", ""))
+                if parameters.get("mlflow_run_id"):
+                    span.set_attribute("mlflow.run_id", parameters["mlflow_run_id"])
                 send_to_kafka(context, operation, parameters)
 
             return context.Response(

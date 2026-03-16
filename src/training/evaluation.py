@@ -233,6 +233,32 @@ def test_mnist_all(
     with open(os.path.join(run_dir, "run_config.json"), "w") as f:
         json.dump(run_config, f, indent=2)
 
+    # MLflow: start run BEFORE image list so experiment_id and run_id can be injected
+    mlflow_run_ctx = None
+    mlflow_experiment_id = None
+    mlflow_run_id = None
+    try:
+        import mlflow
+        import mlflow.data
+        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", MLFLOW_DEFAULT_URI))
+        _experiment = mlflow.set_experiment(MLFLOW_EXPERIMENT)
+        mlflow_experiment_id = _experiment.experiment_id
+
+        _has_psutil = importlib.util.find_spec("psutil") is not None
+        parent_active = mlflow.active_run() is not None
+        mlflow_run_ctx = mlflow.start_run(
+            run_name=f"run_{timestamp}",
+            nested=parent_active,
+            log_system_metrics=_has_psutil and not quiet,
+        )
+        mlflow_run_ctx.__enter__()
+        _active_run = mlflow.active_run()
+        mlflow_run_id = _active_run.info.run_id if _active_run else None
+    except ImportError:
+        mlflow = None
+    except Exception:
+        mlflow = None
+
     # Collect all test images
     all_images: List[Tuple[str, str, str, Dict[str, Any]]] = []
     for cls in classes:
@@ -244,6 +270,10 @@ def test_mnist_all(
         for fname in images:
             image_id = str(uuid.uuid4())
             image_params = {**params, "image_id": image_id}
+            if mlflow_experiment_id:
+                image_params["mlflow_experiment_id"] = mlflow_experiment_id
+            if mlflow_run_id:
+                image_params["mlflow_run_id"] = mlflow_run_id
             all_images.append((os.path.join(nuclio_folder, fname), image_id, str(cls), image_params))
 
     total_images = len(all_images)
@@ -252,27 +282,6 @@ def test_mnist_all(
 
     id_to_expected = {img_id: expected for _, img_id, expected, _ in all_images}
     id_to_path = {img_id: path for path, img_id, _, _ in all_images}
-
-    # MLflow: start run BEFORE classification so duration reflects actual work
-    mlflow_run_ctx = None
-    try:
-        import mlflow
-        import mlflow.data
-        mlflow.set_tracking_uri(os.environ.get("MLFLOW_TRACKING_URI", MLFLOW_DEFAULT_URI))
-        mlflow.set_experiment(MLFLOW_EXPERIMENT)
-
-        _has_psutil = importlib.util.find_spec("psutil") is not None
-        parent_active = mlflow.active_run() is not None
-        mlflow_run_ctx = mlflow.start_run(
-            run_name=f"run_{timestamp}",
-            nested=parent_active,
-            log_system_metrics=_has_psutil and not quiet,
-        )
-        mlflow_run_ctx.__enter__()
-    except ImportError:
-        mlflow = None
-    except Exception:
-        mlflow = None
 
     try:
         if mlflow is not None:

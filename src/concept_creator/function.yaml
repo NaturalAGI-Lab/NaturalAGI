@@ -7,7 +7,7 @@ metadata:
 spec:
   httpTimeout: 1000
   handler: "nuclio_handler:handler"
-  runtime: "python:3.9"
+  runtime: "python:3.12"
   env:
     - name: NEO4J_DSN
       value: "bolt://neo4j:7687"
@@ -18,12 +18,13 @@ spec:
     - name: USE_ENERGY_MINIMIZATION
       value: "false"
   build:
-    baseImage: "python:3.9"
+    baseImage: "python:3.12"
     commands:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
-      - "pip install numpy requests pydantic-settings neo4j networkx scikit-learn msgpack"
-      - "pip install --upgrade natural-agi-common==0.1.46"
+      - "pip install numpy==2.4.2 requests==2.32.5 pydantic-settings==2.13.1 neo4j==6.1.0 networkx==3.6.1 scikit-learn==1.8.0 msgpack==1.1.2"
+      - "mkdir -p /home/nuclio/bin/py3.12-whl && pip download msgpack==1.1.2 --only-binary=:all: -d /home/nuclio/bin/py3.12-whl --no-deps"
+      - "pip install --upgrade natural-agi-common==0.1.50"
   triggers:
     default-http:
       kind: "http"
