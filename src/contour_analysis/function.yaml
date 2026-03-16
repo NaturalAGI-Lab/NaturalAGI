@@ -1,36 +1,35 @@
 metadata:
   name: contour_analysis
-  namespace: natural-agi
   labels:
-    nuclio.io/project-name: natural-agi
+    nuclio.io/project-name: "default"
 spec:
   handler: "nuclio_handler:handler"
-  runtime: "python:3.9"
+  runtime: "python:3.12"
   resources: {}
   env:
     - name: MERGE_THRESHOLD
       value: "10.0"
     - name: OTEL_EXPORTER_OTLP_ENDPOINT
-      value: "http://jaeger:4317"
+      value: "http://mlflow:5000"
   triggers:
     kafka-trigger:
       kind: kafka-cluster
       attributes:
         initialOffset: earliest
         topics:
-          - angle-point-detector-output
+          - skeletonization-output-topic
         brokers:
           - ${KAFKA_BOOTSTRAP_SERVERS}
         consumerGroup: contour-analysis-group
   version: -1
   build:
-    baseImage: "python:3.9"
+    baseImage: "python:3.12"
     commands:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
-      - "pip install --upgrade pip"
-      - "pip install numpy opencv-python pydantic-settings neo4j scikit-learn kafka-python networkx scipy msgpack opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc"
-      - "pip install --upgrade natural-agi-common==0.1.46"
+      - "pip install numpy==2.4.2 opencv-python==4.13.0.92 pydantic-settings==2.13.1 neo4j==6.1.0 scikit-learn==1.8.0 kafka-python==2.3.0 networkx==3.6.1 scipy==1.17.1 msgpack==1.1.2 opentelemetry-api==1.40.0 opentelemetry-sdk==1.40.0 opentelemetry-exporter-otlp-proto-http==1.40.0"
+      - "mkdir -p /home/nuclio/bin/py3.12-whl && pip download msgpack==1.1.2 --only-binary=:all: -d /home/nuclio/bin/py3.12-whl --no-deps"
+      - "pip install --upgrade natural-agi-common==0.1.50"
   loggerSinks:
     - level: debug
   platform:
@@ -39,7 +38,6 @@ spec:
         name: always
         maximumRetryCount: 3
       mountMode: volume
-      # network: infrastructure_neo4j-internal
   securityContext: {}
   eventTimeout: ""
   httpTimeout: 1000

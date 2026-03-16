@@ -2,13 +2,12 @@
 
 import dataclasses
 import json
-import os
 import time
 import cv2
 from kafka import KafkaProducer
 import traceback
 from common.model.dlq import DLQModel
-from common.tracing import init_tracer, inject_trace_headers, extract_span_link, SpanKind
+from common.tracing import init_tracer, inject_trace_headers, extract_trace_context, SpanKind
 from settings import Settings
 from skeleton_gng_mapper import SkeletonGNGMapper
 from graph_serializer import GraphSerializer
@@ -28,6 +27,7 @@ def init_context(context):
         f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
     )
 
+    setattr(context.user_data, "settings", settings)
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
 
@@ -37,8 +37,7 @@ def init_context(context):
     )
     setattr(context.user_data, "kafka_producer", producer)
 
-    otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
-    tracer = init_tracer(HANDLER_NAME, otlp_endpoint)
+    tracer = init_tracer(HANDLER_NAME)
     setattr(context.user_data, "tracer", tracer)
 
 
@@ -51,16 +50,22 @@ def kafka_handler(context, event):
         start_time = time.time_ns()
         context.logger.info_with(f"Received request: {data}", handler=HANDLER_NAME)
 
-        links = extract_span_link(event.headers)
+        operation = data.get("operation")
+        parameters = data.get("parameters", {})
+
+        experiment_id = parameters.get("mlflow_experiment_id")
+        if experiment_id:
+            context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
         tracer = context.user_data.tracer
 
+        parent_ctx = extract_trace_context(event.headers)
         with tracer.start_as_current_span(
-            "skeletonization.process", links=links, kind=SpanKind.SERVER
+            "skeletonization.process", context=parent_ctx, kind=SpanKind.SERVER
         ) as span:
-            operation = data.get("operation")
-            parameters = data.get("parameters", {})
             span.set_attribute("image_id", parameters.get("image_id", ""))
             span.set_attribute("operation", operation or "")
+            if parameters.get("mlflow_run_id"):
+                span.set_attribute("mlflow.run_id", parameters["mlflow_run_id"])
 
             context.logger.info_with(
                 f"Received request: {event.trigger.kind}", handler=HANDLER_NAME
@@ -78,7 +83,7 @@ def kafka_handler(context, event):
             parameters["image_width"] = image_width
             parameters["image_height"] = image_height
 
-            settings = Settings()
+            settings = context.user_data.settings
             skeletonization_threshold = parameters.get(
                 "skeletonization_threshold", settings.skeletonization_threshold
             )

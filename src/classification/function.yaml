@@ -7,7 +7,7 @@ metadata:
 spec:
   httpTimeout: 1000
   handler: "nuclio_handler:handler"
-  runtime: "python:3.9"
+  runtime: "python:3.12"
   resources:
     limits:
       cpu: "2"
@@ -17,7 +17,7 @@ spec:
       memory: "2Gi"
   env:
     - name: OTEL_EXPORTER_OTLP_ENDPOINT
-      value: "http://jaeger:4317"
+      value: "http://mlflow:5000"
     # Feature list override (JSON array). Uncomment to activate:
     # - name: CLASSIFICATION_FEATURES
     #   value: '["normalized_x","normalized_y","horizontal_direction","vertical_direction","cycle_count"]'
@@ -38,12 +38,13 @@ spec:
     - name: NUMEXPR_NUM_THREADS
       value: "1"
   build:
-    baseImage: "python:3.9"
+    baseImage: "python:3.12"
     commands:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
-      - "pip install numpy==1.26.4 requests pydantic-settings neo4j kafka-python networkx scipy msgpack opentelemetry-api opentelemetry-sdk opentelemetry-exporter-otlp-proto-grpc pot"
-      - "pip install --upgrade natural-agi-common==0.1.46"
+      - "pip install numpy==2.4.2 requests==2.32.5 pydantic-settings==2.13.1 neo4j==6.1.0 kafka-python==2.3.0 networkx==3.6.1 scipy==1.17.1 msgpack==1.1.2 opentelemetry-api==1.40.0 opentelemetry-sdk==1.40.0 opentelemetry-exporter-otlp-proto-http==1.40.0 pot==0.9.6"
+      - "mkdir -p /home/nuclio/bin/py3.12-whl && pip download msgpack==1.1.2 --only-binary=:all: -d /home/nuclio/bin/py3.12-whl --no-deps"
+      - "pip install --upgrade natural-agi-common==0.1.50"
   triggers:
     default-http:
       kind: "http"

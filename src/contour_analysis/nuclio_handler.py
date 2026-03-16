@@ -1,6 +1,5 @@
 import json
 import dataclasses
-import os
 import traceback
 import time
 
@@ -20,7 +19,7 @@ from service.graph_analysis.analyzers.contour_type_analyzer import ContourTypeAn
 from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
 from service.graph_analysis.analyzers.cycle_count_analyzer import CycleCountAnalyzer
 
-HANDLER_NAME = "Contour analysis"
+HANDLER_NAME = "contour_analysis"
 
 
 class Settings(BaseSettings):
@@ -78,8 +77,7 @@ def init_context(context):
     )
     setattr(context.user_data, "kafka_producer", producer)
 
-    otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
-    tracer = init_tracer(HANDLER_NAME, otlp_endpoint)
+    tracer = init_tracer(HANDLER_NAME)
     setattr(context.user_data, "tracer", tracer)
 
 
@@ -92,20 +90,25 @@ def kafka_handler(context, event):
         )
         input_data = json.loads(event.body)
 
-        parent_ctx = extract_trace_context(event.headers)
+        operation = input_data["operation"]
+        parameters = input_data["parameters"]
+        profiling = input_data["profiling"]
+        session_id = parameters["session_id"]
+        image_id = parameters["image_id"]
+
+        experiment_id = parameters.get("mlflow_experiment_id")
+        if experiment_id:
+            context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
         tracer = context.user_data.tracer
 
+        parent_ctx = extract_trace_context(event.headers)
         with tracer.start_as_current_span(
             "contour_analysis.process", context=parent_ctx, kind=SpanKind.SERVER
         ) as span:
-            operation = input_data["operation"]
-            parameters = input_data["parameters"]
-            profiling = input_data["profiling"]
-            session_id = parameters["session_id"]
-            image_id = parameters["image_id"]
-
             span.set_attribute("image_id", image_id)
             span.set_attribute("session_id", session_id)
+            if parameters.get("mlflow_run_id"):
+                span.set_attribute("mlflow.run_id", parameters["mlflow_run_id"])
 
             context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
             context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)

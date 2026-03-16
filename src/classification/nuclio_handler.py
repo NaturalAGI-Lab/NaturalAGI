@@ -91,8 +91,7 @@ def init_context(context):
         handler=HANDLER_NAME,
     )
 
-    otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://jaeger:4317")
-    tracer = init_tracer(HANDLER_NAME, otlp_endpoint)
+    tracer = init_tracer(HANDLER_NAME)
     setattr(context.user_data, "tracer", tracer)
 
     # Apply env-var defaults for cost config (overridden per-message at runtime)
@@ -137,6 +136,10 @@ def kafka_handler(context, event):
         f"Classification params: {classification_params}", handler=HANDLER_NAME
     )
 
+    experiment_id = data["parameters"].get("mlflow_experiment_id")
+    if experiment_id:
+        context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
+
     parent_ctx = extract_trace_context(event.headers)
     tracer = context.user_data.tracer
 
@@ -144,6 +147,8 @@ def kafka_handler(context, event):
         "classification.process", context=parent_ctx, kind=otel_trace.SpanKind.SERVER
     ) as span:
         span.set_attribute("image_id", image_id)
+        if data["parameters"].get("mlflow_run_id"):
+            span.set_attribute("mlflow.run_id", data["parameters"]["mlflow_run_id"])
 
         orchestrator = ClassificationOrchestrator(
             neo4j_dsn=settings.neo4j_dsn,

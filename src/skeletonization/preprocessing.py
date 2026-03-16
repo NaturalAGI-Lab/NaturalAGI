@@ -23,7 +23,7 @@ def iterate_over_images_in_folder(folder_path: str) -> Generator[str, None, None
 def custom_binary_image(
     image: np.ndarray,
     threshold: Optional[float] = None,
-    min_size: int = 10,
+    max_size: int = 9,
     closing_size: int = 0,
 ) -> Tuple[np.ndarray, float]:
     """
@@ -32,7 +32,7 @@ def custom_binary_image(
     Args:
         image: Grayscale image array.
         threshold: Fixed threshold value. If None, Otsu is used.
-        min_size: Remove objects smaller than this many pixels.
+        max_size: Remove objects with this many pixels or fewer.
         closing_size: Morphological closing kernel size (0 = disabled).
 
     Returns:
@@ -42,7 +42,7 @@ def custom_binary_image(
         threshold = threshold_otsu(image)
 
     binary = image > threshold
-    binary = remove_small_objects(binary, min_size=min_size)
+    binary = remove_small_objects(binary, max_size=max_size)
 
     if closing_size > 0:
         binary = closing(binary, square(closing_size))
@@ -53,7 +53,7 @@ def custom_binary_image(
 def custom_skeletonize(
     image: np.ndarray,
     threshold: Optional[float] = None,
-    min_size: int = 10,
+    max_size: int = 9,
     closing_size: int = 0,
     min_branch_len: int = 7,
     use_adaptive: bool = False,
@@ -66,7 +66,7 @@ def custom_skeletonize(
     Args:
         image: Grayscale image array.
         threshold: Fixed binarization threshold. If None, Otsu is used.
-        min_size: Remove objects smaller than this many pixels.
+        max_size: Remove objects with this many pixels or fewer.
         closing_size: Morphological closing kernel size (0 = disabled).
         min_branch_len: Fixed branch pruning threshold in pixels (used when use_adaptive=False).
         use_adaptive: If True, prune branches shorter than prune_percent of total skeleton length.
@@ -76,7 +76,7 @@ def custom_skeletonize(
     Returns:
         (skeleton, binary, threshold_used)
     """
-    binary, threshold_used = custom_binary_image(image, threshold, min_size, closing_size)
+    binary, threshold_used = custom_binary_image(image, threshold, max_size, closing_size)
     skeleton = skimage_skeletonize(binary)
 
     sk = Skeleton(skeleton, source_image=binary)
