@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Dict
 import networkx as nx
@@ -56,9 +57,12 @@ class Neo4jToNetworkx:
         for record in records:
             node_id = record["node_id"]
             if node_id not in nodes:
+                props = Neo4jToNetworkx._deserialize_properties(
+                    record["node_properties"]
+                )
                 nodes[node_id] = {
                     "labels": record["node_labels"],
-                    **record["node_properties"],
+                    **props,
                 }
 
         # Add nodes to graph
@@ -74,3 +78,16 @@ class Neo4jToNetworkx:
                 )
 
         return G
+
+    @staticmethod
+    def _deserialize_properties(props: Dict) -> Dict:
+        result = {}
+        for k, v in props.items():
+            if isinstance(v, str) and v and v[0] in ("{", "["):
+                try:
+                    result[k] = json.loads(v)
+                except (json.JSONDecodeError, ValueError):
+                    result[k] = v
+            else:
+                result[k] = v
+        return result

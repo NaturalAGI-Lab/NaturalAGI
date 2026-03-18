@@ -63,6 +63,7 @@ logger = logging.getLogger(__name__)
 
 _TRAINING_DIR = os.path.dirname(os.path.abspath(__file__))
 _PROJECT_ROOT = os.path.abspath(os.path.join(_TRAINING_DIR, "..", ".."))
+_EXPERIMENTS_DIR = os.path.join(_PROJECT_ROOT, "experiments")
 
 CONFUSION_MATRIX_FIGSIZE = (10, 7)
 
@@ -597,3 +598,135 @@ def compare_against_best(
         "is_improvement": delta > 0,
         "best_run_id": best["run_id"],
     }
+
+
+_ACCURACY_KEYS = ("accuracy_quick", "accuracy_quick_25pct", "accuracy")
+
+_NORMALIZER_SHORT_TO_FULL = {
+    "norm_x": "normalized_x",
+    "norm_y": "normalized_y",
+    "norm_hdir": "horizontal_direction",
+    "norm_vdir": "vertical_direction",
+    "norm_cycle": "cycle_count",
+    "norm_angle": "angle_with_ox",
+}
+
+
+def _scan_param_files(exp_dir: str) -> List[Tuple[str, Dict[str, Any], float | None]]:
+    results: List[Tuple[str, Dict[str, Any], float | None]] = []
+    for fname in sorted(os.listdir(exp_dir)):
+        if not (fname.startswith("best_params") and fname.endswith(".json")):
+            continue
+        with open(os.path.join(exp_dir, fname)) as f:
+            data = json.load(f)
+        accuracy = None
+        for key in _ACCURACY_KEYS:
+            if key in data:
+                accuracy = data[key]
+                break
+        results.append((fname, data, accuracy))
+    return results
+
+
+def list_experiments() -> List[Dict[str, Any]]:
+    if not os.path.isdir(_EXPERIMENTS_DIR):
+        return []
+    experiments = []
+    for name in sorted(os.listdir(_EXPERIMENTS_DIR)):
+        exp_dir = os.path.join(_EXPERIMENTS_DIR, name)
+        if not os.path.isdir(exp_dir):
+            continue
+        entries = _scan_param_files(exp_dir)
+        best_acc = None
+        for _, _, acc in entries:
+            if acc is not None and (best_acc is None or acc > best_acc):
+                best_acc = acc
+        experiments.append({
+            "name": name,
+            "best_accuracy": best_acc,
+            "param_files": [fname for fname, _, _ in entries],
+        })
+    return experiments
+
+
+def load_best_params(experiment: str) -> Dict[str, Any]:
+    exp_dir = os.path.join(_EXPERIMENTS_DIR, experiment)
+    if not os.path.isdir(exp_dir):
+        available = [e["name"] for e in list_experiments()]
+        raise FileNotFoundError(
+            f"Experiment '{experiment}' not found. Available: {available}"
+        )
+
+    candidates = _scan_param_files(exp_dir)
+
+    if not candidates:
+        raise FileNotFoundError(f"No best_params*.json in {exp_dir}")
+
+    with_acc = [(n, d, a) for n, d, a in candidates if a is not None]
+    if with_acc:
+        fname, data, accuracy = max(with_acc, key=lambda x: x[2])  # type: ignore[arg-type]
+    else:
+        fname, data, accuracy = candidates[0]
+
+    params = _normalize_experiment_params(data)
+    acc_str = f" (accuracy: {accuracy * 100:.2f}%)" if accuracy else ""
+    print(f"Loaded {experiment}/{fname}{acc_str}")
+    return params
+
+
+def _normalize_experiment_params(raw: Dict[str, Any]) -> Dict[str, Any]:
+    if "params" in raw and isinstance(raw["params"], dict):
+        return _normalize_nested_format(raw)
+    metadata = {"trial_number", "accuracy_quick_25pct", "accuracy_quick", "accuracy", "trial"}
+    return {k: v for k, v in raw.items() if k not in metadata}
+
+
+def _normalize_nested_format(raw: Dict[str, Any]) -> Dict[str, Any]:
+    p = raw["params"]
+
+    params: Dict[str, Any] = {}
+
+    if "comparison_method" in p:
+        params["comparison_method"] = p["comparison_method"]
+    elif "comparison_method" in raw:
+        params["comparison_method"] = raw["comparison_method"]
+    elif "fgw_alpha" in p:
+        params["comparison_method"] = "fgw"
+    else:
+        params["comparison_method"] = "ged"
+
+    if "fgw_alpha" in p:
+        params["fgw_alpha"] = p["fgw_alpha"]
+
+    for key in ("ged_timeout", "simplification_epsilon"):
+        if key in p:
+            params[key] = p[key]
+    if "skel_threshold" in p:
+        params["skeletonization_threshold"] = p["skel_threshold"]
+
+    if raw.get("features"):
+        params["features"] = raw["features"]
+
+    normalizers = {}
+    for short, full in _NORMALIZER_SHORT_TO_FULL.items():
+        if short in p:
+            normalizers[full] = p[short]
+    if normalizers:
+        params["property_normalizers"] = normalizers
+
+    if raw.get("derived_costs"):
+        params["node_costs"] = raw["derived_costs"]
+    elif "cost_minor" in p:
+        minor = p["cost_minor"]
+        general = minor + p.get("gap_minor_general", 0)
+        severe = general + p.get("gap_general_severe", 0)
+        params["node_costs"] = {
+            "NO_COST": 0.0,
+            "MINOR": minor,
+            "GENERAL": general,
+            "SEVERE": severe,
+            "NO_MATCH": p.get("cost_no_match", 1.0),
+            "IMPOSSIBLE": p.get("cost_impossible", 100.0),
+        }
+
+    return params
