@@ -1,5 +1,4 @@
 from typing import List
-from neo4j import GraphDatabase
 import networkx as nx
 
 from .neo4j_to_networkx import Neo4jToNetworkX
@@ -8,16 +7,8 @@ from common.decorator import timed
 
 class ConceptRepository:
 
-    def __init__(self, neo4j_dsn: str, neo4j_user: str, neo4j_pass: str):
-        self.neo4j_dsn = neo4j_dsn
-        self.neo4j_user = neo4j_user
-        self.neo4j_pass = neo4j_pass
-        self.driver = GraphDatabase.driver(
-            neo4j_dsn, auth=(neo4j_user, neo4j_pass), max_connection_lifetime=200
-        )
-
-    def close(self):
-        self.driver.close()
+    def __init__(self, driver):
+        self.driver = driver
 
     @timed(label="get_all_concept_ids")
     def get_all_concept_ids(self) -> List[str]:

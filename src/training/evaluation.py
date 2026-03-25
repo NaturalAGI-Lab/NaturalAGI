@@ -168,6 +168,7 @@ def test_mnist_all(
     sample_fraction: float = 1.0,
     description: str = "",
     quiet: bool = False,
+    tracing_enabled: bool = True,
     results_dir: str = os.path.join(_TRAINING_DIR, "training_results"),
     nuclio_volume_path_template: str = "/opt/nuclio/shared_storage/generated_samples/mnist_{cls}/test",
     local_path_template: str = os.path.join(_TRAINING_DIR, "../../tests/generated_samples/mnist_{cls}/test"),
@@ -270,9 +271,11 @@ def test_mnist_all(
         for fname in images:
             image_id = str(uuid.uuid4())
             image_params = {**params, "image_id": image_id}
-            if mlflow_experiment_id:
+            if not tracing_enabled:
+                image_params["disable_tracing"] = True
+            if mlflow_experiment_id and tracing_enabled:
                 image_params["mlflow_experiment_id"] = mlflow_experiment_id
-            if mlflow_run_id:
+            if mlflow_run_id and tracing_enabled:
                 image_params["mlflow_run_id"] = mlflow_run_id
             all_images.append((os.path.join(nuclio_folder, fname), image_id, str(cls), image_params))
 
@@ -308,6 +311,9 @@ def test_mnist_all(
             node_costs = feature_config.get("node_costs", {})
             if node_costs:
                 mlflow.log_params({f"node_cost.{k}": v for k, v in node_costs.items()})
+            weights = feature_config.get("feature_weights", {})
+            if weights:
+                mlflow.log_params({f"weight.{k}": v for k, v in weights.items()})
 
             mlflow.set_tag("researcher", os.environ.get("USER", "unknown"))
             mlflow.set_tag("git_dirty", str(run_config.get("git", {}).get("dirty", False)))
@@ -466,6 +472,9 @@ def _build_run_config(
             **({
                 "node_costs": params["node_costs"],
             } if "node_costs" in params else {}),
+            **({
+                "feature_weights": params["feature_weights"],
+            } if "feature_weights" in params else {}),
         },
     }
 
@@ -495,6 +504,7 @@ def _read_feature_config() -> Dict[str, Any]:
         return {
             "features": list(mod.features),
             "property_normalizers": dict(mod.PROPERTY_NORMALIZERS),
+            "feature_weights": dict(mod.FEATURE_WEIGHTS),
             "node_costs": {
                 k: v for k, v in vars(mod.NodeCost).items()
                 if not k.startswith("_") and isinstance(v, (int, float))

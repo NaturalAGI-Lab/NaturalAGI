@@ -27,17 +27,13 @@ class ClassificationOrchestrator:
 
     def __init__(
         self,
-        neo4j_dsn: str,
-        neo4j_user: str,
-        neo4j_pass: str,
+        driver,
         ged_timeout: float = 15,
         comparison_method: str = "ged",
         fgw_alpha: float = 0.5,
         tracer: Optional[otel_trace.Tracer] = None,
     ):
-        self.neo4j_dsn = neo4j_dsn
-        self.neo4j_user = neo4j_user
-        self.neo4j_pass = neo4j_pass
+        self.driver = driver
         self.ged_timeout = ged_timeout
         self.comparator = _build_comparator(comparison_method, ged_timeout, fgw_alpha)
         self.graph_complexity_service = GraphComplexityService()
@@ -50,16 +46,10 @@ class ClassificationOrchestrator:
     ) -> List[ClassificationResult]:
         logging.info(f"Starting classification for image {image_id}")
 
-        image_repository = ImageRepository(
-            self.neo4j_dsn, self.neo4j_user, self.neo4j_pass
-        )
-
-        try:
-            image_graph = image_repository.get_image_graph(image_id)
-            results = self._classify_sequentially(image_graph, concept_graphs)
-            return self._process_and_sort_results(results, image_id)
-        finally:
-            image_repository.close()
+        image_repository = ImageRepository(self.driver)
+        image_graph = image_repository.get_image_graph(image_id)
+        results = self._classify_sequentially(image_graph, concept_graphs)
+        return self._process_and_sort_results(results, image_id)
 
     def _classify_sequentially(
         self,

@@ -20,13 +20,44 @@ features = [
 ]
 
 PROPERTY_NORMALIZERS = {
+    # Spatial / positional
     "normalized_x": 3.0,
     "normalized_y": 3.0,
+    "distance_to_centroid": 1.0,
+    # Direction / angle
     "horizontal_direction": 2.0,
     "vertical_direction": 2.0,
-    "cycle_count": 1.0,
     "angle_with_ox": 180.0,
+    "junction_angle_min": 180.0,
+    "junction_angle_max": 180.0,
+    "junction_angle_mean": 180.0,
+    # Degree / topology
+    "node_degree": 4.0,
+    "is_endpoint": 1.0,
+    "is_junction": 1.0,
+    "is_corner": 1.0,
+    "is_on_cycle": 1.0,
+    "cycle_count": 1.0,
+    # Geometric / length
+    "tortuosity": 2.0,
+    "normalized_length": 1.0,
+    "length_ratio_to_max": 1.0,
+    # Branch type
+    "branch_type": 6.0,
+    "connects_cycle_nodes": 1.0,
+    # Centrality
+    "betweenness_centrality": 1.0,
+    "closeness_centrality": 1.0,
+    "eccentricity": 10.0,
+    "pagerank": 1.0,
+    # Neighborhood context
+    "avg_neighbor_vector_length": 50.0,
+    "neighbor_endpoint_count": 3.0,
+    "neighbor_junction_count": 3.0,
+    "neighbor_corner_count": 3.0,
 }
+
+FEATURE_WEIGHTS: dict[str, float] = {}
 
 
 logger = logging.getLogger(__name__)
@@ -119,20 +150,24 @@ def _calculate_properties_similarity_cost(
 
     properties_to_check = features
 
-    total_cost = 0.0
-    properties_checked = 0
-
     common_properties = set(concept_node_data.keys()) & set(image_node_data.keys())
     common_properties_to_check = common_properties.intersection(properties_to_check)
     if not common_properties_to_check:
         return NodeCost.NO_MATCH
 
-    max_prop_penalty = 1.0 / len(common_properties_to_check)
+    raw_weights = {p: FEATURE_WEIGHTS.get(p, 1.0) for p in common_properties_to_check}
+    total_weight = sum(raw_weights.values())
+    if total_weight < 1e-9:
+        return NodeCost.NO_MATCH
+
     logger.debug(
-        "Common properties to check: %s, max prop penalty: %s",
+        "Common properties to check: %s, weights: %s",
         common_properties_to_check,
-        max_prop_penalty,
+        raw_weights,
     )
+
+    total_cost = 0.0
+    properties_checked = 0
 
     for property_name in properties_to_check:
         concept_value = concept_node_data.get(property_name)
@@ -142,15 +177,21 @@ def _calculate_properties_similarity_cost(
             continue
         elif image_value is None and concept_value is not None:
             continue
-        elif concept_value is None and image_value is not None:
-            total_cost += max_prop_penalty
+
+        w = raw_weights.get(property_name)
+        if w is None:
+            continue
+        normalized_w = w / total_weight
+
+        if concept_value is None and image_value is not None:
+            total_cost += normalized_w
             properties_checked += 1
             continue
 
         property_cost = _calculate_property_similarity_cost(
-            concept_value, image_value, property_name, max_prop_penalty
+            concept_value, image_value, property_name, normalized_w
         )
-        total_cost += min(property_cost, max_prop_penalty)
+        total_cost += min(property_cost, normalized_w)
         properties_checked += 1
 
     return total_cost if properties_checked > 0 else NodeCost.NO_COST

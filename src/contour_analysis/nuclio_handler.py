@@ -18,6 +18,7 @@ from service.analysis_result_persistence_service import AnalysisResultPersistenc
 from service.graph_analysis.analyzers.contour_type_analyzer import ContourTypeAnalyzer
 from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
 from service.graph_analysis.analyzers.cycle_count_analyzer import CycleCountAnalyzer
+from service.graph_analysis.analyzers.structural_feature_analyzer import StructuralFeatureAnalyzer
 
 HANDLER_NAME = "contour_analysis"
 
@@ -96,68 +97,78 @@ def kafka_handler(context, event):
         session_id = parameters["session_id"]
         image_id = parameters["image_id"]
 
-        experiment_id = parameters.get("mlflow_experiment_id")
-        if experiment_id:
-            context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
-        tracer = context.user_data.tracer
+        tracing_disabled = bool(parameters.get("disable_tracing"))
 
-        parent_ctx = extract_trace_context(event.headers)
-        with tracer.start_as_current_span(
-            "contour_analysis.process", context=parent_ctx, kind=SpanKind.SERVER
-        ) as span:
-            span.set_attribute("image_id", image_id)
-            span.set_attribute("session_id", session_id)
-            if parameters.get("mlflow_run_id"):
-                span.set_attribute("mlflow.run_id", parameters["mlflow_run_id"])
+        if not tracing_disabled:
+            experiment_id = parameters.get("mlflow_experiment_id")
+            if experiment_id:
+                context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
 
-            context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
-            context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
+        context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
+        context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
 
-            network = GraphDeserializer.deserialize(input_data["skeleton"])
+        network = GraphDeserializer.deserialize(input_data["skeleton"])
 
-            # Create NetworkxGraphAnalysis instance
-            networkx_graph_analysis = NetworkxGraphAnalysis(
-                network,
-                analysis_result_persistence_service=context.user_data.analysis_result_persistence_service,
-                merge_threshold=context.user_data.settings.merge_threshold,
-            )
+        networkx_graph_analysis = NetworkxGraphAnalysis(
+            network,
+            analysis_result_persistence_service=context.user_data.analysis_result_persistence_service,
+            merge_threshold=context.user_data.settings.merge_threshold,
+        )
 
-            # Apply reduction rules first
-            networkx_graph_analysis.merge_close_intersection_points()
+        networkx_graph_analysis.merge_close_intersection_points()
 
-            # Now persist the graph AFTER merging operations
-            context.user_data.data_preprocessing_service.persist_graph(
-                network, image_id, parameters["session_id"]
-            )
+        context.user_data.data_preprocessing_service.persist_graph(
+            network, image_id, parameters["session_id"]
+        )
 
-            networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
-            networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
-            networkx_graph_analysis.add_analyzer(CycleCountAnalyzer)
-            networkx_graph_analysis.analyze_graph(image_id, session_id)
+        networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
+        networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
+        networkx_graph_analysis.add_analyzer(CycleCountAnalyzer)
+        networkx_graph_analysis.add_analyzer(StructuralFeatureAnalyzer)
+        networkx_graph_analysis.analyze_graph(image_id, session_id)
 
-            context.user_data.tertiary_features_service.create_tertiary_features(
-                image_id, session_id
-            )
+        context.user_data.tertiary_features_service.create_tertiary_features(
+            image_id, session_id
+        )
 
-            profiling["contour_analysis_time_ms"] = (
-                time.time_ns() - start_time
-            ) / 1_000_000
-            span.set_attribute("duration_ms", profiling["contour_analysis_time_ms"])
+        profiling["contour_analysis_time_ms"] = (
+            time.time_ns() - start_time
+        ) / 1_000_000
 
-            headers = inject_trace_headers()
+        output_value = {
+            "operation": operation,
+            "parameters": parameters,
+            "profiling": profiling,
+        }
+
+        if tracing_disabled:
             context.user_data.kafka_producer.send(
                 context.user_data.kafka_topic,
-                value={
-                    "operation": operation,
-                    "parameters": parameters,
-                    "profiling": profiling,
-                },
-                headers=headers,
+                value=output_value,
+                headers=[],
             )
+        else:
+            tracer = context.user_data.tracer
+            parent_ctx = extract_trace_context(event.headers)
+            with tracer.start_as_current_span(
+                "contour_analysis.process", context=parent_ctx, kind=SpanKind.SERVER
+            ) as span:
+                span.set_attribute("image_id", image_id)
+                span.set_attribute("session_id", session_id)
+                if parameters.get("mlflow_run_id"):
+                    span.set_attribute("mlflow.run_id", parameters["mlflow_run_id"])
+                span.set_attribute("duration_ms", profiling["contour_analysis_time_ms"])
 
-            context.logger.info_with(
-                f"Analysis complete for image_id: {image_id}", handler=HANDLER_NAME
-            )
+                headers = inject_trace_headers()
+                context.user_data.kafka_producer.send(
+                    context.user_data.kafka_topic,
+                    value=output_value,
+                    headers=headers,
+                )
+
+        context.logger.info_with(
+            f"Analysis complete for image_id: {image_id}", handler=HANDLER_NAME
+        )
 
     except Exception as error:
         error_info = {

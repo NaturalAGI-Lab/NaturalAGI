@@ -32,7 +32,11 @@ def node_property_cost(
     if not common:
         return _cf.NodeCost.NO_MATCH
 
-    max_prop_penalty = 1.0 / len(common)
+    raw_weights = {p: _cf.FEATURE_WEIGHTS.get(p, 1.0) for p in common}
+    total_weight = sum(raw_weights.values())
+    if total_weight < 1e-9:
+        return _cf.NodeCost.NO_MATCH
+
     total = 0.0
     checked = 0
 
@@ -44,15 +48,21 @@ def node_property_cost(
             continue
         if i_val is None and c_val is not None:
             continue
+
+        w = raw_weights.get(feat)
+        if w is None:
+            continue
+        nw = w / total_weight
+
         if c_val is None and i_val is not None:
-            total += max_prop_penalty
+            total += nw
             checked += 1
             continue
 
         cost = _cf._calculate_property_similarity_cost(
-            c_val, i_val, feat, max_prop_penalty
+            c_val, i_val, feat, nw
         )
-        total += min(cost, max_prop_penalty)
+        total += min(cost, nw)
         checked += 1
 
     return total if checked > 0 else _cf.NodeCost.NO_COST
