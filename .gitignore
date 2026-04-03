@@ -188,9 +188,12 @@ tests/archive/*
 # Claude Code MCP config (contains credentials)
 .mcp.json
 CLAUDE.md
+.DS_Store
 
 /plans
 /researches
 
 .claude/
 src/training/experiments/*
+
+fin_prog/

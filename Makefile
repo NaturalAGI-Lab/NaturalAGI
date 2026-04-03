@@ -57,7 +57,7 @@ PARAMS ?= {}
 USE_ENERGY_MINIMIZATION ?= true
 
 # Phony targets
-.PHONY: all deploy train classify send_random_image clean docker_clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
+.PHONY: all deploy unpack_dataset train classify send_random_image clean docker_clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
 
 # Kafka-related targets
 .PHONY: create_kafka_topics list_kafka_topics
@@ -204,6 +204,18 @@ docker_clean:
 	@echo -e "${GREEN}Docker cleanup — after:${NC}"
 	@docker system df
 
+unpack_dataset:
+	@if [ -d datasets/mnist_all ] && [ "$$(ls -A datasets/mnist_all 2>/dev/null)" ]; then \
+		echo -e "${GREEN}Dataset already unpacked (datasets/ exists and is not empty).${NC}"; \
+	elif [ -f datasets.zip ]; then \
+		echo -e "${BLUE}Unpacking datasets.zip...${NC}"; \
+		unzip -o datasets.zip; \
+		echo -e "${GREEN}Dataset unpacked.${NC}"; \
+	else \
+		echo -e "${RED}datasets.zip not found. Please download it first.${NC}"; \
+		exit 1; \
+	fi
+
 dashboard:
 	cd src/training && streamlit run dashboard.py --server.port 8501
 
@@ -221,6 +233,7 @@ help:
 	@echo "  classify           - Run classification with given concept_id and image_id"
 	@echo "  clean              - Clean up training results"
 	@echo "  docker_clean       - Remove dangling volumes, build cache, and stale Nuclio images"
+	@echo "  unpack_dataset     - Unpack datasets.zip (skips if already unpacked)"
 	@echo "  help               - Show this help message"
 	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
 	@echo ""
