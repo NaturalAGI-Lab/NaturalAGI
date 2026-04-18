@@ -21,9 +21,6 @@ spec:
     # Feature list override (JSON array). Uncomment to activate:
     # - name: CLASSIFICATION_FEATURES
     #   value: '["normalized_x","normalized_y","horizontal_direction","vertical_direction","cycle_count"]'
-    # Property normalizers override (JSON object). Uncomment to activate:
-    # - name: CLASSIFICATION_PROPERTY_NORMALIZERS
-    #   value: '{"normalized_x":3.0,"normalized_y":3.0,"horizontal_direction":2.0,"vertical_direction":2.0,"cycle_count":1.0}'
     # Node cost values override (JSON object). Uncomment to activate:
     # - name: CLASSIFICATION_NODE_COSTS
     #   value: '{"NO_COST":0.0,"MINOR":0.25,"GENERAL":0.4,"SEVERE":0.65,"NO_MATCH":1.0,"IMPOSSIBLE":100.0}'
@@ -44,7 +41,7 @@ spec:
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
       - "pip install numpy==2.4.2 requests==2.32.5 pydantic-settings==2.13.1 neo4j==6.1.0 kafka-python==2.3.0 networkx==3.6.1 scipy==1.17.1 msgpack==1.1.2 opentelemetry-api==1.40.0 opentelemetry-sdk==1.40.0 opentelemetry-exporter-otlp-proto-http==1.40.0 pot==0.9.6"
       - "mkdir -p /home/nuclio/bin/py3.12-whl && pip download msgpack==1.1.2 --only-binary=:all: -d /home/nuclio/bin/py3.12-whl --no-deps"
-      - "pip install --upgrade natural-agi-common==0.1.51"
+      - "pip install --upgrade natural-agi-common==0.1.55"
   triggers:
     default-http:
       kind: "http"

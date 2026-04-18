@@ -24,7 +24,7 @@ spec:
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
       - "pip install numpy==2.4.2 requests==2.32.5 pydantic-settings==2.13.1 neo4j==6.1.0 networkx==3.6.1 scikit-learn==1.8.0 msgpack==1.1.2"
       - "mkdir -p /home/nuclio/bin/py3.12-whl && pip download msgpack==1.1.2 --only-binary=:all: -d /home/nuclio/bin/py3.12-whl --no-deps"
-      - "pip install --upgrade natural-agi-common==0.1.51"
+      - "pip install --upgrade natural-agi-common==0.1.55"
   triggers:
     default-http:
       kind: "http"

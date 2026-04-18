@@ -6,6 +6,8 @@ from typing import Any
 import networkx as nx
 from neo4j import ManagedTransaction
 
+from common.feature_scales import h_k
+
 from .base_analyzer import BaseAnalyzer
 
 logging.basicConfig(level=logging.INFO)
@@ -16,11 +18,13 @@ MIN_CORNER_ANGLE = 160
 class StructuralFeatureAnalyzer(BaseAnalyzer):
     """Computes structural features on the pre-persistence Point-only NetworkX graph.
 
-    Point features: node_degree, is_endpoint, is_junction, is_corner, is_on_cycle,
-        distance_to_centroid, junction_angle_min/max/mean, avg_neighbor_vector_length,
-        betweenness_centrality, closeness_centrality, eccentricity,
-        normalized_eccentricity, pagerank.
-    Edge features (persisted on Vector nodes): tortuosity, normalized_length,
+    All numeric outputs are passed through h_k (Parzhyn formula 36) so Neo4j stores
+    internal energy u_k ∈ [0, 1], not raw k. Categorical/binary flags are identity.
+    Point features: node_degree, raw_node_degree (scratch for tertiary phase),
+        is_endpoint/junction/corner/on_cycle, distance_to_centroid,
+        junction_angle_min/max/mean, avg_neighbor_vector_length,
+        betweenness/closeness_centrality, eccentricity, pagerank.
+    Edge features (on Vector nodes): tortuosity, normalized_length,
         length_ratio_to_max, branch_type, connects_cycle_nodes.
     """
 
@@ -39,28 +43,32 @@ class StructuralFeatureAnalyzer(BaseAnalyzer):
             ntype = node_types[node]
 
             features: dict[str, Any] = {
-                "node_degree": degree,
+                "node_degree": h_k("node_degree", degree),
+                "raw_node_degree": degree,
                 "is_endpoint": 1 if ntype == "E" else 0,
                 "is_junction": 1 if ntype == "J" else 0,
                 "is_corner": 1 if ntype == "C" else 0,
                 "is_on_cycle": 1 if node in cycle_nodes else 0,
-                "distance_to_centroid": self._normalized_distance(
-                    data["x"], data["y"], cx, cy, max_dist
+                "distance_to_centroid": h_k(
+                    "distance_to_centroid",
+                    self._normalized_distance(data["x"], data["y"], cx, cy, max_dist),
                 ),
-                "avg_neighbor_vector_length": self._avg_neighbor_length(node),
+                "avg_neighbor_vector_length": h_k(
+                    "avg_neighbor_vector_length", self._avg_neighbor_length(node)
+                ),
             }
 
             angle_min, angle_max, angle_mean = self._junction_angles(node)
             if angle_min is not None:
-                features["junction_angle_min"] = angle_min
-                features["junction_angle_max"] = angle_max
-                features["junction_angle_mean"] = angle_mean
+                features["junction_angle_min"] = h_k("junction_angle_min", angle_min)
+                features["junction_angle_max"] = h_k("junction_angle_max", angle_max)
+                features["junction_angle_mean"] = h_k("junction_angle_mean", angle_mean)
 
             for key in ("betweenness_centrality", "closeness_centrality",
-                        "eccentricity", "normalized_eccentricity", "pagerank"):
+                        "eccentricity", "pagerank"):
                 val = centralities.get(key, {}).get(node)
                 if val is not None:
-                    features[key] = round(val, 6)
+                    features[key] = round(h_k(key, val), 6)
 
             point_features[node] = features
 
@@ -76,10 +84,13 @@ class StructuralFeatureAnalyzer(BaseAnalyzer):
             euclidean = math.hypot(u_data["x"] - v_data["x"], u_data["y"] - v_data["y"])
             length = data.get("length", euclidean)
 
+            raw_tortuosity = length / euclidean if euclidean > 1e-9 else 1.0
+            raw_norm_length = length / total_length if total_length > 0 else 0.0
+            raw_length_ratio = length / max_length if max_length > 0 else 0.0
             edge_features[edge_id] = {
-                "tortuosity": round(length / euclidean, 4) if euclidean > 1e-9 else 1.0,
-                "normalized_length": round(length / total_length, 4) if total_length > 0 else 0.0,
-                "length_ratio_to_max": round(length / max_length, 4) if max_length > 0 else 0.0,
+                "tortuosity": round(h_k("tortuosity", raw_tortuosity), 4),
+                "normalized_length": round(h_k("normalized_length", raw_norm_length), 4),
+                "length_ratio_to_max": round(h_k("length_ratio_to_max", raw_length_ratio), 4),
                 "branch_type": self._branch_type(node_types[u], node_types[v]),
                 "connects_cycle_nodes": 1 if (u in cycle_nodes and v in cycle_nodes) else 0,
             }
@@ -151,9 +162,6 @@ class StructuralFeatureAnalyzer(BaseAnalyzer):
               AND p2.eccentricity IS NOT NULL
             SET v.eccentricity = round(
                     (p1.eccentricity + p2.eccentricity) / 2.0 * 1000000
-                ) / 1000000,
-                v.normalized_eccentricity = round(
-                    (p1.normalized_eccentricity + p2.normalized_eccentricity) / 2.0 * 1000000
                 ) / 1000000
         """, image_id=image_id)
 
@@ -211,22 +219,15 @@ class StructuralFeatureAnalyzer(BaseAnalyzer):
             return set()
 
     def _compute_centralities(self) -> dict[str, dict]:
-        result: dict[str, dict] = {}
-        result["betweenness_centrality"] = nx.betweenness_centrality(self.graph)
-        result["closeness_centrality"] = nx.closeness_centrality(self.graph)
-        result["pagerank"] = nx.pagerank(self.graph)
-
+        result: dict[str, dict] = {
+            "betweenness_centrality": nx.betweenness_centrality(self.graph),
+            "closeness_centrality": nx.closeness_centrality(self.graph),
+            "pagerank": nx.pagerank(self.graph),
+        }
         if nx.is_connected(self.graph):
-            ecc: dict = nx.eccentricity(self.graph)
-            diameter = max(ecc.values()) if ecc else 1
-            result["eccentricity"] = ecc
-            result["normalized_eccentricity"] = {
-                n: v / diameter if diameter > 0 else 0.0 for n, v in ecc.items()
-            }
+            result["eccentricity"] = nx.eccentricity(self.graph)
         else:
             result["eccentricity"] = {}
-            result["normalized_eccentricity"] = {}
-
         return result
 
     def _compute_length_aggregates(self) -> tuple[float, float]:

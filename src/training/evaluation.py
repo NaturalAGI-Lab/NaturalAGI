@@ -170,8 +170,8 @@ def test_mnist_all(
     quiet: bool = False,
     tracing_enabled: bool = True,
     results_dir: str = os.path.join(_TRAINING_DIR, "training_results"),
-    nuclio_volume_path_template: str = "/opt/nuclio/shared_storage/generated_samples/mnist_{cls}/test",
-    local_path_template: str = os.path.join(_TRAINING_DIR, "../../tests/generated_samples/mnist_{cls}/test"),
+    nuclio_volume_path_template: str = "/opt/nuclio/shared_storage/test/{cls}",
+    local_path_template: str = os.path.join(_TRAINING_DIR, "../../datasets/test/{cls}"),
     kafka_bootstrap_servers: str = "localhost:29092",
     neo4j_uri: str = _NEO4J_URI,
     neo4j_user: str = _NEO4J_USER,
@@ -305,15 +305,12 @@ def test_mnist_all(
             })
 
             feature_config = run_config.get("features", {})
-            normalizers = feature_config.get("property_normalizers", {})
-            if normalizers:
-                mlflow.log_params({f"normalizer.{k}": v for k, v in normalizers.items()})
             node_costs = feature_config.get("node_costs", {})
             if node_costs:
                 mlflow.log_params({f"node_cost.{k}": v for k, v in node_costs.items()})
-            weights = feature_config.get("feature_weights", {})
-            if weights:
-                mlflow.log_params({f"weight.{k}": v for k, v in weights.items()})
+            epsilon = feature_config.get("diagnostic_weight_epsilon")
+            if epsilon is not None:
+                mlflow.log_param("diagnostic_weight_epsilon", epsilon)
 
             mlflow.set_tag("researcher", os.environ.get("USER", "unknown"))
             mlflow.set_tag("git_dirty", str(run_config.get("git", {}).get("dirty", False)))
@@ -467,14 +464,11 @@ def _build_run_config(
                 "features": params["features"],
             } if "features" in params else {}),
             **({
-                "property_normalizers": params["property_normalizers"],
-            } if "property_normalizers" in params else {}),
-            **({
                 "node_costs": params["node_costs"],
             } if "node_costs" in params else {}),
             **({
-                "feature_weights": params["feature_weights"],
-            } if "feature_weights" in params else {}),
+                "diagnostic_weight_epsilon": params["diagnostic_weight_epsilon"],
+            } if "diagnostic_weight_epsilon" in params else {}),
         },
     }
 
@@ -503,8 +497,7 @@ def _read_feature_config() -> Dict[str, Any]:
         spec.loader.exec_module(mod)  # type: ignore[union-attr]
         return {
             "features": list(mod.features),
-            "property_normalizers": dict(mod.PROPERTY_NORMALIZERS),
-            "feature_weights": dict(mod.FEATURE_WEIGHTS),
+            "diagnostic_weight_epsilon": float(mod.DIAGNOSTIC_WEIGHT_EPSILON),
             "node_costs": {
                 k: v for k, v in vars(mod.NodeCost).items()
                 if not k.startswith("_") and isinstance(v, (int, float))

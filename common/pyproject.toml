@@ -1,6 +1,6 @@
 [project]
 name = "natural-agi-common"
-version = "0.1.51"
+version = "0.1.55"
 description = "Components of reduction neural networks concept"
 authors = [
     {name = "koboh", email = "konstboh@gmail.com"},

@@ -36,27 +36,34 @@ class Settings(BaseSettings):
     fgw_alpha: float = 0.5
 
 
+def _annotate_range_widths(concept_graphs: dict) -> None:
+    for graph in concept_graphs.values():
+        for node_id in graph.nodes():
+            node_data = graph.nodes[node_id]
+            widths: dict[str, float] = {}
+            for key, val in node_data.items():
+                if isinstance(val, dict) and "min" in val and "max" in val:
+                    widths[key] = abs(float(val["max"]) - float(val["min"]))
+            node_data["_range_widths"] = widths
+
+
 @contextmanager
-def _cost_config_override(features=None, normalizers=None, costs=None, weights=None):
+def _cost_config_override(features=None, costs=None, epsilon=None):
     orig_features = _cf.features
-    orig_normalizers = _cf.PROPERTY_NORMALIZERS
-    orig_weights = _cf.FEATURE_WEIGHTS
+    orig_epsilon = _cf.DIAGNOSTIC_WEIGHT_EPSILON
     orig_costs = {k: v for k, v in vars(_cf.NodeCost).items() if not k.startswith("_")}
     try:
         if features is not None:
             _cf.features = features
-        if normalizers is not None:
-            _cf.PROPERTY_NORMALIZERS = normalizers
-        if weights is not None:
-            _cf.FEATURE_WEIGHTS = weights
+        if epsilon is not None:
+            _cf.DIAGNOSTIC_WEIGHT_EPSILON = float(epsilon)
         if costs is not None:
             for k, v in costs.items():
                 setattr(_cf.NodeCost, k.upper(), float(v))
         yield
     finally:
         _cf.features = orig_features
-        _cf.PROPERTY_NORMALIZERS = orig_normalizers
-        _cf.FEATURE_WEIGHTS = orig_weights
+        _cf.DIAGNOSTIC_WEIGHT_EPSILON = orig_epsilon
         for k, v in orig_costs.items():
             setattr(_cf.NodeCost, k, v)
 
@@ -105,16 +112,19 @@ def init_context(context):
     features_env = os.environ.get("CLASSIFICATION_FEATURES")
     if features_env:
         _cf.features = json.loads(features_env)
-    normalizers_env = os.environ.get("CLASSIFICATION_PROPERTY_NORMALIZERS")
-    if normalizers_env:
-        _cf.PROPERTY_NORMALIZERS = json.loads(normalizers_env)
     costs_env = os.environ.get("CLASSIFICATION_NODE_COSTS")
     if costs_env:
         for k, v in json.loads(costs_env).items():
             setattr(_cf.NodeCost, k.upper(), float(v))
-    weights_env = os.environ.get("CLASSIFICATION_FEATURE_WEIGHTS")
-    if weights_env:
-        _cf.FEATURE_WEIGHTS = json.loads(weights_env)
+    epsilon_env = os.environ.get("CLASSIFICATION_DIAGNOSTIC_WEIGHT_EPSILON")
+    if epsilon_env:
+        _cf.DIAGNOSTIC_WEIGHT_EPSILON = float(epsilon_env)
+
+    _annotate_range_widths(concept_graphs)
+    context.logger.info_with(
+        f"Annotated range widths on {len(concept_graphs)} concept graphs",
+        handler=HANDLER_NAME,
+    )
 
 
 def kafka_handler(context, event):
@@ -170,11 +180,10 @@ def _classify_no_trace(context, data, image_id, classification_params,
             raise ValueError("image_id must be provided in the request body")
 
         msg_features = data["parameters"].get("features")
-        msg_normalizers = data["parameters"].get("property_normalizers")
         msg_costs = data["parameters"].get("node_costs")
-        msg_weights = data["parameters"].get("feature_weights")
+        msg_epsilon = data["parameters"].get("diagnostic_weight_epsilon")
 
-        with _cost_config_override(msg_features, msg_normalizers, msg_costs, msg_weights):
+        with _cost_config_override(msg_features, msg_costs, msg_epsilon):
             comparison_results = orchestrator.classify_image(
                 image_id, context.user_data.concept_graphs
             )
@@ -240,11 +249,10 @@ def _classify_with_trace(context, event, data, image_id, classification_params,
                 raise ValueError("image_id must be provided in the request body")
 
             msg_features = data["parameters"].get("features")
-            msg_normalizers = data["parameters"].get("property_normalizers")
             msg_costs = data["parameters"].get("node_costs")
-            msg_weights = data["parameters"].get("feature_weights")
+            msg_epsilon = data["parameters"].get("diagnostic_weight_epsilon")
 
-            with _cost_config_override(msg_features, msg_normalizers, msg_costs, msg_weights):
+            with _cost_config_override(msg_features, msg_costs, msg_epsilon):
                 comparison_results = orchestrator.classify_image(
                     image_id, context.user_data.concept_graphs
                 )
