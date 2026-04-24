@@ -166,7 +166,7 @@ def _calculate_properties_similarity_cost(
         property_cost = _calculate_property_similarity_cost(
             concept_value, image_value, property_name, normalized_w
         )
-        total_cost += min(property_cost, normalized_w)
+        total_cost += property_cost
         properties_checked += 1
 
     return total_cost if properties_checked > 0 else NodeCost.NO_COST

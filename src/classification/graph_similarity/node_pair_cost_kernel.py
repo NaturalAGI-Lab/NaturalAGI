@@ -32,7 +32,7 @@ def node_property_cost(
     if not common:
         return _cf.NodeCost.NO_MATCH
 
-    raw_weights = {p: _cf.FEATURE_WEIGHTS.get(p, 1.0) for p in common}
+    raw_weights = {p: _cf._resolve_weight(p, concept_node) for p in common}
     total_weight = sum(raw_weights.values())
     if total_weight < 1e-9:
         return _cf.NodeCost.NO_MATCH

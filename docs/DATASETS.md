@@ -101,7 +101,7 @@ Subclass folders use the format `{digit}_{subclass}`, e.g.:
 
 1. Raw MNIST images were filtered and curated using `mnist_filter.ipynb`
 2. Images were manually annotated for structure quality using `manual_annotator.ipynb` (results in manifest CSV)
-3. Training samples were prepared per subclass in `tests/prepared_samples/`
+3. Training samples were prepared per subclass in `datasets/train/`
 4. Active subclasses (matching `classes_to_subclasses`) were copied to `datasets/train/`
 5. Remaining subclasses were placed in `datasets/inactive/`
 6. The entire `datasets/` folder was packed into `datasets.zip` for version control

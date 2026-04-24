@@ -21,7 +21,7 @@ def generate_mnist_samples(
     number: int,
     max_samples: int = 100,
     test_fraction: float = 0.2,
-    output_dir: str = os.path.join(_PROJECT_ROOT, "tests", "generated_samples"),
+    output_dir: str = os.path.join(_PROJECT_ROOT, "datasets", "generated"),
     randomize: bool = True,
 ) -> None:
     """
