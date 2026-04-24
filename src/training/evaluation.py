@@ -4,6 +4,7 @@ Extracted from training.ipynb.
 """
 from __future__ import annotations
 
+import csv
 import importlib.util
 import json
 import logging
@@ -14,7 +15,7 @@ import subprocess
 import sys
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, Iterable, List, Set, Tuple
 
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -163,6 +164,53 @@ def save_confusion_matrix(cm: np.ndarray, classes: List[str], run_dir: str) -> N
     plt.close()
 
 
+_DEFAULT_MANIFEST_PATH = os.path.join(
+    _TRAINING_DIR, "../../datasets/mnist_all_manifest.csv"
+)
+_DEFAULT_STRUCTURE_FILTER: Tuple[str, ...] = ("complete",)
+
+
+def _load_manifest_allowlist(
+    manifest_path: str,
+    classes: Iterable[int],
+    structure_filter: Tuple[str, ...],
+) -> Dict[int, Set[str]]:
+    """Build {class -> {allowed basenames}} from the annotation manifest.
+
+    Raises FileNotFoundError if the manifest is missing. A class that ends up
+    with no allowed basenames is preserved in the result (as an empty set) so
+    downstream can report the gap explicitly.
+    """
+    if not os.path.isfile(manifest_path):
+        raise FileNotFoundError(
+            f"Annotation manifest not found at {manifest_path}. "
+            f"Disable filtering by passing structure_filter=() or point manifest_path= elsewhere."
+        )
+
+    wanted = {int(c) for c in classes}
+    allowed: Dict[int, Set[str]] = {c: set() for c in wanted}
+    allowed_labels = set(structure_filter)
+
+    with open(manifest_path, newline="") as f:
+        reader = csv.DictReader(f)
+        missing = {"image_path", "class", "structure"} - set(reader.fieldnames or [])
+        if missing:
+            raise ValueError(
+                f"Manifest {manifest_path} is missing required columns: {sorted(missing)}"
+            )
+        for row in reader:
+            try:
+                cls = int(row["class"])
+            except (TypeError, ValueError):
+                continue
+            if cls not in wanted:
+                continue
+            if row["structure"] not in allowed_labels:
+                continue
+            allowed[cls].add(os.path.basename(row["image_path"]))
+    return allowed
+
+
 def test_mnist_all(
     classes: List[int],
     params: Dict[str, Any],
@@ -171,8 +219,10 @@ def test_mnist_all(
     quiet: bool = False,
     tracing_enabled: bool = True,
     results_dir: str = os.path.join(_TRAINING_DIR, "training_results"),
-    nuclio_volume_path_template: str = "/opt/nuclio/shared_storage/test/{cls}",
-    local_path_template: str = os.path.join(_TRAINING_DIR, "../../datasets/test/{cls}"),
+    nuclio_volume_path_template: str = "/opt/nuclio/shared_storage/mnist_all/{cls}",
+    local_path_template: str = os.path.join(_TRAINING_DIR, "../../datasets/mnist_all/{cls}"),
+    manifest_path: str = _DEFAULT_MANIFEST_PATH,
+    structure_filter: Tuple[str, ...] = _DEFAULT_STRUCTURE_FILTER,
     kafka_bootstrap_servers: str = "localhost:29092",
     neo4j_uri: str = _NEO4J_URI,
     neo4j_user: str = _NEO4J_USER,
@@ -231,7 +281,28 @@ def test_mnist_all(
 
     snapshot_path = export_concept_snapshot(concept_graphs, run_dir)
 
-    run_config = _build_run_config(classes, params, sample_fraction, concept_complexities)
+    allowlist: Dict[int, Set[str]] | None = None
+    manifest_summary: Dict[str, Any] | None = None
+    if structure_filter:
+        allowlist = _load_manifest_allowlist(manifest_path, classes, structure_filter)
+        manifest_summary = {
+            "manifest_path": os.path.relpath(manifest_path, _PROJECT_ROOT),
+            "structure_filter": list(structure_filter),
+            "allowed_per_class": {str(c): len(s) for c, s in allowlist.items()},
+            "total_allowed": sum(len(s) for s in allowlist.values()),
+        }
+        if not quiet:
+            per_class = ", ".join(
+                f"{c}={len(allowlist[c])}" for c in sorted(allowlist)
+            )
+            print(
+                f"Manifest filter [{', '.join(structure_filter)}]: "
+                f"{manifest_summary['total_allowed']} images allowed ({per_class})"
+            )
+
+    run_config = _build_run_config(
+        classes, params, sample_fraction, concept_complexities, manifest_summary
+    )
     with open(os.path.join(run_dir, "run_config.json"), "w") as f:
         json.dump(run_config, f, indent=2)
 
@@ -267,6 +338,15 @@ def test_mnist_all(
         local_folder = local_path_template.format(cls=cls)
         nuclio_folder = nuclio_volume_path_template.format(cls=cls)
         images = [f for f in os.listdir(local_folder) if f.endswith((".png", ".jpg", ".jpeg"))]
+        if allowlist is not None:
+            cls_allowed = allowlist.get(int(cls), set())
+            kept = [f for f in images if f in cls_allowed]
+            if not quiet:
+                print(
+                    f"  class {cls}: {len(kept)}/{len(images)} images pass "
+                    f"{list(structure_filter)} filter"
+                )
+            images = kept
         if sample_fraction < 1.0:
             images = random.sample(images, max(1, int(len(images) * sample_fraction)))
         for fname in images:
@@ -440,6 +520,7 @@ def _build_run_config(
     params: Dict[str, Any],
     sample_fraction: float,
     concept_complexities: Dict[str, int],
+    manifest: Dict[str, Any] | None = None,
 ) -> Dict[str, Any]:
     git_commit = subprocess.run(
         ["git", "rev-parse", "HEAD"], capture_output=True, text=True, cwd=_PROJECT_ROOT
@@ -459,6 +540,7 @@ def _build_run_config(
         "sample_fraction": sample_fraction,
         "classes": sorted(classes),
         "concepts": concept_complexities,
+        "manifest": manifest,
         "features": {
             **_read_feature_config(),
             **({
