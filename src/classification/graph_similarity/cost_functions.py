@@ -6,11 +6,11 @@ from common.feature_scales import CATEGORICAL_FEATURES, SCALE_STRENGTH
 
 class NodeCost:
     NO_COST = 0.0
-    MINOR = 0.25
-    GENERAL = 0.4
-    SEVERE = 0.65
-    NO_MATCH = 1.0
-    IMPOSSIBLE = 100.0
+    MINOR = 0.65
+    GENERAL = 0.75
+    SEVERE = 1.0
+    NO_MATCH = 1.5
+    IMPOSSIBLE = 10.0
 
 features = [
     # Spatial / positional

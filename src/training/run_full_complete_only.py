@@ -19,10 +19,10 @@ PARAMS = {
     "node_costs": {
         "NO_COST": 0.0,
         "MINOR": 0.65,
-        "GENERAL": 0.45,
-        "SEVERE": 0.726,
-        "NO_MATCH": 1.304,
-        "IMPOSSIBLE": 6.681,
+        "GENERAL": 0.75,
+        "SEVERE": 1.0,
+        "NO_MATCH": 1.5,
+        "IMPOSSIBLE": 10.0,
     },
     "features": [
         "normalized_x", "normalized_y",
