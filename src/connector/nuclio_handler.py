@@ -75,12 +75,12 @@ def http_handler(context, event):
                 for image_file in image_files:
                     parameters["image_path"] = os.path.join(dataset_path, image_file)
                     parameters["image_id"] = str(uuid.uuid4())
-                    send_to_kafka(context, operation, parameters)
+                    send_to_kafka(context, operation, parameters, trace=False)
             # Handle single file path
             elif os.path.isfile(dataset_path):
                 parameters["image_path"] = dataset_path
                 parameters["image_id"] = str(uuid.uuid4())
-                send_to_kafka(context, operation, parameters)
+                send_to_kafka(context, operation, parameters, trace=False)
             else:
                 raise ValueError(f"Invalid dataset_path: {dataset_path}")
 
@@ -102,18 +102,21 @@ def http_handler(context, event):
 
             parameters["image_id"] = parameters.get("image_id", str(uuid.uuid4()))
 
-            experiment_id = parameters.get("mlflow_experiment_id")
-            if experiment_id:
-                context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
-            tracer = context.user_data.tracer
+            if bool(parameters.get("disable_tracing")):
+                send_to_kafka(context, operation, parameters, trace=False)
+            else:
+                experiment_id = parameters.get("mlflow_experiment_id")
+                if experiment_id:
+                    context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
+                tracer = context.user_data.tracer
 
-            with tracer.start_as_current_span("connector.classify") as span:
-                span.set_attribute("image_id", parameters["image_id"])
-                span.set_attribute("image_path", image_path)
-                span.set_attribute("session_id", parameters.get("session_id", ""))
-                if parameters.get("mlflow_run_id"):
-                    span.set_attribute("mlflow.run_id", parameters["mlflow_run_id"])
-                send_to_kafka(context, operation, parameters)
+                with tracer.start_as_current_span("connector.classify") as span:
+                    span.set_attribute("image_id", parameters["image_id"])
+                    span.set_attribute("image_path", image_path)
+                    span.set_attribute("session_id", parameters.get("session_id", ""))
+                    if parameters.get("mlflow_run_id"):
+                        span.set_attribute("mlflow.run_id", parameters["mlflow_run_id"])
+                    send_to_kafka(context, operation, parameters)
 
             return context.Response(
                 body="Image sent for classification",
@@ -135,12 +138,12 @@ def http_handler(context, event):
             status_code=500,
         )
 
-def send_to_kafka(context, operation: str, parameters: dict):
+def send_to_kafka(context, operation: str, parameters: dict, trace: bool = True):
     kafka_message = {
         "operation": operation,
         "parameters": parameters
     }
-    headers = inject_trace_headers()
+    headers = inject_trace_headers() if trace else []
     context.user_data.kafka_producer.send(
         context.user_data.kafka_topic,
         value=kafka_message,

@@ -1,0 +1,95 @@
+{
+  "timestamp": "2026-04-24T13:29:09.220731",
+  "git": {
+    "commit": "4dc794e1b8f5506d85406398d929d97d830ead96",
+    "branch": "feat/graph-features-and-cleanup",
+    "dirty": true
+  },
+  "common_lib_version": "0.1.0",
+  "classification_params": {
+    "ged_timeout": 15,
+    "skeletonization_threshold": 110,
+    "simplification_epsilon": 4.55,
+    "comparison_method": "ged",
+    "diagnostic_weight_epsilon": 1.0,
+    "node_costs": {
+      "NO_COST": 0.0,
+      "MINOR": 0.254,
+      "GENERAL": 0.45,
+      "SEVERE": 0.726,
+      "NO_MATCH": 1.304,
+      "IMPOSSIBLE": 6.681
+    },
+    "features": [
+      "normalized_x",
+      "normalized_y",
+      "distance_to_centroid",
+      "horizontal_direction",
+      "vertical_direction",
+      "angle_with_ox",
+      "junction_angle_min",
+      "is_endpoint",
+      "is_corner",
+      "length_ratio_to_max",
+      "eccentricity",
+      "avg_neighbor_vector_length",
+      "neighbor_endpoint_count",
+      "neighbor_junction_count"
+    ]
+  },
+  "sample_fraction": 1.0,
+  "classes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "concepts": {
+    "0_1": 12,
+    "1_1": 7,
+    "1_3": 3,
+    "2_1": 7,
+    "2_2": 10,
+    "3_1": 11,
+    "4_1": 8,
+    "4_2": 9,
+    "5_1": 9,
+    "6_1": 10,
+    "7_1": 5,
+    "8_1": 15,
+    "9_2": 8
+  },
+  "features": {
+    "features": [
+      "normalized_x",
+      "normalized_y",
+      "distance_to_centroid",
+      "horizontal_direction",
+      "vertical_direction",
+      "angle_with_ox",
+      "junction_angle_min",
+      "is_endpoint",
+      "is_corner",
+      "length_ratio_to_max",
+      "eccentricity",
+      "avg_neighbor_vector_length",
+      "neighbor_endpoint_count",
+      "neighbor_junction_count"
+    ],
+    "diagnostic_weight_epsilon": 1.0,
+    "node_costs": {
+      "NO_COST": 0.0,
+      "MINOR": 0.254,
+      "GENERAL": 0.45,
+      "SEVERE": 0.726,
+      "NO_MATCH": 1.304,
+      "IMPOSSIBLE": 6.681
+    }
+  }
+}

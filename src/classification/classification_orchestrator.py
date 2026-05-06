@@ -1,4 +1,5 @@
 import logging
+import math
 from typing import List, Dict, Optional
 
 import networkx as nx
@@ -10,6 +11,18 @@ from models import ClassificationResult
 from services.graph_complexity_service import GraphComplexityService
 from graph_similarity.comparator_protocol import GraphComparator
 from graph_similarity.ged_comparator import GEDComparator
+
+# === Bayesian log-complexity specificity prior (Method 3 winner, +3.96pp at 25% QUICK) ===
+# score = sim + COMPLEXITY_PRIOR_LAMBDA * log2(concept_complexity)
+# Formalizes "при прочих равних, complex concept wins" as a Bayesian prior:
+# P(concept | match) ∝ P(match | concept) * P(concept). Smaller concepts have higher
+# P(match | random graph), so their observed similarity is less informative. The log2
+# term is the number of bits needed to specify a graph of that complexity (MDL prior).
+# Empirically, lambda=0.02 gives increments of ~0.046–0.092 over c=5..24, matching
+# the observed tiebreaker margin of 0.01–0.05 from the top1-issue analysis.
+# Reference: Grünwald (2007) MDL Ch 17; Cilibrasi-Vitányi (2005) NCD.
+# Winner of exp_050..exp_053 bench — see researches/ged_size_bias_four_methods_findings.md.
+COMPLEXITY_PRIOR_LAMBDA = 0.02
 
 logging.basicConfig(level=logging.DEBUG)
 
@@ -27,17 +40,13 @@ class ClassificationOrchestrator:
 
     def __init__(
         self,
-        neo4j_dsn: str,
-        neo4j_user: str,
-        neo4j_pass: str,
+        driver,
         ged_timeout: float = 15,
         comparison_method: str = "ged",
         fgw_alpha: float = 0.5,
         tracer: Optional[otel_trace.Tracer] = None,
     ):
-        self.neo4j_dsn = neo4j_dsn
-        self.neo4j_user = neo4j_user
-        self.neo4j_pass = neo4j_pass
+        self.driver = driver
         self.ged_timeout = ged_timeout
         self.comparator = _build_comparator(comparison_method, ged_timeout, fgw_alpha)
         self.graph_complexity_service = GraphComplexityService()
@@ -50,16 +59,10 @@ class ClassificationOrchestrator:
     ) -> List[ClassificationResult]:
         logging.info(f"Starting classification for image {image_id}")
 
-        image_repository = ImageRepository(
-            self.neo4j_dsn, self.neo4j_user, self.neo4j_pass
-        )
-
-        try:
-            image_graph = image_repository.get_image_graph(image_id)
-            results = self._classify_sequentially(image_graph, concept_graphs)
-            return self._process_and_sort_results(results, image_id)
-        finally:
-            image_repository.close()
+        image_repository = ImageRepository(self.driver)
+        image_graph = image_repository.get_image_graph(image_id)
+        results = self._classify_sequentially(image_graph, concept_graphs)
+        return self._process_and_sort_results(results, image_id)
 
     def _classify_sequentially(
         self,
@@ -128,12 +131,24 @@ class ClassificationOrchestrator:
             logging.warning(f"No classification results for image {image_id}")
             return []
 
+        def _complexity_adjusted_score(r: ClassificationResult) -> float:
+            base = r.similarity or 0.0
+            c = max(r.concept_complexity or 1, 1)
+            return base + COMPLEXITY_PRIOR_LAMBDA * math.log2(c)
+
         results.sort(
-            key=lambda x: (x.is_minor, x.similarity or 0),
+            key=lambda x: (x.is_minor, _complexity_adjusted_score(x)),
             reverse=True,
         )
 
         matching = sum(1 for r in results if r.is_minor)
+        if results:
+            top = results[0]
+            logging.info(
+                f"Top concept={top.concept_id}, sim={top.similarity}, "
+                f"concept_complexity={top.concept_complexity}, "
+                f"adjusted_score={_complexity_adjusted_score(top):.4f}"
+            )
         logging.info(
             f"Found {matching} matching concepts out of {len(results)} processed"
         )

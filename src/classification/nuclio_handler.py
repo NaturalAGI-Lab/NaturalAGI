@@ -8,6 +8,7 @@ from contextlib import contextmanager
 from typing import Optional
 
 from kafka import KafkaProducer
+from neo4j import GraphDatabase
 from pydantic_settings import BaseSettings
 from opentelemetry import trace as otel_trace
 from common.tracing import init_tracer, extract_trace_context
@@ -35,23 +36,34 @@ class Settings(BaseSettings):
     fgw_alpha: float = 0.5
 
 
+def _annotate_range_widths(concept_graphs: dict) -> None:
+    for graph in concept_graphs.values():
+        for node_id in graph.nodes():
+            node_data = graph.nodes[node_id]
+            widths: dict[str, float] = {}
+            for key, val in node_data.items():
+                if isinstance(val, dict) and "min" in val and "max" in val:
+                    widths[key] = abs(float(val["max"]) - float(val["min"]))
+            node_data["_range_widths"] = widths
+
+
 @contextmanager
-def _cost_config_override(features=None, normalizers=None, costs=None):
+def _cost_config_override(features=None, costs=None, epsilon=None):
     orig_features = _cf.features
-    orig_normalizers = _cf.PROPERTY_NORMALIZERS
+    orig_epsilon = _cf.DIAGNOSTIC_WEIGHT_EPSILON
     orig_costs = {k: v for k, v in vars(_cf.NodeCost).items() if not k.startswith("_")}
     try:
         if features is not None:
             _cf.features = features
-        if normalizers is not None:
-            _cf.PROPERTY_NORMALIZERS = normalizers
+        if epsilon is not None:
+            _cf.DIAGNOSTIC_WEIGHT_EPSILON = float(epsilon)
         if costs is not None:
             for k, v in costs.items():
                 setattr(_cf.NodeCost, k.upper(), float(v))
         yield
     finally:
         _cf.features = orig_features
-        _cf.PROPERTY_NORMALIZERS = orig_normalizers
+        _cf.DIAGNOSTIC_WEIGHT_EPSILON = orig_epsilon
         for k, v in orig_costs.items():
             setattr(_cf.NodeCost, k, v)
 
@@ -77,14 +89,16 @@ def init_context(context):
     )
     setattr(context.user_data, "kafka_producer", producer)
 
-    concept_repo = ConceptRepository(
-        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
+    driver = GraphDatabase.driver(
+        settings.neo4j_dsn, auth=(settings.neo4j_user, settings.neo4j_pass)
     )
+    setattr(context.user_data, "neo4j_driver", driver)
+
+    concept_repo = ConceptRepository(driver)
     concept_ids = concept_repo.get_all_concept_ids()
     concept_graphs = {
         cid: concept_repo.get_concept_graph(cid) for cid in concept_ids
     }
-    concept_repo.close()
     setattr(context.user_data, "concept_graphs", concept_graphs)
     context.logger.info_with(
         f"Cached {len(concept_graphs)} concept graphs at startup",
@@ -98,13 +112,19 @@ def init_context(context):
     features_env = os.environ.get("CLASSIFICATION_FEATURES")
     if features_env:
         _cf.features = json.loads(features_env)
-    normalizers_env = os.environ.get("CLASSIFICATION_PROPERTY_NORMALIZERS")
-    if normalizers_env:
-        _cf.PROPERTY_NORMALIZERS = json.loads(normalizers_env)
     costs_env = os.environ.get("CLASSIFICATION_NODE_COSTS")
     if costs_env:
         for k, v in json.loads(costs_env).items():
             setattr(_cf.NodeCost, k.upper(), float(v))
+    epsilon_env = os.environ.get("CLASSIFICATION_DIAGNOSTIC_WEIGHT_EPSILON")
+    if epsilon_env:
+        _cf.DIAGNOSTIC_WEIGHT_EPSILON = float(epsilon_env)
+
+    _annotate_range_widths(concept_graphs)
+    context.logger.info_with(
+        f"Annotated range widths on {len(concept_graphs)} concept graphs",
+        handler=HANDLER_NAME,
+    )
 
 
 def kafka_handler(context, event):
@@ -136,6 +156,72 @@ def kafka_handler(context, event):
         f"Classification params: {classification_params}", handler=HANDLER_NAME
     )
 
+    tracing_disabled = bool(data["parameters"].get("disable_tracing"))
+
+    if tracing_disabled:
+        _classify_no_trace(context, data, image_id, classification_params,
+                           profiling, delete_image_nodes, start_time)
+    else:
+        _classify_with_trace(context, event, data, image_id, classification_params,
+                             profiling, delete_image_nodes, start_time)
+
+
+def _classify_no_trace(context, data, image_id, classification_params,
+                       profiling, delete_image_nodes, start_time):
+    orchestrator = ClassificationOrchestrator(
+        driver=context.user_data.neo4j_driver,
+        ged_timeout=classification_params["ged_timeout"],
+        comparison_method=classification_params.get("comparison_method", "ged"),
+        fgw_alpha=float(classification_params.get("fgw_alpha", 0.5)),
+        tracer=None,
+    )
+    try:
+        if not image_id:
+            raise ValueError("image_id must be provided in the request body")
+
+        msg_features = data["parameters"].get("features")
+        msg_costs = data["parameters"].get("node_costs")
+        msg_epsilon = data["parameters"].get("diagnostic_weight_epsilon")
+
+        with _cost_config_override(msg_features, msg_costs, msg_epsilon):
+            comparison_results = orchestrator.classify_image(
+                image_id, context.user_data.concept_graphs
+            )
+
+        context.logger.info_with(
+            f"Classification results: {len(comparison_results)} matches found",
+            handler=HANDLER_NAME,
+        )
+
+        profiling["classification_time_ms"] = (time.time_ns() - start_time) / 1_000_000
+        context.user_data.kafka_producer.send(
+            context.user_data.kafka_topic,
+            value={
+                "status": "success",
+                "classification_results": [r.__dict__ for r in comparison_results],
+                "image_id": image_id,
+                "image_path": data["parameters"]["image_path"],
+                "parameters": {**classification_params, **data["parameters"]},
+                "profiling": profiling,
+            },
+        )
+
+    except Exception as e:
+        context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)
+        logging.error(f"Error: {e}", exc_info=True, stack_info=True)
+        context.user_data.kafka_producer.send(
+            context.user_data.dlq_topic,
+            value={"error": str(e), "source": HANDLER_NAME, "value": data},
+        )
+
+    finally:
+        if delete_image_nodes:
+            image_repository = ImageRepository(context.user_data.neo4j_driver)
+            image_repository.remove_image_nodes(image_id)
+
+
+def _classify_with_trace(context, event, data, image_id, classification_params,
+                         profiling, delete_image_nodes, start_time):
     experiment_id = data["parameters"].get("mlflow_experiment_id")
     if experiment_id:
         context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
@@ -151,9 +237,7 @@ def kafka_handler(context, event):
             span.set_attribute("mlflow.run_id", data["parameters"]["mlflow_run_id"])
 
         orchestrator = ClassificationOrchestrator(
-            neo4j_dsn=settings.neo4j_dsn,
-            neo4j_user=settings.neo4j_user,
-            neo4j_pass=settings.neo4j_pass,
+            driver=context.user_data.neo4j_driver,
             ged_timeout=classification_params["ged_timeout"],
             comparison_method=classification_params.get("comparison_method", "ged"),
             fgw_alpha=float(classification_params.get("fgw_alpha", 0.5)),
@@ -165,10 +249,10 @@ def kafka_handler(context, event):
                 raise ValueError("image_id must be provided in the request body")
 
             msg_features = data["parameters"].get("features")
-            msg_normalizers = data["parameters"].get("property_normalizers")
             msg_costs = data["parameters"].get("node_costs")
+            msg_epsilon = data["parameters"].get("diagnostic_weight_epsilon")
 
-            with _cost_config_override(msg_features, msg_normalizers, msg_costs):
+            with _cost_config_override(msg_features, msg_costs, msg_epsilon):
                 comparison_results = orchestrator.classify_image(
                     image_id, context.user_data.concept_graphs
                 )
@@ -214,13 +298,8 @@ def kafka_handler(context, event):
 
         finally:
             if delete_image_nodes:
-                image_repository = ImageRepository(
-                    settings.neo4j_dsn,
-                    settings.neo4j_user,
-                    settings.neo4j_pass,
-                )
+                image_repository = ImageRepository(context.user_data.neo4j_driver)
                 image_repository.remove_image_nodes(image_id)
-                image_repository.close()
 
 
 def handler(context, event):

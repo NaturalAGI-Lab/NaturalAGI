@@ -17,6 +17,7 @@ _propagator = TraceContextTextMapPropagator()
 TRACING_ENABLED = os.environ.get("OTEL_TRACING_ENABLED", "true").lower() == "true"
 
 _tracer_cache: dict[str, trace.Tracer] = {}
+_provider_cache: dict[str, TracerProvider] = {}
 
 
 def init_tracer(service_name: str, experiment_id: str | None = None) -> trace.Tracer:
@@ -30,6 +31,15 @@ def init_tracer(service_name: str, experiment_id: str | None = None) -> trace.Tr
     if cache_key in _tracer_cache:
         return _tracer_cache[cache_key]
 
+    old_key = next((k for k in _provider_cache if k.startswith(f"{service_name}:")), None)
+    if old_key and old_key != cache_key:
+        try:
+            _provider_cache[old_key].shutdown()
+        except Exception:
+            pass
+        _provider_cache.pop(old_key, None)
+        _tracer_cache.pop(old_key, None)
+
     otlp_endpoint = os.environ.get("OTEL_EXPORTER_OTLP_ENDPOINT", "http://mlflow:5000")
     resource = Resource.create({"service.name": service_name})
     provider = TracerProvider(resource=resource)
@@ -38,11 +48,16 @@ def init_tracer(service_name: str, experiment_id: str | None = None) -> trace.Tr
             OTLPSpanExporter(
                 endpoint=f"{otlp_endpoint}/v1/traces",
                 headers={"x-mlflow-experiment-id": experiment_id},
-            )
+            ),
+            max_queue_size=2048,
+            schedule_delay_millis=5000,
+            max_export_batch_size=512,
+            export_timeout_millis=5000,
         )
     )
     tracer = provider.get_tracer(service_name)
     _tracer_cache[cache_key] = tracer
+    _provider_cache[cache_key] = provider
     return tracer
 
 

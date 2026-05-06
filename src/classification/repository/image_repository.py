@@ -1,4 +1,3 @@
-from neo4j import GraphDatabase
 import networkx as nx
 import logging
 from common.decorator import timed
@@ -6,15 +5,9 @@ from .neo4j_to_networkx import Neo4jToNetworkX
 
 
 class ImageRepository:
-    def __init__(self, neo4j_dsn: str, neo4j_user: str, neo4j_pass: str):
-        self.neo4j_dsn = neo4j_dsn
-        self.neo4j_user = neo4j_user
-        self.neo4j_pass = neo4j_pass
-        self.driver = GraphDatabase.driver(neo4j_dsn, auth=(neo4j_user, neo4j_pass))
+    def __init__(self, driver):
+        self.driver = driver
         self.logger = logging.getLogger(__name__)
-
-    def close(self):
-        self.driver.close()
 
     @timed(label="get_image_graph")
     def get_image_graph(self, image_id: str) -> nx.Graph:

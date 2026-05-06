@@ -29,7 +29,7 @@ spec:
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
       - "pip install numpy==2.4.2 opencv-python==4.13.0.92 pydantic-settings==2.13.1 neo4j==6.1.0 scikit-learn==1.8.0 kafka-python==2.3.0 networkx==3.6.1 scipy==1.17.1 msgpack==1.1.2 opentelemetry-api==1.40.0 opentelemetry-sdk==1.40.0 opentelemetry-exporter-otlp-proto-http==1.40.0"
       - "mkdir -p /home/nuclio/bin/py3.12-whl && pip download msgpack==1.1.2 --only-binary=:all: -d /home/nuclio/bin/py3.12-whl --no-deps"
-      - "pip install --upgrade natural-agi-common==0.1.50"
+      - "pip install --upgrade natural-agi-common==0.1.55"
   loggerSinks:
     - level: debug
   platform:

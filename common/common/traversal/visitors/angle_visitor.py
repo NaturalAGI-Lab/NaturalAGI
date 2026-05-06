@@ -5,6 +5,7 @@ from neo4j import ManagedTransaction
 from .visitor import Visitor
 from ...model.point import Point
 from ...model.vector import Vector
+from ...feature_scales import h_k
 import networkx as nx
 
 
@@ -159,4 +160,5 @@ class AngleVisitor(Visitor):
 
         cos_angle = dot_product / magnitude
         angle = math.degrees(math.acos(max(-1.0, min(1.0, cos_angle))))
-        return round(angle / 10) * 10
+        # 10° quantization (discretization) → h_k (v/180) to match write-time transform.
+        return h_k("angle_with_ox", round(angle / 10) * 10)

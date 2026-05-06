@@ -139,7 +139,6 @@ class GraphEditDistanceComparator:
 
             logger.info(f"GED: {best_cost} after {iterations} iterations")
 
-            # Boria et al. (2019) normalization — guarantees similarity in [0, 1]
             n1 = image_graph.number_of_nodes() + image_graph.number_of_edges()
             n2 = concept_graph.number_of_nodes() + concept_graph.number_of_edges()
             similarity = 1.0 - (best_cost / (best_cost + max(n1, n2, 1)))

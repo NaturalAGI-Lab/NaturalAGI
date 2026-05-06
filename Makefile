@@ -14,14 +14,14 @@ IMAGE_ID ?= default_image
 
 # Number of instances for each service (balanced for post-IO-optimization latencies:
 # skel ~40ms, contour ~50ms, classification ~243ms)
-INSTANCES_SKEL ?= 2
+INSTANCES_SKEL ?= 4
 INSTANCES_CONTOUR ?= 4
-INSTANCES_CLASSIFICATION ?= 12
+INSTANCES_CLASSIFICATION ?= 16
 
 # Kafka partition counts per topic (2 × instances for even distribution)
-PARTITIONS_CONNECTOR ?= 4
+PARTITIONS_CONNECTOR ?= 8
 PARTITIONS_SKEL ?= 8
-PARTITIONS_CONTOUR ?= 24
+PARTITIONS_CONTOUR ?= 32
 PARTITIONS_CLASSIFICATION ?= 1
 PARTITIONS_DLQ ?= 1
 

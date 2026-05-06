@@ -1,70 +1,37 @@
-\documentclass[conference,a4paper]{IEEEtran}
+\documentclass[runningheads]{llncs}
 
-\usepackage{cite}
-\usepackage{amsmath,amssymb,amsfonts}
-\usepackage{algorithmic}
+\usepackage[T1]{fontenc}
 \usepackage{graphicx}
-\usepackage{textcomp}
-\usepackage{xcolor}
-\usepackage{url}
-\usepackage{hyperref} % TODO: remove before submission
-\usepackage{orcidlink} % ORCID icon (modern way)
-\usepackage{lipsum}
-
-\makeatletter
-\newcommand{\linebreakand}{%
-  \end{@IEEEauthorhalign}
-  \hfill\mbox{}\par
-  \mbox{}\hfill\begin{@IEEEauthorhalign}
-}
-\makeatother
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{hyperref}
 
 \begin{document}
 
-\title{Graph-Based Representation of Contour Images: A Step Toward Self-Describing Explainable AI}
+\title{Graph-Based Representation of Contour Images: A Step toward Self-describing Explainable AI}
+\titlerunning{Graph-Based Representation of Contour Images}
 
-\author{
-\IEEEauthorblockN{Mykyta Lapin}
-\IEEEauthorblockA{\textit{Department of System Analysis and Information}\\
-\textit{and Analytical Technologies}\\
-\textit{of National Technical University}\\
-\textit{``Kharkiv Polytechnic Institute''}\\
-Kharkiv, Ukraine\\
-Mykyta.Lapin@cit.khpi.edu.ua}
+\author{Mykyta Lapin\inst{1}\thanks{Corresponding author.}\orcidID{0009-0003-6307-1172} \and
+Kostiantyn Bokhan\inst{1}\orcidID{0000-0003-3375-2527} \and
+Yurii Parzhyn\inst{2}\orcidID{0000-0001-5727-1918} \and
+Kyrylo Perevoznyk\inst{1}\orcidID{0009-0009-2327-1501}}
+\authorrunning{M. Lapin et al.}
+
+\institute{Department of System Analysis and Information and Analytical Technologies,\\
+National Technical University ``Kharkiv Polytechnic Institute'', Kharkiv, Ukraine\\
+\email{Mykyta.Lapin@cit.khpi.edu.ua}\\
+\email{kostiantyn.bokhan@khpi.edu.ua}\\
+\email{kyrylo.perevoznyk@cs.khpi.edu.ua}
 \and
-\IEEEauthorblockN{Kostiantyn Bokhan}
-\IEEEauthorblockA{\textit{Department of System Analysis and Information}\\
-\textit{and Analytical Technologies}\\
-\textit{of National Technical University}\\
-\textit{``Kharkiv Polytechnic Institute''}\\
-Kharkiv, Ukraine\\
-kostiantyn.bokhan@khpi.edu.ua}
-\linebreakand
-\IEEEauthorblockN{Yurii Parzhyn}
-\IEEEauthorblockA{\textit{Postdoctoral Fellow}\\
-\textit{School of Computer and Cyber Sciences}\\
-\textit{Augusta University}\\
-Augusta, USA\\
-yparzhyn@augusta.edu}
-\and
-\IEEEauthorblockN{Kyrylo Perevoznyk}
-\IEEEauthorblockA{\textit{Department of System Analysis and Information}\\
-\textit{and Analytical Technologies}\\
-\textit{of National Technical University}\\
-\textit{``Kharkiv Polytechnic Institute''}\\
-Kharkiv, Ukraine\\
-kyrylo.perevoznyk@cs.khpi.edu.ua}
-}
+School of Computer and Cyber Sciences, Augusta University, Augusta, USA\\
+\email{yparzhyn@augusta.edu}}
 
 \maketitle
 
 \begin{abstract}
 Opaque perception pipelines hinder trust and diagnosis in real-world AI systems. We present a graph-based representation for contour images that makes structure the carrier of explanations. The approach encodes visual patterns as attributed graphs where nodes represent critical points (endpoints, corners, junctions) and edges represent connecting line segments, with semantic tags and geometric attributes attached directly to graph elements. Crucially, we demonstrate how multiple graph instances of the same class can be reduced to form stable \textit{concept attractors}---canonical graph structures that capture shared topological and parametric patterns while filtering instance-specific variations. This concept formation process operates through iterative structural and parametric reduction without backpropagation, enabling few-shot learning from minimal training data. We validate the approach on MNIST handwritten digits, where concepts formed from 5--6 training samples achieve meaningful classification through graph matching. By encoding semantics explicitly in graph structure rather than in opaque weight matrices, the approach advances explainable AI while maintaining competitive few-shot learning performance.
-\end{abstract}
 
-\begin{IEEEkeywords}
-explainable AI (XAI), artificial neural networks, hypergraph models, few-shot learning, structural reduction, graph matching
-\end{IEEEkeywords}
+\keywords{Explainable AI (XAI) \and Artificial neural networks \and Hypergraph models \and Few-shot learning \and Structural reduction \and Graph matching}
+\end{abstract}
 
 \section{Introduction}
 
@@ -279,7 +246,7 @@ F1 Score & 82.16 \\
 
 \section{Discussion}
 
-\subsection{Explainability Through Structure}
+\subsection{Explainability through Structure}
 
 The graph representation makes structure the carrier of explanations, providing inherent interpretability without post-hoc approximation. Graph cycles directly encode topological properties: closed-loop digits (6, 9) exhibit mean degree 2.0 and contain intersection points, while open-contour digits exhibit lower mean degrees (1.33--1.71) and terminal endpoints (Table~\ref{tab:concept_metrics}). Parametric generalization (\autoref{subsec:parametric_generalization}) encodes decision boundaries as explicit attribute ranges rather than implicit weight matrices: normalized coordinate spans (e.g., $x \in [-0.7, 0.2]$ for digit 3) define acceptable variation transparently, while categorical properties persist only when consistent across all training samples.
 
@@ -293,7 +260,10 @@ The approach exhibits four primary limitations. First, Graph Edit Distance compu
 
 This paper presents a graph-based representation for contour images that makes structure the carrier of explanations. The approach encodes visual patterns as attributed graphs where nodes represent critical points and connecting line segments, with semantic tags and geometric attributes attached directly to graph elements. Multiple graph instances are reduced to stable concept attractors through iterative structural composition, requiring only 2--6 training samples per concept without gradient-based optimization. Validation on MNIST handwritten digits demonstrates that this few-shot learning approach achieves 82.35\% classification accuracy through explicit graph matching, with confusion patterns tracing directly to structural similarity. By encoding semantics in queryable graph topology rather than opaque weight matrices, the approach advances explainable AI toward systems where decision paths are inherently transparent, verifiable, and suitable for domains requiring trustworthy, traceable reasoning.
 
-\bibliographystyle{IEEEtran}
+\subsubsection*{Disclosure of Interests.}
+The authors have no competing interests to declare that are relevant to the content of this article.
+
+\bibliographystyle{splncs04}
 \bibliography{references}
 
 \end{document}

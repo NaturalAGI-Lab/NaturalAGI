@@ -9,13 +9,7 @@
       "params": {
         "ged_timeout": 5,
         "skeletonization_threshold": 180,
-        "property_normalizers": {
-          "normalized_x": 2.0,
-          "normalized_y": 2.0,
-          "horizontal_direction": 2.0,
-          "vertical_direction": 2.0,
-          "cycle_count": 4.0
-        }
+        "diagnostic_weight_epsilon": 0.1
       },
       "classes": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
       "status": "pending",
