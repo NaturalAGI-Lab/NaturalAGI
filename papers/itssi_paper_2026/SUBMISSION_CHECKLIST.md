@@ -53,13 +53,15 @@ After running `make build`, open the `.docx` in Microsoft Word and do:
 
 1. **Insert the MathType formula** in §4 Methods. The generator writes a placeholder paragraph `[TODO MathType: C_{i+1} = CRO(C_i, G_{i+1})]`. Delete the placeholder text and insert a MathType object on its place via *Insert → Object → MathType Equation*. Number stays right-aligned as `(1)`. Word's built-in equation editor is **forbidden** by the journal — use MathType only.
 
-2. **Insert Figure 1** (pipeline image → skeleton → graph → concept → GED). The generator emits `[Рисунок 1: ...]` placeholder. **Source**: needs to be drawn in Visio, draw.io, or similar, ≥300 dpi, exported as `.png`. See `figures/fig_1_pipeline_TODO.md` for a full description of what to depict. Place the image where the placeholder line is, with the caption "Рис. 1. Пайплайн перетворення растрового зображення на концепт-граф і класифікації за GED" centred below.
+2. **Insert Figure 1** (pipeline image → skeleton → graph → concept → GED). PNG already produced at `figures/fig_1_pipeline.png` (2700-wide, ≥300 dpi). Vector source in `figures/fig_1_pipeline.drawio` for editor's typesetting (convert to `.vsdx` per `figures/README.md`). Replace placeholder via *Insert → Pictures → This Device*. Caption "Рис. 1. Пайплайн перетворення растрового зображення на концепт-граф і класифікації за GED" centred below.
 
-3. **Insert Figure 2** (graph representation of one digit-7 image). See `figures/fig_2_digit7_TODO.md` for the Cypher query that pulls a single digit-7 graph from Neo4j and the matplotlib snippet to render it. Replace the placeholder.
+3. **Insert Figure 2** (graph representation of one digit-7 image). PNG already produced at `figures/fig_2_digit7_graph.png` (4170×2247). Hybrid figure: raster left half (`digit7_sample.png`) + vector right half (`fig_2_digit7_graph.drawio`); composed by `figures/compose_fig_2.py`. Replace the placeholder.
 
-4. **Insert Figure 3** (concept-attractor 7_1 after reduction). See `figures/fig_3_concept_7_1_TODO.md`. Replace placeholder.
+4. **Insert Figure 3** (concept-attractor 7_1 after reduction). PNG already produced at `figures/fig_3_concept_7_1.png`. Vector source in `figures/fig_3_concept_7_1.drawio`. Replace placeholder.
 
-5. **Insert Figure 4** (confusion matrix). PNG already produced at `figures/fig_4_confusion_matrix.png` (300 dpi). Replace the placeholder via *Insert → Pictures → This Device*.
+5. **Insert Figure 4** (confusion matrix). PNG already produced at `figures/fig_4_confusion_matrix.png` (2571×2062, ~515 dpi at 4-inch height). **PNG-only by design** — heatmap data viz, not a schematic; journal rule permits PNG ≥300 dpi. Replace the placeholder via *Insert → Pictures → This Device*.
+
+**Editor's Visio request (2026-05-12).** Three figures have editable vector sources next to their PNGs: `fig_1_pipeline.{drawio,svg}`, `fig_2_digit7_graph.{drawio,svg}`, `fig_3_concept_7_1.{drawio,svg}`. Submit the `.svg` files as the vector deliverable — Visio 2016+ imports SVG natively. Draw.io has no `.vsdx` exporter in any version (desktop or web), so if the editor specifically demands `.vsdx`, run a one-off conversion via CloudConvert / Aspose web app / Microsoft Visio for the Web; full rationale and step-by-step in `figures/README.md`. Fig 4 stays PNG-only by design (data heatmap, not a schematic).
 
 6. **Insert Table 1** (comparison with classical baselines). Data prepared in `figures/table_1_baselines.csv`. Recommended: open the CSV in Excel, copy-paste into Word as a Table, then format header row with bold + centred. Place where the `[Таблиця 1. ...]` placeholder line currently sits. Caption above the table.
 

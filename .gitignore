@@ -196,3 +196,10 @@ CLAUDE.md
 src/training/experiments/*
 
 fin_prog/
+
+# Draw.io editor lock/backup files
+*.drawio.bkp
+.$*.drawio.bkp
+
+# Local student projects (live in this workspace, not part of the repo)
+student_projects/
