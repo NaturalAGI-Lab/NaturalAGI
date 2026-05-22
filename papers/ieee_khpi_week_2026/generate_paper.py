@@ -120,19 +120,49 @@ def _add_full_width_table(doc: Document, table_data: dict) -> None:
     _set_columns(body_section, 2)
 
 
-def _add_author_block(doc: Document, author: dict) -> None:
-    """One Author-styled paragraph per co-author, four lines each."""
-    lines = [
-        author["name"],
-        author["department"],
-        author["organisation"],
-        f"{author['city_country']} — {author['email']}",
-    ]
-    p = doc.add_paragraph("\n".join(lines))
-    try:
-        p.style = doc.styles["Author"]
-    except KeyError:
-        p.style = doc.styles["Normal"]
+def _hide_cell_borders(cell) -> None:
+    """Remove all visible borders from a single table cell."""
+    tc_pr = cell._tc.get_or_add_tcPr()
+    tc_borders = OxmlElement("w:tcBorders")
+    for side in ("top", "left", "bottom", "right"):
+        border = OxmlElement(f"w:{side}")
+        border.set(qn("w:val"), "nil")
+        tc_borders.append(border)
+    tc_pr.append(tc_borders)
+
+
+def _add_author_table(doc: Document, authors: list[dict], cols: int = 3) -> None:
+    """Render co-authors in the IEEE 3-column author layout.
+
+    5 authors -> 2 rows × 3 cols (last cell stays empty). Borders are hidden
+    so the cells read as plain text blocks. Each cell uses 4 lines: name
+    (bold) / department / organisation / city, country — email.
+    """
+    rows = (len(authors) + cols - 1) // cols
+    table = doc.add_table(rows=rows, cols=cols)
+    table.alignment = WD_TABLE_ALIGNMENT.CENTER
+    table.autofit = True
+
+    for row in table.rows:
+        for cell in row.cells:
+            _hide_cell_borders(cell)
+
+    for idx, author in enumerate(authors):
+        row, col = divmod(idx, cols)
+        cell = table.rows[row].cells[col]
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        try:
+            p.style = doc.styles["Author"]
+        except KeyError:
+            pass
+
+        name_run = p.add_run(author["name"])
+        name_run.bold = True
+        name_run.add_break()
+        p.add_run(author["department"]).add_break()
+        p.add_run(author["organisation"]).add_break()
+        p.add_run(f"{author['city_country']} — {author['email']}")
 
 
 def _set_columns(section, num: int) -> None:
@@ -178,9 +208,8 @@ def build_document() -> None:
     # --- Title ---
     _add_styled(doc, C.TITLE, "paper title")
 
-    # --- Authors ---
-    for author in C.AUTHORS:
-        _add_author_block(doc, author)
+    # --- Authors (IEEE 3-column layout) ---
+    _add_author_table(doc, C.AUTHORS)
 
     # --- Abstract ---
     p = doc.add_paragraph()
