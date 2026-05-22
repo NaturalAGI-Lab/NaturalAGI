@@ -104,6 +104,22 @@ def _add_table(doc: Document, table_data: dict) -> None:
                 run.font.size = Pt(9)
 
 
+def _add_full_width_table(doc: Document, table_data: dict) -> None:
+    """Insert a table that spans both body columns (IEEE "table*" pattern).
+
+    Implementation: switch to a single-column continuous section just for the
+    table, then switch back to 2-column for the following body text. Each
+    table therefore lives in its own 1-col section, sandwiched between 2-col
+    body sections. Word renders this with the table spanning the full page
+    width and prose flowing in 2 columns above and below.
+    """
+    span_section = doc.add_section(WD_SECTION.CONTINUOUS)
+    _set_columns(span_section, 1)
+    _add_table(doc, table_data)
+    body_section = doc.add_section(WD_SECTION.CONTINUOUS)
+    _set_columns(body_section, 2)
+
+
 def _add_author_block(doc: Document, author: dict) -> None:
     """One Author-styled paragraph per co-author, four lines each."""
     lines = [
@@ -218,7 +234,7 @@ def build_document() -> None:
             if last_h2 in table_inserts and table_inserts[last_h2]:
                 for item in table_inserts.pop(last_h2):
                     if item[0] == "table":
-                        _add_table(doc, item[1])
+                        _add_full_width_table(doc, item[1])
                     elif item[0] == "figure":
                         _, path, caption = item
                         if path.exists():
