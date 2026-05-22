@@ -1,7 +1,7 @@
 import logging
 import copy
 import networkx as nx
-from typing import Tuple
+from typing import Any, Tuple
 
 from common import CriticalGraphUtils, GraphUtils
 from reduction_strategy.endpoint_strategy import EndpointReductionStrategy
@@ -102,50 +102,64 @@ class CriticalPointPreprocessor:
         Returns:
             Tuple of (reduced_inference_graph, concept_graph)
         """
-        # Iterate until critical point graphs are isomorphic or no more reductions can be made
+        # Inner-convergence control flow: each strategy runs repeatedly until its
+        # pass is a no-op, before the next strategy takes over.
         for i in range(self.max_iterations):
             self.logger.info(f"Iteration {i+1} of {self.max_iterations}")
-            self.logger.info(
-                f"Inference critical graph: {inference_critical_graph.nodes}"
-            )
-            self.logger.info(f"Concept critical graph: {concept_critical_graph.nodes}")
 
-            # Apply endpoint reduction
-            inference_graph, concept_graph = self.endpoint_reduction_strategy.reduce(
-                image_graph=inference_graph,
-                concept_graph=concept_graph,
+            inference_graph, concept_graph = self._run_strategy_to_fixpoint(
+                self.endpoint_reduction_strategy,
+                "endpoint",
+                inference_graph,
+                concept_graph,
             )
-
-            # Apply intersection reduction
-            inference_graph, concept_graph = (
-                self.intersection_reduction_strategy.reduce(
-                    image_graph=inference_graph,
-                    concept_graph=concept_graph,
-                )
+            inference_graph, concept_graph = self._run_strategy_to_fixpoint(
+                self.intersection_reduction_strategy,
+                "intersection",
+                inference_graph,
+                concept_graph,
             )
-
-            # Apply corner point reduction
-            inference_graph, concept_graph = (
-                self.corner_point_reduction_strategy.reduce(
-                    image_graph=inference_graph,
-                    concept_graph=concept_graph,
-                )
+            inference_graph, concept_graph = self._run_strategy_to_fixpoint(
+                self.corner_point_reduction_strategy,
+                "corner",
+                inference_graph,
+                concept_graph,
             )
 
-            # Extract critical points from both graphs
-            inference_critical_graph, _ = CriticalGraphUtils.get_critical_graph(
-                inference_graph
-            )
-            concept_critical_graph, _ = CriticalGraphUtils.get_critical_graph(
-                concept_graph
-            )
+            inference_critical_graph, _ = CriticalGraphUtils.get_critical_graph(inference_graph)
+            concept_critical_graph,   _ = CriticalGraphUtils.get_critical_graph(concept_graph)
 
-            is_isomorphic = GraphUtils.is_graph_isomorphic(
-                inference_critical_graph, concept_critical_graph
-            )
-
-            if is_isomorphic:
+            if GraphUtils.is_graph_isomorphic(inference_critical_graph, concept_critical_graph):
                 self.logger.info("Critical point graphs are isomorphic, stopping")
                 return inference_graph, concept_graph
 
         raise ValueError("Reached maximum reduction iterations, stopping")
+
+    def _run_strategy_to_fixpoint(
+        self,
+        strategy,
+        name: str,
+        inference_graph: nx.Graph,
+        concept_graph: nx.Graph,
+        max_inner: int = 5,
+    ) -> Tuple[nx.Graph, nx.Graph]:
+        for inner in range(max_inner):
+            before = self._graph_signature(inference_graph)
+            inference_graph, concept_graph = strategy.reduce(
+                image_graph=inference_graph,
+                concept_graph=concept_graph,
+            )
+            after = self._graph_signature(inference_graph)
+            if before == after:
+                self.logger.debug(f"{name} reached fixpoint after pass {inner+1}")
+                return inference_graph, concept_graph
+        self.logger.debug(f"{name} hit max_inner={max_inner} without fixpoint")
+        return inference_graph, concept_graph
+
+    @staticmethod
+    def _graph_signature(g: nx.Graph) -> Tuple[int, int, Tuple[Any, ...]]:
+        return (
+            g.number_of_nodes(),
+            g.number_of_edges(),
+            tuple(sorted(tuple(sorted(g.nodes[n].get("labels", []))) for n in g.nodes)),
+        )

@@ -34,6 +34,8 @@ class PointExtractor:
 
                 # Step 2: Check if the angle is below the threshold
                 if angle < MIN_CORNER_ANGLE:
+                    self.graph.nodes[node]["angle"] = angle
+                    self.graph.nodes[node]["normalized_angle"] = (angle / 90.0) - 1.0
                     corner_points.append(
                         CornerPoint(
                             id=node,

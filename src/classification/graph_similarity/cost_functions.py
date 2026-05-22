@@ -1,29 +1,56 @@
-import enum
 import logging
 from typing import Any, Union
 
+from common.feature_scales import CATEGORICAL_FEATURES, SCALE_STRENGTH
 
-class NodeCost(enum.Enum):
+
+class NodeCost:
     NO_COST = 0.0
-    MINOR = 0.25
-    GENERAL = 0.4
-    SEVERE = 0.65
-    NO_MATCH = 1.0
-    IMPOSSIBLE = 100.0
+    MINOR = 0.65
+    GENERAL = 0.75
+    SEVERE = 1.0
+    NO_MATCH = 1.5
+    IMPOSSIBLE = 10.0
 
 features = [
-    "segments",
+    # Spatial / positional
     "normalized_x",
     "normalized_y",
+    "distance_to_centroid",
+    # Direction / angle
     "horizontal_direction",
     "vertical_direction",
-    # "quadrant"
-    # "angle_with_ox",
-    # "angle",
-    # "quadrant_change_count",
-    # "intersection_points_count",
-    # "endpoints_count",
+    "angle_with_ox",
+    "junction_angle_min",
+    "junction_angle_max",
+    "junction_angle_mean",
+    # Degree / topology
+    "node_degree",
+    "is_endpoint",
+    "is_junction",
+    "is_corner",
+    "is_on_cycle",
+    "cycle_count",
+    # Geometric / length
+    "tortuosity",
+    "normalized_length",
+    "length_ratio_to_max",
+    # Branch type
+    "branch_type",
+    "connects_cycle_nodes",
+    # Centrality
+    "betweenness_centrality",
+    "closeness_centrality",
+    "eccentricity",
+    "pagerank",
+    # Neighborhood context
+    "avg_neighbor_vector_length",
+    "neighbor_endpoint_count",
+    "neighbor_junction_count",
+    "neighbor_corner_count",
 ]
+
+DIAGNOSTIC_WEIGHT_EPSILON: float = 1.0
 
 
 logger = logging.getLogger(__name__)
@@ -31,36 +58,21 @@ logger.setLevel(logging.INFO)
 
 
 def edge_match(_: Any, __: Any) -> bool:
-    """
-    Edge match function.
-    """
     return True
 
 
 def edge_del_cost(edge_data: Any) -> float:
-    """
-    Cost function for edge deletion.
-    """
-    return NodeCost.MINOR.value
+    return NodeCost.MINOR
 
 
 def edge_ins_cost(edge_data: Any) -> float:
-    """
-    Cost function for edge insertion.
-    When the node is removed, the edge to connect neighbors should be created.
-    This is a special case of edge substitution.
-    """
-    return NodeCost.NO_COST.value
+    return NodeCost.NO_COST
 
 
 def node_subst_cost(image_node_data: Any, concept_node_data: Any) -> float:
-    """
-    Cost function for node substitution.
-    """
     try:
-        is_compatible_labels = _check_labels_match(image_node_data, concept_node_data)
-        if not is_compatible_labels:
-            return NodeCost.IMPOSSIBLE.value
+        if not _check_labels_match(image_node_data, concept_node_data):
+            return NodeCost.IMPOSSIBLE
 
         properties_cost = _calculate_properties_similarity_cost(
             image_node_data, concept_node_data
@@ -77,37 +89,34 @@ def node_subst_cost(image_node_data: Any, concept_node_data: Any) -> float:
 
     except Exception as e:
         logger.error("Error calculating node substitution cost: %s", e, exc_info=True)
-        return NodeCost.NO_MATCH.value
+        return NodeCost.NO_MATCH
 
 
 def node_del_cost(node_data: Any) -> float:
-    """
-    Cost function for node deletion.
-    """
-    return NodeCost.MINOR.value
+    return NodeCost.MINOR
 
 
 def node_ins_cost(_: Any) -> float:
-    """
-    Cost function for node insertion.
-    """
-    return NodeCost.IMPOSSIBLE.value
+    return NodeCost.IMPOSSIBLE
 
 
 def _check_labels_match(image_node_data: Any, concept_node_data: Any) -> bool:
-    """
-    Check if the labels match.
-    """
     image_labels = set(image_node_data.get("labels", []))
     concept_labels = set(concept_node_data.get("labels", []))
 
     if not image_labels or not concept_labels:
         raise ValueError("Labels are not present in the node data")
 
-    if concept_labels.issubset(image_labels):
-        return True
+    return concept_labels.issubset(image_labels)
 
-    return False
+
+def _resolve_weight(feature: str, concept_node_data: dict) -> float:
+    strength = SCALE_STRENGTH.get(feature, 1.0)
+    if feature in CATEGORICAL_FEATURES:
+        return strength
+    widths = concept_node_data.get("_range_widths") or {}
+    width = float(widths.get(feature, 0.0))
+    return strength / (width + DIAGNOSTIC_WEIGHT_EPSILON)
 
 
 def _calculate_properties_similarity_cost(
@@ -116,20 +125,24 @@ def _calculate_properties_similarity_cost(
 
     properties_to_check = features
 
-    total_cost = 0.0
-    properties_checked = 0
-
     common_properties = set(concept_node_data.keys()) & set(image_node_data.keys())
     common_properties_to_check = common_properties.intersection(properties_to_check)
     if not common_properties_to_check:
-        return NodeCost.NO_MATCH.value
+        return NodeCost.NO_MATCH
 
-    max_prop_penalty = 1.0 / len(common_properties_to_check)
+    raw_weights = {p: _resolve_weight(p, concept_node_data) for p in common_properties_to_check}
+    total_weight = sum(raw_weights.values())
+    if total_weight < 1e-9:
+        return NodeCost.NO_MATCH
+
     logger.debug(
-        "Common properties to check: %s, max prop penalty: %s",
+        "Common properties to check: %s, weights: %s",
         common_properties_to_check,
-        max_prop_penalty,
+        raw_weights,
     )
+
+    total_cost = 0.0
+    properties_checked = 0
 
     for property_name in properties_to_check:
         concept_value = concept_node_data.get(property_name)
@@ -139,36 +152,42 @@ def _calculate_properties_similarity_cost(
             continue
         elif image_value is None and concept_value is not None:
             continue
-        elif concept_value is None and image_value is not None:
-            total_cost += max_prop_penalty
+
+        w = raw_weights.get(property_name)
+        if w is None:
+            continue
+        normalized_w = w / total_weight
+
+        if concept_value is None and image_value is not None:
+            total_cost += normalized_w
             properties_checked += 1
             continue
 
         property_cost = _calculate_property_similarity_cost(
-            concept_value, image_value, property_name, max_prop_penalty
+            concept_value, image_value, property_name, normalized_w
         )
-        total_cost += min(property_cost, max_prop_penalty)
+        total_cost += property_cost
         properties_checked += 1
 
-    return total_cost if properties_checked > 0 else NodeCost.NO_COST.value
+    return total_cost if properties_checked > 0 else NodeCost.NO_COST
 
 
 def _calculate_property_similarity_cost(
     concept_value: Any,
     image_value: Any,
-    property_name: str = None,
-    max_cost: float = NodeCost.NO_MATCH.value,
+    property_name: str | None = None,
+    max_cost: float = NodeCost.NO_MATCH,
 ) -> float:
     if concept_value == image_value:
-        return NodeCost.NO_COST.value
+        return NodeCost.NO_COST
 
     try:
         if _is_number(concept_value) and _is_number(image_value):
-            return _calculate_number_similarity_cost(concept_value, image_value)
+            return _calculate_number_similarity_cost(concept_value, image_value, property_name)
 
         elif _is_range(concept_value) and _is_number(image_value):
             return _calculate_range_similarity_cost(
-                concept_value, image_value, max_cost
+                concept_value, image_value, max_cost, property_name
             )
 
         elif _is_string(concept_value) and _is_string(image_value):
@@ -176,9 +195,6 @@ def _calculate_property_similarity_cost(
 
         elif _is_list(concept_value) and _is_list(image_value):
             return _calculate_list_similarity_cost(concept_value, image_value)
-
-        elif _is_string(concept_value) and isinstance(image_value, enum.Enum):
-            return _calculate_string_similarity_cost(concept_value, image_value.value)
 
         else:
             raise ValueError(
@@ -210,53 +226,38 @@ def _is_list(value: Any) -> bool:
 
 
 def _calculate_number_similarity_cost(
-    concept_num: Union[int, float], image_num: Union[int, float]
+    concept_num: Union[int, float],
+    image_num: Union[int, float],
+    property_name: str | None = None,
 ) -> float:
-    tolerance = 1e-10
-    if abs(concept_num - image_num) < tolerance:
-        return NodeCost.NO_COST.value
-    else:
-        return NodeCost.NO_MATCH.value
+    # Values are already u_k ∈ [0, 1] (h_k applied at extraction); |a - b| is bounded by 1.
+    return min(abs(float(concept_num) - float(image_num)), 1.0)
 
 
 def _calculate_range_similarity_cost(
-    concept_range: dict, image_num: Union[int, float], max_cost: float
+    concept_range: dict,
+    image_num: Union[int, float],
+    max_cost: float,
+    property_name: str | None = None,
 ) -> float:
     try:
-        min_val = concept_range["min"]
-        max_val = concept_range["max"]
-        center = concept_range["center"]
+        lo = float(concept_range["min"])
+        hi = float(concept_range["max"])
+        center = float(concept_range["center"])
+        v = float(image_num)
 
-        if not _is_number(min_val) or not _is_number(max_val):
-            raise ValueError(f"Invalid range values: min={min_val}, max={max_val}")
+        if lo > hi:
+            raise ValueError(f"Invalid range: min ({lo}) > max ({hi})")
 
-        if min_val > max_val:
-            raise ValueError(f"Invalid range: min ({min_val}) > max ({max_val})")
+        if not (lo <= v <= hi):
+            return NodeCost.NO_MATCH
 
-        if not (min_val <= image_num <= max_val):
-            return NodeCost.NO_MATCH.value
+        width = hi - lo
+        if width == 0:
+            return NodeCost.NO_COST
 
-        # Value is within range - calculate distance-based cost
-        range_width = max_val - min_val
-
-        # Handle single point range
-        if range_width == 0:
-            return NodeCost.NO_COST.value
-
-        # Calculate distance from range center
-        distance_from_center = abs(image_num - center)
-
-        # Normalize distance (0.0 at center, 0.5 at edges)
-        normalized_distance = distance_from_center / (range_width / 2.0)
-
-        # Apply graduated cost: closer to center = lower cost
-        # Use cosine similarity inspired approach for smooth gradation
-        cost_factor = normalized_distance  # Linear factor from 0 to 1
-
-        # Scale between NO_COST and MINOR based on position
-        graduated_cost = NodeCost.NO_COST.value + (max_cost * cost_factor)
-
-        return min(graduated_cost, max_cost)
+        graduated = max_cost * (abs(v - center) / (width / 2.0))
+        return min(graduated, max_cost)
 
     except Exception as e:
         logger.error(f"Error in range similarity calculation: {e}", exc_info=True)
@@ -265,25 +266,23 @@ def _calculate_range_similarity_cost(
 
 def _calculate_string_similarity_cost(concept_str: str, image_str: str) -> float:
     if concept_str.lower() == image_str.lower():
-        return NodeCost.NO_COST.value
-    else:
-        return NodeCost.NO_MATCH.value
+        return NodeCost.NO_COST
+    return NodeCost.NO_MATCH
 
 
 def _calculate_list_similarity_cost(concept_list: list, image_list: list) -> float:
     if concept_list == image_list:
-        return NodeCost.NO_COST.value
+        return NodeCost.NO_COST
 
     if not concept_list and not image_list:
-        return NodeCost.NO_COST.value
+        return NodeCost.NO_COST
 
     if not concept_list and image_list:
-        return NodeCost.NO_MATCH.value
+        return NodeCost.NO_MATCH
 
     concept_set = set(concept_list)
     image_set = set(image_list)
 
     if concept_set.issubset(image_set):
-        return NodeCost.NO_COST.value
-    else:
-        return NodeCost.NO_MATCH.value
+        return NodeCost.NO_COST
+    return NodeCost.NO_MATCH

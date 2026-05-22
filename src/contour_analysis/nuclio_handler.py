@@ -4,9 +4,11 @@ import traceback
 import time
 
 from kafka import KafkaProducer
+from neo4j import GraphDatabase
 from pydantic_settings import BaseSettings
 
 from common.model import DLQModel
+from common.tracing import init_tracer, inject_trace_headers, extract_trace_context, SpanKind
 from service.graph_persistance_service import GraphPersistenceService
 from converter.graph_serializer import GraphDeserializer
 from data_preprocessing_service import DataPreprocessingService
@@ -16,8 +18,9 @@ from service.analysis_result_persistence_service import AnalysisResultPersistenc
 from service.graph_analysis.analyzers.contour_type_analyzer import ContourTypeAnalyzer
 from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
 from service.graph_analysis.analyzers.cycle_count_analyzer import CycleCountAnalyzer
+from service.graph_analysis.analyzers.structural_feature_analyzer import StructuralFeatureAnalyzer
 
-HANDLER_NAME = "Contour analysis"
+HANDLER_NAME = "contour_analysis"
 
 
 class Settings(BaseSettings):
@@ -46,16 +49,13 @@ def init_context(context):
         f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
     )
 
-    graph_persistence_service = GraphPersistenceService(
-        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
+    driver = GraphDatabase.driver(
+        settings.neo4j_dsn, auth=(settings.neo4j_user, settings.neo4j_pass)
     )
+    graph_persistence_service = GraphPersistenceService(driver)
     data_preprocessing_service = DataPreprocessingService(graph_persistence_service)
-    tertiary_features_service = TertiaryFeaturesService(
-        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
-    )
-    analysis_result_persistence_service = AnalysisResultPersistenceService(
-        settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
-    )
+    tertiary_features_service = TertiaryFeaturesService(driver)
+    analysis_result_persistence_service = AnalysisResultPersistenceService(driver)
 
     setattr(
         context.user_data, "kafka_bootstrap_servers", settings.kafka_bootstrap_servers
@@ -71,6 +71,15 @@ def init_context(context):
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
     setattr(context.user_data, "settings", settings)
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
+
+    producer = KafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
+    setattr(context.user_data, "kafka_producer", producer)
+
+    tracer = init_tracer(HANDLER_NAME)
+    setattr(context.user_data, "tracer", tracer)
 
 
 def kafka_handler(context, event):
@@ -88,22 +97,26 @@ def kafka_handler(context, event):
         session_id = parameters["session_id"]
         image_id = parameters["image_id"]
 
+        tracing_disabled = bool(parameters.get("disable_tracing"))
+
+        if not tracing_disabled:
+            experiment_id = parameters.get("mlflow_experiment_id")
+            if experiment_id:
+                context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
+
         context.logger.info_with(f"Operation: {operation}", handler=HANDLER_NAME)
         context.logger.info_with(f"Parameters: {parameters}", handler=HANDLER_NAME)
 
         network = GraphDeserializer.deserialize(input_data["skeleton"])
 
-        # Create NetworkxGraphAnalysis instance
         networkx_graph_analysis = NetworkxGraphAnalysis(
             network,
             analysis_result_persistence_service=context.user_data.analysis_result_persistence_service,
             merge_threshold=context.user_data.settings.merge_threshold,
         )
 
-        # Apply reduction rules first
         networkx_graph_analysis.merge_close_intersection_points()
 
-        # Now persist the graph AFTER merging operations
         context.user_data.data_preprocessing_service.persist_graph(
             network, image_id, parameters["session_id"]
         )
@@ -111,29 +124,47 @@ def kafka_handler(context, event):
         networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
         networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
         networkx_graph_analysis.add_analyzer(CycleCountAnalyzer)
+        networkx_graph_analysis.add_analyzer(StructuralFeatureAnalyzer)
         networkx_graph_analysis.analyze_graph(image_id, session_id)
 
         context.user_data.tertiary_features_service.create_tertiary_features(
             image_id, session_id
         )
 
-        producer = KafkaProducer(
-            bootstrap_servers=context.user_data.settings.kafka_bootstrap_servers.split(
-                ","
-            ),
-            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        )
         profiling["contour_analysis_time_ms"] = (
             time.time_ns() - start_time
         ) / 1_000_000
-        producer.send(
-            context.user_data.kafka_topic,
-            value={
-                "operation": operation,
-                "parameters": parameters,
-                "profiling": profiling,
-            },
-        )
+
+        output_value = {
+            "operation": operation,
+            "parameters": parameters,
+            "profiling": profiling,
+        }
+
+        if tracing_disabled:
+            context.user_data.kafka_producer.send(
+                context.user_data.kafka_topic,
+                value=output_value,
+                headers=[],
+            )
+        else:
+            tracer = context.user_data.tracer
+            parent_ctx = extract_trace_context(event.headers)
+            with tracer.start_as_current_span(
+                "contour_analysis.process", context=parent_ctx, kind=SpanKind.SERVER
+            ) as span:
+                span.set_attribute("image_id", image_id)
+                span.set_attribute("session_id", session_id)
+                if parameters.get("mlflow_run_id"):
+                    span.set_attribute("mlflow.run_id", parameters["mlflow_run_id"])
+                span.set_attribute("duration_ms", profiling["contour_analysis_time_ms"])
+
+                headers = inject_trace_headers()
+                context.user_data.kafka_producer.send(
+                    context.user_data.kafka_topic,
+                    value=output_value,
+                    headers=headers,
+                )
 
         context.logger.info_with(
             f"Analysis complete for image_id: {image_id}", handler=HANDLER_NAME
@@ -153,8 +184,6 @@ def kafka_handler(context, event):
             error_details=error_json,
         )
         send_to_dlq(context, input_data, error_info)
-    finally:
-        producer.close()
 
 
 def handler(context, event):

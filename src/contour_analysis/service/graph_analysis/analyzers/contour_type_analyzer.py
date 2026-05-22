@@ -1,7 +1,7 @@
 import logging
 from neo4j import ManagedTransaction
 from .base_analyzer import BaseAnalyzer
-from common.models import ContourType
+from common.model import ContourType
 
 
 class ContourTypeAnalyzer(BaseAnalyzer):
@@ -23,21 +23,14 @@ class ContourTypeAnalyzer(BaseAnalyzer):
         image_id: str,
         result: ContourType,
     ):
-        # query = """
-        #     MERGE (contour_type:ContourType:Feature {
-        #         session_id: $session_id,
-        #         value: $result
-        #     })
-        #     ON CREATE SET contour_type.samples = [$image_id]
-        #     ON MATCH SET contour_type.samples = CASE
-        #         WHEN NOT $image_id IN contour_type.samples THEN contour_type.samples + $image_id
-        #         ELSE contour_type.samples
-        #     END
-        # """
-        # mx.run(query, session_id=session_id, result=result.name, image_id=image_id)
         query = """
-            MATCH (n {session_id: $session_id})
-            WHERE n:Point or n:Vector
-            SET n.contour_type = $result
+            CALL {
+                MATCH (n:Point {image_id: $image_id})
+                SET n.contour_type = $result
+            }
+            CALL {
+                MATCH (n:Vector {image_id: $image_id})
+                SET n.contour_type = $result
+            }
         """
-        mx.run(query, session_id=session_id, result=result.name)
+        mx.run(query, image_id=image_id, result=result.value)

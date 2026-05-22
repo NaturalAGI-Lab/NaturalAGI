@@ -1,0 +1,6 @@
+Approach,Accuracy,Training samples,Backprop required,Local explainability,Reference
+CNN (LeCun et al.),~99.0%,~6000 / class,Yes,No (post-hoc only),[LeCun 1998]
+SVM (RBF + invariant preprocessing),~98.6%,~6000 / class,No,No,[DeCoste & Schölkopf 2002]
+MLP (with deskewing/augmentation),~97.5%,~6000 / class,Yes,No,[LeCun 1998]
+"Prototypical Networks (5-way 5-shot, Omniglot/miniImageNet)",~95-97%,5 (different benchmark),Yes (meta-train),Partial (centroid),[Snell et al. 2017]
+Graph attractors (this work; MNIST complete),85.80%,2-6 / concept,No,Yes (graph-level),this paper

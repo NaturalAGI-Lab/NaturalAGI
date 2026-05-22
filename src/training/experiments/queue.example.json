@@ -1,0 +1,24 @@
+{
+  "baseline_accuracy": 73.0,
+  "promising_threshold": 70.0,
+  "experiments": [
+    {
+      "id": "exp_001",
+      "name": "example_experiment",
+      "description": "Describe the hypothesis and which confusion pairs this targets",
+      "params": {
+        "ged_timeout": 5,
+        "skeletonization_threshold": 180,
+        "diagnostic_weight_epsilon": 0.1
+      },
+      "classes": [0, 1, 2, 3, 4, 5, 6, 7, 8, 9],
+      "status": "pending",
+      "quick_accuracy": null,
+      "quick_run_id": null,
+      "full_accuracy": null,
+      "full_run_id": null,
+      "mlflow_parent_run_id": null,
+      "notes": ""
+    }
+  ]
+}

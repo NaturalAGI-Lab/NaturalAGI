@@ -13,12 +13,17 @@ from common.critical_point import CriticalPoint, CriticalPointType
 
 
 class StartPointPicker:
+    TYPE_PRIORITY = {
+        CriticalPointType.INTERSECTION_POINT.value: 2,
+        CriticalPointType.CORNER_POINT.value: 1,
+    }
+
     def __init__(
         self, sample_graphs: List[nx.Graph], clustering_algorithm: str = "dbscan"
     ):
         if not sample_graphs:
             raise ValueError("Sample graphs list cannot be empty.")
-        self.sample_graphs: List[nx.Graph] = sample_graphs
+        self.sample_graphs: List[nx.Graph] = list(sample_graphs)
         self.num_samples: int = len(sample_graphs)
         self.start_point_characteristic: Optional[Tuple[str, np.ndarray]] = None
         self.critical_point_labels: Set[str] = {
@@ -31,6 +36,10 @@ class StartPointPicker:
         self.clusters: Dict[int, List[CriticalPoint]] = {}
         self.valid_clusters: Dict[int, List[CriticalPoint]] = {}
         self.final_cluster_points: Optional[List[CriticalPoint]] = None
+        self.expected_start_degree: Optional[int] = None
+        self.degree_map: Dict[tuple, int] = {}
+        self._uuid_to_graph_index: Dict[uuid.UUID, int] = {}
+        self._sample_start_nodes: Dict[int, Any] = {}
 
         # Set the clustering algorithm
         self.clustering_algorithm = clustering_algorithm.lower()
@@ -49,6 +58,7 @@ class StartPointPicker:
         critical_points = []
         for i, graph in enumerate(self.sample_graphs):
             graph_id = uuid.uuid4()
+            self._uuid_to_graph_index[graph_id] = i
             for node_id, data in graph.nodes(data=True):
                 node_labels = data.get("labels", [])
                 is_critical = any(
@@ -93,6 +103,7 @@ class StartPointPicker:
                     critical_points.append(
                         CriticalPoint(graph_id, node_id, critical_label, norm_x, norm_y)
                     )
+                    self.degree_map[(graph_id, node_id)] = graph.degree(node_id)
         return critical_points
 
     def _cluster_points(
@@ -148,6 +159,45 @@ class StartPointPicker:
                 clusters[label].append(point)
         return clusters
 
+    def _check_betti_guard(self) -> Optional[Tuple[str, np.ndarray]]:
+        """If ≥90% of samples have B1≥2 and share a common cycle-intersection node,
+        return (INTERSECTION_POINT, centroid) as the mandated characteristic."""
+        if self.structure_type != "Closed":
+            return None
+
+        intersection_coords = []
+        intersection_degrees = []
+        samples_with_multi_cycle = 0
+
+        for graph in self.sample_graphs:
+            cycle_basis = nx.cycle_basis(graph)
+            if len(cycle_basis) < 2:
+                continue
+            samples_with_multi_cycle += 1
+
+            cycle_sets = [set(c) for c in cycle_basis]
+            shared = cycle_sets[0].intersection(*cycle_sets[1:])
+            if not shared:
+                continue
+
+            shared_node = next(iter(shared))
+            data = graph.nodes[shared_node]
+            norm_x = data.get("normalized_x")
+            norm_y = data.get("normalized_y")
+            if norm_x is not None and norm_y is not None:
+                intersection_coords.append(np.array([norm_x, norm_y]))
+                intersection_degrees.append(graph.degree(shared_node))
+
+        if samples_with_multi_cycle < self.num_samples * 0.9:
+            return None
+        if len(intersection_coords) < self.num_samples * 0.9:
+            return None
+
+        centroid = np.mean(intersection_coords, axis=0)
+        if intersection_degrees:
+            self.expected_start_degree = Counter(intersection_degrees).most_common(1)[0][0]
+        return (CriticalPointType.INTERSECTION_POINT.value, centroid)
+
     def _determine_structure_type(self) -> str:
         has_endpoint = True
         for graph in self.sample_graphs:
@@ -182,22 +232,30 @@ class StartPointPicker:
 
         return self.valid_clusters
 
-    def _select_top_leftmost_cluster(
+    def _select_best_cluster(
         self, clusters: Dict[int, List[CriticalPoint]]
     ) -> Optional[List[CriticalPoint]]:
+        """Select the best cluster using type priority (closed only), then spatial metric."""
         if not clusters:
             return None
 
-        min_metric = float("inf")
-        best_cluster_id = -1
+        best_cluster_id = None
+        best_priority = -1
+        best_metric = float("inf")
 
         for cluster_id, points_in_cluster in clusters.items():
+            dominant_label = Counter(
+                p.label for p in points_in_cluster
+            ).most_common(1)[0][0]
+
+            priority = self.TYPE_PRIORITY.get(dominant_label, 0) if self.structure_type == "Closed" else 0
             avg_x = np.mean([p.norm_x for p in points_in_cluster])
             avg_y = np.mean([p.norm_y for p in points_in_cluster])
             metric = 2 * avg_x + avg_y
 
-            if metric < min_metric:
-                min_metric = metric
+            if priority > best_priority or (priority == best_priority and metric < best_metric):
+                best_priority = priority
+                best_metric = metric
                 best_cluster_id = cluster_id
 
         return clusters.get(best_cluster_id)
@@ -217,8 +275,13 @@ class StartPointPicker:
             clustering_min_samples: Min samples parameter for DBSCAN and OPTICS algorithms
             n_clusters: Number of clusters for KMeans and Agglomerative algorithms
         """
+        betti_result = self._check_betti_guard()
+        if betti_result is not None:
+            self.start_point_characteristic = betti_result
+            print(f"Betti guard: mandated IntersectionPoint start, centroid={betti_result[1]}")
+            return
+
         if not self.all_critical_points:
-            # Handle case with no critical points found
             self.start_point_characteristic = None
             print("Warning: No critical points found in sample graphs.")
             return
@@ -242,7 +305,7 @@ class StartPointPicker:
         print(
             f"candidate_clusters: {len(candidate_clusters) if candidate_clusters else 0}"
         )
-        self.final_cluster_points = self._select_top_leftmost_cluster(
+        self.final_cluster_points = self._select_best_cluster(
             candidate_clusters
         )
         print(
@@ -256,8 +319,24 @@ class StartPointPicker:
                 p.label for p in self.final_cluster_points
             ).most_common(1)[0][0]
             self.start_point_characteristic = (dominant_label, centroid)
+            cluster_degrees = [
+                self.degree_map.get((p.graph_id, p.node_id))
+                for p in self.final_cluster_points
+            ]
+            cluster_degrees = [d for d in cluster_degrees if d is not None]
+            if cluster_degrees:
+                self.expected_start_degree = Counter(cluster_degrees).most_common(1)[0][0]
+
+            graph_points: Dict[int, List[CriticalPoint]] = defaultdict(list)
+            for p in self.final_cluster_points:
+                graph_idx = self._uuid_to_graph_index[p.graph_id]
+                graph_points[graph_idx].append(p)
+            for graph_idx, points in graph_points.items():
+                best = min(points, key=lambda p: np.linalg.norm(p.coordinates - centroid))
+                self._sample_start_nodes[graph_idx] = best.node_id
+
             print(
-                f"Determined start point characteristic: Label='{dominant_label}', Centroid={centroid}"
+                f"Determined start point characteristic: Label='{dominant_label}', Centroid={centroid}, ExpectedDegree={self.expected_start_degree}"
             )
         else:
             # Handle case where no cluster satisfies all criteria
@@ -296,6 +375,10 @@ class StartPointPicker:
             print("Warning: Start point characteristic not determined yet.")
             return None
 
+        for i, sample_graph in enumerate(self.sample_graphs):
+            if graph is sample_graph and i in self._sample_start_nodes:
+                return self._sample_start_nodes[i]
+
         _, centroid = self.start_point_characteristic
         structure_type = self._determine_structure_type()
 
@@ -312,7 +395,17 @@ class StartPointPicker:
                 CriticalPointType.INTERSECTION_POINT.value,
             ]
 
-        # Find the closest point of the appropriate type
+        # Use projection onto centroid direction to find the most extreme
+        # endpoint in the centroid's direction, rather than the closest by
+        # Euclidean distance. This avoids selecting branch endpoints that
+        # happen to sit closer to the centroid than true curve endpoints.
+        centroid_norm = np.linalg.norm(centroid)
+        if centroid_norm > 0:
+            centroid_direction = centroid / centroid_norm
+        else:
+            centroid_direction = np.array([0.0, 0.0])
+
+        node_type_map = {}
         candidates = []
 
         for node_id, data in graph.nodes(data=True):
@@ -323,21 +416,39 @@ class StartPointPicker:
             if norm_x is None or norm_y is None:
                 continue
 
-            # Check if node has any of the appropriate labels for this structure type
             if any(label in appropriate_labels for label in node_labels):
-                # Calculate distance to centroid
                 node_coords = np.array([norm_x, norm_y])
-                distance = np.linalg.norm(node_coords - centroid)
-                candidates.append((node_id, distance))
+                projection = np.dot(node_coords, centroid_direction)
+                node_type = None
+                for label_type in [
+                    CriticalPointType.INTERSECTION_POINT.value,
+                    CriticalPointType.CORNER_POINT.value,
+                    CriticalPointType.END_POINT.value,
+                    CriticalPointType.START_POINT.value,
+                ]:
+                    if label_type in node_labels:
+                        node_type = label_type
+                        break
+                node_type_map[node_id] = node_type
+                candidates.append((node_id, projection))
 
-        # Sort by distance (closest first)
-        candidates.sort(key=lambda x: x[1])
+        if self.structure_type == "Closed":
+            exp_deg = self.expected_start_degree
+            candidates.sort(
+                key=lambda x: (
+                    self.TYPE_PRIORITY.get(node_type_map.get(x[0]), 0),
+                    -abs(graph.degree(x[0]) - exp_deg) if exp_deg is not None else 0,
+                    x[1],
+                ),
+                reverse=True,
+            )
+        else:
+            candidates.sort(key=lambda x: x[1], reverse=True)
 
-        # Return the closest appropriate point
         if candidates:
             return candidates[0][0]
 
-        # Fallback: just find the closest critical point of any type
+        # Fallback: find the most extreme critical point of any type
         fallback_candidates = []
         for node_id, data in graph.nodes(data=True):
             node_labels = data.get("labels", [])
@@ -346,10 +457,10 @@ class StartPointPicker:
                 norm_y = data.get("normalized_y")
                 if norm_x is not None and norm_y is not None:
                     node_coords = np.array([norm_x, norm_y])
-                    distance = np.linalg.norm(node_coords - centroid)
-                    fallback_candidates.append((node_id, distance))
+                    projection = np.dot(node_coords, centroid_direction)
+                    fallback_candidates.append((node_id, projection))
 
-        fallback_candidates.sort(key=lambda x: x[1])
+        fallback_candidates.sort(key=lambda x: x[1], reverse=True)
         if fallback_candidates:
             print(
                 f"Warning: No points with appropriate labels found. Using any critical point."

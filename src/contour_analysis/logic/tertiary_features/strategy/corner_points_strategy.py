@@ -8,9 +8,7 @@ from logic.tertiary_features.strategy.tertiary_feature_extraction_strategy impor
 
 
 class CornerPointsStrategy(TertiaryFeatureStrategy):
-    """Strategy for extracting corner points.
-    This class counts number of corner points + intersection points per sample (image) and creates a new node
-    named CornerPointsCount:Feature. With the count as a property.
+    """Strategy for counting corner points + intersection points per sample and storing count as a node property.
 
     Note: Intersection points are included in the count as they can functionally replace corner points.
     """
@@ -25,15 +23,16 @@ class CornerPointsStrategy(TertiaryFeatureStrategy):
            MATCH (intersection_point:IntersectionPoint {image_id: $image_id})
            WITH corner_count, COUNT(intersection_point) AS intersection_count
            WITH corner_count + intersection_count AS total_count
-           MATCH (n)
-           WHERE n.image_id = $image_id
-           SET n.corner_points_count = total_count
-           /*
-            MERGE (corner_points_count:CornerPointsCount:Feature {session_id: $session_id, value: count})
-            ON CREATE SET corner_points_count.samples = [$image_id]
-            ON MATCH SET corner_points_count.samples = CASE WHEN $image_id IN corner_points_count.samples THEN corner_points_count.samples ELSE corner_points_count.samples + $image_id END
-            RETURN corner_points_count
-           */
+           CALL {
+               WITH total_count
+               MATCH (n:Point {image_id: $image_id})
+               SET n.corner_points_count = total_count
+           }
+           CALL {
+               WITH total_count
+               MATCH (n:Vector {image_id: $image_id})
+               SET n.corner_points_count = total_count
+           }
         """
         result = tx.run(query, image_id=image_id, session_id=self.session_id)
         result_data = result.data()

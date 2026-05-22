@@ -1,34 +1,51 @@
-[tool.poetry]
+[project]
 name = "natural-agi"
 version = "0.1.0"
-description = "This project consists of components of reduction neiral netwworks concept"
-authors = ["koboh <konstboh@gmail.com>", "nlapin <nlapin.java@gmail.com>"]
+description = "Non-backpropagation approach to pattern recognition and classification"
+authors = [
+    {name = "koboh", email = "konstboh@gmail.com"},
+    {name = "nlapin", email = "nlapin.java@gmail.com"}
+]
 readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "natural-agi-common>=0.1.49",
+]
 
-[tool.poetry.dependencies]
-python = "^3.11"
-neo4j = "^5.13.0"
-opencv-python = "^4.8.1.78"
-pydantic = "^2.4.2"
-requests = "^2.31.0"
-nuclio-sdk = "^0.5.6"
-pillow = "^10.0.1"
-matplotlib = "^3.8.1"
-scikit-image = "^0.22.0"
-scikit-learn = "^1.3.2"
+[project.optional-dependencies]
+dev = [
+    "notebook>=7.0.4",
+    "ipywidgets>=8.0.0",
+    "seaborn>=0.13.0",
+    "python-dotenv>=1.0.0",
+    "bibtexparser>=1.4.0",
+    "pyvis>=0.3.0",
+    "duckdb>=1.0.0",
+    "mlflow>=3.0.0",
+    "psutil>=5.9.0",
+    "streamlit>=1.40.0",
+    "optuna>=4.0.0",
+]
+ml = [
+    "torch>=2.5.0",
+    "torchvision>=0.20.0",
+    "torch-geometric>=2.4.0",
+    "grakel>=0.1.10",
+    "gspan-mining>=0.2.0",
+    "pandas>=2.0.0",
+]
 
-
-[tool.poetry.group.dev.dependencies]
-notebook = "^7.0.4"
-
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.group.skeletonization]
-optional = true
-
-[tool.poetry.group.skeletonization.dependencies]
-scipy = "*"
-numpy = "*"
-ypstruct = "^0.0.2"
+[dependency-groups]
+dev = [
+    "notebook>=7.0.4",
+    "ipywidgets>=8.0.0",
+    "seaborn>=0.13.0",
+    "python-dotenv>=1.0.0",
+    "bibtexparser>=1.4.0",
+    "pyvis>=0.3.0",
+    "duckdb>=1.0.0",
+    "mlflow>=3.0.0",
+    "psutil>=5.9.0",
+    "streamlit>=1.40.0",
+    "optuna>=4.0.0",
+]

@@ -1,4 +1,6 @@
 import logging
+import time
+
 import networkx as nx
 
 from .cost_functions import (
@@ -112,8 +114,11 @@ class GraphEditDistanceComparator:
         )
 
         try:
-            # Calculate GED with custom cost functions
-            paths, cost = nx.optimal_edit_paths(
+            best_cost = None
+            deadline = time.monotonic() + ged_timeout
+            iterations = 0
+
+            for cost in nx.optimize_graph_edit_distance(
                 image_graph,
                 concept_graph,
                 node_subst_cost=node_subst_cost,
@@ -122,27 +127,26 @@ class GraphEditDistanceComparator:
                 edge_match=edge_match,
                 edge_del_cost=edge_del_cost,
                 edge_ins_cost=edge_ins_cost,
-                # timeout=ged_timeout,
-            )
+            ):
+                best_cost = cost
+                iterations += 1
+                if time.monotonic() >= deadline:
+                    logger.info(f"GED timeout after {iterations} iterations")
+                    break
 
-            logger.info(f"GED: {cost}")
-
-            # Log detailed edit operations
-            GraphEditDistanceComparator.log_edit_operations(
-                paths, image_graph, concept_graph
-            )
-
-            if cost is None:  # Timeout occurred
+            if best_cost is None:
                 return 0.0
 
-            # Convert GED to similarity score (inverse and normalize)
-            max_possible_cost = max(len(image_graph) + len(concept_graph), 1)
-            similarity = 1.0 - (cost / max_possible_cost)
-            similarity = round(similarity, 2)
+            logger.info(f"GED: {best_cost} after {iterations} iterations")
+
+            n1 = image_graph.number_of_nodes() + image_graph.number_of_edges()
+            n2 = concept_graph.number_of_nodes() + concept_graph.number_of_edges()
+            similarity = 1.0 - (best_cost / (best_cost + max(n1, n2, 1)))
+            similarity = round(similarity, 4)
             logging.info(
-                f"GED: {cost}, max_possible_cost: {max_possible_cost}, similarity: {similarity}"
+                f"GED: {best_cost}, n1: {n1}, n2: {n2}, similarity: {similarity}"
             )
-            return max(0.0, min(1.0, similarity))  # Ensure score is between 0 and 1
+            return similarity
 
         except Exception as e:
             logging.error(f"Error calculating GED: {str(e)}", exc_info=True)

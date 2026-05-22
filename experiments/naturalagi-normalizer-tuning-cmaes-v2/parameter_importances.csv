@@ -1,0 +1,14 @@
+parameter,importance
+diagnostic_weight_epsilon,0.265639
+norm_distance_to_centroid,0.199142
+norm_eccentricity,0.074817
+norm_normalized_y,0.074301
+norm_normalized_x,0.064096
+norm_horizontal_direction,0.064041
+norm_length_ratio_to_max,0.05274
+norm_neighbor_junction_count,0.050305
+norm_vertical_direction,0.043702
+norm_avg_neighbor_vector_length,0.031603
+norm_neighbor_endpoint_count,0.030743
+norm_angle_with_ox,0.028803
+norm_junction_angle_min,0.020066

@@ -1,13 +1,20 @@
 """Generic Nuclio Handler Template"""
 
-import logging
-import multiprocessing as mp
-import time
-from kafka import KafkaProducer
 import json
+import logging
+import os
+import time
+from contextlib import contextmanager
+from typing import Optional
+
+from kafka import KafkaProducer
+from neo4j import GraphDatabase
 from pydantic_settings import BaseSettings
-from common import ClassificationParams
+from opentelemetry import trace as otel_trace
+from common.tracing import init_tracer, extract_trace_context
 from classification_orchestrator import ClassificationOrchestrator
+from graph_similarity import cost_functions as _cf
+from repository.concept_repository import ConceptRepository
 from repository.image_repository import ImageRepository
 
 HANDLER_NAME = "classification"
@@ -23,6 +30,42 @@ class Settings(BaseSettings):
     kafka_bootstrap_servers: str
     dlq_topic: str
     ged_timeout: float
+    skeletonization_threshold: float = 180.0
+    simplification_epsilon: Optional[float] = None
+    comparison_method: str = "ged"
+    fgw_alpha: float = 0.5
+
+
+def _annotate_range_widths(concept_graphs: dict) -> None:
+    for graph in concept_graphs.values():
+        for node_id in graph.nodes():
+            node_data = graph.nodes[node_id]
+            widths: dict[str, float] = {}
+            for key, val in node_data.items():
+                if isinstance(val, dict) and "min" in val and "max" in val:
+                    widths[key] = abs(float(val["max"]) - float(val["min"]))
+            node_data["_range_widths"] = widths
+
+
+@contextmanager
+def _cost_config_override(features=None, costs=None, epsilon=None):
+    orig_features = _cf.features
+    orig_epsilon = _cf.DIAGNOSTIC_WEIGHT_EPSILON
+    orig_costs = {k: v for k, v in vars(_cf.NodeCost).items() if not k.startswith("_")}
+    try:
+        if features is not None:
+            _cf.features = features
+        if epsilon is not None:
+            _cf.DIAGNOSTIC_WEIGHT_EPSILON = float(epsilon)
+        if costs is not None:
+            for k, v in costs.items():
+                setattr(_cf.NodeCost, k.upper(), float(v))
+        yield
+    finally:
+        _cf.features = orig_features
+        _cf.DIAGNOSTIC_WEIGHT_EPSILON = orig_epsilon
+        for k, v in orig_costs.items():
+            setattr(_cf.NodeCost, k, v)
 
 
 def init_context(context):
@@ -32,23 +75,56 @@ def init_context(context):
         context: Nuclio context
     """
 
-    context.logger.debug_with(
-        f"Exporter initializing with:\n{Settings().model_dump()}", handler=HANDLER_NAME
-    )
     settings = Settings()
+    context.logger.debug_with(
+        f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
+    )
+    setattr(context.user_data, "settings", settings)
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
 
-    # Initialize multiprocessing settings
-    try:
-        mp.set_start_method("fork", force=True)
-        context.logger.info_with(
-            "Multiprocessing start method set to 'fork'", handler=HANDLER_NAME
-        )
-    except Exception as e:
-        context.logger.warning_with(
-            f"Could not set multiprocessing start method: {e}", handler=HANDLER_NAME
-        )
+    producer = KafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
+    setattr(context.user_data, "kafka_producer", producer)
+
+    driver = GraphDatabase.driver(
+        settings.neo4j_dsn, auth=(settings.neo4j_user, settings.neo4j_pass)
+    )
+    setattr(context.user_data, "neo4j_driver", driver)
+
+    concept_repo = ConceptRepository(driver)
+    concept_ids = concept_repo.get_all_concept_ids()
+    concept_graphs = {
+        cid: concept_repo.get_concept_graph(cid) for cid in concept_ids
+    }
+    setattr(context.user_data, "concept_graphs", concept_graphs)
+    context.logger.info_with(
+        f"Cached {len(concept_graphs)} concept graphs at startup",
+        handler=HANDLER_NAME,
+    )
+
+    tracer = init_tracer(HANDLER_NAME)
+    setattr(context.user_data, "tracer", tracer)
+
+    # Apply env-var defaults for cost config (overridden per-message at runtime)
+    features_env = os.environ.get("CLASSIFICATION_FEATURES")
+    if features_env:
+        _cf.features = json.loads(features_env)
+    costs_env = os.environ.get("CLASSIFICATION_NODE_COSTS")
+    if costs_env:
+        for k, v in json.loads(costs_env).items():
+            setattr(_cf.NodeCost, k.upper(), float(v))
+    epsilon_env = os.environ.get("CLASSIFICATION_DIAGNOSTIC_WEIGHT_EPSILON")
+    if epsilon_env:
+        _cf.DIAGNOSTIC_WEIGHT_EPSILON = float(epsilon_env)
+
+    _annotate_range_widths(concept_graphs)
+    context.logger.info_with(
+        f"Annotated range widths on {len(concept_graphs)} concept graphs",
+        handler=HANDLER_NAME,
+    )
 
 
 def kafka_handler(context, event):
@@ -65,52 +141,52 @@ def kafka_handler(context, event):
     image_id = data["parameters"]["image_id"]
     profiling = data["profiling"]
     delete_image_nodes = data["parameters"].get("delete_image_nodes", True)
-    settings = Settings()
+    settings = context.user_data.settings
 
-    classification_params_fields = {
-        "ged_timeout",
-    }
-
-    params = {
+    classification_params = {
         key: value
         for key, value in {
             **settings.model_dump(),
             **data["parameters"],
         }.items()
-        if key in classification_params_fields
+        if key in {"ged_timeout", "skeletonization_threshold", "simplification_epsilon", "comparison_method", "fgw_alpha"}
     }
-
-    classification_params = ClassificationParams(**params)
 
     context.logger.info_with(
         f"Classification params: {classification_params}", handler=HANDLER_NAME
     )
 
-    # Get orchestrator parameters
-    use_multiprocessing = data["parameters"].get("use_multiprocessing", True)
-    max_workers_override = data["parameters"].get("max_workers")
+    tracing_disabled = bool(data["parameters"].get("disable_tracing"))
 
-    # Create the classification orchestrator
+    if tracing_disabled:
+        _classify_no_trace(context, data, image_id, classification_params,
+                           profiling, delete_image_nodes, start_time)
+    else:
+        _classify_with_trace(context, event, data, image_id, classification_params,
+                             profiling, delete_image_nodes, start_time)
+
+
+def _classify_no_trace(context, data, image_id, classification_params,
+                       profiling, delete_image_nodes, start_time):
     orchestrator = ClassificationOrchestrator(
-        neo4j_dsn=settings.neo4j_dsn,
-        neo4j_user=settings.neo4j_user,
-        neo4j_pass=settings.neo4j_pass,
-        ged_timeout=classification_params.ged_timeout,
-        max_workers_override=max_workers_override,
-        use_multiprocessing=use_multiprocessing,
+        driver=context.user_data.neo4j_driver,
+        ged_timeout=classification_params["ged_timeout"],
+        comparison_method=classification_params.get("comparison_method", "ged"),
+        fgw_alpha=float(classification_params.get("fgw_alpha", 0.5)),
+        tracer=None,
     )
-
-    producer = KafkaProducer(
-        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
-        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-    )
-
     try:
         if not image_id:
             raise ValueError("image_id must be provided in the request body")
 
-        # Perform classification using orchestrator
-        comparison_results = orchestrator.classify_image(image_id)
+        msg_features = data["parameters"].get("features")
+        msg_costs = data["parameters"].get("node_costs")
+        msg_epsilon = data["parameters"].get("diagnostic_weight_epsilon")
+
+        with _cost_config_override(msg_features, msg_costs, msg_epsilon):
+            comparison_results = orchestrator.classify_image(
+                image_id, context.user_data.concept_graphs
+            )
 
         context.logger.info_with(
             f"Classification results: {len(comparison_results)} matches found",
@@ -118,16 +194,14 @@ def kafka_handler(context, event):
         )
 
         profiling["classification_time_ms"] = (time.time_ns() - start_time) / 1_000_000
-        producer.send(
+        context.user_data.kafka_producer.send(
             context.user_data.kafka_topic,
             value={
                 "status": "success",
-                "classification_results": [
-                    result.__dict__ for result in comparison_results
-                ],
+                "classification_results": [r.__dict__ for r in comparison_results],
                 "image_id": image_id,
                 "image_path": data["parameters"]["image_path"],
-                "parameters": {**params, **data["parameters"]},
+                "parameters": {**classification_params, **data["parameters"]},
                 "profiling": profiling,
             },
         )
@@ -135,22 +209,97 @@ def kafka_handler(context, event):
     except Exception as e:
         context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)
         logging.error(f"Error: {e}", exc_info=True, stack_info=True)
-
-        producer.send(
+        context.user_data.kafka_producer.send(
             context.user_data.dlq_topic,
             value={"error": str(e), "source": HANDLER_NAME, "value": data},
         )
 
     finally:
         if delete_image_nodes:
-            image_repository = ImageRepository(
-                settings.neo4j_dsn,
-                settings.neo4j_user,
-                settings.neo4j_pass,
-            )
+            image_repository = ImageRepository(context.user_data.neo4j_driver)
             image_repository.remove_image_nodes(image_id)
-            image_repository.close()
-        producer.close()
+
+
+def _classify_with_trace(context, event, data, image_id, classification_params,
+                         profiling, delete_image_nodes, start_time):
+    experiment_id = data["parameters"].get("mlflow_experiment_id")
+    if experiment_id:
+        context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
+
+    parent_ctx = extract_trace_context(event.headers)
+    tracer = context.user_data.tracer
+
+    with tracer.start_as_current_span(
+        "classification.process", context=parent_ctx, kind=otel_trace.SpanKind.SERVER
+    ) as span:
+        span.set_attribute("image_id", image_id)
+        if data["parameters"].get("mlflow_run_id"):
+            span.set_attribute("mlflow.run_id", data["parameters"]["mlflow_run_id"])
+
+        orchestrator = ClassificationOrchestrator(
+            driver=context.user_data.neo4j_driver,
+            ged_timeout=classification_params["ged_timeout"],
+            comparison_method=classification_params.get("comparison_method", "ged"),
+            fgw_alpha=float(classification_params.get("fgw_alpha", 0.5)),
+            tracer=tracer,
+        )
+
+        try:
+            if not image_id:
+                raise ValueError("image_id must be provided in the request body")
+
+            msg_features = data["parameters"].get("features")
+            msg_costs = data["parameters"].get("node_costs")
+            msg_epsilon = data["parameters"].get("diagnostic_weight_epsilon")
+
+            with _cost_config_override(msg_features, msg_costs, msg_epsilon):
+                comparison_results = orchestrator.classify_image(
+                    image_id, context.user_data.concept_graphs
+                )
+
+            context.logger.info_with(
+                f"Classification results: {len(comparison_results)} matches found",
+                handler=HANDLER_NAME,
+            )
+
+            span.set_attribute("results_count", len(comparison_results))
+            matching = [r for r in comparison_results if r.is_minor]
+            if matching:
+                span.set_attribute("predicted_concept", matching[0].concept_id)
+                span.set_attribute("top_similarity", matching[0].similarity or 0)
+
+            profiling["classification_time_ms"] = (time.time_ns() - start_time) / 1_000_000
+            span.set_attribute("duration_ms", profiling["classification_time_ms"])
+
+            context.user_data.kafka_producer.send(
+                context.user_data.kafka_topic,
+                value={
+                    "status": "success",
+                    "classification_results": [
+                        result.__dict__ for result in comparison_results
+                    ],
+                    "image_id": image_id,
+                    "image_path": data["parameters"]["image_path"],
+                    "parameters": {**classification_params, **data["parameters"]},
+                    "profiling": profiling,
+                },
+            )
+
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(otel_trace.StatusCode.ERROR)
+            context.logger.error_with(f"Error: {e}", handler=HANDLER_NAME)
+            logging.error(f"Error: {e}", exc_info=True, stack_info=True)
+
+            context.user_data.kafka_producer.send(
+                context.user_data.dlq_topic,
+                value={"error": str(e), "source": HANDLER_NAME, "value": data},
+            )
+
+        finally:
+            if delete_image_nodes:
+                image_repository = ImageRepository(context.user_data.neo4j_driver)
+                image_repository.remove_image_nodes(image_id)
 
 
 def handler(context, event):

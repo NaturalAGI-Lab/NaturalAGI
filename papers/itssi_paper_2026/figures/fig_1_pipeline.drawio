@@ -1,0 +1,142 @@
+<mxfile host="Electron" agent="NaturalAGI/ITSSI-2026">
+  <diagram id="fig_1_pipeline" name="Fig 1 — Pipeline">
+    <mxGraphModel dx="489" dy="314" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1700" pageHeight="500" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="b1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#000000;fontFamily=Times New Roman;fontSize=14;fontColor=#000000;verticalAlign=top;align=center;spacingTop=10;arcSize=12;" value="1. Input&#xa;&#xa;Raster image&#xa;100×100 px" vertex="1">
+          <mxGeometry height="260" width="240" x="20" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b1_icon" parent="1" style="rounded=0;fillColor=#000000;strokeColor=#000000;" value="" vertex="1">
+          <mxGeometry height="100" width="120" x="80" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="b1_seven" parent="1" style="text;html=1;fontFamily=Times New Roman;fontSize=70;fontColor=#FFFFFF;fontStyle=1;align=center;verticalAlign=middle;" value="7" vertex="1">
+          <mxGeometry height="100" width="120" x="80" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="b2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#000000;fontFamily=Times New Roman;fontSize=14;fontColor=#000000;verticalAlign=top;align=center;spacingTop=10;arcSize=12;" value="2. Skeletonisation&#xa;&#xa;Growing Neural Gas&#xa;(GNG) + RDP&#xa;simplification" vertex="1">
+          <mxGeometry height="260" width="240" x="340" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b2_l1" edge="1" parent="1" style="endArrow=none;html=1;strokeColor=#000000;strokeWidth=3;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="395" y="220" as="sourcePoint" />
+            <mxPoint x="525" y="220" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b2_l2" edge="1" parent="1" style="endArrow=none;html=1;strokeColor=#000000;strokeWidth=3;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="515" y="220" as="sourcePoint" />
+            <mxPoint x="450" y="305" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b2_dot1" parent="1" style="ellipse;fillColor=#000000;strokeColor=#000000;" value="" vertex="1">
+          <mxGeometry height="12" width="12" x="389" y="214" as="geometry" />
+        </mxCell>
+        <mxCell id="b2_dot2" parent="1" style="ellipse;fillColor=#000000;strokeColor=#000000;" value="" vertex="1">
+          <mxGeometry height="12" width="12" x="514" y="214" as="geometry" />
+        </mxCell>
+        <mxCell id="b2_dot3" parent="1" style="ellipse;fillColor=#000000;strokeColor=#000000;" value="" vertex="1">
+          <mxGeometry height="12" width="12" x="444" y="298" as="geometry" />
+        </mxCell>
+        <mxCell id="b3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#000000;fontFamily=Times New Roman;fontSize=14;fontColor=#000000;verticalAlign=top;align=center;spacingTop=10;arcSize=12;" value="3. Contour analysis&#xa;&#xa;Adds geometric&#xa;features, writes&#xa;graph to Neo4j" vertex="1">
+          <mxGeometry height="260" width="240" x="660" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b3_node" parent="1" style="ellipse;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="28" width="28" x="694" y="200" as="geometry" />
+        </mxCell>
+        <mxCell id="b3_tuple" parent="1" style="text;html=1;align=left;verticalAlign=middle;fontFamily=Courier New;fontSize=11;fontColor=#000000;" value="(x, y, angle,&#xa;is_endpoint,&#xa;is_corner, …)" vertex="1">
+          <mxGeometry height="55" width="140" x="756" y="190" as="geometry" />
+        </mxCell>
+        <mxCell id="b3_arrow" edge="1" parent="1" style="endArrow=open;html=1;strokeColor=#000000;strokeWidth=1.5;dashed=1;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="730" y="214" as="sourcePoint" />
+            <mxPoint x="749" y="214" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b3_note" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=10;fontStyle=2;fontColor=#555555;" value="Node with the&#xa;stored feature tuple" vertex="1">
+          <mxGeometry height="40" width="220" x="685" y="260" as="geometry" />
+        </mxCell>
+        <mxCell id="b4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#000000;fontFamily=Times New Roman;fontSize=14;fontColor=#000000;verticalAlign=top;align=center;spacingTop=10;arcSize=12;" value="4. Concept attractor&#xa;&#xa;Class prototype&#xa;after CRO reduction&#xa;(stored in Neo4j)" vertex="1">
+          <mxGeometry height="260" width="240" x="980" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b4_n_start" parent="1" style="ellipse;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="1010" y="178" as="geometry" />
+        </mxCell>
+        <mxCell id="b4_n_vh" parent="1" style="ellipse;fillColor=#dddddd;strokeColor=#000000;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="1080" y="168" as="geometry" />
+        </mxCell>
+        <mxCell id="b4_n_corner" parent="1" style="ellipse;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="1150" y="183" as="geometry" />
+        </mxCell>
+        <mxCell id="b4_n_v" parent="1" style="ellipse;fillColor=#dddddd;strokeColor=#000000;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="1110" y="225" as="geometry" />
+        </mxCell>
+        <mxCell id="b4_n_end" parent="1" style="ellipse;fillColor=#ffffff;strokeColor=#000000;strokeWidth=2;" value="" vertex="1">
+          <mxGeometry height="20" width="20" x="1080" y="262" as="geometry" />
+        </mxCell>
+        <mxCell id="b4_e1" edge="1" parent="1" style="endArrow=none;html=1;strokeColor=#000000;strokeWidth=1.5;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1030" y="188" as="sourcePoint" />
+            <mxPoint x="1080" y="178" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b4_e2" edge="1" parent="1" style="endArrow=none;html=1;strokeColor=#000000;strokeWidth=1.5;" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1100" y="178" as="sourcePoint" />
+            <mxPoint x="1150" y="193" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b4_e3" edge="1" parent="1" style="endArrow=none;html=1;strokeColor=#000000;strokeWidth=1.5;entryX=1;entryY=0;entryDx=0;entryDy=0;" target="b4_n_v" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1160" y="203" as="sourcePoint" />
+            <mxPoint x="1130" y="235" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b4_e4" edge="1" parent="1" source="b4_n_v" style="endArrow=none;html=1;strokeColor=#000000;strokeWidth=1.5;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=1;entryY=0;entryDx=0;entryDy=0;" target="b4_n_end" value="">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1110" y="245" as="sourcePoint" />
+            <mxPoint x="1090" y="262" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="b4_note" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=10;fontStyle=2;fontColor=#555555;" value="mini concept 7_1 (5 nodes)" vertex="1">
+          <mxGeometry height="22" width="240" x="980" y="290" as="geometry" />
+        </mxCell>
+        <mxCell id="b5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#000000;fontFamily=Times New Roman;fontSize=14;fontColor=#000000;verticalAlign=top;align=center;spacingTop=10;arcSize=12;" value="5. Classification&#xa;&#xa;GED + Boria similarity,&#xa;complexity-adjusted" vertex="1">
+          <mxGeometry height="260" width="380" x="1300" y="60" as="geometry" />
+        </mxCell>
+        <mxCell id="b5_formula" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=15;fontStyle=2;fontColor=#000000;" value="sim = 1 − d / (d + max(n₁, n₂))" vertex="1">
+          <mxGeometry height="30" width="360" x="1310" y="195" as="geometry" />
+        </mxCell>
+        <mxCell id="b5_argmax" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=13;fontColor=#000000;" value="argmax over class concepts" vertex="1">
+          <mxGeometry height="24" width="360" x="1310" y="235" as="geometry" />
+        </mxCell>
+        <mxCell id="b5_note" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontFamily=Times New Roman;fontSize=10;fontStyle=2;fontColor=#555555;" value="d — Graph Edit Distance,&#xa;n₁, n₂ — complexity of test and concept graphs" vertex="1">
+          <mxGeometry height="40" width="360" x="1310" y="265" as="geometry" />
+        </mxCell>
+        <mxCell id="a12" edge="1" parent="1" style="endArrow=open;html=1;strokeColor=#000000;strokeWidth=2;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" value="binary&#xa;PNG">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="260" y="190" as="sourcePoint" />
+            <mxPoint x="340" y="190" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a23" edge="1" parent="1" style="endArrow=open;html=1;strokeColor=#000000;strokeWidth=2;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" value="skeleton&#xa;graph">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="580" y="190" as="sourcePoint" />
+            <mxPoint x="660" y="190" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a34" edge="1" parent="1" style="endArrow=open;html=1;strokeColor=#000000;strokeWidth=2;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" value="Point/Vector&#xa;with features">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="900" y="190" as="sourcePoint" />
+            <mxPoint x="980" y="190" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="a45" edge="1" parent="1" style="endArrow=open;html=1;strokeColor=#000000;strokeWidth=2;fontFamily=Times New Roman;fontSize=11;fontStyle=2;" value="GED vs&#xa;all concepts">
+          <mxGeometry relative="1" as="geometry">
+            <mxPoint x="1220" y="190" as="sourcePoint" />
+            <mxPoint x="1300" y="190" as="targetPoint" />
+          </mxGeometry>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,3 +1,4 @@
+import json
 import logging
 from typing import Dict
 import networkx as nx
@@ -25,7 +26,7 @@ class Neo4jToNetworkx:
                m.id as target_id
         """
         result = session.run(query, image_id=image_id)
-        return Neo4jToNetworkx._build_networkx_graph(result)
+        return Neo4jToNetworkx._build_networkx_graph(result, image_id)
 
     @staticmethod
     def extract_concept_graph(session: Session, concept_id: str) -> nx.Graph:
@@ -36,18 +37,19 @@ class Neo4jToNetworkx:
         WITH n, labels(n) as node_labels, properties(n) as node_properties
         OPTIONAL MATCH (n)-[r]-(m {concept_id: $concept_id})
         WITH n, node_labels, node_properties, r, m
-        RETURN n.id as node_id, 
-               node_labels, 
+        RETURN n.uuid as node_id,
+               node_labels,
                node_properties,
-               type(r) as rel_type, 
-               m.id as target_id
+               type(r) as rel_type,
+               m.uuid as target_id
         """
         result = session.run(query, concept_id=concept_id)
-        return Neo4jToNetworkx._build_networkx_graph(result)
+        return Neo4jToNetworkx._build_networkx_graph(result, concept_id)
 
     @staticmethod
-    def _build_networkx_graph(result) -> nx.Graph:
+    def _build_networkx_graph(result, graph_id: str) -> nx.Graph:
         G = nx.Graph()
+        G.graph["graph_id"] = graph_id
         nodes: Dict[int, Dict] = {}  # Store node data including degree
 
         # First pass: collect all nodes and their degrees
@@ -55,9 +57,12 @@ class Neo4jToNetworkx:
         for record in records:
             node_id = record["node_id"]
             if node_id not in nodes:
+                props = Neo4jToNetworkx._deserialize_properties(
+                    record["node_properties"]
+                )
                 nodes[node_id] = {
                     "labels": record["node_labels"],
-                    **record["node_properties"],
+                    **props,
                 }
 
         # Add nodes to graph
@@ -73,3 +78,16 @@ class Neo4jToNetworkx:
                 )
 
         return G
+
+    @staticmethod
+    def _deserialize_properties(props: Dict) -> Dict:
+        result = {}
+        for k, v in props.items():
+            if isinstance(v, str) and v and v[0] in ("{", "["):
+                try:
+                    result[k] = json.loads(v)
+                except (json.JSONDecodeError, ValueError):
+                    result[k] = v
+            else:
+                result[k] = v
+        return result

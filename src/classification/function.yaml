@@ -5,20 +5,25 @@ metadata:
   labels:
     nuclio.io/project-name: "default"
 spec:
-  maxWorkers: 4
   httpTimeout: 1000
   handler: "nuclio_handler:handler"
-  runtime: "python:3.9"
+  runtime: "python:3.12"
   resources:
     limits:
-      cpu: "6"
-      memory: "8Gi"
-    requests:
-      cpu: "4"
+      cpu: "2"
       memory: "4Gi"
+    requests:
+      cpu: "1"
+      memory: "2Gi"
   env:
-    - name: EXAMPLE_ENV_VAR
-      value: "some-value"
+    - name: OTEL_EXPORTER_OTLP_ENDPOINT
+      value: "http://mlflow:5000"
+    # Feature list override (JSON array). Uncomment to activate:
+    # - name: CLASSIFICATION_FEATURES
+    #   value: '["normalized_x","normalized_y","horizontal_direction","vertical_direction","cycle_count"]'
+    # Node cost values override (JSON object). Uncomment to activate:
+    # - name: CLASSIFICATION_NODE_COSTS
+    #   value: '{"NO_COST":0.0,"MINOR":0.25,"GENERAL":0.4,"SEVERE":0.65,"NO_MATCH":1.0,"IMPOSSIBLE":100.0}'
     - name: OMP_NUM_THREADS
       value: "1"
     - name: OPENBLAS_NUM_THREADS
@@ -30,15 +35,15 @@ spec:
     - name: NUMEXPR_NUM_THREADS
       value: "1"
   build:
-    baseImage: "python:3.9"
+    baseImage: "python:3.12"
     commands:
       - "apt-get update -y --fix-missing"
       - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
-      - "pip install numpy==1.26.4 requests pydantic-settings neo4j kafka-python networkx scipy grakel torch torch-geometric"
-      - "pip install --upgrade natural-agi-common==0.1.36"
+      - "pip install numpy==2.4.2 requests==2.32.5 pydantic-settings==2.13.1 neo4j==6.1.0 kafka-python==2.3.0 networkx==3.6.1 scipy==1.17.1 msgpack==1.1.2 opentelemetry-api==1.40.0 opentelemetry-sdk==1.40.0 opentelemetry-exporter-otlp-proto-http==1.40.0 pot==0.9.6"
+      - "mkdir -p /home/nuclio/bin/py3.12-whl && pip download msgpack==1.1.2 --only-binary=:all: -d /home/nuclio/bin/py3.12-whl --no-deps"
+      - "pip install --upgrade natural-agi-common==0.1.55"
   triggers:
     default-http:
       kind: "http"
       attributes:
         port: 5001
-  replicas: 2

@@ -1,21 +1,21 @@
 import logging
-from typing import List
 from neo4j import ManagedTransaction
 import networkx as nx
+
+from common.feature_scales import h_k
 
 from .base_analyzer import BaseAnalyzer
 
 logging.basicConfig(level=logging.INFO)
 
+
 class CycleCountAnalyzer(BaseAnalyzer):
     def analyze(self) -> int:
-        cycle_count = self._count_cycles()
-        return cycle_count
+        return self._count_cycles()
 
     def _count_cycles(self) -> int:
         logging.info("Analyzing cycles in contour")
         try:
-            # Find all elementary cycles in the graph
             cycles = list(nx.simple_cycles(self.graph))
             cycle_count = len(cycles)
             logging.info(f"Found {cycle_count} cycles in the contour")
@@ -29,28 +29,18 @@ class CycleCountAnalyzer(BaseAnalyzer):
         mx: ManagedTransaction,
         session_id: str,
         image_id: str,
-        result: int
+        result: int,
     ) -> None:
-        # query = """
-        #     MERGE (cycle_count_feature:CycleCount:Feature {
-        #         session_id: $session_id,
-        #         value: $result
-        #     })
-        #     ON CREATE SET cycle_count_feature.samples = [$image_id]
-        #     ON MATCH SET cycle_count_feature.samples = CASE
-        #         WHEN NOT $image_id IN cycle_count_feature.samples THEN cycle_count_feature.samples + $image_id
-        #         ELSE cycle_count_feature.samples
-        #     END
-        # """
-        # mx.run(
-        #     query,
-        #     session_id=session_id,
-        #     result=result,
-        #     image_id=image_id
-        # )
+        # h_k: saturating map v/(v+1) — raw count → u_k ∈ [0, 1).
+        transformed = h_k("cycle_count", result)
         query = """
-            MATCH (n {session_id: $session_id})
-            WHERE n:Point or n:Vector
-            SET n.cycle_count = $result
+            CALL {
+                MATCH (n:Point {image_id: $image_id})
+                SET n.cycle_count = $val
+            }
+            CALL {
+                MATCH (n:Vector {image_id: $image_id})
+                SET n.cycle_count = $val
+            }
         """
-        mx.run(query, session_id=session_id, result=result)
+        mx.run(query, image_id=image_id, val=transformed)

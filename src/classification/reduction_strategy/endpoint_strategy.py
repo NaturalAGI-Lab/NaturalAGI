@@ -1,4 +1,5 @@
 import logging
+import math
 from typing import Tuple, List, Any
 
 import numpy as np
@@ -8,6 +9,16 @@ from common.critical_point import CriticalPointType
 from common.graph_utils import GraphUtils
 
 from .abstract_strategy import AbstractReductionStrategy
+
+
+def _coord_mid(v: Any) -> float:
+    if v is None:
+        return 0.0
+    if isinstance(v, (int, float)):
+        return float(v)
+    if isinstance(v, dict) and "center" in v:
+        return float(v["center"])
+    return 0.0
 
 
 class EndpointReductionStrategy(AbstractReductionStrategy):
@@ -78,6 +89,9 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
         len_concept_endpoints = len(concept_endpoints)
         len_image_endpoints = len(image_endpoints)
 
+        len_concept_endpoints = len(concept_endpoints)
+        len_image_endpoints = len(image_endpoints)
+
         if len_concept_endpoints == len_image_endpoints:
             self.logger.info(
                 "Concept and image have the same number of endpoints. No reduction needed."
@@ -101,6 +115,9 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             similarity_matrix,
             points_large,
             abs(len_concept_endpoints - len_image_endpoints),
+            graph_large=graph_large,
+            graph_small=graph_small,
+            endpoints_small=points_small,
         )
 
         if excess_endpoints_to_remove:
@@ -242,6 +259,9 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
         similarity_matrix: np.ndarray,
         endpoints_large: List[Any],
         difference: int,
+        graph_large: "nx.Graph | None" = None,
+        graph_small: "nx.Graph | None" = None,
+        endpoints_small: "List[Any] | None" = None,
     ) -> List[Any]:
         if difference <= 0:
             self.logger.error("Difference is less than or equal to 0. Raising error.", exc_info=True)
@@ -251,24 +271,100 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             self.logger.error("Similarity matrix is empty. Raising error.", exc_info=True)
             raise ValueError("Similarity matrix is empty.")
 
-        # Find the maximum similarity for each endpoint in the larger set (each row in the matrix)
+        # Branch-aware path: when graph context + concept endpoints are available, score each
+        # image endpoint by how well its branch (path from endpoint to nearest junction or
+        # critical point) matches ANY concept branch. Remove the `difference` endpoints
+        # whose branches match worst. Preserves topology better than spatial similarity.
+        if graph_large is not None and graph_small is not None and endpoints_small:
+            branch_scores = self._score_branches_against_concept(
+                graph_large, graph_small, endpoints_large, endpoints_small
+            )
+            indexed = list(enumerate(branch_scores))
+            indexed.sort(key=lambda x: x[1])
+            indices_to_remove = [idx for idx, _ in indexed[:difference]]
+            nodes_to_remove = [endpoints_large[i] for i in indices_to_remove]
+            self.logger.debug(
+                f"Branch-aware removal indices (lowest branch match): {indices_to_remove}"
+            )
+            return nodes_to_remove
+
+        # Fallback: spatial-similarity-only (original behaviour, kept for callers that
+        # cannot pass graph context).
         max_similarities_per_large_endpoint = np.max(similarity_matrix, axis=1)
-
-        # Create a list of (index_in_large_list, max_similarity)
         indexed_similarities = list(enumerate(max_similarities_per_large_endpoint))
-
-        # Sort by max_similarity in ascending order (lowest similarity first)
         indexed_similarities.sort(key=lambda x: x[1])
-
-        # Get the indices of the 'difference' endpoints with the lowest max similarity
         indices_to_remove = [idx for idx, sim in indexed_similarities[:difference]]
-
-        # Get the actual node IDs corresponding to these indices
         nodes_to_remove = [endpoints_large[i] for i in indices_to_remove]
-
         self.logger.debug(
-            f"Indices identified for removal based on lowest max similarity: {indices_to_remove}"
+            f"Spatial-similarity removal indices: {indices_to_remove}"
         )
-        self.logger.debug(f"Nodes identified for removal: {nodes_to_remove}")
-
         return nodes_to_remove
+
+    # --- branch-aware helpers ---
+
+    def _endpoint_branch(self, graph: nx.Graph, endpoint: Any) -> List[Any]:
+        """Walk from `endpoint` along the graph until hitting a node with degree > 2
+        or another critical point. Returns the ordered list of visited node ids."""
+        path = [endpoint]
+        visited = {endpoint}
+        current = endpoint
+        while True:
+            nbrs = [n for n in graph.neighbors(current) if n not in visited]
+            if not nbrs:
+                break
+            nxt = nbrs[0]
+            visited.add(nxt)
+            path.append(nxt)
+            data = graph.nodes[nxt]
+            if graph.degree(nxt) > 2 or GraphUtils.is_critical_point(data):
+                break
+            current = nxt
+        return path
+
+    def _branch_similarity(
+        self, b1: List[Any], b2: List[Any], g1: nx.Graph, g2: nx.Graph
+    ) -> float:
+        def coord(g: nx.Graph, n: Any) -> Tuple[float, float]:
+            d = g.nodes[n]
+            return (_coord_mid(d.get("normalized_x")), _coord_mid(d.get("normalized_y")))
+
+        def direction(branch: List[Any], g: nx.Graph) -> float:
+            s = coord(g, branch[0])
+            e = coord(g, branch[-1])
+            return math.atan2(e[1] - s[1], e[0] - s[0])
+
+        dir_diff = abs(direction(b1, g1) - direction(b2, g2))
+        if dir_diff > math.pi:
+            dir_diff = 2 * math.pi - dir_diff
+        dir_score = 1 - dir_diff / math.pi
+
+        len_score = 1.0 / (1.0 + abs(len(b1) - len(b2)))
+
+        def terminal_kind(branch: List[Any], g: nx.Graph) -> str:
+            labels = g.nodes[branch[-1]].get("labels", [])
+            for lbl in ("IntersectionPoint", "CornerPoint", "StartPoint", "EndPoint"):
+                if lbl in labels:
+                    return lbl
+            return "Other"
+
+        label_score = 1.0 if terminal_kind(b1, g1) == terminal_kind(b2, g2) else 0.3
+        return (dir_score + len_score + label_score) / 3.0
+
+    def _score_branches_against_concept(
+        self,
+        graph_large: nx.Graph,
+        graph_small: nx.Graph,
+        endpoints_large: List[Any],
+        endpoints_small: List[Any],
+    ) -> List[float]:
+        branches_large = [self._endpoint_branch(graph_large, ep) for ep in endpoints_large]
+        branches_small = [self._endpoint_branch(graph_small, ep) for ep in endpoints_small]
+        scores: List[float] = []
+        for bl in branches_large:
+            best = 0.0
+            for bs in branches_small:
+                s = self._branch_similarity(bl, bs, graph_large, graph_small)
+                if s > best:
+                    best = s
+            scores.append(best)
+        return scores

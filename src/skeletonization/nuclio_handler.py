@@ -7,6 +7,7 @@ import cv2
 from kafka import KafkaProducer
 import traceback
 from common.model.dlq import DLQModel
+from common.tracing import init_tracer, inject_trace_headers, extract_trace_context, SpanKind
 from settings import Settings
 from skeleton_gng_mapper import SkeletonGNGMapper
 from graph_serializer import GraphSerializer
@@ -26,15 +27,24 @@ def init_context(context):
         f"Exporter initializing with:\n{settings.model_dump()}", handler=HANDLER_NAME
     )
 
+    setattr(context.user_data, "settings", settings)
     setattr(context.user_data, "kafka_topic", settings.kafka_topic)
     setattr(context.user_data, "dlq_topic", settings.dlq_topic)
+
+    producer = KafkaProducer(
+        bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
+        value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    )
+    setattr(context.user_data, "kafka_producer", producer)
+
+    tracer = init_tracer(HANDLER_NAME)
+    setattr(context.user_data, "tracer", tracer)
 
 
 def kafka_handler(context, event):
     """Handles Kafka messages"""
 
     data = json.loads(event.body)
-    producer = None
 
     try:
         start_time = time.time_ns()
@@ -42,6 +52,13 @@ def kafka_handler(context, event):
 
         operation = data.get("operation")
         parameters = data.get("parameters", {})
+
+        tracing_disabled = bool(parameters.get("disable_tracing"))
+
+        if not tracing_disabled:
+            experiment_id = parameters.get("mlflow_experiment_id")
+            if experiment_id:
+                context.user_data.tracer = init_tracer(HANDLER_NAME, experiment_id)
 
         context.logger.info_with(
             f"Received request: {event.trigger.kind}", handler=HANDLER_NAME
@@ -57,20 +74,20 @@ def kafka_handler(context, event):
         parameters["image_width"] = image_width
         parameters["image_height"] = image_height
 
-        settings = Settings()
+        settings = context.user_data.settings
         skeletonization_threshold = parameters.get(
             "skeletonization_threshold", settings.skeletonization_threshold
         )
         simplification_epsilon = parameters.get(
             "simplification_epsilon", settings.simplification_epsilon
         )
-        net, threshold = SkeletonGNGMapper(
+        graph, threshold = SkeletonGNGMapper(
             settings, skeletonization_threshold, simplification_epsilon
         ).process_image(image)
         data["parameters"]["skeletonization_threshold"] = threshold
         data["parameters"]["simplification_epsilon"] = simplification_epsilon
 
-        json_net = GraphSerializer.serialize(net)
+        json_net = GraphSerializer.serialize(graph)
         context.logger.info_with(f"Net: {json_net}", handler=HANDLER_NAME)
 
         context.logger.info_with("Processed request successfully", handler=HANDLER_NAME)
@@ -82,33 +99,44 @@ def kafka_handler(context, event):
             time.time_ns() - start_time
         ) / 1_000_000
 
-        producer = KafkaProducer(
-            bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
-            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
-        )
-        producer.send(context.user_data.kafka_topic, value=data)
+        if tracing_disabled:
+            context.user_data.kafka_producer.send(
+                context.user_data.kafka_topic, value=data, headers=[]
+            )
+        else:
+            tracer = context.user_data.tracer
+            parent_ctx = extract_trace_context(event.headers)
+            with tracer.start_as_current_span(
+                "skeletonization.process", context=parent_ctx, kind=SpanKind.SERVER
+            ) as span:
+                span.set_attribute("image_id", parameters.get("image_id", ""))
+                span.set_attribute("operation", operation or "")
+                if parameters.get("mlflow_run_id"):
+                    span.set_attribute("mlflow.run_id", parameters["mlflow_run_id"])
+                span.set_attribute("image_width", image_width)
+                span.set_attribute("image_height", image_height)
+                span.set_attribute("final_threshold", threshold)
+                span.set_attribute(
+                    "duration_ms", data["profiling"]["skeletonization_time_ms"]
+                )
+
+                headers = inject_trace_headers()
+                context.user_data.kafka_producer.send(
+                    context.user_data.kafka_topic, value=data, headers=headers
+                )
 
     except Exception as e:
         context.logger.warn_with(f"Error: {e}", handler=HANDLER_NAME)
         traceback.print_exc()
 
-        settings = Settings()
         dlq_model = DLQModel(
             source=HANDLER_NAME,
             error={"error": str(e), "traceback": traceback.format_exc()},
             value=data,
         )
-
-        dlq_producer = KafkaProducer(
-            bootstrap_servers=settings.kafka_bootstrap_servers.split(","),
-            value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+        context.user_data.kafka_producer.send(
+            context.user_data.dlq_topic, value=dataclasses.asdict(dlq_model)
         )
-        dlq_producer.send(context.user_data.dlq_topic, value=dataclasses.asdict(dlq_model))
-        dlq_producer.close()
-
-    finally:
-        if producer:
-            producer.close()
 
 
 def handler(context, event):

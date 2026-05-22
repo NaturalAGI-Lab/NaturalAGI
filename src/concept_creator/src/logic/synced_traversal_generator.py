@@ -2,6 +2,8 @@ import logging
 from typing import Any, List, Tuple, Set, FrozenSet, Dict
 import networkx as nx
 import collections
+import numpy as np
+from scipy.optimize import linear_sum_assignment
 from common.critical_point import CriticalPointType
 from common.graph_utils import GraphUtils
 from src.node_similarity_calculator import NodeSimilarityCalculator
@@ -69,6 +71,11 @@ class SyncedTraversalGenerator:
         completed_paths = set()
 
         processed_segments: Set[FrozenSet[Tuple[Any, Any]]] = set()
+        # Track which exits from intersection/multi-branch nodes have been processed.
+        # Key: (intersection_concept_node, exit_neighbor_concept_node)
+        # This allows parallel paths between the same pair of critical points
+        # (e.g., two arcs of a figure-8 upper loop) to be traversed separately.
+        processed_intersection_exits: Set[Tuple[Any, Any]] = set()
 
         # Queue stores (node_c, node_i, path_id, prev_c, prev_i)
         # The prev_* values help avoid immediate backtracking
@@ -96,34 +103,35 @@ class SyncedTraversalGenerator:
             is_intersection_point_c = GraphUtils.is_intersection_point(
                 G_c.nodes[current_c]
             )
+            is_multi_branch_start = prev_c is None and G_c.degree(current_c) >= 2
 
-            if is_intersection_point_c:
+            if is_intersection_point_c or is_multi_branch_start:
+                if is_multi_branch_start:
+                    self.logger.info(
+                        f"Multi-branch start point: {current_c}, {current_i} (degree={G_c.degree(current_c)})"
+                    )
                 self.logger.info(f"Intersection point found: {current_c}, {current_i}")
-                processed_c = set(node_c for node_c, _ in visited.keys())
-                processed_i = set(node_i for _, node_i in visited.keys())
-                matched_points = (
+                matched_branches = (
                     self._get_matched_intersection_point_critical_neighbors(
                         G_c=G_c,
                         G_i=G_i,
                         intersection_c=current_c,
                         intersection_i=current_i,
-                        processed_c=processed_c,
-                        processed_i=processed_i,
                     )
                 )
 
-                # For the matched points, create new path branches
-                for concept_neighbor_cp, image_neighbor_cp in matched_points.items():
+                # For the matched branches, create new path branches
+                for concept_neighbor_cp, image_neighbor_cp, exit_c, exit_i in matched_branches:
                     neighbor_pair = (concept_neighbor_cp, image_neighbor_cp)
 
-                    segment = frozenset([current_pair, neighbor_pair])
-                    if segment in processed_segments:
+                    exit_key = (current_c, exit_c)
+                    if exit_key in processed_intersection_exits:
                         self.logger.debug(
-                            f"Segment {segment} already processed, skipping branch."
+                            f"Exit branch ({current_c}, {exit_c}) already processed, skipping."
                         )
                         continue
-                    processed_segments.add(segment)
-                    self.logger.debug(f"Added segment {segment} to processed set.")
+                    processed_intersection_exits.add(exit_key)
+                    self.logger.debug(f"Processing exit branch ({current_c}, {exit_c}) -> {concept_neighbor_cp}.")
 
                     # Create a new path ID
                     new_path_id = len(sync_list)
@@ -184,7 +192,13 @@ class SyncedTraversalGenerator:
             if not GraphUtils.is_same_critical_point_type(
                 G_c.nodes[next_c_critical_point], G_i.nodes[next_i_critical_point]
             ):
-                raise ValueError("Critical points are not the same type")
+                self.logger.info(
+                    f"Path {path_id} ending: Critical point type mismatch - "
+                    f"concept={G_c.nodes[next_c_critical_point].get('labels')}, "
+                    f"image={G_i.nodes[next_i_critical_point].get('labels')}"
+                )
+                completed_paths.add(path_id)
+                continue
 
             next_pair = (next_c_critical_point, next_i_critical_point)
 
@@ -233,18 +247,20 @@ class SyncedTraversalGenerator:
         G_i: nx.Graph,
         intersection_c: Any,
         intersection_i: Any,
-        processed_c: Set[Any],
-        processed_i: Set[Any],
-    ) -> Dict[Any, Any]:
-        """Getting the matched critical point-neighbors of the current intersection point"""
+    ) -> List[Tuple[Any, Any, Any, Any]]:
+        """Get matched critical point-neighbor branches of the current intersection point.
+
+        Returns a list of branch tuples preserving multiplicity — multiple branches
+        to the same critical point (parallel paths) are kept as separate entries.
+
+        Returns:
+            List of (concept_dest_cp, image_dest_cp, exit_neighbor_c, exit_neighbor_i).
+        """
         neighbors_c = list(G_c.neighbors(intersection_c))
         neighbors_i = list(G_i.neighbors(intersection_i))
 
-        # We start from the neighbors of the intersection point and find the next critical point excluding the intersection point itself
-        critical_neighbors_c = []
-        critical_neighbors_i = []
-
-        # Continue with regular neighbor finding
+        # Build branch info: (exit_neighbor, destination_critical_point)
+        branches_c: List[Tuple[Any, Any]] = []
         for neighbor_c in neighbors_c:
             next_c_critical_point = GraphUtils.find_next_critical_point_bfs(
                 G_c,
@@ -252,13 +268,10 @@ class SyncedTraversalGenerator:
                 prev_point=intersection_c,
                 supported_types=self.critical_point_types,
             )
-            if (
-                next_c_critical_point is not None
-                and (next_c_critical_point not in processed_c
-                or next_c_critical_point == intersection_c)
-            ):
-                critical_neighbors_c.append(next_c_critical_point)
+            if next_c_critical_point is not None:
+                branches_c.append((neighbor_c, next_c_critical_point))
 
+        branches_i: List[Tuple[Any, Any]] = []
         for neighbor_i in neighbors_i:
             next_i_critical_point = GraphUtils.find_next_critical_point_bfs(
                 G_i,
@@ -266,136 +279,126 @@ class SyncedTraversalGenerator:
                 prev_point=intersection_i,
                 supported_types=self.critical_point_types,
             )
-            if (
-                next_i_critical_point is not None
-                and (next_i_critical_point not in processed_i
-                or next_i_critical_point == intersection_i)
-            ):
-                critical_neighbors_i.append(next_i_critical_point)
+            if next_i_critical_point is not None:
+                branches_i.append((neighbor_i, next_i_critical_point))
 
-        # Log critical neighbors found
         self.logger.debug(
-            f"Critical neighbors for concept intersection {intersection_c}: {critical_neighbors_c}"
+            f"Concept branches from {intersection_c}: "
+            f"{[(exit_n, dest) for exit_n, dest in branches_c]}"
         )
         self.logger.debug(
-            f"Critical neighbors for image intersection {intersection_i}: {critical_neighbors_i}"
+            f"Image branches from {intersection_i}: "
+            f"{[(exit_n, dest) for exit_n, dest in branches_i]}"
         )
 
-        return self._match_critical_points(
-            G_c=G_c,
-            G_i=G_i,
-            concept_critical_points=critical_neighbors_c,
-            image_critical_points=critical_neighbors_i,
-        )
+        return self._match_branches(G_c, G_i, branches_c, branches_i)
 
-    def _match_critical_points(
+    def _match_branches(
         self,
         G_c: nx.Graph,
         G_i: nx.Graph,
-        concept_critical_points: List[Any],
-        image_critical_points: List[Any],
-    ) -> Dict[Any, Any]:
-        """Matching the critical points between the two graphs"""
+        branches_c: List[Tuple[Any, Any]],
+        branches_i: List[Tuple[Any, Any]],
+    ) -> List[Tuple[Any, Any, Any, Any]]:
+        """Match concept and image branches by destination type and exit neighbor similarity.
 
-        # Prepare the critical points by type
-        concept_node_type_to_critical_points = {}
-        for cp in concept_critical_points:
-            cp_type = GraphUtils.get_critical_point_type(G_c.nodes[cp])
-            if cp_type not in concept_node_type_to_critical_points:
-                concept_node_type_to_critical_points[cp_type] = []
-            concept_node_type_to_critical_points[cp_type].append(cp)
+        When multiple branches lead to the same critical point type (parallel paths),
+        uses exit neighbor spatial properties with Hungarian algorithm to pair them.
 
-        image_node_type_to_critical_points = {}
-        for cp in image_critical_points:
-            cp_type = GraphUtils.get_critical_point_type(G_i.nodes[cp])
-            if cp_type not in image_node_type_to_critical_points:
-                image_node_type_to_critical_points[cp_type] = []
-            image_node_type_to_critical_points[cp_type].append(cp)
+        Args:
+            branches_c: List of (exit_neighbor, destination_cp) from concept intersection.
+            branches_i: List of (exit_neighbor, destination_cp) from image intersection.
 
-        critical_point_mapping = {}
+        Returns:
+            List of (concept_dest_cp, image_dest_cp, exit_c, exit_i) tuples.
+        """
+        groups_c: Dict[CriticalPointType, List[Tuple[Any, Any]]] = {}
+        for exit_n, dest_cp in branches_c:
+            cp_type = GraphUtils.get_critical_point_type(G_c.nodes[dest_cp])
+            if cp_type not in groups_c:
+                groups_c[cp_type] = []
+            groups_c[cp_type].append((exit_n, dest_cp))
 
-        unmatched_concept_critical_points = set(concept_critical_points)
-        unmatched_image_critical_points = set(image_critical_points)
+        groups_i: Dict[CriticalPointType, List[Tuple[Any, Any]]] = {}
+        for exit_n, dest_cp in branches_i:
+            cp_type = GraphUtils.get_critical_point_type(G_i.nodes[dest_cp])
+            if cp_type not in groups_i:
+                groups_i[cp_type] = []
+            groups_i[cp_type].append((exit_n, dest_cp))
 
-        # First, match critical points where there's only one node per type
-        for cp_type, concept_points in concept_node_type_to_critical_points.items():
-            image_points = image_node_type_to_critical_points.get(cp_type, [])
+        matched: List[Tuple[Any, Any, Any, Any]] = []
 
-            # If there's exactly one critical point of this type in both graphs, match them
-            if len(concept_points) == 1 and len(image_points) == 1:
-                concept_cp = concept_points[0]
-                image_cp = image_points[0]
+        for cp_type, c_group in groups_c.items():
+            i_group = groups_i.get(cp_type, [])
+            if not i_group:
+                continue
 
-                critical_point_mapping[concept_cp] = image_cp
-
-                # Remove these points from the unmatched sets
-                unmatched_concept_critical_points.remove(concept_cp)
-                unmatched_image_critical_points.remove(image_cp)
-
+            if len(c_group) == 1 and len(i_group) == 1:
+                exit_c, dest_c = c_group[0]
+                exit_i, dest_i = i_group[0]
+                matched.append((dest_c, dest_i, exit_c, exit_i))
                 self.logger.debug(
-                    f"Matched unique critical points of type {cp_type}: {concept_cp} -> {image_cp}"
+                    f"Matched unique branch of type {cp_type}: {dest_c} -> {dest_i}"
                 )
+            else:
+                # Multiple branches of the same type: match by exit neighbor similarity
+                n_c, n_i = len(c_group), len(i_group)
+                distance_matrix = np.zeros((n_c, n_i))
 
-        # For critical point types with multiple nodes, use node similarity to match them
-        for cp_type, concept_points in concept_node_type_to_critical_points.items():
-            image_points = image_node_type_to_critical_points.get(cp_type, [])
+                for idx_c, (exit_c, _) in enumerate(c_group):
+                    for idx_i, (exit_i, _) in enumerate(i_group):
+                        c_x = self._get_node_coord(G_c.nodes[exit_c], 'x')
+                        c_y = self._get_node_coord(G_c.nodes[exit_c], 'y')
+                        i_x = self._get_node_coord(G_i.nodes[exit_i], 'x')
+                        i_y = self._get_node_coord(G_i.nodes[exit_i], 'y')
+                        distance_matrix[idx_c, idx_i] = np.sqrt(
+                            (c_x - i_x) ** 2 + (c_y - i_y) ** 2
+                        )
 
-            # Skip if we've already matched all points of this type
-            if not any(
-                cp in unmatched_concept_critical_points for cp in concept_points
-            ):
-                continue
+                max_distance = np.sqrt(2 * (2 ** 2))
+                similarity_matrix = 1.0 - (distance_matrix / max_distance)
+                cost_matrix = -similarity_matrix
+                row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
-            # Skip if there are no image points of this type
-            if not image_points:
-                continue
-
-            # Filter to only include unmatched points
-            unmatched_concept_points = [
-                cp for cp in concept_points if cp in unmatched_concept_critical_points
-            ]
-            unmatched_image_points = [
-                cp for cp in image_points if cp in unmatched_image_critical_points
-            ]
-
-            if not unmatched_concept_points or not unmatched_image_points:
-                continue
-
-            self.logger.debug(
-                f"Matching remaining critical points of type {cp_type}: {len(unmatched_concept_points)} concept points, {len(unmatched_image_points)} image points"
-            )
-
-            # Calculate similarity matrix between unmatched points
-            similarity_matrix = self.similarity_calculator.calculate_similarity_matrix(
-                G_c, G_i, unmatched_concept_points, unmatched_image_points
-            )
-
-            # Match points greedily based on highest similarity
-            while unmatched_concept_points and unmatched_image_points:
-                # Find the highest similarity score
-                max_similarity = -1
-                best_match = None
-
-                for i, concept_cp in enumerate(unmatched_concept_points):
-                    for j, image_cp in enumerate(unmatched_image_points):
-                        if similarity_matrix[i][j] > max_similarity:
-                            max_similarity = similarity_matrix[i][j]
-                            best_match = (concept_cp, image_cp, i, j)
-
-                # If we found a match with reasonable similarity
-                if best_match:
-                    concept_cp, image_cp, _, _ = best_match
-                    critical_point_mapping[concept_cp] = image_cp
-
-                    # Remove from our local lists too
-                    unmatched_concept_points.remove(concept_cp)
-                    unmatched_image_points.remove(image_cp)
-
+                for r, c_idx in zip(row_ind, col_ind):
+                    exit_c, dest_c = c_group[r]
+                    exit_i, dest_i = i_group[c_idx]
+                    sim = similarity_matrix[r, c_idx]
+                    matched.append((dest_c, dest_i, exit_c, exit_i))
                     self.logger.debug(
-                        f"Matched critical points based on similarity ({max_similarity:.2f}): {concept_cp} -> {image_cp}"
+                        f"Matched branch of type {cp_type} (similarity={sim:.2f}): "
+                        f"exit {exit_c} -> {dest_c} with exit {exit_i} -> {dest_i}"
                     )
-                else:
-                    # No more good matches found
-                    break
 
-        return critical_point_mapping
+        return matched
+
+    @staticmethod
+    def _get_node_coord(node_data: Dict, axis: str) -> float:
+        """Extract a representative coordinate from a node (Point or Vector)."""
+        # Try normalized coordinates first
+        norm_key = f'normalized_{axis}'
+        if norm_key in node_data:
+            val = node_data[norm_key]
+            if isinstance(val, dict):
+                return val.get('center', val.get('min', 0))
+            return val
+
+        # For vectors: use midpoint of endpoints
+        key1 = f'{axis}1'
+        key2 = f'{axis}2'
+        if key1 in node_data and key2 in node_data:
+            v1, v2 = node_data[key1], node_data[key2]
+            if isinstance(v1, dict):
+                v1 = v1.get('center', v1.get('min', 0))
+            if isinstance(v2, dict):
+                v2 = v2.get('center', v2.get('min', 0))
+            return (v1 + v2) / 2
+
+        # Fallback: raw coordinate
+        if axis in node_data:
+            val = node_data[axis]
+            if isinstance(val, dict):
+                return val.get('center', val.get('min', 0))
+            return val
+
+        return 0

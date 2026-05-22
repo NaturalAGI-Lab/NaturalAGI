@@ -1,18 +1,27 @@
-from neo4j import GraphDatabase, ManagedTransaction
+from neo4j import Driver, ManagedTransaction
 
 from service.graph_analysis.analyzers.base_analyzer import BaseAnalyzer
 
 
 class AnalysisResultPersistenceService:
-    def __init__(self, uri: str, user: str, password: str):
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+    def __init__(self, driver: Driver):
+        self.driver = driver
 
-    def save_analysis_result(self, analyzer: BaseAnalyzer, result: any, image_id: str, session_id: str) -> None:
+    def save_all_results(
+        self,
+        analyzer_results: list[tuple[BaseAnalyzer, any]],
+        image_id: str,
+        session_id: str,
+    ) -> None:
         with self.driver.session() as session:
-            session.write_transaction(self._save_result, analyzer, result, image_id, session_id)
+            session.execute_write(self._save_all, analyzer_results, image_id, session_id)
 
-    def _save_result(self, tx: ManagedTransaction, analyzer: BaseAnalyzer, result: any, image_id: str, session_id: str) -> None:
-        analyzer.persist(tx, session_id, image_id, result)
-
-    def close(self):
-        self.driver.close()
+    def _save_all(
+        self,
+        tx: ManagedTransaction,
+        analyzer_results: list[tuple[BaseAnalyzer, any]],
+        image_id: str,
+        session_id: str,
+    ) -> None:
+        for analyzer, result in analyzer_results:
+            analyzer.persist(tx, session_id, image_id, result)

@@ -1,78 +1,62 @@
 import networkx as nx
-from neo4j import GraphDatabase
+from neo4j import Driver
 from logic.point_extractor import PointExtractor
 import logging
 
 
 class GraphPersistenceService:
-    def __init__(self, uri: str, user: str, password: str):
-        self.driver = GraphDatabase.driver(uri, auth=(user, password))
-        self.point_extractor = None
+    def __init__(self, driver: Driver):
+        self.driver = driver
         self.logger = logging.getLogger(__name__)
 
-    def save_graph_to_neo4j(
-        self, graph: nx.Graph, image_id: str, session_id: str
-    ) -> None:
-        self.point_extractor = PointExtractor(graph)
+    def save_graph_to_neo4j(self, graph: nx.Graph, image_id: str, session_id: str) -> None:
+        point_types = {
+            point.id: type(point).__name__
+            for point in PointExtractor(graph).extract_points()
+        }
         with self.driver.session() as session:
-            session.write_transaction(self._save_graph, graph, image_id, session_id)
+            session.execute_write(self._save_graph, graph, image_id, session_id, point_types)
 
-    def _save_graph(self, tx, graph: nx.Graph, image_id: str, session_id: str) -> None:
-        # Extract all points
-        self.logger.info(
-            f"Extracting points for image {image_id} and session {session_id}"
-        )
-        all_points = self.point_extractor.extract_points()
-        self.logger.info(f"Extracted {len(all_points)} points")
-        self.logger.info(f"Points: {all_points}")
-
-        # Create a dictionary to map node ids to their point types
-        point_types = {point.id: type(point).__name__ for point in all_points}
-
-        # Create nodes
+    def _save_graph(
+        self, tx, graph: nx.Graph, image_id: str, session_id: str, point_types: dict
+    ) -> None:
+        by_label: dict[str | None, list[dict]] = {}
         for node_id, data in graph.nodes(data=True):
-            labels = ["Point"]
-            if node_id in point_types:
-                labels.append(point_types[node_id])
+            label = point_types.get(node_id)
+            by_label.setdefault(label, []).append(
+                {"id": node_id, "image_id": image_id, "session_id": session_id, **data}
+            )
 
-            params = {
-                "id": node_id,
+        for label, nodes in by_label.items():
+            label_clause = f":Point:{label}" if label else ":Point"
+            tx.run(f"UNWIND $nodes AS p CREATE (n{label_clause}) SET n = p", nodes=nodes)
+
+        edges = [
+            {
+                "u": u,
+                "v": v,
+                "vector_id": data["id"],
+                "length": data["length"],
                 "image_id": image_id,
                 "session_id": session_id,
-                **data,
             }
-            tx.run(
-                f"""
-                CREATE (n:{':'.join(labels)} $params)
-                """,
-                params=params,
-            )
-
-        # Create edges
-        for u, v, data in graph.edges(data=True):
-            vector_id = data["id"]
-
+            for u, v, data in graph.edges(data=True)
+        ]
+        if edges:
             tx.run(
                 """
-                MATCH (a:Point {id: $u, image_id: $image_id}), (b:Point {id: $v, image_id: $image_id})
-                CREATE (v:Vector {
-                    id: $vector_id,
-                    x1: a.x, y1: a.y,
-                    x2: b.x, y2: b.y,
-                    length: $length,
-                    image_id: $image_id,
-                    session_id: $session_id
+                UNWIND $edges AS e
+                MATCH (a:Point {id: e.u, image_id: e.image_id})
+                MATCH (b:Point {id: e.v, image_id: e.image_id})
+                CREATE (vec:Vector {
+                    id: e.vector_id,
+                    x1: a.x, y1: a.y, x2: b.x, y2: b.y,
+                    length: e.length,
+                    image_id: e.image_id,
+                    session_id: e.session_id
                 })
-                MERGE (a)-[:CONNECTED_TO]->(v)
-                MERGE (v)<-[:CONNECTED_TO]-(b)            
+                CREATE (a)-[:CONNECTED_TO]->(vec)
+                CREATE (vec)<-[:CONNECTED_TO]-(b)
                 """,
-                u=u,
-                v=v,
-                vector_id=vector_id,
-                image_id=image_id,
-                session_id=session_id,
-                length=data["length"],
+                edges=edges,
             )
-
-    def close(self):
-        self.driver.close()

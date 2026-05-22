@@ -1,6 +1,16 @@
+x-logging: &default-logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "50m"
+      max-file: "3"
+
 networks:
   neo4j-internal:
     driver: bridge
+
+volumes:
+  pgdata:
 
 services:
 
@@ -27,8 +37,12 @@ services:
     environment:
       - NEO4J_AUTH
       - NEO4J_PLUGINS=["graph-data-science", "apoc"]
+      - NEO4J_server_memory_heap_initial__size=1500m
+      - NEO4J_server_memory_heap_max__size=1500m
+      - NEO4J_server_memory_pagecache_size=1500m
       - NEO4J_dbms_memory_transaction_total_max=512M
       - NEO4J_dbms.security.procedures.unrestricted=apoc.*
+      - NEO4J_db_tx__log_rotation_retention__policy=100M size
 
     volumes:
       - ./neo4j-data:/data
@@ -43,12 +57,13 @@ services:
     deploy:
       resources:
         limits:
-          cpus: '3.0'
-          memory: 2048M
+          cpus: '2.0'
+          memory: 4096M
+    <<: *default-logging
 
   nuclio-dashboard:
-    
-    image: quay.io/nuclio/dashboard:stable-arm64
+
+    image: quay.io/nuclio/dashboard:1.15.20-arm64
 
     hostname: nuclio-dashboard
     container_name: nuclio-dashboard
@@ -70,40 +85,46 @@ services:
     
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-
-  zookeeper:
-    image: confluentinc/cp-zookeeper:latest
-    networks:
-      - neo4j-internal
-    environment:
-      ZOOKEEPER_CLIENT_PORT: 2181
-      ZOOKEEPER_TICK_TIME: 2000
+    <<: *default-logging
 
   kafka:
-    image: confluentinc/cp-kafka:7.4.0
+    image: confluentinc/cp-kafka:8.2.0
     hostname: kafka
     ports:
       - "29092:29092"
+      - "9092:9092"
     environment:
-      KAFKA_BROKER_ID: 1
-      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT
-      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${HOST_IP}:29092
-      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092
+      # KRaft mode (no Zookeeper)
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      CLUSTER_ID: MkU3OEVBNTcwNTJENDM2Qk
+      # Listeners
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT,CONTROLLER:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://${HOST_IP}:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:29092,PLAINTEXT_HOST://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      # Topic defaults
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
       KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
       KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
       KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
-      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'false'
       KAFKA_DELETE_TOPIC_ENABLE: 'true'
+      # Log retention
+      KAFKA_LOG_RETENTION_HOURS: 1
+      KAFKA_LOG_RETENTION_BYTES: 104857600
+      KAFKA_LOG_SEGMENT_BYTES: 16777216
+      KAFKA_LOG_INDEX_SIZE_MAX_BYTES: 1048576
+      KAFKA_LOG_CLEANUP_POLICY: delete
+      KAFKA_LOG_RETENTION_CHECK_INTERVAL_MS: 30000
     networks:
       - neo4j-internal
-    depends_on:
-      - zookeeper
+    <<: *default-logging
 
   kafka-ui:
-    image: provectuslabs/kafka-ui:latest
+    image: ghcr.io/kafbat/kafka-ui:v1.4.2
     networks:
       - neo4j-internal
     depends_on:
@@ -113,4 +134,49 @@ services:
     environment:
       KAFKA_CLUSTERS_0_NAME: local
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${HOST_IP}:29092
-      KAFKA_CLUSTERS_0_ZOOKEEPER: zookeeper:2181
+    <<: *default-logging
+
+  postgres:
+    image: postgres:16-alpine
+    networks:
+      - neo4j-internal
+    environment:
+      POSTGRES_USER: ${MLFLOW_DB_USER}
+      POSTGRES_PASSWORD: ${MLFLOW_DB_PASSWORD}
+      POSTGRES_DB: ${MLFLOW_DB_NAME}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MLFLOW_DB_USER}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 512M
+    <<: *default-logging
+
+  mlflow:
+    build:
+      context: .
+      dockerfile: Dockerfile.mlflow
+    networks:
+      - neo4j-internal
+    ports:
+      - "5050:5000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ./mlflow-data:/mlflow
+    command: >
+      mlflow server
+      --host 0.0.0.0
+      --port 5000
+      --backend-store-uri postgresql://${MLFLOW_DB_USER}:${MLFLOW_DB_PASSWORD}@postgres:5432/${MLFLOW_DB_NAME}
+      --default-artifact-root mlflow-artifacts:/
+      --serve-artifacts
+      --artifacts-destination /mlflow/artifacts
+    <<: *default-logging

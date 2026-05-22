@@ -20,4 +20,5 @@ class ConceptResult:
     steps_debug: List[ConceptFormationStep] = None
     is_error: bool = False
     error_message: str = None
+    skipped_images: List[str] = None
 
