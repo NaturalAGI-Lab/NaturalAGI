@@ -21,7 +21,7 @@ from __future__ import annotations
 
 # ---------- Metadata ----------
 
-TITLE = "Few-Shot Digit Recognition using Graph Concept Attractors"
+TITLE = "Explainable AI for Few-Shot Digit Recognition"
 
 KEYWORDS = [
     "Explainable AI (XAI)",
