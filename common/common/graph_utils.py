@@ -88,9 +88,9 @@ class GraphUtils:
         """
         Check if two nodes are the same critical point type.
         """
-        labels_c = node_c_data.get(LABELS_KEY, [])
-        labels_i = node_i_data.get(LABELS_KEY, [])
-        return set(labels_c) == set(labels_i)
+        return GraphUtils.get_critical_point_type(
+            node_c_data
+        ) == GraphUtils.get_critical_point_type(node_i_data)
 
     @staticmethod
     def is_intersection_point(node_data: Dict[str, Any]) -> bool:

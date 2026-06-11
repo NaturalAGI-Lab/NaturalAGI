@@ -150,7 +150,8 @@ class StartPointPicker:
 
             elif self.clustering_algorithm == "optics":
                 # Perform OPTICS clustering
-                clusterer = OPTICS(min_samples=max(min_samples, 2))
+                actual_min_samples = min(max(min_samples, 2), len(points))
+                clusterer = OPTICS(min_samples=actual_min_samples, max_eps=eps)
                 labels = clusterer.fit_predict(coordinates)
 
         clusters = defaultdict(list)
@@ -312,6 +313,28 @@ class StartPointPicker:
             f"self.final_cluster_points: {len(self.final_cluster_points) if self.final_cluster_points else 0}"
         )
         if self.final_cluster_points:
+            provisional_centroid = np.mean(
+                [p.coordinates for p in self.final_cluster_points], axis=0
+            )
+            per_graph: Dict[Any, CriticalPoint] = {}
+            ambiguous_graphs = 0
+            for p in self.final_cluster_points:
+                existing = per_graph.get(p.graph_id)
+                if existing is None:
+                    per_graph[p.graph_id] = p
+                    continue
+                ambiguous_graphs += 1
+                if np.linalg.norm(p.coordinates - provisional_centroid) < np.linalg.norm(
+                    existing.coordinates - provisional_centroid
+                ):
+                    per_graph[p.graph_id] = p
+            if ambiguous_graphs:
+                print(
+                    f"Start cluster ambiguity: {ambiguous_graphs} extra points dropped "
+                    f"(kept per-graph nearest to centroid)"
+                )
+            self.final_cluster_points = list(per_graph.values())
+
             centroid = np.mean(
                 [p.coordinates for p in self.final_cluster_points], axis=0
             )
@@ -395,16 +418,8 @@ class StartPointPicker:
                 CriticalPointType.INTERSECTION_POINT.value,
             ]
 
-        # Use projection onto centroid direction to find the most extreme
-        # endpoint in the centroid's direction, rather than the closest by
-        # Euclidean distance. This avoids selecting branch endpoints that
-        # happen to sit closer to the centroid than true curve endpoints.
-        centroid_norm = np.linalg.norm(centroid)
-        if centroid_norm > 0:
-            centroid_direction = centroid / centroid_norm
-        else:
-            centroid_direction = np.array([0.0, 0.0])
-
+        # Select by minimum Euclidean distance to the cluster centroid — the
+        # same rule used for the sample graphs in _sample_start_nodes.
         node_type_map = {}
         candidates = []
 
@@ -418,7 +433,7 @@ class StartPointPicker:
 
             if any(label in appropriate_labels for label in node_labels):
                 node_coords = np.array([norm_x, norm_y])
-                projection = np.dot(node_coords, centroid_direction)
+                distance = float(np.linalg.norm(node_coords - centroid))
                 node_type = None
                 for label_type in [
                     CriticalPointType.INTERSECTION_POINT.value,
@@ -430,25 +445,24 @@ class StartPointPicker:
                         node_type = label_type
                         break
                 node_type_map[node_id] = node_type
-                candidates.append((node_id, projection))
+                candidates.append((node_id, distance))
 
         if self.structure_type == "Closed":
             exp_deg = self.expected_start_degree
             candidates.sort(
                 key=lambda x: (
-                    self.TYPE_PRIORITY.get(node_type_map.get(x[0]), 0),
-                    -abs(graph.degree(x[0]) - exp_deg) if exp_deg is not None else 0,
+                    -self.TYPE_PRIORITY.get(node_type_map.get(x[0]), 0),
+                    abs(graph.degree(x[0]) - exp_deg) if exp_deg is not None else 0,
                     x[1],
-                ),
-                reverse=True,
+                )
             )
         else:
-            candidates.sort(key=lambda x: x[1], reverse=True)
+            candidates.sort(key=lambda x: x[1])
 
         if candidates:
             return candidates[0][0]
 
-        # Fallback: find the most extreme critical point of any type
+        # Fallback: nearest critical point of any type
         fallback_candidates = []
         for node_id, data in graph.nodes(data=True):
             node_labels = data.get("labels", [])
@@ -457,10 +471,10 @@ class StartPointPicker:
                 norm_y = data.get("normalized_y")
                 if norm_x is not None and norm_y is not None:
                     node_coords = np.array([norm_x, norm_y])
-                    projection = np.dot(node_coords, centroid_direction)
-                    fallback_candidates.append((node_id, projection))
+                    distance = float(np.linalg.norm(node_coords - centroid))
+                    fallback_candidates.append((node_id, distance))
 
-        fallback_candidates.sort(key=lambda x: x[1], reverse=True)
+        fallback_candidates.sort(key=lambda x: x[1])
         if fallback_candidates:
             print(
                 f"Warning: No points with appropriate labels found. Using any critical point."

@@ -1,4 +1,5 @@
 import logging
+import os
 from typing import Any, List, Tuple, Set, FrozenSet, Dict
 import networkx as nx
 import collections
@@ -15,6 +16,16 @@ class SyncedTraversalGenerator:
         self.logger.setLevel(logging.DEBUG)
         self.similarity_calculator = NodeSimilarityCalculator()
         self.critical_point_types = critical_point_types
+        self.max_pair_distance = float(
+            os.getenv("CONCEPT_PAIR_DISTANCE_THRESHOLD", "0.35")
+        )
+
+    def _pair_distance(self, node_c_data: Dict, node_i_data: Dict) -> float:
+        c_x = self._get_node_coord(node_c_data, "x")
+        c_y = self._get_node_coord(node_c_data, "y")
+        i_x = self._get_node_coord(node_i_data, "x")
+        i_y = self._get_node_coord(node_i_data, "y")
+        return float(np.sqrt((c_x - i_x) ** 2 + (c_y - i_y) ** 2))
 
     def generate_synced_traversal(
         self, G_c: nx.Graph, G_i: nx.Graph
@@ -200,6 +211,17 @@ class SyncedTraversalGenerator:
                 completed_paths.add(path_id)
                 continue
 
+            pair_distance = self._pair_distance(
+                G_c.nodes[next_c_critical_point], G_i.nodes[next_i_critical_point]
+            )
+            if pair_distance > self.max_pair_distance:
+                self.logger.info(
+                    f"Path {path_id} ending: spatial mismatch {pair_distance:.2f} for pair "
+                    f"({next_c_critical_point}, {next_i_critical_point})"
+                )
+                completed_paths.add(path_id)
+                continue
+
             next_pair = (next_c_critical_point, next_i_critical_point)
 
             segment = frozenset([current_pair, next_pair])
@@ -225,8 +247,6 @@ class SyncedTraversalGenerator:
             if next_pair not in visited:
                 visited[next_pair] = set()
             visited[next_pair].add(path_id)
-
-            visited[(next_c_critical_point, next_i_critical_point)] = {path_id}
 
             # Add the next critical points to the queue
             queue.append(
@@ -336,6 +356,15 @@ class SyncedTraversalGenerator:
             if len(c_group) == 1 and len(i_group) == 1:
                 exit_c, dest_c = c_group[0]
                 exit_i, dest_i = i_group[0]
+                pair_distance = self._pair_distance(
+                    G_c.nodes[exit_c], G_i.nodes[exit_i]
+                )
+                if pair_distance > self.max_pair_distance:
+                    self.logger.info(
+                        f"Rejecting branch of type {cp_type}: spatial mismatch "
+                        f"{pair_distance:.2f} for exits ({exit_c}, {exit_i})"
+                    )
+                    continue
                 matched.append((dest_c, dest_i, exit_c, exit_i))
                 self.logger.debug(
                     f"Matched unique branch of type {cp_type}: {dest_c} -> {dest_i}"
@@ -364,6 +393,12 @@ class SyncedTraversalGenerator:
                     exit_c, dest_c = c_group[r]
                     exit_i, dest_i = i_group[c_idx]
                     sim = similarity_matrix[r, c_idx]
+                    if distance_matrix[r, c_idx] > self.max_pair_distance:
+                        self.logger.info(
+                            f"Rejecting branch of type {cp_type}: spatial mismatch "
+                            f"{distance_matrix[r, c_idx]:.2f} for exits ({exit_c}, {exit_i})"
+                        )
+                        continue
                     matched.append((dest_c, dest_i, exit_c, exit_i))
                     self.logger.debug(
                         f"Matched branch of type {cp_type} (similarity={sim:.2f}): "
