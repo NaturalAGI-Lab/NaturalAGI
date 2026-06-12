@@ -101,3 +101,16 @@ def test_step_figure_animated_frames():
     assert len(fig.data) == 8           # same traces, lines hidden in base
     assert len(fig.frames) == 3          # 0, 1, 2 pairs revealed
     assert all(not t.visible for t in fig.data[6:])
+
+
+def test_range_evolution_figure():
+    steps = [
+        {"step": 1, "image_id": "a", "description": "", "concept_after": GRAPH},
+        {"step": 2, "image_id": "b", "description": "", "concept_after": GRAPH},
+    ]
+    fig = plotting.range_evolution_figure(steps)
+    # 1 mean trace + per-node traces for top widest final nodes (2 nodes here)
+    assert len(fig.data) == 3
+    assert fig.data[0].name == "mean_xy_width"
+    # SUSPECT threshold rendered as a horizontal line shape
+    assert any(s.type == "line" for s in fig.layout.shapes)

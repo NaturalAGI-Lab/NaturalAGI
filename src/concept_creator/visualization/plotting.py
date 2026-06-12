@@ -220,3 +220,26 @@ def step_figure(step: dict, merge_events: list[dict], animate: bool = False) -> 
         plot_bgcolor="white",
     )
     return fig
+
+
+def range_evolution_figure(steps: list[dict], k_widest: int = 5) -> go.Figure:
+    xs = [s["step"] for s in steps]
+    means = [mean_xy_width(s["concept_after"]) for s in steps]
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(x=xs, y=means, mode="lines+markers",
+                             name="mean_xy_width", line=dict(width=3)))
+
+    final = steps[-1]["concept_after"]
+    for node_id, _ in widest_nodes(final, k=k_widest):
+        ys = []
+        for s in steps:
+            node = _node_props(s["concept_after"], node_id)
+            ys.append(node_xy_width(node) if node else None)
+        fig.add_trace(go.Scatter(x=xs, y=ys, mode="lines",
+                                 name=f"node {node_id}", line=dict(dash="dot")))
+
+    fig.add_hline(y=SUSPECT_WIDTH, line_color="red", line_dash="dash",
+                  annotation_text=f"SUSPECT >= {SUSPECT_WIDTH}")
+    fig.update_layout(xaxis_title="step", yaxis_title="xy range width",
+                      height=420, margin=dict(l=10, r=10, t=30, b=10))
+    return fig
