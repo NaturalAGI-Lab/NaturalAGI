@@ -126,7 +126,8 @@ class CriticalPointConceptService:
                     "Error finding max common minor for image %s, skipping", image_id
                 )
                 skipped_images.append(image_id)
-                self.repository.remove_image_data(image_id)
+                if not debug_mode:
+                    self.repository.remove_image_data(image_id)
                 steps_debug.append(
                     ConceptFormationStep(
                         current_concept=concept_old,
