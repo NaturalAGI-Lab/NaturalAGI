@@ -205,10 +205,10 @@ def step_figure(step: dict, merge_events: list[dict], animate: bool = False) -> 
         fig.update_layout(updatemenus=[dict(
             type="buttons", x=0.0, y=1.5,
             buttons=[
-                dict(label="Play", method="animate",
+                dict(label="▶ Play", method="animate",
                      args=[None, {"frame": {"duration": 600, "redraw": False},
                                   "fromcurrent": True}]),
-                dict(label="Pause", method="animate",
+                dict(label="⏸ Pause", method="animate",
                      args=[[None], {"mode": "immediate"}]),
             ],
         )])
@@ -239,7 +239,7 @@ def range_evolution_figure(steps: list[dict], k_widest: int = 5) -> go.Figure:
                                  name=f"node {node_id}", line=dict(dash="dot")))
 
     fig.add_hline(y=SUSPECT_WIDTH, line_color="red", line_dash="dash",
-                  annotation_text=f"SUSPECT >= {SUSPECT_WIDTH}")
+                  annotation_text=f"SUSPECT ≥ {SUSPECT_WIDTH}")
     fig.update_layout(xaxis_title="step", yaxis_title="xy range width",
                       height=420, margin=dict(l=10, r=10, t=30, b=10))
     return fig
