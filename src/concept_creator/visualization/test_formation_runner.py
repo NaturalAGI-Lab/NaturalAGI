@@ -45,3 +45,24 @@ def test_payload_mismatch_events(flipped_payload):
 
 def test_payload_contains_only_plain_types(flipped_payload):
     _assert_plain(flipped_payload)
+
+
+def test_step_advancer_increments_before_delegating():
+    from unittest.mock import MagicMock
+
+    from visualization.formation_runner import attach_step_advancer
+
+    service = MagicMock()
+    step_ref = [1]
+    seen = []
+
+    def fake_merge(*args, **kwargs):
+        seen.append(step_ref[0])
+        return "merged"
+
+    service.graph_minor_finder.find_max_common_minor = fake_merge
+    attach_step_advancer(service, step_ref)
+    assert service.graph_minor_finder.find_max_common_minor("g", "h") == "merged"
+    assert service.graph_minor_finder.find_max_common_minor("g2", "h2") == "merged"
+    assert seen == [2, 3]
+    assert step_ref[0] == 3

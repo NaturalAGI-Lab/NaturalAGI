@@ -76,6 +76,17 @@ def _mean_xy_width(concept: nx.Graph) -> float:
     return sum(widths) / len(widths) if widths else 0.0
 
 
+def attach_step_advancer(service, step_ref: list[int]) -> None:
+    """Neo4j mode has no _run_offline loop; tick the step counter per merge call."""
+    original = service.graph_minor_finder.find_max_common_minor
+
+    def advancing_find_max_common_minor(*args, **kwargs):
+        step_ref[0] += 1
+        return original(*args, **kwargs)
+
+    service.graph_minor_finder.find_max_common_minor = advancing_find_max_common_minor
+
+
 def build_payload(result, recorder, params: dict, duration_s: float) -> dict:
     steps = []
     for st in result.steps_debug:
@@ -140,7 +151,8 @@ def run_neo4j_session(session_id: str, steps, mismatch_threshold: float) -> dict
 
     recorder = ProgressRecorder(mismatch_threshold=mismatch_threshold)
     service = CriticalPointConceptService(uri, user, pwd)
-    attach_instrumentation(service, recorder)
+    step_ref = attach_instrumentation(service, recorder)
+    attach_step_advancer(service, step_ref)
     result = service.create_concept_incrementally(
         session_id, concept_id=f"viz_{session_id}", steps=steps, debug_mode=True
     )
