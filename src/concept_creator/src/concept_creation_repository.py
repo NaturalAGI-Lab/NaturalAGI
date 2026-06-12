@@ -72,7 +72,6 @@ class ConceptCreationRepository:
         query = """
             MATCH (n {session_id: $session_id})
             RETURN DISTINCT n.image_id AS image_id
-            ORDER BY image_id
         """
         result = tx.run(query, session_id=session_id)
         return [
@@ -106,10 +105,6 @@ class ConceptCreationRepository:
         Args:
             graph: A NetworkX graph object (Graph, DiGraph, MultiGraph, or MultiDiGraph).
         """
-        tx.run(
-            "MATCH (n {concept_id: $concept_id}) DETACH DELETE n",
-            concept_id=concept_id,
-        )
         NetworkxToNeo4j.create_structure(tx, graph, concept_id)
 
     def _remove_image_data(self, tx: ManagedTransaction, image_id: str) -> None:

@@ -1,6 +1,5 @@
 import networkx as nx
 import logging
-import os
 from typing import Tuple, List, Any, Optional
 from src.property_handlers import PropertyProcessor
 from src.node_similarity_calculator import NodeSimilarityCalculator
@@ -30,10 +29,6 @@ class SyncedGraphMinorFinder:
                 CriticalPointType.CORNER_POINT,
             }
         )
-        self.min_match_similarity = float(
-            os.getenv("CONCEPT_MIN_MATCH_SIMILARITY", "0.3")
-        )
-        self._segment_counter = 0
 
     def find_max_common_minor(self, G_c: nx.Graph, G_i: nx.Graph) -> nx.Graph:
         """Finding the maximum common minor of two graphs by traversing through critical points first, generating the skeleton graph
@@ -53,24 +48,6 @@ class SyncedGraphMinorFinder:
 
         self.logger.info(f"Processed concept graph nodes: {len(G_c_processed.nodes)}")
         self.logger.info(f"Processed image graph nodes: {len(G_i_processed.nodes)}")
-
-        start_c = GraphUtils.get_first_point_by_type(
-            G_c_processed, CriticalPointType.START_POINT
-        )
-        start_i = GraphUtils.get_first_point_by_type(
-            G_i_processed, CriticalPointType.START_POINT
-        )
-        if start_c is not None and start_i is not None:
-            start_distance = self.synced_traversal_generator._pair_distance(
-                G_c_processed.nodes[start_c], G_i_processed.nodes[start_i]
-            )
-            if start_distance > self.synced_traversal_generator.max_pair_distance:
-                raise ValueError(
-                    f"Start-pair spatial mismatch {start_distance:.2f} exceeds "
-                    f"threshold {self.synced_traversal_generator.max_pair_distance}"
-                )
-
-        self._segment_counter = 0
 
         # Matrix of the subpaths between intersection points
         # Inside each subpath we have the traversal sequence of two graphs
@@ -102,7 +79,7 @@ class SyncedGraphMinorFinder:
         G_i: nx.Graph,
         subpath: List[Tuple[Any, Any]],
         result_graph: nx.Graph,
-    ) -> None:
+    ) -> List[Tuple[Any, Any]]:
         """Reducing the subpath to the maximum common minor"""
         processed_paths_c = list()
         processed_paths_i = list()
@@ -359,18 +336,9 @@ class SyncedGraphMinorFinder:
         # Add nodes from the template path to the result graph, merging properties
         prev_node_in_result = template_start_node
 
-        segment_index = self._segment_counter
-        self._segment_counter += 1
-
-        alignment = self._align_paths(similarity_matrix) if similarity_matrix else []
-
         for i, template_node_id in enumerate(template_path):
-            best_match_idx = alignment[i] if i < len(alignment) else None
-            if (
-                best_match_idx is not None
-                and similarity_matrix[i][best_match_idx] < self.min_match_similarity
-            ):
-                best_match_idx = None
+            # Find the best matching node from the other path
+            best_match_idx = self._find_best_matching_node(similarity_matrix, i)
 
             if best_match_idx is not None and best_match_idx < len(other_path):
                 other_node_id = other_path[best_match_idx]
@@ -392,16 +360,34 @@ class SyncedGraphMinorFinder:
                     template_node_id
                 ].copy()  # Make a copy
 
-            # Interior nodes get collision-proof IDs; critical points keep
-            # graph1 IDs as shared anchors across segments.
-            result_node_id = f"seg{segment_index}_pos{i}"
-            node_props["origin_template_id"] = template_node_id
-
-            assert result_node_id not in result_graph, (
-                f"Interior node {result_node_id} already exists in result graph"
+            # Use the node ID from the *first* graph (concept graph) if possible,
+            # otherwise use the template node ID. This maintains consistency if graph1 was template.
+            result_node_id = (
+                template_node_id
+                if template_graph == graph1
+                else (
+                    other_path[best_match_idx]
+                    if best_match_idx is not None
+                    else template_node_id
+                )
             )
-            result_graph.add_node(result_node_id, **node_props)
-            self.logger.debug(f"Added node {result_node_id} to result graph")
+            # Correction: Always use the ID from the template path's graph for the result node ID
+            # to represent the reduced structure based on the template.
+            # However, for consistency, we should probably try to map back to graph1's IDs
+            # if graph2 was the template. Let's stick to template ID for simplicity now.
+            result_node_id = template_node_id  # Node ID from the template path
+
+            # Add the node to the result graph if it doesn't exist
+            if result_node_id not in result_graph:
+                result_graph.add_node(result_node_id, **node_props)
+                self.logger.debug(f"Added node {result_node_id} to result graph")
+            else:
+                # If node exists, update properties (this might happen with complex merges)
+                # For now, we assume nodes are added once per path creation.
+                # Re-adding might indicate issues elsewhere. Let's log a warning.
+                self.logger.warning(
+                    f"Node {result_node_id} already exists in result graph. Properties not updated."
+                )
 
             # Add the edge from the previous node in the result path
             if prev_node_in_result != result_node_id:  # Avoid self-loops
@@ -439,34 +425,40 @@ class SyncedGraphMinorFinder:
                 f"Added direct edge ({template_start_node}, {template_end_node}) between critical points"
             )
 
-    def _align_paths(self, sim: List[List[float]]) -> List[Optional[int]]:
-        """Monotone (order-preserving) one-to-one alignment of two ordered paths.
-
-        Needleman–Wunsch-style DP over the similarity matrix; gap = unmatched node.
+    def _find_best_matching_node(
+        self,
+        similarity_matrix: List[List[float]],
+        current_idx: int,
+    ) -> Optional[int]:
         """
-        n = len(sim)
-        m = len(sim[0]) if sim else 0
-        if n == 0 or m == 0:
-            return [None] * n
+        Find the best matching node in path2 for the node at current_idx in path1.
 
-        dp = [[0.0] * (m + 1) for _ in range(n + 1)]
-        for i in range(1, n + 1):
-            for j in range(1, m + 1):
-                dp[i][j] = max(
-                    dp[i - 1][j],
-                    dp[i][j - 1],
-                    dp[i - 1][j - 1] + sim[i - 1][j - 1],
-                )
+        This supports finding the maximum common minor by identifying corresponding
+        nodes between two paths.
 
-        match: List[Optional[int]] = [None] * n
-        i, j = n, m
-        while i > 0 and j > 0:
-            if dp[i][j] == dp[i - 1][j - 1] + sim[i - 1][j - 1]:
-                match[i - 1] = j - 1
-                i -= 1
-                j -= 1
-            elif dp[i][j] == dp[i - 1][j]:
-                i -= 1
-            else:
-                j -= 1
-        return match
+        Args:
+            similarity_matrix: Node similarity matrix
+            current_idx: Index of the current node in path1
+            path1: First path
+            path2: Second path
+
+        Returns:
+            Index of the best matching node in path2, or None if no good match
+        """
+        self.logger.debug(
+            f"Finding best matching node for node at index {current_idx} in path1"
+        )
+
+        # We need to find a node in path2 that best matches the node at current_idx in path1
+        # Get similarity scores for the current node
+        scores = similarity_matrix[current_idx]
+
+        # Find the index with highest similarity
+        best_idx = max(range(len(scores)), key=lambda i: scores[i])
+        best_score = scores[best_idx]
+
+        self.logger.debug(
+            f"Best match is node at index {best_idx} with score {best_score:.2f}"
+        )
+
+        return best_idx

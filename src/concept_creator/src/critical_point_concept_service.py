@@ -181,7 +181,7 @@ class CriticalPointConceptService:
         MAX_ITERATIONS = 15
         start_clustering_eps = 0.01
         eps_step = 0.05
-        min_samples_coefficient = np.arange(0.4, 0.8, 0.1)
+        min_samples_coefficient = np.arange(0.4, 0.8)
         clustering_algorithm = "optics"
         start_point_characteristic = None
 
