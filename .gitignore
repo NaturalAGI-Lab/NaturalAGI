@@ -203,3 +203,9 @@ fin_prog/
 
 # Local student projects (live in this workspace, not part of the repo)
 student_projects/
+
+# /goal autonomous-run state (improve-accuracy skill)
+.goal_state/
+
+# Formation viz run cache
+src/concept_creator/visualization/output/
