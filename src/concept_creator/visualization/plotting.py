@@ -98,3 +98,125 @@ def widening_history(steps: list[dict], node_id) -> list[dict]:
         if cur:
             prev = cur
     return history
+
+
+def _edge_trace(graph: dict, pos: dict) -> go.Scatter:
+    xs, ys = [], []
+    for link in graph["links"]:
+        a, b = pos.get(link["source"]), pos.get(link["target"])
+        if a is None or b is None:
+            continue
+        xs += [a[0], b[0], None]
+        ys += [a[1], b[1], None]
+    return go.Scatter(x=xs, y=ys, mode="lines",
+                      line=dict(color="gray", width=1.5),
+                      opacity=0.6, hoverinfo="skip", showlegend=False)
+
+
+def _hover_text(node: dict) -> str:
+    lines = [f"<b>{node['id']}</b>", ", ".join(node.get("labels", []))]
+    for key, value in node.items():
+        if key in ("id", "labels"):
+            continue
+        if isinstance(value, dict) and "min" in value:
+            lines.append(f"{key}: [{value['min']:.3f}, {value['max']:.3f}]")
+        else:
+            lines.append(f"{key}: {value}")
+    return "<br>".join(lines)
+
+
+def _node_trace(graph: dict, pos: dict) -> go.Scatter:
+    ids = [n["id"] for n in graph["nodes"]]
+    return go.Scatter(
+        x=[pos[i][0] for i in ids], y=[pos[i][1] for i in ids],
+        mode="markers+text", text=[str(i) for i in ids],
+        textposition="top center", textfont=dict(size=8),
+        marker=dict(size=14, color=[node_color(n) for n in graph["nodes"]]),
+        hovertext=[_hover_text(n) for n in graph["nodes"]],
+        hoverinfo="text", showlegend=False,
+    )
+
+
+def _nearest(pos: dict, tx: float, ty: float):
+    best, best_d = None, float("inf")
+    for nid, (px, py) in pos.items():
+        d = (px - tx) ** 2 + (py - ty) ** 2
+        if d < best_d:
+            best, best_d = nid, d
+    return best
+
+
+def _correspondence_pairs(merge_events: list[dict], pos_before: dict,
+                          pos_sample: dict) -> list[dict]:
+    pairs = []
+    for ev in merge_events:
+        if ev.get("type") != "merge":
+            continue
+        a = _nearest(pos_before, ev.get("g_x", 0.0), -ev.get("g_y", 0.0))
+        b = _nearest(pos_sample, ev.get("h_x", 0.0) + PANEL_OFFSET, -ev.get("h_y", 0.0))
+        if a is None or b is None:
+            continue
+        pairs.append({"a": pos_before[a], "b": pos_sample[b],
+                      "mismatch": bool(ev.get("mismatch")),
+                      "distance": ev.get("distance", 0.0)})
+    return pairs
+
+
+def _pair_trace(pair: dict, visible: bool = True) -> go.Scatter:
+    color = "red" if pair["mismatch"] else "lightgray"
+    width = 2.0 if pair["mismatch"] else 0.8
+    return go.Scatter(
+        x=[pair["a"][0], pair["b"][0]], y=[pair["a"][1], pair["b"][1]],
+        mode="lines", line=dict(color=color, width=width), opacity=0.7,
+        visible=visible, hoverinfo="text",
+        hovertext=f"distance={pair['distance']:.3f}", showlegend=False,
+    )
+
+
+def step_figure(step: dict, merge_events: list[dict], animate: bool = False) -> go.Figure:
+    panels = [
+        ("Concept (before)", step["concept_before"], 0.0),
+        ("Sample", step["sample"], PANEL_OFFSET),
+        ("Merged result", step["concept_after"], 2 * PANEL_OFFSET),
+    ]
+    base, annotations, positions = [], [], {}
+    for title, graph, off in panels:
+        pos = node_positions(graph, off)
+        positions[title] = pos
+        base += [_edge_trace(graph, pos), _node_trace(graph, pos)]
+        annotations.append(dict(x=off + 0.5, y=1.4, text=f"<b>{title}</b>",
+                                showarrow=False, xanchor="center"))
+
+    pairs = _correspondence_pairs(
+        merge_events, positions["Concept (before)"], positions["Sample"]
+    )
+    lines = [_pair_trace(p, visible=not animate) for p in pairs]
+    fig = go.Figure(data=base + lines)
+
+    if animate and pairs:
+        n0 = len(base)
+        line_idx = list(range(n0, n0 + len(pairs)))
+        fig.frames = [
+            go.Frame(name=str(k), traces=line_idx,
+                     data=[_pair_trace(p, visible=(j < k))
+                           for j, p in enumerate(pairs)])
+            for k in range(len(pairs) + 1)
+        ]
+        fig.update_layout(updatemenus=[dict(
+            type="buttons", x=0.0, y=1.5,
+            buttons=[
+                dict(label="Play", method="animate",
+                     args=[None, {"frame": {"duration": 600, "redraw": False},
+                                  "fromcurrent": True}]),
+                dict(label="Pause", method="animate",
+                     args=[[None], {"mode": "immediate"}]),
+            ],
+        )])
+
+    fig.update_layout(
+        annotations=annotations, height=480, showlegend=False,
+        margin=dict(l=10, r=10, t=60, b=10),
+        xaxis=dict(visible=False), yaxis=dict(visible=False),
+        plot_bgcolor="white",
+    )
+    return fig

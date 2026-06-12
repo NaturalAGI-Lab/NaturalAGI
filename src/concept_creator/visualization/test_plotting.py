@@ -74,3 +74,30 @@ def test_widening_history():
     assert hist[2]["image_id"] == "c"
     assert hist[2]["from_width"] == pytest.approx(0.4)
     assert hist[2]["to_width"] == pytest.approx(1.8)
+
+
+STEP = {
+    "step": 2, "description": "Image 2/3: b", "image_id": "b",
+    "concept_before": GRAPH, "sample": GRAPH, "concept_after": GRAPH,
+}
+MERGE_EVENTS = [
+    {"type": "merge", "step": 2, "g_x": 0.1, "g_y": 0.2, "h_x": 0.1, "h_y": 0.2,
+     "distance": 0.0, "mismatch": False},
+    {"type": "merge", "step": 2, "g_x": 0.5, "g_y": 0.0, "h_x": 0.1, "h_y": 0.2,
+     "distance": 0.45, "mismatch": True},
+]
+
+
+def test_step_figure_static_trace_count():
+    fig = plotting.step_figure(STEP, MERGE_EVENTS, animate=False)
+    # 3 panels x (edge trace + node trace) + 2 correspondence lines
+    assert len(fig.data) == 8
+    line_colors = [t.line.color for t in fig.data[6:]]
+    assert "red" in line_colors
+
+
+def test_step_figure_animated_frames():
+    fig = plotting.step_figure(STEP, MERGE_EVENTS, animate=True)
+    assert len(fig.data) == 8           # same traces, lines hidden in base
+    assert len(fig.frames) == 3          # 0, 1, 2 pairs revealed
+    assert all(not t.visible for t in fig.data[6:])
