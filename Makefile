@@ -219,6 +219,9 @@ unpack_dataset:
 dashboard:
 	cd src/training && streamlit run dashboard.py --server.port 8501
 
+formation_viz:
+	cd src/concept_creator && ../../natural-agi/bin/python -m streamlit run visualization/formation_viz_app.py --server.port 8502
+
 help:
 	@echo "Available targets:"
 	@echo "  all                - Deploy functions, create Kafka topics, and run training (default)"
