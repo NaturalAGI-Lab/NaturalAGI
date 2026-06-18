@@ -139,18 +139,18 @@ One per `generate_synced_traversal` call.
 | `num_mismatches` | int | Pairs with mismatch flag |
 
 ### `segment_match`
-Fired inside `_find_best_matching_node` for each row of the similarity matrix.
+Fired once per aligned pair returned by `align_monotone_one_to_one` (monotone 1:1).
 
 | field | type | description |
 |---|---|---|
 | `type` | `"segment_match"` | |
 | `step` | int | |
-| `row_idx` | int | Row (template node index) |
-| `best_idx` | int | Column with highest score |
+| `row_idx` | int | Concept-side (A) node index |
+| `best_idx` | int | Matched image-side (B) node index |
 | `best_score` | float | |
 | `row_scores` | list[float] | All column scores for this row |
-| `crossing` | bool | `True` when best_idx < previous best_idx (non-monotone) |
-| `many_to_one` | bool | `True` when best_idx already used by an earlier row |
+| `crossing` | bool | Always `False` (alignment is monotone by construction) |
+| `many_to_one` | bool | Always `False` (alignment is 1:1 by construction) |
 
 ### `start_point`
 Fired in `StartPointModifier.change_start_point` BEFORE labels are cleared.

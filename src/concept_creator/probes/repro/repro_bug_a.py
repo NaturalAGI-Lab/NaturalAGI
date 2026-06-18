@@ -1,23 +1,10 @@
 """
-Repro for Bug A: cross-graph node-ID collision in _create_reduced_path_in_result.
+Bug A (FIXED): cross-graph node-ID collision in _create_reduced_path_in_result.
 
-Shows that when graph2 (image) is shorter than graph1 (concept),
-the template becomes graph2 and template_node_id values come from
-image-graph IDs (0,1,2,...).  If the concept graph also has those
-same integer IDs (it always does — both graphs use sequential Neo4j
-integer IDs starting at 0), then:
-
-  result_node_id = template_node_id   (line 378 hard-overrides)
-
-... so the result graph ends up with ID 1 in it.  If a later
-subpath also tries to add ID 1 (because the concept path
-through a different segment also contains node 1), the code
-hits the "Node X already exists in result graph. Properties not updated."
-warning and silently keeps stale properties.
-
-We demonstrate this directly without Neo4j by building two tiny
-bipartite Point-Vector graphs with overlapping integer IDs but
-different spatial coordinates.
+Previously, when the image sub-path was shorter it became the "template" and
+result nodes were keyed by image-graph IDs (old line 378), colliding with
+concept IDs. The rewrite keys every result node by the concept-side ID, so the
+collision no longer occurs. This script now documents that fixed behavior.
 """
 import sys
 import os
@@ -144,5 +131,5 @@ print(f"Captured log output:\n{captured if captured else '(no warnings - unexpec
 print(f"\nResult graph node 1 AFTER second call (should still have first image's source):")
 print(f"  node 1: {result_graph.nodes[1]}")
 print()
-print("VERDICT: If 'source' is still 'concept' (merged with image), node 1 was not updated on second call.")
-print("The 'Properties not updated' warning would fire in real execution (log level DEBUG/WARNING).")
+print("VERDICT (fixed): node 1 is keyed by the concept ID and merged with the image node;")
+print("re-adding the same concept ID across segments is the only 'already exists' path now.")
