@@ -208,33 +208,26 @@ def _make_synced_traversal_wrapper(recorder: FormationRecorder, original, step_r
     return _wrapper
 
 
-def _make_best_match_wrapper(recorder: FormationRecorder, original, step_ref: list[int]):
-    # Baseline picks one match per template row (argmax in _find_best_matching_node);
-    # accumulate rows of the same segment to flag crossings / many-to-one as they appear.
-    state = {"matrix_id": None, "matches": []}
-
-    def _wrapper(similarity_matrix, current_idx):
-        best_idx = original(similarity_matrix, current_idx)
-        if state["matrix_id"] != id(similarity_matrix) or current_idx == 0:
-            state["matrix_id"] = id(similarity_matrix)
-            state["matches"] = []
-        state["matches"].append(best_idx)
-        used = [j for j in state["matches"] if j is not None]
-        crossing = used != sorted(used)
-        many_to_one = len(used) != len(set(used))
-        scores = list(similarity_matrix[current_idx]) if similarity_matrix else []
-        best_score = scores[best_idx] if scores and best_idx is not None else 0.0
-        recorder.emit({
-            "type": "segment_match",
-            "step": step_ref[0],
-            "row_idx": current_idx,
-            "best_idx": best_idx,
-            "best_score": round(best_score, 4),
-            "row_scores": [round(sc, 4) for sc in scores],
-            "crossing": crossing,
-            "many_to_one": many_to_one,
-        })
-        return best_idx
+def _make_align_wrapper(recorder: FormationRecorder, original, step_ref: list[int]):
+    # The monotone aligner returns all (concept_idx, image_idx) pairs for a
+    # segment at once; emit one segment_match event per pair. By construction
+    # the result is monotone and 1:1, so crossing/many_to_one are always False.
+    def _wrapper(similarity, types_a, types_b):
+        pairs = original(similarity, types_a, types_b)
+        for row_idx, col_idx in pairs:
+            row_scores = list(similarity[row_idx]) if similarity else []
+            best_score = row_scores[col_idx] if row_scores else 0.0
+            recorder.emit({
+                "type": "segment_match",
+                "step": step_ref[0],
+                "row_idx": row_idx,
+                "best_idx": col_idx,
+                "best_score": round(best_score, 4),
+                "row_scores": [round(sc, 4) for sc in row_scores],
+                "crossing": False,
+                "many_to_one": False,
+            })
+        return pairs
     return _wrapper
 
 
@@ -283,11 +276,12 @@ def attach_instrumentation(service, recorder: FormationRecorder) -> list[int]:
         recorder, original_stg, step_ref
     )
 
-    # 3. Wrap SyncedGraphMinorFinder._find_best_matching_node (baseline per-row argmax)
-    finder = service.graph_minor_finder
-    original_match = finder._find_best_matching_node
-    finder._find_best_matching_node = _make_best_match_wrapper(
-        recorder, original_match, step_ref
+    # 3. Wrap the monotone aligner (one segment_match event per aligned pair)
+    import src.synced_graph_algorithm as synced_graph_algorithm
+
+    original_align = synced_graph_algorithm.align_monotone_one_to_one
+    synced_graph_algorithm.align_monotone_one_to_one = _make_align_wrapper(
+        recorder, original_align, step_ref
     )
 
     # 4. Wrap StartPointModifier.change_start_point at class level
