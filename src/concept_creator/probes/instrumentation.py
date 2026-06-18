@@ -276,12 +276,20 @@ def attach_instrumentation(service, recorder: FormationRecorder) -> list[int]:
         recorder, original_stg, step_ref
     )
 
-    # 3. Wrap the monotone aligner (one segment_match event per aligned pair)
+    # 3. Wrap the monotone aligner (one segment_match event per aligned pair).
+    #    Store the pristine original once so repeated attach_instrumentation calls
+    #    in one process re-wrap the real aligner (not a prior wrapper), keeping
+    #    each run's segment_match events attributed to its own recorder.
     import src.synced_graph_algorithm as synced_graph_algorithm
 
-    original_align = synced_graph_algorithm.align_monotone_one_to_one
+    if not hasattr(synced_graph_algorithm, "_align_monotone_one_to_one_original"):
+        synced_graph_algorithm._align_monotone_one_to_one_original = (
+            synced_graph_algorithm.align_monotone_one_to_one
+        )
     synced_graph_algorithm.align_monotone_one_to_one = _make_align_wrapper(
-        recorder, original_align, step_ref
+        recorder,
+        synced_graph_algorithm._align_monotone_one_to_one_original,
+        step_ref,
     )
 
     # 4. Wrap StartPointModifier.change_start_point at class level
