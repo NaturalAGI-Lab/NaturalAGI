@@ -232,20 +232,27 @@ class DistanceMatrixCalculator:
         distance_matrix: np.ndarray,
         points_large: List[Any],
         difference: int,
+        orientation: Optional[str] = None,
     ) -> List[Any]:
-        """Find points to remove using orientation-agnostic order-preserving matching.
+        """Find points to remove using order-preserving matching.
 
         The monotone DP respects the sequential order of points along a path, but
         that only yields the right matching when both sequences share one traversal
         orientation. The two loops of a figure-8 can be emitted in opposite angular
         order, where the geometrically correct match is a crossing the forward DP
-        cannot express. We therefore run the DP on both orientations of the large
-        set and keep the one with the lower matched cost.
+        cannot express.
+
+        Orientation handling:
+            "forward"/"reverse" — caller decided the orientation geometrically
+                (e.g. by loop winding) and forces it.
+            None — fall back to the cost heuristic: run both orientations and keep
+                the one with the lower matched cost.
 
         Args:
             distance_matrix: Shape (m, n) where m > n. Rows = large set, cols = small set.
             points_large: Point IDs for the larger set (rows), in path order.
             difference: Number of points to remove (m - n).
+            orientation: "forward", "reverse", or None (cost-based).
 
         Returns:
             List of point IDs from points_large that were not matched.
@@ -263,7 +270,11 @@ class DistanceMatrixCalculator:
         # Reversed matches are in flipped-row space; map back to original indices.
         rev_matched = {m - 1 - i for i in rev_matched}
 
-        if rev_cost < fwd_cost:
+        if orientation == "forward":
+            matched_indices, chosen = fwd_matched, "forward(forced)"
+        elif orientation == "reverse":
+            matched_indices, chosen = rev_matched, "reverse(forced)"
+        elif rev_cost < fwd_cost:
             matched_indices, chosen = rev_matched, "reversed"
         else:
             matched_indices, chosen = fwd_matched, "forward"

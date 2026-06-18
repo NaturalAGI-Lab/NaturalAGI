@@ -1,5 +1,5 @@
 import logging
-from typing import Tuple, List, Any
+from typing import Tuple, List, Any, Optional
 
 import numpy as np
 import networkx as nx
@@ -16,6 +16,45 @@ CONCEPT = "concept"
 IMAGE = "image"
 
 PROPERTIES_TO_COMPARE = set(["normalized_x", "normalized_y", "normalized_angle"])
+
+# Below this |signed area|, a corner sequence is collinear / its winding
+# direction is undefined, so we defer the orientation choice to the cost heuristic.
+WINDING_DEGENERATE_EPS = 0.02
+
+
+def signed_area(points: List[Tuple[float, float]]) -> float:
+    """Shoelace signed area of the closed polygon through `points`.
+
+    Sign encodes winding direction: > 0 counter-clockwise, < 0 clockwise.
+    """
+    area = 0.0
+    n = len(points)
+    for i in range(n):
+        x1, y1 = points[i]
+        x2, y2 = points[(i + 1) % n]
+        area += x1 * y2 - x2 * y1
+    return area / 2.0
+
+
+def orientation_from_windings(
+    winding_large: float, winding_small: float
+) -> Optional[str]:
+    """Decide corner-matching orientation from two loop windings.
+
+    Returns "reverse" only when both sequences wind confidently (|area| >= eps)
+    in opposite directions — the counter-oriented-loop case where the monotone DP
+    must cross. Otherwise None: collinear/degenerate or co-oriented sequences keep
+    the cost-based default, so behaviour is unchanged everywhere except the
+    counter-oriented case.
+    """
+    if (
+        abs(winding_large) < WINDING_DEGENERATE_EPS
+        or abs(winding_small) < WINDING_DEGENERATE_EPS
+    ):
+        return None
+    if (winding_large > 0) != (winding_small > 0):
+        return "reverse"
+    return None
 
 class CornerPointReductionStrategy(AbstractReductionStrategy):
     """Reduces corner points in concept and image graphs to align them.
@@ -293,9 +332,16 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
         # Calculate how many corner points to remove
         difference = abs(len_concept_corner_points - len_image_corner_points)
 
+        # Decide matching orientation by loop winding: counter-oriented loops need
+        # the reversed (crossing) match the monotone DP cannot otherwise express.
+        orientation = orientation_from_windings(
+            self._sequence_winding(graph_large, points_large),
+            self._sequence_winding(graph_small, points_small),
+        )
+
         # Identify which corner points to remove using order-preserving DP matching
         points_to_remove = self.distance_matrix_calculator.find_ordered_points_for_difference(
-            distance_matrix, points_large, difference
+            distance_matrix, points_large, difference, orientation=orientation
         )
 
         if points_to_remove:
@@ -308,6 +354,27 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
                 concept_graph = self._apply_reduction(concept_graph, points_to_remove)
             else:
                 image_graph = self._apply_reduction(image_graph, points_to_remove)
+
+    def _coord(self, graph: nx.Graph, node: Any) -> Tuple[float, float]:
+        data = graph.nodes[node]
+        x = self.distance_matrix_calculator.extract_coordinate_value(data.get("normalized_x"))
+        y = self.distance_matrix_calculator.extract_coordinate_value(data.get("normalized_y"))
+        return (float(x or 0.0), float(y or 0.0))
+
+    def _anchor_coord(self, graph: nx.Graph) -> Tuple[float, float]:
+        """The critical point a loop winds around: its intersection, else its start."""
+        for node, data in graph.nodes(data=True):
+            if CriticalPointType.INTERSECTION_POINT.value in data.get("labels", []):
+                return self._coord(graph, node)
+        for node, data in graph.nodes(data=True):
+            if CriticalPointType.START_POINT.value in data.get("labels", []):
+                return self._coord(graph, node)
+        return (0.0, 0.0)
+
+    def _sequence_winding(self, graph: nx.Graph, points: List[Any]) -> float:
+        """Signed area of the corner sequence closed through the loop anchor."""
+        coords = [self._coord(graph, node) for node in points]
+        return signed_area([self._anchor_coord(graph)] + coords)
 
     def _get_corner_points(self, graph: nx.Graph) -> List[Any]:
         """Get all corner points in a graph."""

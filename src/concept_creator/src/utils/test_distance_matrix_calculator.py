@@ -45,6 +45,26 @@ def test_co_oriented_sequence_preserves_forward_choice():
     assert removed == ["Z"]
 
 
+def test_orientation_param_forces_chosen_direction():
+    """The strategy decides orientation geometrically (winding) and passes it in;
+    the DP must honour a forced orientation, and default to cost-min when None.
+
+    Real concept-6 / b2f649f1 loop matrix (rows=image corners, cols=concept):
+    forward is cheaper (0.6116) so cost-min drops node2 — but the loops are
+    counter-oriented, so winding forces 'reverse' and drops node3 (correct).
+    """
+    calc = _calc()
+    dm = np.array([[0.202, 0.379, 0.278],   # node3
+                   [0.219, 0.318, 0.198],   # 207514122
+                   [0.085, 0.270, 0.091],   # -10503959
+                   [0.145, 0.169, 0.262]])  # node2
+    large = ["node3", "207514122", "-10503959", "node2"]
+
+    assert calc.find_ordered_points_for_difference(dm, large, 1) == ["node2"]
+    assert calc.find_ordered_points_for_difference(dm, large, 1, orientation="forward") == ["node2"]
+    assert calc.find_ordered_points_for_difference(dm, large, 1, orientation="reverse") == ["node3"]
+
+
 def test_removes_requested_count():
     """difference=2 removes exactly two points, keeping the best monotone pair
     under whichever orientation is cheaper."""
