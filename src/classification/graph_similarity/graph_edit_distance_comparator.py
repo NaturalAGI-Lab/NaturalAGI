@@ -69,16 +69,27 @@ class GraphEditDistanceComparator:
             return
         node_path, edge_path = paths[0]
         ops = build_edit_operations(node_path, edge_path, image_graph, concept_graph)
-        node_total = sum(o["cost"] for o in ops if o["kind"] == "node")
-        edge_total = sum(o["cost"] for o in ops if o["kind"] == "edge")
+        node_ops = [o for o in ops if o["kind"] == "node"]
+        edge_ops = [o for o in ops if o["kind"] == "edge"]
+        node_total = sum(o["cost"] for o in node_ops)
+        edge_total = sum(o["cost"] for o in edge_ops)
         logger.info("=" * 60)
         logger.info("GRAPH EDIT DISTANCE OPERATIONS")
-        for o in ops:
+        logger.info("NODE OPERATIONS:")
+        logger.info("-" * 60)
+        for o in node_ops:
             logger.info(
                 f"{o['op']:<12} {str(o['image_ref']):<16} "
                 f"{str(o['concept_ref']):<16} {o['cost']:<8} {o['reason']}"
             )
         logger.info(f"TOTAL NODE COST: {node_total}")
+        logger.info("EDGE OPERATIONS:")
+        logger.info("-" * 60)
+        for o in edge_ops:
+            logger.info(
+                f"{o['op']:<12} {str(o['image_ref']):<16} "
+                f"{str(o['concept_ref']):<16} {o['cost']:<8} {o['reason']}"
+            )
         logger.info(f"TOTAL EDGE COST: {edge_total}")
         logger.info(f"TOTAL COST: {node_total + edge_total}")
         logger.info("=" * 60)
