@@ -10,6 +10,7 @@ if str(_CLASSIFICATION) not in sys.path:
     sys.path.insert(0, str(_CLASSIFICATION))
 
 from repository.image_repository import ImageRepository
+from repository.concept_repository import ConceptRepository
 from concept_minor_classifier import ConceptMinorClassifier
 from graph_similarity.graph_edit_distance_comparator import (
     GraphEditDistanceComparator,
@@ -43,6 +44,10 @@ def get_image_graph_if_present(driver, image_id: str):
     if graph is None or graph.number_of_nodes() == 0:
         return None
     return graph
+
+
+def get_concept_graph(driver, concept_id: str):
+    return ConceptRepository(driver).get_concept_graph(concept_id)
 
 
 def expected_concepts(all_concept_ids, classification_results, expected_class) -> list:

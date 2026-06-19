@@ -155,7 +155,7 @@ def cached_breakdown(run: str, image_id: str, concept_id: str) -> dict | None:
     graph = ged_breakdown.get_image_graph_if_present(get_driver(), image_id)
     if graph is None:
         return None
-    concept_graph = load_concept_graph(concept_id)["graph"]
+    concept_graph = ged_breakdown.get_concept_graph(get_driver(), concept_id)
     return ged_breakdown.compute_breakdown(graph, concept_id, concept_graph)
 
 

@@ -36,6 +36,17 @@ def test_get_image_graph_if_present_returns_none_on_empty(monkeypatch):
     assert ged_breakdown.get_image_graph_if_present(None, "img1") is None
 
 
+def test_get_concept_graph_delegates_to_repo(monkeypatch):
+    sentinel = nx.Graph()
+    sentinel.add_node(1)
+    fake_repo = type("R", (), {
+        "get_concept_graph": lambda self, cid: sentinel,
+    })
+    monkeypatch.setattr(ged_breakdown, "ConceptRepository", lambda driver: fake_repo())
+    result = ged_breakdown.get_concept_graph(None, "1_1")
+    assert result is sentinel
+
+
 def test_run_ged_breakdown_returns_payload():
     out = ged_breakdown._run_ged_breakdown(_node_graph(2), _node_graph(2), "7_1", 5.0)
     assert set(out) == {"image_nodelink", "concept_nodelink", "edit_ops",
