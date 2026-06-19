@@ -143,3 +143,38 @@ class GraphEditDistanceComparator:
         except Exception as e:
             logging.error(f"Error calculating GED: {str(e)}", exc_info=True)
             return 0.0
+
+    @staticmethod
+    def compare_graphs_ged_with_path(
+        image_graph: nx.Graph,
+        concept_graph: nx.Graph,
+        concept_name: str,
+        ged_timeout: float,
+    ):
+        best = None
+        try:
+            for node_path, edge_path, cost in nx.optimize_edit_paths(
+                image_graph,
+                concept_graph,
+                node_subst_cost=node_subst_cost,
+                node_del_cost=node_del_cost,
+                node_ins_cost=node_ins_cost,
+                edge_match=edge_match,
+                edge_del_cost=edge_del_cost,
+                edge_ins_cost=edge_ins_cost,
+                timeout=ged_timeout,
+            ):
+                best = (node_path, edge_path, cost)
+        except Exception as e:
+            logging.error(f"Error calculating GED path for {concept_name}: {e}",
+                          exc_info=True)
+            return 0.0, 0.0, [], []
+
+        if best is None:
+            return 0.0, 0.0, [], []
+
+        node_path, edge_path, cost = best
+        n1 = image_graph.number_of_nodes() + image_graph.number_of_edges()
+        n2 = concept_graph.number_of_nodes() + concept_graph.number_of_edges()
+        similarity = round(1.0 - (cost / (cost + max(n1, n2, 1))), 4)
+        return similarity, cost, node_path, edge_path
