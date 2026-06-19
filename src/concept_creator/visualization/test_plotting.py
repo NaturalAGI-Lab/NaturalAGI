@@ -223,3 +223,38 @@ def test_range_evolution_figure():
     assert fig.layout.plot_bgcolor == plotting.PLOT_BG
     # SUSPECT threshold rendered as a horizontal line shape
     assert any(s.type == "line" for s in fig.layout.shapes)
+
+
+import plotting
+
+
+def _payload(prefix):
+    return {
+        "nodes": [
+            {"id": f"{prefix}1", "labels": ["Point", "EndPoint"],
+             "normalized_x": 0.2, "normalized_y": 0.3},
+            {"id": f"{prefix}2", "labels": ["Point", "CornerPoint"],
+             "normalized_x": 0.6, "normalized_y": 0.7},
+        ],
+        "links": [{"source": f"{prefix}1", "target": f"{prefix}2"}],
+    }
+
+
+def test_cost_color_bands():
+    assert plotting.cost_color(0.0) == "#22c55e"
+    assert plotting.cost_color(10.0) == "#f87171"
+    assert plotting.cost_color(0.7) != plotting.cost_color(0.0)
+
+
+def test_comparison_figure_trace_count():
+    img = _payload("i")
+    con = _payload("c")
+    edit_ops = [
+        {"kind": "node", "op": "MATCH", "image_ref": "i1",
+         "concept_ref": "c1", "cost": 0.0, "reason": ""},
+        {"kind": "node", "op": "DELETE", "image_ref": "i2",
+         "concept_ref": None, "cost": 0.65, "reason": "no slot"},
+    ]
+    fig = plotting.comparison_figure(img, con, edit_ops)
+    # 2 edge + 2 node base traces, 1 correspondence line, 1 halo trace
+    assert len(fig.data) == 6

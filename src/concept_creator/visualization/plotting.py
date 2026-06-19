@@ -402,6 +402,83 @@ def step_figure(step: dict, correspondence_events: list[dict],
     return fig
 
 
+def cost_color(cost: float) -> str:
+    if cost <= 0.0:
+        return "#22c55e"   # match
+    if cost < 0.34:
+        return "#86efac"   # minor
+    if cost < 0.67:
+        return "#f59e0b"   # general
+    if cost < 1.0:
+        return "#fb7185"   # severe
+    return "#f87171"       # no-match / impossible
+
+
+def comparison_figure(image_graph: dict, concept_graph: dict,
+                      edit_ops: list, *, height: int = 420) -> go.Figure:
+    # Base traces index pos by the RAW node id (may be int); edit_ops refs are
+    # stringified, so keep a separate str-keyed lookup for matching them.
+    pos_img_raw = node_positions(image_graph, 0.0)
+    pos_con_raw = node_positions(concept_graph, PANEL_OFFSET)
+
+    base = [
+        _edge_trace(image_graph, pos_img_raw), _node_trace(image_graph, pos_img_raw),
+        _edge_trace(concept_graph, pos_con_raw), _node_trace(concept_graph, pos_con_raw),
+    ]
+
+    pos_img = {str(k): v for k, v in pos_img_raw.items()}
+    pos_con = {str(k): v for k, v in pos_con_raw.items()}
+
+    lines, halo_x, halo_y = [], [], []
+    for op in edit_ops:
+        if op.get("kind") != "node":
+            continue
+        if op["op"] in ("MATCH", "SUBSTITUTE"):
+            a = pos_img.get(str(op["image_ref"]))
+            b = pos_con.get(str(op["concept_ref"]))
+            if a and b:
+                lines.append(go.Scatter(
+                    x=[a[0], b[0]], y=[a[1], b[1]], mode="lines",
+                    line=dict(color=cost_color(op["cost"]), width=2.2),
+                    opacity=0.6, hoverinfo="text",
+                    hovertext=f"{op['reason']} · cost={op['cost']:.2f}",
+                    showlegend=False))
+        elif op["op"] == "DELETE":
+            p = pos_img.get(str(op["image_ref"]))
+            if p:
+                halo_x.append(p[0]); halo_y.append(p[1])
+        elif op["op"] == "INSERT":
+            p = pos_con.get(str(op["concept_ref"]))
+            if p:
+                halo_x.append(p[0]); halo_y.append(p[1])
+
+    halo = []
+    if halo_x:
+        halo = [go.Scatter(
+            x=halo_x, y=halo_y, mode="markers",
+            marker=dict(size=22, color="rgba(0,0,0,0)",
+                        line=dict(color="#f87171", width=1.6)),
+            hoverinfo="skip", showlegend=False)]
+
+    fig = go.Figure(data=base + lines + halo)
+    offsets = [0.0, PANEL_OFFSET]
+    x_range = [min(offsets) - PANEL_HALF_WIDTH - 0.16,
+               max(offsets) + PANEL_HALF_WIDTH + 0.16]
+    y_range = [-PANEL_HALF_HEIGHT - 0.12, PANEL_HALF_HEIGHT + 0.12]
+    _figure_layout(fig, height=height, margin=dict(l=12, r=12, t=40, b=20),
+                   x_range=x_range, y_range=y_range)
+    annotations = [
+        dict(x=0.0, y=1.04, xref="x", yref="paper", text="<b>Image</b>",
+             showarrow=False, xanchor="center", yanchor="bottom",
+             font=dict(color=TEXT, size=12)),
+        dict(x=PANEL_OFFSET, y=1.04, xref="x", yref="paper",
+             text="<b>Expected concept</b>", showarrow=False,
+             xanchor="center", yanchor="bottom", font=dict(color=TEXT, size=12)),
+    ]
+    fig.update_layout(annotations=annotations, shapes=_panel_shapes(offsets))
+    return fig
+
+
 def range_evolution_figure(steps: list[dict], k_widest: int = 5) -> go.Figure:
     xs = [s["step"] for s in steps]
     means = [mean_xy_width(s["concept_after"]) for s in steps]
