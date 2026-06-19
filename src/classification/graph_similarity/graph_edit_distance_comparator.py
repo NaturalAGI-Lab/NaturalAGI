@@ -63,6 +63,10 @@ def build_edit_operations(node_path, edge_path, image_graph, concept_graph) -> l
 
 class GraphEditDistanceComparator:
     @staticmethod
+    def _similarity(cost: float, n1: int, n2: int) -> float:
+        return round(1.0 - (cost / (cost + max(n1, n2, 1))), 4)
+
+    @staticmethod
     def log_edit_operations(paths, image_graph: nx.Graph, concept_graph: nx.Graph):
         if not paths:
             logger.info("No edit paths found")
@@ -133,8 +137,7 @@ class GraphEditDistanceComparator:
 
             n1 = image_graph.number_of_nodes() + image_graph.number_of_edges()
             n2 = concept_graph.number_of_nodes() + concept_graph.number_of_edges()
-            similarity = 1.0 - (best_cost / (best_cost + max(n1, n2, 1)))
-            similarity = round(similarity, 4)
+            similarity = GraphEditDistanceComparator._similarity(best_cost, n1, n2)
             logging.info(
                 f"GED: {best_cost}, n1: {n1}, n2: {n2}, similarity: {similarity}"
             )
@@ -150,7 +153,7 @@ class GraphEditDistanceComparator:
         concept_graph: nx.Graph,
         concept_name: str,
         ged_timeout: float,
-    ):
+    ) -> tuple[float, float, list, list]:
         best = None
         try:
             for node_path, edge_path, cost in nx.optimize_edit_paths(
@@ -168,7 +171,7 @@ class GraphEditDistanceComparator:
         except Exception as e:
             logging.error(f"Error calculating GED path for {concept_name}: {e}",
                           exc_info=True)
-            return 0.0, 0.0, [], []
+            # fall through — use best-so-far if any
 
         if best is None:
             return 0.0, 0.0, [], []
@@ -176,5 +179,5 @@ class GraphEditDistanceComparator:
         node_path, edge_path, cost = best
         n1 = image_graph.number_of_nodes() + image_graph.number_of_edges()
         n2 = concept_graph.number_of_nodes() + concept_graph.number_of_edges()
-        similarity = round(1.0 - (cost / (cost + max(n1, n2, 1))), 4)
+        similarity = GraphEditDistanceComparator._similarity(cost, n1, n2)
         return similarity, cost, node_path, edge_path

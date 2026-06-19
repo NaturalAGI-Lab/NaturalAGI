@@ -25,3 +25,4 @@ def test_identical_graphs_have_zero_cost_and_full_similarity():
     assert cost == 0.0
     assert sim == 1.0
     assert len(node_path) == 2
+    assert len(edge_path) == 1
