@@ -14,11 +14,25 @@ from neo4j import GraphDatabase
 import networkx as nx
 from pyvis.network import Network
 import streamlit.components.v1 as components
+import sys
+from pathlib import Path
+
+_VIZ = Path(__file__).resolve().parents[1] / "concept_creator" / "visualization"
+if str(_VIZ) not in sys.path:
+    sys.path.insert(0, str(_VIZ))
+
+import plotting
+import ged_breakdown
 
 NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
 NEO4J_PASS = os.environ.get("NEO4J_PASS", "111122223333")
 RESULTS_DIR = "training_results"
+
+
+@st.cache_resource
+def get_driver():
+    return GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
 
 
 def get_run_dirs():
@@ -134,6 +148,15 @@ def load_concept_graph(concept_id: str) -> dict:
     driver.close()
     G = parse_graph_properties(G)
     return {"nodes": G.number_of_nodes(), "edges": G.number_of_edges(), "graph": G}
+
+
+@st.cache_data(ttl=300)
+def cached_breakdown(run: str, image_id: str, concept_id: str) -> dict | None:
+    graph = ged_breakdown.get_image_graph_if_present(get_driver(), image_id)
+    if graph is None:
+        return None
+    concept_graph = load_concept_graph(concept_id)["graph"]
+    return ged_breakdown.compute_breakdown(graph, concept_id, concept_graph)
 
 
 @st.cache_data(ttl=300)
@@ -260,6 +283,58 @@ with tab_incorrect:
                     st.warning(
                         "Cannot parse classification_results — run with JSON serialization fix first"
                     )
+                st.markdown("---")
+                st.caption("Image vs. expected concept — GED penalty breakdown")
+                expected = str(row["expected"])
+                try:
+                    all_ids = get_all_concept_ids()
+                except Exception:
+                    all_ids = []
+                try:
+                    results_list = json.loads(row["classification_results"])
+                except (json.JSONDecodeError, TypeError):
+                    results_list = []
+                cand = ged_breakdown.expected_concepts(all_ids, results_list, expected)
+                if not cand:
+                    st.info(f"No concept of class {expected} in Neo4j.")
+                else:
+                    labels = [
+                        f"{c['concept_id']} "
+                        + (f"(sim {c['similarity']:.3f})" if c["similarity"] is not None
+                           else "(pre-filtered)")
+                        for c in cand
+                    ]
+                    pick = st.selectbox("Expected concept", labels, key=f"exp_{idx}")
+                    concept_id = cand[labels.index(pick)]["concept_id"]
+                    try:
+                        bd = cached_breakdown(selected_run, str(row["image_id"]), concept_id)
+                    except Exception as e:
+                        bd = None
+                        st.warning(f"Breakdown unavailable: {e}")
+                    if bd is None:
+                        st.info(
+                            "Image graph not in Neo4j (run cleaned / "
+                            "delete_image_nodes=True). Re-run classification with "
+                            "delete_image_nodes=False to enable the breakdown."
+                        )
+                    else:
+                        st.caption(
+                            f"GED cost {bd['cost']:.2f} · n1 {bd['n1']} · n2 {bd['n2']} "
+                            f"· similarity {bd['similarity']:.3f}"
+                        )
+                        fig = plotting.comparison_figure(
+                            bd["image_nodelink"], bd["concept_nodelink"], bd["edit_ops"]
+                        )
+                        components.html(
+                            plotting.figure_html(fig),
+                            height=int(fig.layout.height or 420) + 8,
+                            scrolling=False,
+                        )
+                        ops_df = pd.DataFrame([
+                            o for o in bd["edit_ops"] if o["op"] != "MATCH"
+                        ])
+                        if not ops_df.empty:
+                            st.dataframe(ops_df, use_container_width=True)
     else:
         st.info("No incorrect_results.csv found for this run.")
 
