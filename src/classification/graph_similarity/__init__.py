@@ -1,7 +1,10 @@
 from .graph_edit_distance_comparator import GraphEditDistanceComparator
 from .comparator_protocol import GraphComparator
 from .ged_comparator import GEDComparator
-from .fgw_comparator import FGWComparator
+try:
+    from .fgw_comparator import FGWComparator
+except ImportError:
+    FGWComparator = None  # type: ignore[assignment,misc]
 from .cost_functions import (
     node_subst_cost,
     node_del_cost,

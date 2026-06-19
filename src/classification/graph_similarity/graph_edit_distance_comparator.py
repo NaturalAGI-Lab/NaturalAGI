@@ -10,10 +10,55 @@ from .cost_functions import (
     edge_match,
     edge_del_cost,
     edge_ins_cost,
+    NodeCost,
 )
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.DEBUG)
+
+
+def _labels(node_data) -> list:
+    return sorted(str(x) for x in node_data.get("labels", []))
+
+
+def build_edit_operations(node_path, edge_path, image_graph, concept_graph) -> list:
+    ops = []
+    for n1, n2 in node_path:
+        if n1 is None:
+            ops.append({"kind": "node", "op": "INSERT", "image_ref": None,
+                        "concept_ref": str(n2),
+                        "cost": node_ins_cost(concept_graph.nodes[n2]),
+                        "reason": "concept node unmatched"})
+        elif n2 is None:
+            ops.append({"kind": "node", "op": "DELETE", "image_ref": str(n1),
+                        "concept_ref": None,
+                        "cost": node_del_cost(image_graph.nodes[n1]),
+                        "reason": "no slot in concept"})
+        else:
+            cost = node_subst_cost(image_graph.nodes[n1], concept_graph.nodes[n2])
+            op = "MATCH" if cost == NodeCost.NO_COST else "SUBSTITUTE"
+            ops.append({"kind": "node", "op": op, "image_ref": str(n1),
+                        "concept_ref": str(n2), "cost": cost,
+                        "reason": f"{_labels(image_graph.nodes[n1])} ↔ "
+                                  f"{_labels(concept_graph.nodes[n2])}"})
+    for e1, e2 in edge_path:
+        if e1 is None:
+            ops.append({"kind": "edge", "op": "INSERT", "image_ref": None,
+                        "concept_ref": str(e2),
+                        "cost": edge_ins_cost(concept_graph.edges[e2]), "reason": ""})
+        elif e2 is None:
+            ops.append({"kind": "edge", "op": "DELETE", "image_ref": str(e1),
+                        "concept_ref": None,
+                        "cost": edge_del_cost(image_graph.edges[e1]), "reason": ""})
+        elif not edge_match(image_graph.edges[e1], concept_graph.edges[e2]):
+            ops.append({"kind": "edge", "op": "SUBSTITUTE", "image_ref": str(e1),
+                        "concept_ref": str(e2),
+                        "cost": edge_del_cost(image_graph.edges[e1])
+                        + edge_ins_cost(concept_graph.edges[e2]), "reason": ""})
+        else:
+            ops.append({"kind": "edge", "op": "MATCH", "image_ref": str(e1),
+                        "concept_ref": str(e2), "cost": 0.0, "reason": ""})
+    return ops
 
 
 class GraphEditDistanceComparator:
@@ -22,84 +67,20 @@ class GraphEditDistanceComparator:
         if not paths:
             logger.info("No edit paths found")
             return
-
         node_path, edge_path = paths[0]
-
+        ops = build_edit_operations(node_path, edge_path, image_graph, concept_graph)
+        node_total = sum(o["cost"] for o in ops if o["kind"] == "node")
+        edge_total = sum(o["cost"] for o in ops if o["kind"] == "edge")
         logger.info("=" * 60)
         logger.info("GRAPH EDIT DISTANCE OPERATIONS")
-        logger.info("=" * 60)
-
-        # Log node operations
-        logger.info("NODE OPERATIONS:")
-        logger.info("-" * 60)
-        logger.info(
-            f"{'Operation':<15} {'Source Node':<15} {'Target Node':<15} {'Cost':<10}"
-        )
-        logger.info("-" * 60)
-
-        total_node_cost = 0
-        for node1, node2 in node_path:
-            if node1 is None:  # Node insertion
-                node2_data = concept_graph.nodes[node2]
-                cost = node_ins_cost(node2_data)
-                logger.info(f"{'INSERT':<15} {'None':<15} {str(node2):<15} {cost:<10}")
-                total_node_cost += cost
-            elif node2 is None:  # Node deletion
-                node1_data = image_graph.nodes[node1]
-                cost = node_del_cost(node1_data)
-                logger.info(f"{'DELETE':<15} {str(node1):<15} {'None':<15} {cost:<10}")
-                total_node_cost += cost
-            else:  # Node substitution
-                cost = node_subst_cost(
-                    image_graph.nodes[node1], concept_graph.nodes[node2]
-                )
-                logger.info(
-                    f"{'SUBSTITUTE':<15} {str(node1):<15} {str(node2):<15} {cost:<10}"
-                )
-                total_node_cost += cost
-
-        logger.info("-" * 60)
-        logger.info(f"{'TOTAL NODE COST:':<45} {total_node_cost:<10}")
-        logger.info("")
-
-        # Log edge operations
-        logger.info("EDGE OPERATIONS:")
-        logger.info("-" * 60)
-        logger.info(
-            f"{'Operation':<15} {'Source Edge':<20} {'Target Edge':<20} {'Cost':<10}"
-        )
-        logger.info("-" * 60)
-
-        total_edge_cost = 0
-        for edge1, edge2 in edge_path:
-            if edge1 is None:  # Edge insertion
-                edge2_data = concept_graph.edges[edge2]
-                cost = edge_ins_cost(edge2_data)
-                logger.info(f"{'INSERT':<15} {'None':<20} {str(edge2):<20} {cost:<10}")
-                total_edge_cost += cost
-            elif edge2 is None:  # Edge deletion
-                edge1_data = image_graph.edges[edge1]
-                cost = edge_del_cost(edge1_data)
-                logger.info(f"{'DELETE':<15} {str(edge1):<20} {'None':<20} {cost:<10}")
-                total_edge_cost += cost
-            else:  # Edge substitution (if not matching)
-                edge1_data = image_graph.edges[edge1]
-                edge2_data = concept_graph.edges[edge2]
-                if not edge_match(edge1_data, edge2_data):
-                    cost = edge_del_cost(edge1_data) + edge_ins_cost(edge2_data)
-                    logger.info(
-                        f"{'SUBSTITUTE':<15} {str(edge1):<20} {str(edge2):<20} {cost:<10}"
-                    )
-                    total_edge_cost += cost
-                else:
-                    logger.info(
-                        f"{'MATCH':<15} {str(edge1):<20} {str(edge2):<20} {0:<10}"
-                    )
-
-        logger.info("-" * 60)
-        logger.info(f"{'TOTAL EDGE COST:':<45} {total_edge_cost:<10}")
-        logger.info("-" * 60)
-        logger.info(f"{'TOTAL COST:':<45} {total_node_cost + total_edge_cost:<10}")
+        for o in ops:
+            logger.info(
+                f"{o['op']:<12} {str(o['image_ref']):<16} "
+                f"{str(o['concept_ref']):<16} {o['cost']:<8} {o['reason']}"
+            )
+        logger.info(f"TOTAL NODE COST: {node_total}")
+        logger.info(f"TOTAL EDGE COST: {edge_total}")
+        logger.info(f"TOTAL COST: {node_total + edge_total}")
         logger.info("=" * 60)
 
     @staticmethod
