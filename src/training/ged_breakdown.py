@@ -29,6 +29,8 @@ def _to_payload(g: nx.Graph) -> dict:
 
 
 def _is_number(o) -> bool:
+    if isinstance(o, bool):
+        return False
     try:
         float(o)
         return True
