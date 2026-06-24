@@ -118,7 +118,7 @@ def kafka_handler(context, event):
         networkx_graph_analysis.merge_close_intersection_points()
 
         context.user_data.data_preprocessing_service.persist_graph(
-            network, image_id, parameters["session_id"]
+            network, image_id, parameters["session_id"], parameters.get("image_path")
         )
 
         networkx_graph_analysis.add_analyzer(ContourTypeAnalyzer)
