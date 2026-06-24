@@ -160,6 +160,14 @@ def cached_breakdown(run: str, image_id: str, concept_id: str) -> dict | None:
 
 
 @st.cache_data(ttl=300)
+def cached_image_skeleton(image_id: str) -> dict | None:
+    try:
+        return ged_breakdown.get_image_skeleton_payload(get_driver(), image_id)
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=300)
 def get_all_concept_ids() -> list:
     driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
     with driver.session() as session:
@@ -193,6 +201,7 @@ selected_run = st.sidebar.selectbox(
 
 # Load run_config if available
 config_path = os.path.join(selected_run, "run_config.json")
+run_config: dict = {}
 if os.path.exists(config_path):
     with open(config_path) as f:
         run_config = json.load(f)
@@ -267,34 +276,83 @@ with tab_incorrect:
             with st.expander(
                 f"Image: {img_name} | Expected: {row['expected']}, Predicted: {row['predicted']}"
             ):
-                try:
-                    results = json.loads(row["classification_results"])
-                    if results:
-                        results_df = pd.DataFrame(results)
-                        cols_order = ["concept_id", "is_minor", "similarity"]
-                        extra = [c for c in results_df.columns if c not in cols_order]
-                        results_df = results_df[
-                            [c for c in cols_order if c in results_df.columns] + extra
-                        ]
-                        st.dataframe(results_df, use_container_width=True)
-                    else:
-                        st.info("No classification results")
-                except (json.JSONDecodeError, TypeError):
-                    st.warning(
-                        "Cannot parse classification_results — run with JSON serialization fix first"
-                    )
-                st.markdown("---")
-                st.caption("Image vs. expected concept — GED penalty breakdown")
+                image_id = str(row["image_id"])
                 expected = str(row["expected"])
-                try:
-                    all_ids = get_all_concept_ids()
-                except Exception:
-                    all_ids = []
+
+                parse_ok = True
                 try:
                     results_list = json.loads(row["classification_results"])
                 except (json.JSONDecodeError, TypeError):
                     results_list = []
+                    parse_ok = False
+
+                try:
+                    all_ids = get_all_concept_ids()
+                except Exception:
+                    all_ids = []
                 cand = ged_breakdown.expected_concepts(all_ids, results_list, expected)
+
+                # Sample PNG + raw skeleton (independent of concept selection).
+                host_path = ged_breakdown.resolve_sample_path(row.get("image_path", ""))
+                skeleton = cached_image_skeleton(image_id)
+
+                # Default expected concept → breakdown feeds the debug blob.
+                default_cid = cand[0]["concept_id"] if cand else None
+                default_bd = None
+                if default_cid:
+                    try:
+                        default_bd = cached_breakdown(selected_run, image_id, default_cid)
+                    except Exception:
+                        default_bd = None
+
+                blob = ged_breakdown.build_debug_blob(
+                    row, run_config, default_bd, default_cid, host_path,
+                    os.path.basename(selected_run), skeleton is not None,
+                )
+                components.html(ged_breakdown.copy_button_html(blob), height=40)
+
+                c_img, c_skel = st.columns([1, 2])
+                with c_img:
+                    if host_path is not None:
+                        st.image(str(host_path),
+                                 caption=os.path.basename(str(host_path)), width=160)
+                    else:
+                        st.info("Sample PNG not found on host.")
+                with c_skel:
+                    if skeleton is not None:
+                        sk_fig = plotting.single_graph_figure(
+                            skeleton,
+                            title="Original skeleton (Neo4j, pre-preprocessing)",
+                            height=300,
+                        )
+                        components.html(
+                            plotting.figure_html(sk_fig, include_plotlyjs="cdn"),
+                            height=int(sk_fig.layout.height or 300) + 8,
+                            scrolling=False,
+                        )
+                    else:
+                        st.info(
+                            "Skeleton not in Neo4j (run cleaned / "
+                            "delete_image_nodes=True)."
+                        )
+
+                if not parse_ok:
+                    st.warning(
+                        "Cannot parse classification_results — run with JSON serialization fix first"
+                    )
+                elif results_list:
+                    results_df = pd.DataFrame(results_list)
+                    cols_order = ["concept_id", "is_minor", "similarity"]
+                    extra = [c for c in results_df.columns if c not in cols_order]
+                    results_df = results_df[
+                        [c for c in cols_order if c in results_df.columns] + extra
+                    ]
+                    st.dataframe(results_df, use_container_width=True)
+                else:
+                    st.info("No classification results")
+
+                st.markdown("---")
+                st.caption("Image vs. expected concept — GED penalty breakdown")
                 if not cand:
                     st.info(f"No concept of class {expected} in Neo4j.")
                 else:
@@ -307,7 +365,7 @@ with tab_incorrect:
                     pick = st.selectbox("Expected concept", labels, key=f"exp_{idx}")
                     concept_id = cand[labels.index(pick)]["concept_id"]
                     try:
-                        bd = cached_breakdown(selected_run, str(row["image_id"]), concept_id)
+                        bd = cached_breakdown(selected_run, image_id, concept_id)
                     except Exception as e:
                         bd = None
                         st.warning(f"Breakdown unavailable: {e}")
