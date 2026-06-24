@@ -1,4 +1,4 @@
-from typing import Dict, List
+from typing import Dict, List, Optional
 from dataclasses import dataclass
 import networkx as nx
 
@@ -17,8 +17,7 @@ class ConceptResult:
     concept_id: str
     concept_graph: nx.Graph
     image_graphs: Dict[str, nx.Graph]
-    steps_debug: List[ConceptFormationStep] = None
+    steps_debug: Optional[List[ConceptFormationStep]] = None
     is_error: bool = False
-    error_message: str = None
-    skipped_images: List[str] = None
+    error_message: Optional[str] = None
 

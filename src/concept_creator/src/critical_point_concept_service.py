@@ -47,6 +47,7 @@ class CriticalPointConceptService:
         concept_id: Optional[str] = None,
         steps: Optional[int] = None,
         debug_mode: bool = False,
+        capture_failure: bool = False,
     ) -> ConceptResult:
         """
         Create a concept incrementally by finding the intersection graph of all training samples.
@@ -78,7 +79,6 @@ class CriticalPointConceptService:
             for image_id, graph in image_graphs.items()
         }
         steps_debug = []
-        skipped_images = []
 
         if not image_ids:
             raise ValueError(f"No images found for session {session_id}")
@@ -102,6 +102,9 @@ class CriticalPointConceptService:
             f"Initialized concept with graph from image {first_image_id}. Nodes: {len(concept_graph.nodes)}"
         )
 
+        is_error = False
+        error_message = None
+
         # Process each additional image
         for i, image_id in enumerate(image_ids[1:], 2):
             if steps and i > steps:
@@ -110,35 +113,43 @@ class CriticalPointConceptService:
             image_graph = image_graphs[image_id]
             concept_old = copy.deepcopy(concept_graph)
 
-            # Find the intersection graph between current concept and new image
             try:
+                # Find the intersection graph between current concept and new image
                 result_graph = self.graph_minor_finder.find_max_common_minor(
                     copy.deepcopy(concept_old), copy.deepcopy(image_graph)
                 )
                 if len(result_graph.nodes) == 0:
-                    self.logger.warning(
-                        f"Skipping image {image_id}: common minor is empty, keeping previous concept"
+                    raise ValueError(
+                        f"Common minor with image {image_id} is empty; "
+                        "every training image must contribute to the concept"
                     )
-                else:
-                    concept_graph = result_graph
-            except Exception:
-                self.logger.exception(
-                    "Error finding max common minor for image %s, skipping", image_id
+            except Exception as exc:
+                if not capture_failure:
+                    raise
+                # Record the concept-so-far and the image that broke formation as
+                # a terminal step, then stop. Never persists (see save block).
+                is_error = True
+                error_message = str(exc)
+                self.logger.error(
+                    f"Concept formation failed at image {i}/{len(image_ids)} "
+                    f"({image_id}): {exc}"
                 )
-                skipped_images.append(image_id)
-                if not debug_mode:
-                    self.repository.remove_image_data(image_id)
                 steps_debug.append(
                     ConceptFormationStep(
                         current_concept=concept_old,
                         current_image=image_graph,
                         current_image_id=image_id,
                         current_step=i,
-                        current_step_description=f"SKIPPED image {i}/{len(image_ids)}: {image_id}",
-                        resulted_concept=concept_graph,
+                        current_step_description=(
+                            f"EXCEPTION at image {i}/{len(image_ids)} "
+                            f"({image_id}): {exc}"
+                        ),
+                        resulted_concept=nx.Graph(),
                     )
                 )
-                continue
+                break
+
+            concept_graph = result_graph
 
             steps_debug.append(
                 ConceptFormationStep(
@@ -154,26 +165,19 @@ class CriticalPointConceptService:
                 f"Updated concept after image {image_id}. Nodes: {len(concept_graph.nodes)}"
             )
 
-        if skipped_images:
-            self.logger.warning(
-                "Skipped %d images during concept formation: %s",
-                len(skipped_images),
-                skipped_images,
-            )
-
-        # Save the final concept
-        if not debug_mode:
+        # Save the final concept (never persist a failed/partial formation)
+        if not debug_mode and not is_error:
             self.repository.save_concept(concept_id, concept_graph)
             for image_id in image_ids:
-                if image_id not in skipped_images:
-                    self.repository.remove_image_data(image_id)
+                self.repository.remove_image_data(image_id)
 
         return ConceptResult(
             concept_id,
             concept_graph,
             image_graphs,
             steps_debug,
-            skipped_images=skipped_images or None,
+            is_error=is_error,
+            error_message=error_message,
         )
 
     def _determine_start_point(
