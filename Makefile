@@ -35,7 +35,7 @@ HOST_IP := $(shell ipconfig getifaddr en0)
 KAFKA_BROKERS := ${HOST_IP}:29092
 NEO4J_PASS=111122223333
 
-LOCAL_STORAGE=./tests/
+LOCAL_STORAGE=./datasets/
 NUCLIO_STORAGE=/opt/nuclio/shared_storage/
 
 DLQ_TOPIC = dlq-topic
@@ -138,17 +138,17 @@ list_kafka_topics:
 
 create_neo4j_indexes:
 	@echo -e "${BLUE}Waiting for Neo4j to be ready...${NC}"
-	@until docker compose exec -T server1 cypher-shell -u neo4j -p ${NEO4J_PASS} "RETURN 1" &> /dev/null; do \
+	@until docker compose exec -T neo4j cypher-shell -u neo4j -p ${NEO4J_PASS} "RETURN 1" &> /dev/null; do \
 		echo "Waiting for Neo4j Bolt to be ready..."; \
 		sleep 3; \
 	done
 	@echo -e "${BLUE}Creating Neo4j property indexes...${NC}"
-	@docker compose exec -T server1 cypher-shell -u neo4j -p ${NEO4J_PASS} < scripts/neo4j_indexes.cypher
+	@docker compose exec -T neo4j cypher-shell -u neo4j -p ${NEO4J_PASS} < scripts/neo4j_indexes.cypher
 	@echo -e "${GREEN}Neo4j indexes created.${NC}"
 
 list_neo4j_indexes:
 	@echo -e "${BLUE}Listing Neo4j indexes...${NC}"
-	@docker compose exec -T server1 cypher-shell -u neo4j -p ${NEO4J_PASS} \
+	@docker compose exec -T neo4j cypher-shell -u neo4j -p ${NEO4J_PASS} \
 		"SHOW INDEXES YIELD name, type, labelsOrTypes, properties, state" \
 		|| echo -e "${RED}Failed to list Neo4j indexes${NC}"
 
@@ -251,7 +251,7 @@ help:
 train_prepared_samples_%:
 	$(eval subclass := $(filter-out $@,$(MAKECMDGOALS)))
 	@echo -e "${BLUE}Running training script for prepared samples class $* subclass $(subclass)...${NC}"
-	@make send_to_connector OPERATION=train CONCEPT_NAME=mnist_$* SUBCLASS=$(subclass) NUCLIO_STORAGE=$(NUCLIO_STORAGE)/prepared_samples/$*_$(subclass) SESSION_ID=$*_$(subclass)
+	@make send_to_connector OPERATION=train CONCEPT_NAME=mnist_$* SUBCLASS=$(subclass) NUCLIO_STORAGE=$(NUCLIO_STORAGE)/train/$*_$(subclass) SESSION_ID=$*_$(subclass)
 	@echo -e "${GREEN}Training script completed.${NC}"
 
 train_square:
@@ -324,6 +324,7 @@ dep_conn:
 	@echo -e "${BLUE}Deploying connector...${NC}"
 	@nuctl deploy --path src/connector \
 		--platform local \
+		--no-pull \
 		--logger-level $(NUCLIO_LOGGER_LEVEL) \
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
@@ -331,6 +332,21 @@ dep_conn:
 		-e KAFKA_TOPIC="${CONNECTOR_KAFKA_TOPIC}" \
 		-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 	@echo -e "${GREEN}Connector deployed.${NC}"
+
+redep_conn:
+	@echo -e "${BLUE}Redeploying connector from cached image (offline, no build)...${NC}"
+	@nuctl deploy connector \
+		--run-image nuclio/processor-connector:latest \
+		-f src/connector/function.yaml \
+		--platform local \
+		--no-pull \
+		--logger-level $(NUCLIO_LOGGER_LEVEL) \
+		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
+		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
+		-e DLQ_TOPIC="${DLQ_TOPIC}" \
+		-e KAFKA_TOPIC="${CONNECTOR_KAFKA_TOPIC}" \
+		-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
+	@echo -e "${GREEN}Connector redeployed from cached image.${NC}"
 
 dep_skel:
 	@echo -e "${BLUE}Deploying skeletonization ($(INSTANCES_SKEL) instances)...${NC}"
