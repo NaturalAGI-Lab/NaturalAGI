@@ -24,6 +24,12 @@ from graph_similarity.ged_comparator import GEDComparator
 # Winner of exp_050..exp_053 bench — see researches/ged_size_bias_four_methods_findings.md.
 COMPLEXITY_PRIOR_LAMBDA = 0.02
 
+# Image-relative coverage penalty (per-message tunable). adjusted_sim = sim * coverage^alpha,
+# coverage = min(concept_complexity / image_complexity, 1.0). alpha=0 disables (baseline).
+# Penalizes a small concept matching a large image (the small-concept over-fire) without
+# penalizing the same concept on a same-size image.
+COVERAGE_ALPHA = 0.0
+
 logging.basicConfig(level=logging.DEBUG)
 
 
@@ -134,6 +140,9 @@ class ClassificationOrchestrator:
         def _complexity_adjusted_score(r: ClassificationResult) -> float:
             base = r.similarity or 0.0
             c = max(r.concept_complexity or 1, 1)
+            if COVERAGE_ALPHA > 0.0 and (r.image_complexity or 0) > 0:
+                coverage = min(c / r.image_complexity, 1.0)
+                base = base * (coverage ** COVERAGE_ALPHA)
             return base + COMPLEXITY_PRIOR_LAMBDA * math.log2(c)
 
         results.sort(

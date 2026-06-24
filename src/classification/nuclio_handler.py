@@ -13,6 +13,7 @@ from pydantic_settings import BaseSettings
 from opentelemetry import trace as otel_trace
 from common.tracing import init_tracer, extract_trace_context
 from classification_orchestrator import ClassificationOrchestrator
+import classification_orchestrator as _orch
 from graph_similarity import cost_functions as _cf
 from repository.concept_repository import ConceptRepository
 from repository.image_repository import ImageRepository
@@ -48,10 +49,13 @@ def _annotate_range_widths(concept_graphs: dict) -> None:
 
 
 @contextmanager
-def _cost_config_override(features=None, costs=None, epsilon=None):
+def _cost_config_override(features=None, costs=None, epsilon=None,
+                         coverage_alpha=None, complexity_lambda=None):
     orig_features = _cf.features
     orig_epsilon = _cf.DIAGNOSTIC_WEIGHT_EPSILON
     orig_costs = {k: v for k, v in vars(_cf.NodeCost).items() if not k.startswith("_")}
+    orig_cov = _orch.COVERAGE_ALPHA
+    orig_lam = _orch.COMPLEXITY_PRIOR_LAMBDA
     try:
         if features is not None:
             _cf.features = features
@@ -60,12 +64,18 @@ def _cost_config_override(features=None, costs=None, epsilon=None):
         if costs is not None:
             for k, v in costs.items():
                 setattr(_cf.NodeCost, k.upper(), float(v))
+        if coverage_alpha is not None:
+            _orch.COVERAGE_ALPHA = float(coverage_alpha)
+        if complexity_lambda is not None:
+            _orch.COMPLEXITY_PRIOR_LAMBDA = float(complexity_lambda)
         yield
     finally:
         _cf.features = orig_features
         _cf.DIAGNOSTIC_WEIGHT_EPSILON = orig_epsilon
         for k, v in orig_costs.items():
             setattr(_cf.NodeCost, k, v)
+        _orch.COVERAGE_ALPHA = orig_cov
+        _orch.COMPLEXITY_PRIOR_LAMBDA = orig_lam
 
 
 def init_context(context):
@@ -182,8 +192,10 @@ def _classify_no_trace(context, data, image_id, classification_params,
         msg_features = data["parameters"].get("features")
         msg_costs = data["parameters"].get("node_costs")
         msg_epsilon = data["parameters"].get("diagnostic_weight_epsilon")
+        msg_cov = data["parameters"].get("coverage_alpha")
+        msg_lam = data["parameters"].get("complexity_prior_lambda")
 
-        with _cost_config_override(msg_features, msg_costs, msg_epsilon):
+        with _cost_config_override(msg_features, msg_costs, msg_epsilon, msg_cov, msg_lam):
             comparison_results = orchestrator.classify_image(
                 image_id, context.user_data.concept_graphs
             )
