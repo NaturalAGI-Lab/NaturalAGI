@@ -300,10 +300,10 @@ class SyncedGraphMinorFinder:
         for concept_idx, image_idx in pairs:
             concept_node = sub_path1[concept_idx]
             image_node = sub_path2[image_idx]
-            node_props = self.prop_manager.process_properties(
-                {}, graph1.nodes[concept_node], graph2.nodes[image_node]
-            )
             if concept_node not in result_graph:
+                node_props = self.prop_manager.process_properties(
+                    {}, graph1.nodes[concept_node], graph2.nodes[image_node]
+                )
                 result_graph.add_node(concept_node, **node_props)
                 self.logger.debug(f"Added node {concept_node} to result graph")
             else:

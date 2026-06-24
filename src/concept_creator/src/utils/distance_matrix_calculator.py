@@ -160,6 +160,35 @@ class DistanceMatrixCalculator:
                 
         return points_above_threshold
     
+    def find_mutual_nearest_pairs(
+        self, distance_matrix: np.ndarray
+    ) -> List[Tuple[int, int]]:
+        """Find (row, col) index pairs that are each other's nearest neighbour.
+
+        A row r and column c form a mutual-nearest pair when c is the nearest
+        column to r AND r is the nearest row to c. Such a pair is a genuine
+        match: it must not be treated as an unmatched, removable point even when
+        its distance exceeds the removal threshold.
+
+        Args:
+            distance_matrix: Shape (n_rows, n_cols).
+
+        Returns:
+            List of (row_index, col_index) mutual-nearest pairs.
+        """
+        if distance_matrix.size == 0:
+            return []
+
+        nearest_col_for_row = np.argmin(distance_matrix, axis=1)
+        nearest_row_for_col = np.argmin(distance_matrix, axis=0)
+
+        pairs: List[Tuple[int, int]] = []
+        for row in range(distance_matrix.shape[0]):
+            col = int(nearest_col_for_row[row])
+            if int(nearest_row_for_col[col]) == row:
+                pairs.append((row, col))
+        return pairs
+
     def find_points_for_difference(
         self,
         distance_matrix: np.ndarray,

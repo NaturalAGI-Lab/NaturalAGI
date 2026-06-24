@@ -97,6 +97,50 @@ def test_concept_longer_than_image_keeps_concept_ids_drops_concept_surplus():
     assert list(nx.all_simple_paths(result, 0, 5)) == [[0, 1, 2, 3, 5]]
 
 
+def test_intermediate_already_in_result_is_not_re_merged():
+    # A concept intermediate (1) that overlapping segments revisit must not be
+    # re-merged once present: process_properties is the merge op, and recomputing
+    # it only to discard the result (the "already exists" path) emits a spurious
+    # merge/correspondence. Anchors already guard this; the intermediate must too.
+    G_c = nx.Graph()
+    G_c.add_node(0, labels=["StartPoint", "Point"], normalized_x=0.0, normalized_y=0.0)
+    G_c.add_node(1, **_hv(0.5, 0.0))
+    G_c.add_node(2, labels=["EndPoint", "Point"], normalized_x=1.0, normalized_y=0.0)
+    G_c.add_edges_from([(0, 1), (1, 2)])
+
+    G_i = nx.Graph()
+    G_i.add_node(10, labels=["StartPoint", "Point"], normalized_x=0.0, normalized_y=0.0)
+    G_i.add_node(11, **_hv(0.5, 0.05))
+    G_i.add_node(12, labels=["EndPoint", "Point"], normalized_x=1.0, normalized_y=0.0)
+    G_i.add_edges_from([(10, 11), (11, 12)])
+
+    finder = _finder()
+    # Concept node 1 was already merged by a prior overlapping segment.
+    result = nx.Graph()
+    result.add_node(1, **_hv(0.5, 0.0))
+
+    g_args = []
+    original = finder.prop_manager.process_properties
+
+    def _spy(mcm_props, g_props, h_props):
+        g_args.append(g_props)
+        return original(mcm_props, g_props, h_props)
+
+    finder.prop_manager.process_properties = _spy
+
+    finder._create_reduced_path_in_result(
+        result_graph=result, graph1=G_c, graph2=G_i,
+        start1=0, end1=2, path1=[0, 1, 2],
+        start2=10, end2=12, path2=[10, 11, 12],
+    )
+
+    # The already-present intermediate (concept node 1) must not be re-merged.
+    assert sum(1 for g in g_args if g is G_c.nodes[1]) == 0
+    # Only the two fresh anchors get merged.
+    assert g_args == [G_c.nodes[0], G_c.nodes[2]]
+    assert set(result.nodes) == {0, 1, 2}
+
+
 def test_adjacent_anchors_no_intermediates_direct_edge():
     G_c = nx.Graph()
     G_c.add_node(0, labels=["StartPoint", "Point"], normalized_x=0.0, normalized_y=0.0)

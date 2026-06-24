@@ -9,6 +9,25 @@ def _calc():
     return DistanceMatrixCalculator(logging.getLogger("test"))
 
 
+def test_find_mutual_nearest_pairs_identifies_reciprocal_nearest():
+    """A (row, col) pair is mutual-nearest when the column is the row's nearest
+    AND the row is that column's nearest. Here concept-0/image-0 and
+    concept-1/image-1 are reciprocal; the extra far column is no one's match."""
+    calc = _calc()
+    dm = np.array([[0.32, 0.90, 0.95],
+                   [0.95, 0.10, 0.80]])
+    assert calc.find_mutual_nearest_pairs(dm) == [(0, 0), (1, 1)]
+
+
+def test_find_mutual_nearest_pairs_single_row_over_threshold():
+    """The f607676c shape: one concept endpoint (row), two image endpoints
+    (cols). The concept endpoint and its nearest image endpoint are mutual even
+    though far; the other image endpoint is excess."""
+    calc = _calc()
+    dm = np.array([[0.41, 0.60]])
+    assert calc.find_mutual_nearest_pairs(dm) == [(0, 0)]
+
+
 def test_counter_oriented_sequence_removes_geometrically_correct_corner():
     """Regression for 8_1 / image 6245cc98.
 
