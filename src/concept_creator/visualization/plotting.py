@@ -479,6 +479,33 @@ def comparison_figure(image_graph: dict, concept_graph: dict,
     return fig
 
 
+def single_graph_figure(graph: dict, *, title: str = "Skeleton",
+                        height: int = 320) -> go.Figure:
+    """One-panel formation-viz render of an arbitrary node-link graph.
+
+    Auto-ranges to the node positions so it is robust whether the graph
+    carries normalized coords (~0..1) or raw pixel coords (~0..100)."""
+    pos = node_positions(graph, 0.0)
+    fig = go.Figure(data=[_edge_trace(graph, pos), _node_trace(graph, pos)])
+    if pos:
+        xs = [p[0] for p in pos.values()]
+        ys = [p[1] for p in pos.values()]
+        pad_x = max((max(xs) - min(xs)) * 0.12, 0.1)
+        pad_y = max((max(ys) - min(ys)) * 0.12, 0.1)
+        x_range = [min(xs) - pad_x, max(xs) + pad_x]
+        y_range = [min(ys) - pad_y, max(ys) + pad_y]
+    else:
+        x_range = [-PANEL_HALF_WIDTH, PANEL_HALF_WIDTH]
+        y_range = [-PANEL_HALF_HEIGHT, PANEL_HALF_HEIGHT]
+    _figure_layout(fig, height=height, margin=dict(l=12, r=12, t=36, b=12),
+                   x_range=x_range, y_range=y_range)
+    fig.update_layout(annotations=[dict(
+        x=0.5, y=1.0, xref="paper", yref="paper", text=f"<b>{title}</b>",
+        showarrow=False, xanchor="center", yanchor="bottom",
+        font=dict(color=TEXT, size=12))])
+    return fig
+
+
 def range_evolution_figure(steps: list[dict], k_widest: int = 5) -> go.Figure:
     xs = [s["step"] for s in steps]
     means = [mean_xy_width(s["concept_after"]) for s in steps]

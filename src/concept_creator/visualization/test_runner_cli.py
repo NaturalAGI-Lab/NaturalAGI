@@ -20,7 +20,8 @@ def test_runner_cli_roundtrip(tmp_path):
     )
     assert proc.returncode == 0, proc.stderr
     assert "PROGRESS step=" in proc.stdout
-    assert "DONE steps=3 verdict=SUSPECT" in proc.stdout
+    # width-only verdict (mismatch input removed); this fixture reads CLEAN
+    assert "DONE steps=3 verdict=CLEAN" in proc.stdout
     # pickle is safe here: the payload comes from our own runner subprocess
     # launched two lines above, never from an untrusted source.
     with out.open("rb") as fh:

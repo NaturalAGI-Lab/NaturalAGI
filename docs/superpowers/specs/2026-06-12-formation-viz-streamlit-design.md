@@ -97,8 +97,8 @@ metadata (duration, params, verdict).
    concept and sample panels from the step's `sync_pair` events: gray = matched,
    **red = mismatch** (`distance > threshold`). Node hover: id, labels, all
    properties with ranges rendered `[min, max]`. Node positions = midpoint of the
-   `normalized_x/y` range. Colors follow the probe palette (EndPoint red,
-   StartPoint orange, Intersection/Corner green, interior gray).
+   `normalized_x/y` range. Colors follow the probe palette (StartPoint red,
+   EndPoint orange, IntersectionPoint purple, CornerPoint green, interior gray).
    **Minimal matching animation:** a toggle that adds Plotly frames revealing
    correspondence lines one pair at a time in event order (the order pairs were
    recorded within the step), with Plotly's built-in play/pause buttons — pure

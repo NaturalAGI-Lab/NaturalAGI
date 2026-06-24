@@ -41,12 +41,10 @@ def list_debug_sessions(uri: str = NEO4J_DSN, user: str = NEO4J_USER,
         driver.close()
 
 
-def runner_invocation(session_id: str, steps, mismatch_threshold: float,
-                      out_path: Path):
+def runner_invocation(session_id: str, steps, out_path: Path):
     cmd = [
         str(VENV_PYTHON), "visualization/formation_runner.py",
         "--session", session_id,
-        "--mismatch-threshold", str(mismatch_threshold),
         "--out", str(out_path),
     ]
     if steps:
@@ -62,9 +60,8 @@ def stderr_log_path(out_path: Path) -> Path:
     return Path(out_path).with_suffix(".stderr.log")
 
 
-def launch_runner(session_id: str, steps, mismatch_threshold: float,
-                  out_path: Path) -> subprocess.Popen:
-    cmd, env, cwd = runner_invocation(session_id, steps, mismatch_threshold, out_path)
+def launch_runner(session_id: str, steps, out_path: Path) -> subprocess.Popen:
+    cmd, env, cwd = runner_invocation(session_id, steps, out_path)
     # stderr goes to a file, NOT a pipe: the formation service logs verbosely
     # to stderr, and an unread PIPE buffer would deadlock the runner while the
     # app reads stdout line-by-line for PROGRESS events.

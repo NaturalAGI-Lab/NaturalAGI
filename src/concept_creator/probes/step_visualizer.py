@@ -154,8 +154,8 @@ def render_step(
         if nid1 is None or nid2 is None:
             continue
 
-        color = "red" if ev.get("mismatch") else "lightgray"
-        lw = 1.5 if ev.get("mismatch") else 0.6
+        color = "lightgray"
+        lw = 0.8
 
         p1 = pos1.get(nid1)
         p2 = pos2.get(nid2)

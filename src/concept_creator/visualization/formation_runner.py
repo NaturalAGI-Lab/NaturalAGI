@@ -15,6 +15,7 @@ import os
 import pickle
 import sys
 import time
+import traceback
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -88,21 +89,34 @@ def attach_step_advancer(service, step_ref: list[int]) -> None:
 
 
 def build_payload(result, recorder, params: dict, duration_s: float) -> dict:
+    is_error = bool(getattr(result, "is_error", False))
+    error_message = getattr(result, "error_message", None)
+    last_idx = len(result.steps_debug) - 1
     steps = []
-    for st in result.steps_debug:
-        steps.append({
+    for idx, st in enumerate(result.steps_debug):
+        # the terminal step of a failed run holds the concept-so-far + the image
+        # that broke formation; flag it so the UI can label the empty result panel
+        is_exception = is_error and idx == last_idx
+        step = {
             "step": int(st.current_step),
             "description": str(st.current_step_description),
             "image_id": str(st.current_image_id),
             "concept_before": serialize_graph(st.current_concept),
             "sample": serialize_graph(st.current_image),
             "concept_after": serialize_graph(st.resulted_concept),
-        })
+            "is_exception": is_exception,
+        }
+        if is_exception:
+            step["error_message"] = error_message
+        steps.append(step)
     summ = recorder.summary()
     mean_xy = _mean_xy_width(result.concept_graph)
-    verdict = (
-        "CLEAN" if summ["mismatch_merges"] == 0 and mean_xy < SUSPECT_WIDTH else "SUSPECT"
-    )
+    if is_error:
+        verdict = "ERROR"
+    elif mean_xy < SUSPECT_WIDTH:
+        verdict = "CLEAN"
+    else:
+        verdict = "SUSPECT"
     return {
         "meta": _sanitize({
             "session_id": params.get("session_id", "offline"),
@@ -110,8 +124,9 @@ def build_payload(result, recorder, params: dict, duration_s: float) -> dict:
             "duration_s": round(duration_s, 2),
             "created_at": datetime.now(timezone.utc).isoformat(),
             "verdict": verdict,
+            "is_error": is_error,
+            "error_message": error_message,
             "mean_xy_width": round(mean_xy, 4),
-            "skipped_images": list(result.skipped_images or []),
             "summary": summ,
         }),
         "steps": steps,
@@ -119,9 +134,9 @@ def build_payload(result, recorder, params: dict, duration_s: float) -> dict:
     }
 
 
-def run_offline_session(samples_dir: Path, steps, mismatch_threshold: float) -> dict:
+def run_offline_session(samples_dir: Path, steps) -> dict:
     t0 = time.monotonic()
-    recorder = ProgressRecorder(mismatch_threshold=mismatch_threshold)
+    recorder = ProgressRecorder()
     image_graphs = _load_graphs_from_dir(Path(samples_dir))
     if not image_graphs:
         raise ValueError(f"No JSON graphs found in {samples_dir}")
@@ -130,18 +145,18 @@ def run_offline_session(samples_dir: Path, steps, mismatch_threshold: float) -> 
     step_ref[0] = 0
     image_graphs = _determine_start_point(image_graphs, logger)
     step_ref[0] = 1
-    result = _run_offline(service, image_graphs, steps, step_ref)
+    result = _run_offline(service, image_graphs, steps, step_ref,
+                          capture_failure=True)
     recorder.close()
     params = {
         "session_id": "offline",
         "samples_dir": str(samples_dir),
         "steps": steps,
-        "mismatch_threshold": mismatch_threshold,
     }
     return build_payload(result, recorder, params, time.monotonic() - t0)
 
 
-def run_neo4j_session(session_id: str, steps, mismatch_threshold: float) -> dict:
+def run_neo4j_session(session_id: str, steps) -> dict:
     from src.critical_point_concept_service import CriticalPointConceptService
 
     t0 = time.monotonic()
@@ -149,20 +164,42 @@ def run_neo4j_session(session_id: str, steps, mismatch_threshold: float) -> dict
     user = os.environ.get("NEO4J_USER", "neo4j")
     pwd = os.environ.get("NEO4J_PASSWORD", "111122223333")
 
-    recorder = ProgressRecorder(mismatch_threshold=mismatch_threshold)
+    recorder = ProgressRecorder()
     service = CriticalPointConceptService(uri, user, pwd)
     step_ref = attach_instrumentation(service, recorder)
     attach_step_advancer(service, step_ref)
     result = service.create_concept_incrementally(
-        session_id, concept_id=f"viz_{session_id}", steps=steps, debug_mode=True
+        session_id, concept_id=f"viz_{session_id}", steps=steps, debug_mode=True,
+        capture_failure=True,
     )
     recorder.close()
     params = {
         "session_id": session_id,
         "steps": steps,
-        "mismatch_threshold": mismatch_threshold,
     }
     return build_payload(result, recorder, params, time.monotonic() - t0)
+
+
+def _error_payload(params: dict, exc: Exception, duration_s: float) -> dict:
+    """Minimal payload for failures that escape the in-loop capture (e.g. start
+    point determination), so the app can still show the error instead of a bare
+    'Runner failed'."""
+    return {
+        "meta": _sanitize({
+            "session_id": params.get("session_id", "offline"),
+            "params": params,
+            "duration_s": round(duration_s, 2),
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "verdict": "ERROR",
+            "is_error": True,
+            "error_message": str(exc),
+            "traceback": traceback.format_exc(),
+            "mean_xy_width": 0.0,
+            "summary": {},
+        }),
+        "steps": [],
+        "events": [],
+    }
 
 
 def main() -> None:
@@ -171,16 +208,22 @@ def main() -> None:
     mode.add_argument("--session", help="Neo4j session ID")
     mode.add_argument("--samples-dir", help="Directory of node-link JSON graphs")
     parser.add_argument("--steps", type=int, default=None)
-    parser.add_argument("--mismatch-threshold", type=float, default=0.35)
     parser.add_argument("--out", required=True, help="Output pickle path")
     args = parser.parse_args()
 
-    if args.session:
-        payload = run_neo4j_session(args.session, args.steps, args.mismatch_threshold)
-    else:
-        payload = run_offline_session(
-            Path(args.samples_dir), args.steps, args.mismatch_threshold
-        )
+    params = {
+        "session_id": args.session or "offline",
+        "samples_dir": args.samples_dir,
+        "steps": args.steps,
+    }
+    t0 = time.monotonic()
+    try:
+        if args.session:
+            payload = run_neo4j_session(args.session, args.steps)
+        else:
+            payload = run_offline_session(Path(args.samples_dir), args.steps)
+    except Exception as exc:  # never leave the app with no payload to render
+        payload = _error_payload(params, exc, time.monotonic() - t0)
 
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)

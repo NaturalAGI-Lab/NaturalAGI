@@ -51,10 +51,11 @@ def _bucket(d: float) -> str:
 # ---------------------------------------------------------------------------
 
 class FormationRecorder:
-    def __init__(self, out_path: Path | None = None, mismatch_threshold: float = 0.35):
-        self.mismatch_threshold = mismatch_threshold
+    def __init__(self, out_path: Path | None = None):
         self.events: list[dict] = []
         self.out_path = out_path
+        self._id_map_c: dict[int, Any] = {}
+        self._id_map_i: dict[int, Any] = {}
         if out_path is not None:
             out_path.parent.mkdir(parents=True, exist_ok=True)
             self._fh = out_path.open("w")
@@ -75,30 +76,22 @@ class FormationRecorder:
     # ------------------------------------------------------------------
     def summary(self) -> dict:
         merge_events = [e for e in self.events if e["type"] == "merge"]
-        sync_events = [e for e in self.events if e["type"] == "sync_pair"]
         sync_summaries = [e for e in self.events if e["type"] == "sync_summary"]
         start_events = [e for e in self.events if e["type"] == "start_point"]
         collision_events = [e for e in self.events if e["type"] == "id_collision"]
         segment_events = [e for e in self.events if e["type"] == "segment_match"]
 
         total_merges = len(merge_events)
-        mismatch_merges = sum(1 for e in merge_events if e.get("mismatch"))
-        merge_rate = mismatch_merges / total_merges if total_merges else 0.0
 
         hist: dict[str, int] = {}
         for e in merge_events:
             b = _bucket(e.get("distance", 0.0))
             hist[b] = hist.get(b, 0) + 1
 
-        sync_mismatches = sum(1 for e in sync_events if e.get("mismatch"))
-
         per_step_merges: dict[int, int] = {}
-        per_step_mismatches: dict[int, int] = {}
         for e in merge_events:
             s = e.get("step", 0)
             per_step_merges[s] = per_step_merges.get(s, 0) + 1
-            if e.get("mismatch"):
-                per_step_mismatches[s] = per_step_mismatches.get(s, 0) + 1
 
         # crossings and many-to-one from segment events
         crossings = sum(1 for e in segment_events if e.get("crossing"))
@@ -115,15 +108,11 @@ class FormationRecorder:
 
         return {
             "total_merges": total_merges,
-            "mismatch_merges": mismatch_merges,
-            "mismatch_rate": round(merge_rate, 4),
             "distance_histogram": hist,
             "crossing_count": crossings,
             "many_to_one_count": many_to_one,
             "id_collisions": len(collision_events),
-            "sync_mismatches": sync_mismatches,
             "per_step_merges": per_step_merges,
-            "per_step_mismatches": per_step_mismatches,
             "start_point_table": start_events,
             "per_property_max_width": prop_max_widths,
             "sync_summaries": sync_summaries,
@@ -137,6 +126,8 @@ class FormationRecorder:
 def _make_process_properties_wrapper(recorder: FormationRecorder, original, step_ref: list[int]):
     def _wrapper(mcm_props, g_props, h_props):
         result = original(mcm_props, g_props, h_props)
+        node_c = recorder._id_map_c.get(id(g_props))
+        node_i = recorder._id_map_i.get(id(h_props))
 
         gx = _coord_val(g_props.get("normalized_x"))
         gy = _coord_val(g_props.get("normalized_y"))
@@ -147,7 +138,7 @@ def _make_process_properties_wrapper(recorder: FormationRecorder, original, step
         width_x = _range_width(result.get("normalized_x"))
         width_y = _range_width(result.get("normalized_y"))
 
-        recorder.emit({
+        event = {
             "type": "merge",
             "step": step_ref[0],
             "g_labels": list(g_props.get("labels", [])),
@@ -159,9 +150,21 @@ def _make_process_properties_wrapper(recorder: FormationRecorder, original, step
             "distance": round(dist, 4),
             "merged_width_normalized_x": round(width_x, 4),
             "merged_width_normalized_y": round(width_y, 4),
-            "mismatch": dist > recorder.mismatch_threshold,
-        })
+        }
+        if node_c is not None:
+            event["node_c"] = node_c
+        if node_i is not None:
+            event["node_i"] = node_i
+        recorder.emit(event)
         return result
+    return _wrapper
+
+
+def _make_create_reduced_path_wrapper(recorder: FormationRecorder, original):
+    def _wrapper(result_graph, graph1, graph2, start1, end1, path1, start2, end2, path2):
+        recorder._id_map_c = {id(data): nid for nid, data in graph1.nodes(data=True)}
+        recorder._id_map_i = {id(data): nid for nid, data in graph2.nodes(data=True)}
+        return original(result_graph, graph1, graph2, start1, end1, path1, start2, end2, path2)
     return _wrapper
 
 
@@ -169,7 +172,6 @@ def _make_synced_traversal_wrapper(recorder: FormationRecorder, original, step_r
     def _wrapper(G_c, G_i):
         sync_list = original(G_c, G_i)
         total_pairs = 0
-        total_mismatches = 0
         for path in sync_list:
             for node_c, node_i in path:
                 data_c = G_c.nodes[node_c]
@@ -179,9 +181,6 @@ def _make_synced_traversal_wrapper(recorder: FormationRecorder, original, step_r
                 ix = _coord_val(data_i.get("normalized_x"))
                 iy = _coord_val(data_i.get("normalized_y"))
                 dist = _euclidean(cx, cy, ix, iy)
-                mismatch = dist > recorder.mismatch_threshold
-                if mismatch:
-                    total_mismatches += 1
                 total_pairs += 1
                 recorder.emit({
                     "type": "sync_pair",
@@ -195,14 +194,12 @@ def _make_synced_traversal_wrapper(recorder: FormationRecorder, original, step_r
                     "c_labels": list(data_c.get("labels", [])),
                     "i_labels": list(data_i.get("labels", [])),
                     "distance": round(dist, 4),
-                    "mismatch": mismatch,
                 })
         recorder.emit({
             "type": "sync_summary",
             "step": step_ref[0],
             "num_paths": len(sync_list),
             "num_pairs": total_pairs,
-            "num_mismatches": total_mismatches,
         })
         return sync_list
     return _wrapper
@@ -269,14 +266,21 @@ def attach_instrumentation(service, recorder: FormationRecorder) -> list[int]:
         recorder, original_pp, step_ref
     )
 
-    # 2. Wrap SyncedTraversalGenerator.generate_synced_traversal on finder's instance
+    # 2. Wrap reduced-path creation to map node data dicts back to graph ids.
+    finder = service.graph_minor_finder
+    original_reduced_path = finder._create_reduced_path_in_result
+    finder._create_reduced_path_in_result = _make_create_reduced_path_wrapper(
+        recorder, original_reduced_path
+    )
+
+    # 3. Wrap SyncedTraversalGenerator.generate_synced_traversal on finder's instance
     stg = service.graph_minor_finder.synced_traversal_generator
     original_stg = stg.generate_synced_traversal
     stg.generate_synced_traversal = _make_synced_traversal_wrapper(
         recorder, original_stg, step_ref
     )
 
-    # 3. Wrap the monotone aligner (one segment_match event per aligned pair).
+    # 4. Wrap the monotone aligner (one segment_match event per aligned pair).
     #    Store the pristine original once so repeated attach_instrumentation calls
     #    in one process re-wrap the real aligner (not a prior wrapper), keeping
     #    each run's segment_match events attributed to its own recorder.
@@ -292,7 +296,7 @@ def attach_instrumentation(service, recorder: FormationRecorder) -> list[int]:
         step_ref,
     )
 
-    # 4. Wrap StartPointModifier.change_start_point at class level
+    # 5. Wrap StartPointModifier.change_start_point at class level
     from src.logic.start_point_modifier import StartPointModifier
 
     original_csp = StartPointModifier.change_start_point
@@ -316,7 +320,7 @@ def attach_instrumentation(service, recorder: FormationRecorder) -> list[int]:
 
     StartPointModifier.change_start_point = _patched_change_start_point
 
-    # 5. Capture id_collision log messages from the finder's logger
+    # 6. Capture id_collision log messages from the finder's logger
     collision_handler = _CollisionLogHandler(recorder, step_ref)
     service.logger.addHandler(collision_handler)
 

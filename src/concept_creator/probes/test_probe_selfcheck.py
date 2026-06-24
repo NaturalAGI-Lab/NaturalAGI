@@ -14,6 +14,8 @@ import os
 import sys
 from pathlib import Path
 
+import pytest
+
 # ------------------------------------------------------------------ paths --
 _PROBE_DIR = Path(__file__).parent
 _SRC_DIR = _PROBE_DIR.parent
@@ -118,16 +120,32 @@ def _ensure_sample_data() -> tuple[Path, Path]:
     return clean_dir, flipped_dir
 
 
+@pytest.fixture(scope="module")
+def clean_dir() -> Path:
+    return _ensure_sample_data()[0]
+
+
+@pytest.fixture(scope="module")
+def flipped_dir() -> Path:
+    return _ensure_sample_data()[1]
+
+
+@pytest.fixture(scope="module")
+def clean_mean_xy(clean_dir: Path) -> float:
+    _, _, mean_xy = _run_probe_offline(clean_dir)
+    return mean_xy
+
+
 # ---------------------------------------------------------------------------
 # helper: run probe offline on a given samples dir
 # ---------------------------------------------------------------------------
 
-def _run_probe_offline(samples_dir: Path, mismatch_threshold: float = 0.35):
+def _run_probe_offline(samples_dir: Path):
     image_graphs = _load_graphs_from_dir(samples_dir)
     assert image_graphs, f"No graphs loaded from {samples_dir}"
 
     service = _build_offline_service()
-    recorder = FormationRecorder(out_path=None, mismatch_threshold=mismatch_threshold)
+    recorder = FormationRecorder(out_path=None)
     step_ref = attach_instrumentation(service, recorder)
     step_ref[0] = 0  # start-point determination phase
 
@@ -155,15 +173,13 @@ def test_clean_set(clean_dir: Path):
     print("\n[test_clean_set] Running probe on seven_clean/ ...")
     recorder, result, mean_xy = _run_probe_offline(clean_dir)
 
-    mismatch_count = sum(1 for e in recorder.events if e.get("mismatch"))
-    print(f"  mismatch_count = {mismatch_count}")
     print(f"  mean_xy_width  = {mean_xy:.4f}")
 
     assert result.concept_graph is not None, "Concept graph should not be None"
     assert len(result.concept_graph.nodes) > 0, "Concept graph should have nodes"
     assert mean_xy < 0.6, f"Clean run mean_xy_width {mean_xy:.4f} should be < 0.6"
     print("  PASS")
-    return mismatch_count, mean_xy
+    return mean_xy
 
 
 # ---------------------------------------------------------------------------
@@ -174,24 +190,32 @@ def test_flipped_set(flipped_dir: Path, clean_mean_xy: float):
     print("\n[test_flipped_set] Running probe on seven_flipped/ ...")
     recorder, result, mean_xy = _run_probe_offline(flipped_dir)
 
-    mismatch_count = sum(1 for e in recorder.events if e.get("mismatch"))
-
-    print(f"  mismatch_count = {mismatch_count}")
     print(f"  mean_xy_width  = {mean_xy:.4f}  (clean was {clean_mean_xy:.4f})")
 
     # Baseline code has no spatial-consistency guard: the planted endpoint flip
-    # produces top<->bottom pair merges. The probe's job is to FLAG them —
-    # mismatch events must fire and ranges must widen relative to the clean run.
-    assert mismatch_count > 0, (
-        f"Probe failed to flag the planted endpoint flip: expected mismatch "
-        f"events, got {mismatch_count}."
-    )
+    # produces top<->bottom pair merges that visibly widen concept ranges. With
+    # the threshold-based flag removed, range widening is the signal: the
+    # flipped run's mean width must exceed the clean run's.
     assert mean_xy > clean_mean_xy, (
         f"Flipped mean_xy_width {mean_xy:.4f} should exceed clean "
         f"{clean_mean_xy:.4f}; the flip must visibly widen concept ranges."
     )
     print("  PASS")
-    return mismatch_count, mean_xy
+    return mean_xy
+
+
+def test_merge_events_include_node_ids(flipped_dir: Path):
+    recorder, result, _ = _run_probe_offline(flipped_dir)
+    merge_events = [e for e in recorder.events if e["type"] == "merge"]
+    steps_by_number = {step.current_step: step for step in result.steps_debug}
+
+    assert merge_events
+    for event in merge_events:
+        assert "node_c" in event
+        assert "node_i" in event
+        step = steps_by_number[event["step"]]
+        assert event["node_c"] in step.current_concept.nodes
+        assert event["node_i"] in step.current_image.nodes
 
 
 # ---------------------------------------------------------------------------
@@ -202,10 +226,10 @@ if __name__ == "__main__":
     print("=== Probe Selfcheck ===")
     clean_dir, flipped_dir = _ensure_sample_data()
 
-    clean_mismatch, clean_mean = test_clean_set(clean_dir)
-    flipped_mismatch, flipped_mean = test_flipped_set(flipped_dir, clean_mean)
+    clean_mean = test_clean_set(clean_dir)
+    flipped_mean = test_flipped_set(flipped_dir, clean_mean)
 
     print(f"\n=== Summary ===")
-    print(f"  clean:   mismatches={clean_mismatch}  mean_xy_width={clean_mean:.4f}")
-    print(f"  flipped: mismatches={flipped_mismatch}  mean_xy_width={flipped_mean:.4f}")
+    print(f"  clean:   mean_xy_width={clean_mean:.4f}")
+    print(f"  flipped: mean_xy_width={flipped_mean:.4f}")
     print("\nAll assertions passed.")

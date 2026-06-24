@@ -162,10 +162,12 @@ def _run_offline(
     image_graphs: dict[str, nx.Graph],
     steps: Optional[int],
     step_ref: list[int],
+    capture_failure: bool = False,
 ) -> ConceptResult:
     image_ids = list(image_graphs.keys())
     steps_debug = []
-    skipped = []
+    is_error = False
+    error_message = None
 
     # _determine_start_point already called before attaching instrumentation;
     # _analyze_graph runs per image
@@ -192,22 +194,29 @@ def _run_offline(
             result_graph = service.graph_minor_finder.find_max_common_minor(
                 copy.deepcopy(concept_old), copy.deepcopy(image_graphs[img_id])
             )
-            if len(result_graph.nodes) > 0:
-                concept_graph = result_graph
-            else:
-                logger.warning("Empty minor for %s, keeping previous concept", img_id)
-        except Exception:
-            logger.exception("Error processing %s, skipping", img_id)
-            skipped.append(img_id)
+            if len(result_graph.nodes) == 0:
+                raise ValueError(
+                    f"Common minor with image {img_id} is empty; "
+                    "every training image must contribute to the concept"
+                )
+        except Exception as exc:
+            if not capture_failure:
+                raise
+            is_error = True
+            error_message = str(exc)
             steps_debug.append(ConceptFormationStep(
                 current_concept=concept_old,
                 current_image=image_graphs[img_id],
                 current_image_id=img_id,
                 current_step=i,
-                current_step_description=f"SKIPPED {img_id}",
-                resulted_concept=concept_graph,
+                current_step_description=(
+                    f"EXCEPTION at image {i}/{len(image_ids)} ({img_id}): {exc}"
+                ),
+                resulted_concept=nx.Graph(),
             ))
-            continue
+            break
+
+        concept_graph = result_graph
 
         steps_debug.append(ConceptFormationStep(
             current_concept=concept_old,
@@ -223,7 +232,8 @@ def _run_offline(
         concept_graph=concept_graph,
         image_graphs=image_graphs,
         steps_debug=steps_debug,
-        skipped_images=skipped or None,
+        is_error=is_error,
+        error_message=error_message,
     )
 
 
@@ -301,14 +311,12 @@ def _write_report(
     merge_events = [e for e in recorder.events if e["type"] == "merge"]
     top_wide = sorted(merge_events, key=lambda e: e.get("merged_width_normalized_y", 0), reverse=True)[:10]
 
-    verdict = "CLEAN" if summ["mismatch_merges"] == 0 and mean_xy_width < threshold else "SUSPECT"
+    verdict = "CLEAN" if mean_xy_width < threshold else "SUSPECT"
 
     lines = [
         "# Concept Formation Probe Report\n",
         f"**Verdict:** {verdict}\n",
         f"- Total merges: {summ['total_merges']}",
-        f"- Mismatch merges: {summ['mismatch_merges']} ({summ['mismatch_rate']*100:.1f}%)",
-        f"- Sync mismatches: {summ['sync_mismatches']}",
         f"- ID collisions: {summ['id_collisions']}",
         f"- Crossings: {summ['crossing_count']}",
         f"- Many-to-one: {summ['many_to_one_count']}",
@@ -327,14 +335,8 @@ def _write_report(
         lines.append(
             f"- step={ev.get('step')} g=({ev.get('g_x'):.3f},{ev.get('g_y'):.3f}) "
             f"h=({ev.get('h_x'):.3f},{ev.get('h_y'):.3f}) "
-            f"dist={ev.get('distance'):.3f} width_y={ev.get('merged_width_normalized_y'):.3f} "
-            f"mismatch={ev.get('mismatch')}"
+            f"dist={ev.get('distance'):.3f} width_y={ev.get('merged_width_normalized_y'):.3f}"
         )
-
-    flagged = [e for e in recorder.events if e.get("mismatch")]
-    lines += [f"\n## Flagged Events ({len(flagged)})\n"]
-    for ev in flagged[:50]:
-        lines.append(f"- {json.dumps(ev, default=str)}")
 
     (out_dir / "report.md").write_text("\n".join(lines) + "\n")
 
@@ -352,7 +354,6 @@ def main():
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--out", default=None, help="Output directory")
     parser.add_argument("--viz", action="store_true", help="Render per-step PNGs")
-    parser.add_argument("--mismatch-threshold", type=float, default=0.35)
     args = parser.parse_args()
 
     concept_id = args.concept_id
@@ -360,7 +361,7 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
 
     jsonl_path = out_dir / "events.jsonl"
-    recorder = FormationRecorder(out_path=jsonl_path, mismatch_threshold=args.mismatch_threshold)
+    recorder = FormationRecorder(out_path=jsonl_path)
 
     if args.session:
         # Neo4j mode
@@ -422,8 +423,8 @@ def main():
 
     print(f"\nResults written to {out_dir}/")
     print(f"  summary.json  — {summ['total_merges']} merges, "
-          f"{summ['mismatch_merges']} mismatches, mean_xy_width={mean_xy:.4f}")
-    verdict = "CLEAN" if summ["mismatch_merges"] == 0 and mean_xy < 0.6 else "SUSPECT"
+          f"mean_xy_width={mean_xy:.4f}")
+    verdict = "CLEAN" if mean_xy < 0.6 else "SUSPECT"
     print(f"  Verdict: {verdict}")
 
 

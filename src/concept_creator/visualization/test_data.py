@@ -30,11 +30,10 @@ def test_load_payload_roundtrip(tmp_path):
 
 def test_runner_cmd_shape(tmp_path):
     cmd, env, cwd = data.runner_invocation("7_1", steps=10,
-                                           mismatch_threshold=0.4,
                                            out_path=tmp_path / "o.pkl")
     assert cmd[1].endswith("visualization/formation_runner.py")
     assert "--session" in cmd and "7_1" in cmd
     assert "--steps" in cmd and "10" in cmd
-    assert "--mismatch-threshold" in cmd and "0.4" in cmd
+    assert "--mismatch-threshold" not in cmd
     assert "PYTHONPATH" in env
     assert str(cwd).endswith("src/concept_creator")
