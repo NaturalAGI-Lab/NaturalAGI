@@ -78,6 +78,27 @@ def _cost_config_override(features=None, costs=None, epsilon=None,
         _orch.COMPLEXITY_PRIOR_LAMBDA = orig_lam
 
 
+def _load_concept_cache(context) -> int:
+    """(Re)load concept graphs from Neo4j into the per-instance cache.
+
+    Shared by init_context() and the HTTP reload_concepts control op so there is
+    a single source of truth for what "the cache" contains. Each instance runs
+    maxWorkers=1, so swapping the dict here cannot interleave with a classify.
+    """
+    concept_repo = ConceptRepository(context.user_data.neo4j_driver)
+    concept_ids = concept_repo.get_all_concept_ids()
+    concept_graphs = {
+        cid: concept_repo.get_concept_graph(cid) for cid in concept_ids
+    }
+    _annotate_range_widths(concept_graphs)
+    setattr(context.user_data, "concept_graphs", concept_graphs)
+    context.logger.info_with(
+        f"Loaded + annotated {len(concept_graphs)} concept graphs",
+        handler=HANDLER_NAME,
+    )
+    return len(concept_graphs)
+
+
 def init_context(context):
     """Initializes Nuclio context
 
@@ -104,16 +125,7 @@ def init_context(context):
     )
     setattr(context.user_data, "neo4j_driver", driver)
 
-    concept_repo = ConceptRepository(driver)
-    concept_ids = concept_repo.get_all_concept_ids()
-    concept_graphs = {
-        cid: concept_repo.get_concept_graph(cid) for cid in concept_ids
-    }
-    setattr(context.user_data, "concept_graphs", concept_graphs)
-    context.logger.info_with(
-        f"Cached {len(concept_graphs)} concept graphs at startup",
-        handler=HANDLER_NAME,
-    )
+    _load_concept_cache(context)
 
     tracer = init_tracer(HANDLER_NAME)
     setattr(context.user_data, "tracer", tracer)
@@ -129,12 +141,6 @@ def init_context(context):
     epsilon_env = os.environ.get("CLASSIFICATION_DIAGNOSTIC_WEIGHT_EPSILON")
     if epsilon_env:
         _cf.DIAGNOSTIC_WEIGHT_EPSILON = float(epsilon_env)
-
-    _annotate_range_widths(concept_graphs)
-    context.logger.info_with(
-        f"Annotated range widths on {len(concept_graphs)} concept graphs",
-        handler=HANDLER_NAME,
-    )
 
 
 def kafka_handler(context, event):
@@ -314,6 +320,26 @@ def _classify_with_trace(context, event, data, image_id, classification_params,
                 image_repository.remove_image_nodes(image_id)
 
 
+def http_handler(context, event):
+    """Handles HTTP control requests (cache invalidation, health ping).
+
+    `reload_concepts` rebuilds this instance's concept cache from Neo4j without a
+    redeploy. Invoked per-instance by name via `nuctl invoke` (see the
+    `reload_concepts` Makefile target), which fans out to every instance.
+    """
+    try:
+        body = event.body if isinstance(event.body, dict) else json.loads(event.body or b"{}")
+    except (ValueError, TypeError):
+        body = {}
+
+    operation = body.get("operation")
+    if operation == "reload_concepts":
+        count = _load_concept_cache(context)
+        return json.dumps({"status": "reloaded", "concept_count": count})
+
+    return json.dumps({"status": "ok"})
+
+
 def handler(context, event):
     """Nuclio main handler"""
 
@@ -326,7 +352,4 @@ def handler(context, event):
 
     if event.trigger.kind == "kafka-cluster":
         return kafka_handler(context, event)
-    else:
-        context.logger.error_with(
-            "Unknown trigger. Only HTTP supported", handler=HANDLER_NAME
-        )
+    return http_handler(context, event)

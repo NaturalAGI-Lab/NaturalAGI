@@ -178,6 +178,22 @@ create_concept:
 		--body '{"session_id": "$(CC_SESSION_ID)", "concept_name": "$(CC_CONCEPT_NAME)", "concept_id": "$(CC_SESSION_ID)"}'
 	@echo -e "${GREEN}Concept creation invoked.${NC}"
 
+# Invalidate the in-memory concept cache on every classification instance after a
+# retrain, without redeploying. Each instance caches concepts in init_context();
+# nuctl invoke reaches each one by name (its HTTP port is exposed even when the
+# only configured trigger is Kafka), so we fan out the reload_concepts control op.
+reload_concepts:
+	@echo -e "${BLUE}Reloading concept cache on all classification instances...${NC}"
+	@for fn in $$(nuctl get functions --platform local 2>/dev/null \
+			| awk -F'|' 'NR>1 {gsub(/ /,"",$$2); if ($$2 ~ /^classification(-[0-9]+)?$$/) print $$2}'); do \
+		printf "  -> %s: " "$$fn"; \
+		nuctl invoke $$fn --platform local --method POST \
+			--body '{"operation":"reload_concepts"}' 2>/dev/null \
+			| awk '/> Response body:/{getline; print; exit}' \
+			| grep . || echo "no ack"; \
+	done
+	@echo -e "${GREEN}Concept cache reload invoked on all instances.${NC}"
+
 # Special target to allow passing arguments to other targets
 %:
 	@:
@@ -291,7 +307,7 @@ send_to_connector:
 	@echo -e "\n${GREEN}Data sent to connector successfully.${NC}"
 
 # Function deployment targets
-.PHONY: base dep_conn dep_skel dep_contour dep_concept dep_classification dep_all
+.PHONY: base dep_conn dep_skel dep_contour dep_concept dep_classification dep_all reload_concepts
 .PHONY: undep_skel undep_contour undep_classification undep_all
 
 # Common env/trigger fragments

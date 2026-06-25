@@ -58,3 +58,9 @@ if __name__ == "__main__":
     for cls, sub in SUBCLASSES:
         train_one(cls, sub)
     print("\nAll concepts trained.")
+
+    # Concepts are cached per-instance in classification's init_context(); fan out
+    # a reload so the running instances pick up the retrained concepts without a
+    # redeploy.
+    subprocess.run(["make", "reload_concepts"], cwd=_PROJECT_ROOT, check=True)
+    print("Concept cache reloaded on all classification instances.")

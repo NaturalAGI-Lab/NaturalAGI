@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import time
 from typing import Dict
 
@@ -262,3 +263,19 @@ def delete_test_neo4j_nodes(
         session.run("MATCH (n {session_id: 'test'}) DETACH DELETE n")
     driver.close()
     print("Test nodes deleted.")
+
+
+# ---------------------------------------------------------------------------
+# Classification instance control
+# ---------------------------------------------------------------------------
+
+def reload_concept_cache() -> None:
+    """Fan out a concept-cache reload to every running classification instance.
+
+    Classification caches concepts per-instance in init_context(), so retrained
+    concepts are invisible until the cache is refreshed. Call this after retraining
+    (or right before a test session) to pick up new concepts WITHOUT a redeploy.
+    Delegates to the `reload_concepts` Make target (single source of truth).
+    """
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    subprocess.run(["make", "reload_concepts"], cwd=project_root, check=True)
