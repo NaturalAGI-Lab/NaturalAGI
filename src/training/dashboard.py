@@ -150,13 +150,24 @@ def load_concept_graph(concept_id: str) -> dict:
     return {"nodes": G.number_of_nodes(), "edges": G.number_of_edges(), "graph": G}
 
 
+def _classification_params_for_run(run: str) -> dict | None:
+    try:
+        with open(os.path.join(run, "run_config.json")) as f:
+            return json.load(f).get("classification_params")
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
 @st.cache_data(ttl=300)
 def cached_breakdown(run: str, image_id: str, concept_id: str) -> dict | None:
     graph = ged_breakdown.get_image_graph_if_present(get_driver(), image_id)
     if graph is None:
         return None
     concept_graph = ged_breakdown.get_concept_graph(get_driver(), concept_id)
-    return ged_breakdown.compute_breakdown(graph, concept_id, concept_graph)
+    return ged_breakdown.compute_breakdown(
+        graph, concept_id, concept_graph,
+        classification_params=_classification_params_for_run(run),
+    )
 
 
 @st.cache_data(ttl=300)

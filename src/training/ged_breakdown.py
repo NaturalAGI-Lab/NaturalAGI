@@ -1,5 +1,6 @@
 import json
 import sys
+from contextlib import nullcontext
 from pathlib import Path
 
 import networkx as nx
@@ -101,11 +102,40 @@ def _run_ged_breakdown(prep_image, prep_concept, concept_id, ged_timeout) -> dic
     }
 
 
-def compute_breakdown(image_graph, concept_id, concept_graph, ged_timeout: float = 5.0) -> dict:
-    prep_image, prep_concept = ConceptMinorClassifier().preprocess_pair(
-        image_graph, concept_graph
+def _cost_config_ctx(classification_params):
+    """Restore the run's cost ladder for the breakdown.
+
+    Without it, GED falls back to the source-default NodeCost ladder, which can flip
+    the optimal node mapping (e.g. a spurious Point↔Vector match) and report a
+    similarity that never entered the live decision. Mirrors nuclio_handler's
+    production scoring context so the breakdown matches the per-concept scores.
+    """
+    if not classification_params:
+        return nullcontext()
+    from nuclio_handler import _cost_config_override
+
+    return _cost_config_override(
+        features=classification_params.get("features"),
+        costs=classification_params.get("node_costs"),
+        epsilon=classification_params.get("diagnostic_weight_epsilon"),
     )
-    return _run_ged_breakdown(prep_image, prep_concept, concept_id, ged_timeout)
+
+
+def compute_breakdown(
+    image_graph,
+    concept_id,
+    concept_graph,
+    ged_timeout: float | None = None,
+    classification_params: dict | None = None,
+) -> dict:
+    if ged_timeout is None:
+        params_timeout = (classification_params or {}).get("ged_timeout")
+        ged_timeout = float(params_timeout) if params_timeout is not None else 5.0
+    with _cost_config_ctx(classification_params):
+        prep_image, prep_concept = ConceptMinorClassifier().preprocess_pair(
+            image_graph, concept_graph
+        )
+        return _run_ged_breakdown(prep_image, prep_concept, concept_id, ged_timeout)
 
 
 def _coerce_results(results) -> list:
