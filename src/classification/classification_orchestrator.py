@@ -34,6 +34,20 @@ COVERAGE_ALPHA = 0.0
 logging.basicConfig(level=logging.DEBUG)
 
 
+def complexity_adjusted_score(result: ClassificationResult) -> float:
+    """Ranking score = similarity (× optional coverage penalty) + log-complexity prior.
+
+    Reads the module-level COMPLEXITY_PRIOR_LAMBDA / COVERAGE_ALPHA at call time, so
+    `_cost_config_override` and debug tools see the same value production ranks with.
+    """
+    base = result.similarity or 0.0
+    c = max(result.concept_complexity or 1, 1)
+    if COVERAGE_ALPHA > 0.0 and (result.image_complexity or 0) > 0:
+        coverage = min(c / result.image_complexity, 1.0)
+        base = base * (coverage ** COVERAGE_ALPHA)
+    return base + COMPLEXITY_PRIOR_LAMBDA * math.log2(c)
+
+
 def _build_comparator(
     method: str, ged_timeout: float, fgw_alpha: float
 ) -> GraphComparator:
@@ -138,16 +152,8 @@ class ClassificationOrchestrator:
             logging.warning(f"No classification results for image {image_id}")
             return []
 
-        def _complexity_adjusted_score(r: ClassificationResult) -> float:
-            base = r.similarity or 0.0
-            c = max(r.concept_complexity or 1, 1)
-            if COVERAGE_ALPHA > 0.0 and (r.image_complexity or 0) > 0:
-                coverage = min(c / r.image_complexity, 1.0)
-                base = base * (coverage ** COVERAGE_ALPHA)
-            return base + COMPLEXITY_PRIOR_LAMBDA * math.log2(c)
-
         results.sort(
-            key=lambda x: (x.is_minor, _complexity_adjusted_score(x)),
+            key=lambda x: (x.is_minor, complexity_adjusted_score(x)),
             reverse=True,
         )
 
@@ -157,7 +163,7 @@ class ClassificationOrchestrator:
             logging.info(
                 f"Top concept={top.concept_id}, sim={top.similarity}, "
                 f"concept_complexity={top.concept_complexity}, "
-                f"adjusted_score={_complexity_adjusted_score(top):.4f}"
+                f"adjusted_score={complexity_adjusted_score(top):.4f}"
             )
         logging.info(
             f"Found {matching} matching concepts out of {len(results)} processed"
