@@ -258,3 +258,39 @@ def test_comparison_figure_trace_count():
     fig = plotting.comparison_figure(img, con, edit_ops)
     # 2 edge + 2 node base traces, 1 correspondence line, 1 halo trace
     assert len(fig.data) == 6
+
+
+def _assert_equal_aspect(fig):
+    # Spatial graphs must render with locked 1:1 data aspect, else the wide-but-
+    # short panels stretch x relative to y and shear near-vertical digits to the
+    # right (mnist "1" rendered at 70deg instead of its true ~28deg lean).
+    assert fig.layout.yaxis.scaleanchor == "x"
+    assert fig.layout.yaxis.scaleratio == 1
+
+
+def test_comparison_figure_locks_equal_aspect():
+    img = _payload("i")
+    con = _payload("c")
+    fig = plotting.comparison_figure(img, con, [])
+    _assert_equal_aspect(fig)
+
+
+def test_single_graph_figure_locks_equal_aspect():
+    fig = plotting.single_graph_figure(_payload("s"))
+    _assert_equal_aspect(fig)
+
+
+def test_step_figure_locks_equal_aspect():
+    fig = plotting.step_figure(STEP, PAIR_EVENTS, animate=False)
+    _assert_equal_aspect(fig)
+
+
+def test_range_evolution_figure_keeps_independent_axes():
+    # The line chart plots step (x) vs range-width (y) — different units; locking
+    # aspect would crush it. It must NOT inherit the equal-aspect constraint.
+    steps = [
+        {"step": 1, "image_id": "a", "description": "", "concept_after": GRAPH},
+        {"step": 2, "image_id": "b", "description": "", "concept_after": GRAPH},
+    ]
+    fig = plotting.range_evolution_figure(steps)
+    assert fig.layout.yaxis.scaleanchor is None

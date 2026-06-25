@@ -244,7 +244,7 @@ def _panel_shapes(offsets: list[float]) -> list[dict]:
 
 
 def _figure_layout(fig: go.Figure, *, height: int, margin: dict,
-                   x_range=None, y_range=None) -> None:
+                   x_range=None, y_range=None, equal_aspect: bool = False) -> None:
     fig.update_layout(
         template="plotly_dark",
         paper_bgcolor=PAPER_BG,
@@ -258,6 +258,14 @@ def _figure_layout(fig: go.Figure, *, height: int, margin: dict,
     )
     fig.update_xaxes(showgrid=False, zeroline=False, visible=False, range=x_range)
     fig.update_yaxes(showgrid=False, zeroline=False, visible=False, range=y_range)
+    if equal_aspect:
+        # Lock 1:1 data aspect so node geometry is preserved regardless of the
+        # container width. Without it, a wide-but-short panel stretches x vs y
+        # and shears near-vertical shapes to the right (a "1" looked ~70° instead
+        # of its true ~28° lean). `constrain="domain"` keeps the set ranges and
+        # letterboxes the panel rather than expanding the visible range.
+        fig.update_yaxes(scaleanchor="x", scaleratio=1, constrain="domain")
+        fig.update_xaxes(constrain="domain")
 
 
 # Click a node marker to copy its id. Runs inside the components.html iframe,
@@ -397,7 +405,7 @@ def step_figure(step: dict, correspondence_events: list[dict],
     ]
     y_range = [-PANEL_HALF_HEIGHT - 0.12, PANEL_HALF_HEIGHT + 0.12]
     _figure_layout(fig, height=560, margin=dict(l=12, r=12, t=72, b=20),
-                   x_range=x_range, y_range=y_range)
+                   x_range=x_range, y_range=y_range, equal_aspect=True)
     fig.update_layout(annotations=annotations, shapes=_panel_shapes(offsets))
     return fig
 
@@ -466,7 +474,7 @@ def comparison_figure(image_graph: dict, concept_graph: dict,
                max(offsets) + PANEL_HALF_WIDTH + 0.16]
     y_range = [-PANEL_HALF_HEIGHT - 0.12, PANEL_HALF_HEIGHT + 0.12]
     _figure_layout(fig, height=height, margin=dict(l=12, r=12, t=40, b=20),
-                   x_range=x_range, y_range=y_range)
+                   x_range=x_range, y_range=y_range, equal_aspect=True)
     annotations = [
         dict(x=0.0, y=1.04, xref="x", yref="paper", text="<b>Image</b>",
              showarrow=False, xanchor="center", yanchor="bottom",
@@ -498,7 +506,7 @@ def single_graph_figure(graph: dict, *, title: str = "Skeleton",
         x_range = [-PANEL_HALF_WIDTH, PANEL_HALF_WIDTH]
         y_range = [-PANEL_HALF_HEIGHT, PANEL_HALF_HEIGHT]
     _figure_layout(fig, height=height, margin=dict(l=12, r=12, t=36, b=12),
-                   x_range=x_range, y_range=y_range)
+                   x_range=x_range, y_range=y_range, equal_aspect=True)
     fig.update_layout(annotations=[dict(
         x=0.5, y=1.0, xref="paper", yref="paper", text=f"<b>{title}</b>",
         showarrow=False, xanchor="center", yanchor="bottom",
