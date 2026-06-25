@@ -8,6 +8,13 @@ export
 # Variables
 SHELL := /bin/bash
 
+# Enable Docker BuildKit so nuctl's `docker build` uses parallel layer resolution and
+# faster context handling. Exported to recipe environments via the `export` directive above.
+DOCKER_BUILDKIT ?= 1
+
+# Max concurrent instance deploys in the multi-instance fan-out (dep_skel/contour/classification).
+DEPLOY_PARALLELISM ?= 6
+
 # Default values for classification
 CONCEPT_ID ?= default_concept
 IMAGE_ID ?= default_image
@@ -88,6 +95,11 @@ lib:
 	@$(COMMON_VENV)/twine upload $(COMMON_DIR)/dist/* --verbose || { rm -rf $(COMMON_DIR)/dist; exit 1; }
 	@rm -rf $(COMMON_DIR)/dist
 	@echo -e "${GREEN}Library built and uploaded.${NC}"
+	@# Sync the new version into every function.yaml pin so the next deploy doesn't
+	@# fail against a version PyPI no longer has (or silently build a stale one).
+	@NEW_VER=$$(grep '^version' $(COMMON_DIR)/pyproject.toml | sed 's/.*"\(.*\)"/\1/'); \
+		sed -i '' "s/natural-agi-common==[0-9][0-9.]*/natural-agi-common==$$NEW_VER/" src/*/function.yaml; \
+		echo -e "${GREEN}function.yaml pins synced to natural-agi-common==$$NEW_VER${NC}"
 	@$(PIP) install --upgrade natural-agi-common
 	@echo -e "${GREEN}Library installed in project venv.${NC}"
 
@@ -279,7 +291,7 @@ send_to_connector:
 	@echo -e "\n${GREEN}Data sent to connector successfully.${NC}"
 
 # Function deployment targets
-.PHONY: dep_conn dep_skel dep_contour dep_concept dep_classification dep_all
+.PHONY: base dep_conn dep_skel dep_contour dep_concept dep_classification dep_all
 .PHONY: undep_skel undep_contour undep_classification undep_all
 
 # Common env/trigger fragments
@@ -320,7 +332,18 @@ CONTOUR_IMAGE = nuclio/processor-contour-analysis:latest
 CLASS_IMAGE = nuclio/processor-classification:latest
 NUCLIO_LOGGER_LEVEL ?= warning
 
-dep_conn:
+# Shared base image: apt deps + pip packages used by 2+ services, built once and reused
+# as `baseImage` by every function.yaml. `docker build` caches it, so rebuilds are instant
+# unless docker/Dockerfile.base changes.
+BASE_IMAGE := naturalagi-base:latest
+BASE_DOCKERFILE := docker/Dockerfile.base
+
+base:
+	@echo -e "${BLUE}Building shared base image ($(BASE_IMAGE))...${NC}"
+	@DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build -f $(BASE_DOCKERFILE) -t $(BASE_IMAGE) docker/
+	@echo -e "${GREEN}Base image ready.${NC}"
+
+dep_conn: base
 	@echo -e "${BLUE}Deploying connector...${NC}"
 	@nuctl deploy --path src/connector \
 		--platform local \
@@ -348,15 +371,17 @@ redep_conn:
 		-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
 	@echo -e "${GREEN}Connector redeployed from cached image.${NC}"
 
-dep_skel:
+dep_skel: base
 	@echo -e "${BLUE}Deploying skeletonization ($(INSTANCES_SKEL) instances)...${NC}"
 	@echo -e "${BLUE}  Instance 1 (building image)...${NC}"
 	@nuctl deploy skeletonization --path src/skeletonization \
 		--platform local \
+		--no-pull \
 		--logger-level $(NUCLIO_LOGGER_LEVEL) \
 		--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
 		$(SKEL_ENV) $(SKEL_TRIGGERS)
 	@if [ $(INSTANCES_SKEL) -gt 1 ]; then \
+		n=0; \
 		for i in $$(seq 2 $(INSTANCES_SKEL)); do \
 			echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
 			nuctl deploy skeletonization-$$i \
@@ -364,21 +389,27 @@ dep_skel:
 				--runtime python:3.12 \
 				--handler nuclio_handler:handler \
 				--platform local \
+				--no-pull \
 				--logger-level $(NUCLIO_LOGGER_LEVEL) \
 				--volume "${LOCAL_STORAGE}:${NUCLIO_STORAGE}" \
-				$(SKEL_ENV) $(SKEL_TRIGGERS); \
+				$(SKEL_ENV) $(SKEL_TRIGGERS) & \
+			n=$$((n+1)); \
+			if [ $$((n % $(DEPLOY_PARALLELISM))) -eq 0 ]; then wait; fi; \
 		done; \
+		wait; \
 	fi
 	@echo -e "${GREEN}Skeletonization deployed ($(INSTANCES_SKEL) instances).${NC}"
 
-dep_contour:
+dep_contour: base
 	@echo -e "${BLUE}Deploying contour analysis ($(INSTANCES_CONTOUR) instances)...${NC}"
 	@echo -e "${BLUE}  Instance 1 (building image)...${NC}"
 	@nuctl deploy contour-analysis --path src/contour_analysis \
 		--platform local \
+		--no-pull \
 		--logger-level $(NUCLIO_LOGGER_LEVEL) \
 		$(CONTOUR_ENV) $(CONTOUR_TRIGGERS)
 	@if [ $(INSTANCES_CONTOUR) -gt 1 ]; then \
+		n=0; \
 		for i in $$(seq 2 $(INSTANCES_CONTOUR)); do \
 			echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
 			nuctl deploy contour-analysis-$$i \
@@ -386,16 +417,21 @@ dep_contour:
 				--runtime python:3.12 \
 				--handler nuclio_handler:handler \
 				--platform local \
+				--no-pull \
 				--logger-level $(NUCLIO_LOGGER_LEVEL) \
-				$(CONTOUR_ENV) $(CONTOUR_TRIGGERS); \
+				$(CONTOUR_ENV) $(CONTOUR_TRIGGERS) & \
+			n=$$((n+1)); \
+			if [ $$((n % $(DEPLOY_PARALLELISM))) -eq 0 ]; then wait; fi; \
 		done; \
+		wait; \
 	fi
 	@echo -e "${GREEN}Contour analysis deployed ($(INSTANCES_CONTOUR) instances).${NC}"
 
-dep_concept:
+dep_concept: base
 	@echo -e "${BLUE}Deploying concept creator...${NC}"
 	@nuctl deploy --path src/concept_creator \
 		--platform local \
+		--no-pull \
 		--logger-level $(NUCLIO_LOGGER_LEVEL) \
 		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 		-e NEO4J_USER=neo4j \
@@ -403,14 +439,16 @@ dep_concept:
 		-e USE_ENERGY_MINIMIZATION=${USE_ENERGY_MINIMIZATION}
 	@echo -e "${GREEN}Concept creator deployed.${NC}"
 
-dep_classification:
+dep_classification: base
 	@echo -e "${BLUE}Deploying classification ($(INSTANCES_CLASSIFICATION) instances)...${NC}"
 	@echo -e "${BLUE}  Instance 1 (building image)...${NC}"
 	@nuctl deploy classification --path src/classification \
 		--platform local \
+		--no-pull \
 		--logger-level $(NUCLIO_LOGGER_LEVEL) \
 		$(CLASS_ENV) $(CLASS_TRIGGERS)
 	@if [ $(INSTANCES_CLASSIFICATION) -gt 1 ]; then \
+		n=0; \
 		for i in $$(seq 2 $(INSTANCES_CLASSIFICATION)); do \
 			echo -e "${BLUE}  Instance $$i (reusing image)...${NC}"; \
 			nuctl deploy classification-$$i \
@@ -418,9 +456,13 @@ dep_classification:
 				--runtime python:3.12 \
 				--handler nuclio_handler:handler \
 				--platform local \
+				--no-pull \
 				--logger-level $(NUCLIO_LOGGER_LEVEL) \
-				$(CLASS_ENV) $(CLASS_TRIGGERS); \
+				$(CLASS_ENV) $(CLASS_TRIGGERS) & \
+			n=$$((n+1)); \
+			if [ $$((n % $(DEPLOY_PARALLELISM))) -eq 0 ]; then wait; fi; \
 		done; \
+		wait; \
 	fi
 	@echo -e "${GREEN}Classification deployed ($(INSTANCES_CLASSIFICATION) instances).${NC}"
 
@@ -459,7 +501,7 @@ undep_all: undep_skel undep_contour undep_classification
 	@nuctl delete function concept-creator --platform local 2>/dev/null || true
 	@echo -e "${GREEN}All functions removed.${NC}"
 
-dep_all: dep_conn dep_skel dep_contour dep_concept dep_classification
+dep_all: base dep_conn dep_skel dep_contour dep_concept dep_classification
 	@echo -e "${BLUE}Pruning dangling Docker images and volumes...${NC}"
 	@docker image prune -f
 	@docker volume prune -f

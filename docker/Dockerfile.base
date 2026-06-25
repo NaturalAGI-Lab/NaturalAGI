@@ -1,0 +1,33 @@
+# Shared base image for all NaturalAGI Nuclio functions.
+# Carries the apt deps + the pip packages installed by >=2 services, pinned to the
+# exact versions used across function.yaml files. Each function.yaml sets
+# `build.baseImage: naturalagi-base:latest` and then installs only its unique deps
+# plus the frequently-changing natural-agi-common lib on top.
+#
+# Build with: make base   (cached after first build; rebuilds only when this file changes)
+FROM python:3.12
+
+# Runtime libs for OpenCV (libgl1, NOT the -dev package) + glib. --no-install-recommends
+# keeps the layer lean; clean apt lists so they don't bloat the image.
+RUN apt-get update -y --fix-missing \
+    && apt-get install -y --no-install-recommends libgl1 libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
+# Shared pip set (installed by 2+ services), exact pins matching the function.yaml files.
+RUN pip install --no-cache-dir \
+    numpy==2.4.2 \
+    networkx==3.6.1 \
+    msgpack==1.1.2 \
+    pydantic-settings==2.13.1 \
+    kafka-python==2.3.0 \
+    neo4j==6.1.0 \
+    scipy==1.17.1 \
+    scikit-learn==1.8.0 \
+    requests==2.32.5 \
+    opentelemetry-api==1.40.0 \
+    opentelemetry-sdk==1.40.0 \
+    opentelemetry-exporter-otlp-proto-http==1.40.0
+
+# Nuclio's Python processor expects the msgpack wheel available offline at this path.
+RUN mkdir -p /home/nuclio/bin/py3.12-whl \
+    && pip download msgpack==1.1.2 --only-binary=:all: -d /home/nuclio/bin/py3.12-whl --no-deps
