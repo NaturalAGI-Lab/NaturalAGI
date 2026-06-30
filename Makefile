@@ -178,10 +178,12 @@ create_concept:
 		--body '{"session_id": "$(CC_SESSION_ID)", "concept_name": "$(CC_CONCEPT_NAME)", "concept_id": "$(CC_SESSION_ID)"}'
 	@echo -e "${GREEN}Concept creation invoked.${NC}"
 
-# Invalidate the in-memory concept cache on every classification instance after a
-# retrain, without redeploying. Each instance caches concepts in init_context();
-# nuctl invoke reaches each one by name (its HTTP port is exposed even when the
-# only configured trigger is Kafka), so we fan out the reload_concepts control op.
+# Refresh the in-memory concept cache on every classification instance after a
+# retrain, without redeploying. Each instance has TWO triggers (http + kafka) in
+# SEPARATE worker processes with separate caches; nuctl invoke reaches only the HTTP
+# worker, so it raises a shared-fs signal that the Kafka classify worker reloads on
+# (see _maybe_reload_concepts). We fan out per-instance because the signal file is
+# container-local. Reload lands on each instance's next classify message.
 reload_concepts:
 	@echo -e "${BLUE}Reloading concept cache on all classification instances...${NC}"
 	@for fn in $$(nuctl get functions --platform local 2>/dev/null \

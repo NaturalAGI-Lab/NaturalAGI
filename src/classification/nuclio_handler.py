@@ -5,6 +5,7 @@ import logging
 import os
 import time
 from contextlib import contextmanager
+from pathlib import Path
 from typing import Optional
 
 from kafka import KafkaProducer
@@ -19,6 +20,25 @@ from repository.concept_repository import ConceptRepository
 from repository.image_repository import ImageRepository
 
 HANDLER_NAME = "classification"
+
+# Cross-process reload signal. The HTTP control worker and the Kafka classify worker
+# are separate processes (one per trigger) that cannot share in-memory state, but they
+# share the container filesystem. The control op touches this file; the Kafka worker
+# reloads its cache when the file is newer than its last load. Overridable for tests.
+RELOAD_SIGNAL_PATH = os.environ.get(
+    "CONCEPT_RELOAD_SIGNAL_PATH", "/tmp/nuclio_concept_cache_reload"
+)
+
+
+def _reload_signal_mtime() -> float:
+    try:
+        return os.stat(RELOAD_SIGNAL_PATH).st_mtime
+    except OSError:
+        return 0.0
+
+
+def _raise_reload_signal() -> None:
+    Path(RELOAD_SIGNAL_PATH).touch()
 
 
 class Settings(BaseSettings):
@@ -91,12 +111,30 @@ def _load_concept_cache(context) -> int:
         cid: concept_repo.get_concept_graph(cid) for cid in concept_ids
     }
     _annotate_range_widths(concept_graphs)
+    _cf.compute_feature_global_spans(concept_graphs)
     setattr(context.user_data, "concept_graphs", concept_graphs)
+    setattr(context.user_data, "concept_reload_mtime", _reload_signal_mtime())
     context.logger.info_with(
         f"Loaded + annotated {len(concept_graphs)} concept graphs",
         handler=HANDLER_NAME,
     )
     return len(concept_graphs)
+
+
+def _maybe_reload_concepts(context) -> None:
+    """Hot-reload the concept cache if another worker raised the reload signal.
+
+    The HTTP control op and this Kafka worker are separate processes, so the op
+    cannot mutate this worker's cache directly — it touches a shared signal file
+    instead. We reload only when that file is newer than our last load, so the
+    cost on the classify path is a single os.stat per message.
+    """
+    if _reload_signal_mtime() > getattr(context.user_data, "concept_reload_mtime", 0.0):
+        context.logger.info_with(
+            "Concept reload signal detected; reloading concept cache",
+            handler=HANDLER_NAME,
+        )
+        _load_concept_cache(context)
 
 
 def init_context(context):
@@ -141,6 +179,12 @@ def init_context(context):
     epsilon_env = os.environ.get("CLASSIFICATION_DIAGNOSTIC_WEIGHT_EPSILON")
     if epsilon_env:
         _cf.DIAGNOSTIC_WEIGHT_EPSILON = float(epsilon_env)
+    gate_env = os.environ.get("CLASSIFICATION_RANGE_GATE_REL_WIDTH")
+    if gate_env:
+        _cf.RANGE_GATE_REL_WIDTH = float(gate_env)
+    span_env = os.environ.get("CLASSIFICATION_RANGE_SOFTEN_SPAN")
+    if span_env:
+        _cf.RANGE_SOFTEN_SPAN = float(span_env)
 
 
 def kafka_handler(context, event):
@@ -153,6 +197,8 @@ def kafka_handler(context, event):
 
     if data["operation"] != "classify":
         return
+
+    _maybe_reload_concepts(context)
 
     image_id = data["parameters"]["image_id"]
     profiling = data["profiling"]
@@ -323,9 +369,12 @@ def _classify_with_trace(context, event, data, image_id, classification_params,
 def http_handler(context, event):
     """Handles HTTP control requests (cache invalidation, health ping).
 
-    `reload_concepts` rebuilds this instance's concept cache from Neo4j without a
-    redeploy. Invoked per-instance by name via `nuctl invoke` (see the
-    `reload_concepts` Makefile target), which fans out to every instance.
+    `reload_concepts` runs on the HTTP-trigger worker, a SEPARATE process from the
+    Kafka-trigger worker that actually classifies — so reloading this worker's cache
+    alone is invisible to the classify path. We therefore raise a shared filesystem
+    signal that the Kafka worker checks per message and reloads on (see
+    `_maybe_reload_concepts`). Invoked per-instance via `nuctl invoke` (the
+    `reload_concepts` Makefile target fans out to every instance).
     """
     try:
         body = event.body if isinstance(event.body, dict) else json.loads(event.body or b"{}")
@@ -334,8 +383,11 @@ def http_handler(context, event):
 
     operation = body.get("operation")
     if operation == "reload_concepts":
+        _raise_reload_signal()
         count = _load_concept_cache(context)
-        return json.dumps({"status": "reloaded", "concept_count": count})
+        return json.dumps(
+            {"status": "reloaded", "concept_count": count, "signal_raised": True}
+        )
 
     return json.dumps({"status": "ok"})
 
