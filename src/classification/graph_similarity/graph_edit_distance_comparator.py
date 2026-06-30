@@ -1,5 +1,4 @@
 import logging
-import time
 
 import networkx as nx
 
@@ -111,10 +110,13 @@ class GraphEditDistanceComparator:
 
         try:
             best_cost = None
-            deadline = time.monotonic() + ged_timeout
             iterations = 0
 
-            for cost in nx.optimize_graph_edit_distance(
+            # `timeout` is enforced INSIDE optimize_edit_paths (checked during the
+            # search), so it bounds even the first/expensive solution. The older
+            # optimize_graph_edit_distance generator took no timeout and its first
+            # yield could run 60-80s uninterruptibly, ignoring ged_timeout entirely.
+            for _node_path, _edge_path, cost in nx.optimize_edit_paths(
                 image_graph,
                 concept_graph,
                 node_subst_cost=node_subst_cost,
@@ -123,12 +125,10 @@ class GraphEditDistanceComparator:
                 edge_match=edge_match,
                 edge_del_cost=edge_del_cost,
                 edge_ins_cost=edge_ins_cost,
+                timeout=ged_timeout,
             ):
                 best_cost = cost
                 iterations += 1
-                if time.monotonic() >= deadline:
-                    logger.info(f"GED timeout after {iterations} iterations")
-                    break
 
             if best_cost is None:
                 return 0.0
