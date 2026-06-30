@@ -64,7 +64,7 @@ PARAMS ?= {}
 USE_ENERGY_MINIMIZATION ?= true
 
 # Phony targets
-.PHONY: all deploy unpack_dataset train classify send_random_image clean docker_clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
+.PHONY: all deploy unpack_dataset repack_dataset train classify send_random_image clean docker_clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
 
 # Kafka-related targets
 .PHONY: create_kafka_topics list_kafka_topics
@@ -246,6 +246,17 @@ unpack_dataset:
 		exit 1; \
 	fi
 
+repack_dataset:
+	@if [ ! -d datasets ] || [ -z "$$(ls -A datasets 2>/dev/null)" ]; then \
+		echo -e "${RED}datasets/ is missing or empty - nothing to pack.${NC}"; \
+		exit 1; \
+	fi
+	@echo -e "${BLUE}Repacking datasets/ -> datasets.zip (fresh build; drops .DS_Store)...${NC}"
+	@rm -f datasets.zip
+	@zip -r -X -q datasets.zip datasets -x '*.DS_Store'
+	@echo -e "${GREEN}Repacked datasets.zip ($$(du -h datasets.zip | cut -f1), $$(unzip -Z1 datasets.zip | grep -v '/$$' | wc -l | tr -d ' ') files).${NC}"
+	@echo -e "${GREEN}Run 'git add datasets.zip' and commit to persist.${NC}"
+
 dashboard:
 	cd src/training && streamlit run dashboard.py --server.port 8501
 
@@ -267,6 +278,7 @@ help:
 	@echo "  clean              - Clean up training results"
 	@echo "  docker_clean       - Remove dangling volumes, build cache, and stale Nuclio images"
 	@echo "  unpack_dataset     - Unpack datasets.zip (skips if already unpacked)"
+	@echo "  repack_dataset     - Rebuild datasets.zip from current datasets/ (then git add)"
 	@echo "  help               - Show this help message"
 	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
 	@echo ""
