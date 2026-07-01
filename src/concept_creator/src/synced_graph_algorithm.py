@@ -1,6 +1,6 @@
 import networkx as nx
 import logging
-from typing import Tuple, List, Any, Optional
+from typing import Tuple, List, Any
 from src.property_handlers import PropertyProcessor
 from src.node_similarity_calculator import NodeSimilarityCalculator
 from src.critical_point_preprocessor import CriticalPointPreprocessor

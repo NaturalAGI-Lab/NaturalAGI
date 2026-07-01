@@ -1,5 +1,6 @@
 """One-shot retrain script: clear Neo4j, then train all 13 active subclasses
-deterministically from `tests/prepared_samples/<X_Y>/` and create each concept.
+deterministically via `make train_prepared_samples_*` (samples under `datasets/`)
+and create each concept.
 
 Subclasses match the 2026-04-27 baseline run (run_20260427_144233):
 0_1, 1_1, 1_3, 2_1, 2_2, 3_1, 4_1, 4_2, 5_1, 6_1, 7_1, 8_1, 9_2.
@@ -9,7 +10,7 @@ from __future__ import annotations
 import os
 import subprocess
 
-from infrastructure import wait_for_kafka_idle, verify_concept_created
+from infrastructure import wait_for_kafka_idle, verify_concept_created, reload_concept_cache
 
 _PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
@@ -62,5 +63,5 @@ if __name__ == "__main__":
     # Concepts are cached per-instance in classification's init_context(); fan out
     # a reload so the running instances pick up the retrained concepts without a
     # redeploy.
-    subprocess.run(["make", "reload_concepts"], cwd=_PROJECT_ROOT, check=True)
+    reload_concept_cache()
     print("Concept cache reloaded on all classification instances.")
