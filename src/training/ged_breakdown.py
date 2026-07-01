@@ -121,10 +121,40 @@ def _cost_config_ctx(classification_params):
     )
 
 
+def load_run_concepts(run_dir: str) -> dict:
+    """Load the run's persisted concept snapshot ({concept_id: nx.Graph}).
+
+    The drilldown must score against the topologies the run actually used, not the
+    current Neo4j state (which changes on every retrain). Returns {} if the run
+    predates concept-snapshot persistence.
+    """
+    snapshot = Path(run_dir) / "concept_graphs.json"
+    if not snapshot.exists():
+        return {}
+    from evaluation import restore_concept_snapshot
+
+    return restore_concept_snapshot(str(snapshot))
+
+
+def _prime_feature_context(all_concepts: dict) -> None:
+    """Replicate production's cache-load setup (range-width annotation + global
+    feature spans) so D33 out-of-range softening and diagnostic weights match the
+    live decision. Without it FEATURE_GLOBAL_SPANS stays empty and every
+    out-of-range feature hits the hard NO_MATCH cliff — a similarity the run never
+    produced.
+    """
+    from nuclio_handler import _annotate_range_widths
+    from graph_similarity import cost_functions as _cf
+
+    _annotate_range_widths(all_concepts)
+    _cf.compute_feature_global_spans(all_concepts)
+
+
 def compute_breakdown(
     image_graph,
     concept_id,
     concept_graph,
+    all_concepts: dict | None = None,
     ged_timeout: float | None = None,
     classification_params: dict | None = None,
 ) -> dict:
@@ -132,6 +162,8 @@ def compute_breakdown(
         params_timeout = (classification_params or {}).get("ged_timeout")
         ged_timeout = float(params_timeout) if params_timeout is not None else 5.0
     with _cost_config_ctx(classification_params):
+        if all_concepts:
+            _prime_feature_context(all_concepts)
         prep_image, prep_concept = ConceptMinorClassifier().preprocess_pair(
             image_graph, concept_graph
         )

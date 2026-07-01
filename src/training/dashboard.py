@@ -163,9 +163,16 @@ def cached_breakdown(run: str, image_id: str, concept_id: str) -> dict | None:
     graph = ged_breakdown.get_image_graph_if_present(get_driver(), image_id)
     if graph is None:
         return None
-    concept_graph = ged_breakdown.get_concept_graph(get_driver(), concept_id)
+    # Score against the run's persisted concept snapshot (the exact topologies it
+    # used), not the current Neo4j state — which changes on every retrain.
+    concepts = ged_breakdown.load_run_concepts(run)
+    concept_graph = concepts.get(concept_id)
+    if concept_graph is None:
+        # Run predates concept-snapshot persistence → fall back to live Neo4j.
+        concept_graph = ged_breakdown.get_concept_graph(get_driver(), concept_id)
+        concepts = None
     return ged_breakdown.compute_breakdown(
-        graph, concept_id, concept_graph,
+        graph, concept_id, concept_graph, all_concepts=concepts,
         classification_params=_classification_params_for_run(run),
     )
 
@@ -290,10 +297,16 @@ with tab_incorrect:
                 image_id = str(row["image_id"])
                 expected = str(row["expected"])
 
+                raw_results = row.get("classification_results")
                 parse_ok = True
-                try:
-                    results_list = json.loads(row["classification_results"])
-                except (json.JSONDecodeError, TypeError):
+                if isinstance(raw_results, str):
+                    try:
+                        results_list = json.loads(raw_results)
+                    except json.JSONDecodeError:
+                        results_list = []
+                        parse_ok = False
+                else:
+                    # Column absent (leaner run schema) or NaN — not a parse failure.
                     results_list = []
                     parse_ok = False
 
@@ -340,6 +353,12 @@ with tab_incorrect:
                             plotting.figure_html(sk_fig, include_plotlyjs="cdn"),
                             height=int(sk_fig.layout.height or 300) + 8,
                             scrolling=False,
+                        )
+                        st.caption(
+                            "⚠︎ Skeleton + breakdown image graph come from **live** "
+                            "Neo4j by image_id. If a later run reused this image_id "
+                            "(deterministic ids + delete_image_nodes=False), this may "
+                            "not be the graph this run actually scored."
                         )
                     else:
                         st.info(
