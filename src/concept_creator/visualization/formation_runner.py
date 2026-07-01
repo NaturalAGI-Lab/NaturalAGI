@@ -4,7 +4,7 @@ plain-types payload pickle for the Streamlit app.
 
 Neo4j mode:   python visualization/formation_runner.py --session 7_1 --out out.pkl
 Offline mode: python visualization/formation_runner.py \
-                  --samples-dir probes/repro/sample_data/seven_flipped --out out.pkl
+                  --samples-dir /path/to/graph/json/dir --out out.pkl
 
 This module is the ONLY place concept_creator code is imported by the viz tool —
 each subprocess run picks up the current source.
@@ -24,8 +24,8 @@ import networkx as nx
 _CC_DIR = Path(__file__).parent.parent
 sys.path.insert(0, str(_CC_DIR))
 
-from probes.instrumentation import FormationRecorder, attach_instrumentation
-from probes.probe_concept_formation import (
+from instrumentation import FormationRecorder, attach_instrumentation
+from probe_concept_formation import (
     _build_offline_service,
     _determine_start_point,
     _load_graphs_from_dir,

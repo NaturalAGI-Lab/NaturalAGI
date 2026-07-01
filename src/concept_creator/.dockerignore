@@ -1,6 +1,6 @@
 # Keep the Nuclio build context minimal: ship only runtime source.
-# probes/ (80 MB of dev driver logs/outputs), saved_graphs/ debug dumps, docs, tests
-# and notebooks are imported only by the host-side viz/dev tooling, never by the
+# visualization/ (host-side Streamlit dev tool), saved_graphs/ debug dumps, docs,
+# tests and notebooks are imported only by host-side viz/dev tooling, never by the
 # nuclio_handler runtime chain — exclude them from the image build context.
 __pycache__/
 **/__pycache__/
@@ -10,7 +10,7 @@ __pycache__/
 .pytest_cache/
 *.ipynb
 *.gif
-probes/
+visualization/
 saved_graphs/
 docs/
 test/

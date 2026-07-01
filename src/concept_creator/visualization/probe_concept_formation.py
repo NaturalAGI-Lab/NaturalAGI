@@ -2,10 +2,10 @@
 probe_concept_formation.py — CLI instrument for concept formation.
 
 Neo4j mode:
-    python probes/probe_concept_formation.py --session <id> [--concept-id foo] [--steps N]
+    python visualization/probe_concept_formation.py --session <id> [--concept-id foo] [--steps N]
 
 Offline mode (no Neo4j):
-    python probes/probe_concept_formation.py --samples-dir probes/repro/sample_data/seven_clean
+    python visualization/probe_concept_formation.py --samples-dir /path/to/graph/json/dir
 """
 import argparse
 import copy
@@ -22,7 +22,6 @@ import networkx as nx
 # ------------------------------------------------------------------ paths --
 _PROBE_DIR = Path(__file__).parent
 _SRC_DIR = _PROBE_DIR.parent
-_COMMON_DIR = Path(__file__).parent.parent.parent.parent.parent / "common"
 sys.path.insert(0, str(_SRC_DIR))
 # common is also found via PYTHONPATH set by the caller
 
@@ -34,9 +33,8 @@ from src.model.concept_result import ConceptFormationStep, ConceptResult
 from src.node_similarity_calculator import NodeSimilarityCalculator
 from src.property_handlers import PropertyProcessor
 from src.synced_graph_algorithm import SyncedGraphMinorFinder
-from src.utils.graph_saver import GraphSaver
 
-from probes.instrumentation import FormationRecorder, attach_instrumentation
+from instrumentation import FormationRecorder, attach_instrumentation
 
 # -----------------------------------------------------------------------
 
@@ -353,7 +351,6 @@ def main():
     parser.add_argument("--concept-id", default="probe")
     parser.add_argument("--steps", type=int, default=None)
     parser.add_argument("--out", default=None, help="Output directory")
-    parser.add_argument("--viz", action="store_true", help="Render per-step PNGs")
     args = parser.parse_args()
 
     concept_id = args.concept_id
@@ -403,23 +400,6 @@ def main():
     mean_xy, _ = _write_range_evolution(result, out_dir)
     summ = _write_summary(recorder, result, mean_xy, out_dir)
     _write_report(summ, recorder, mean_xy, out_dir)
-
-    # Visualisation
-    if args.viz:
-        from probes.step_visualizer import render_step
-
-        for step in result.steps_debug[1:]:
-            s = step.current_step
-            step_events = [e for e in recorder.events if e.get("step") == s]
-            out_png = out_dir / f"step_{s:03d}.png"
-            render_step(
-                concept_before=step.current_concept,
-                image_graph=step.current_image,
-                concept_after=step.resulted_concept,
-                merge_events_for_step=step_events,
-                out_png=out_png,
-            )
-            print(f"  wrote {out_png}")
 
     print(f"\nResults written to {out_dir}/")
     print(f"  summary.json  — {summ['total_merges']} merges, "
