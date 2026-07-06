@@ -18,13 +18,34 @@ from graph_similarity.ged_comparator import GEDComparator
 # P(concept | match) ∝ P(match | concept) * P(concept). Smaller concepts have higher
 # P(match | random graph), so their observed similarity is less informative. The log2
 # term is the number of bits needed to specify a graph of that complexity (MDL prior).
-# Empirically, lambda=0.02 gives increments of ~0.046–0.092 over c=5..24, matching
-# the observed tiebreaker margin of 0.01–0.05 from the top1-issue analysis.
 # Reference: Grünwald (2007) MDL Ch 17; Cilibrasi-Vitányi (2005) NCD.
 # Winner of exp_050..exp_053 bench — see researches/ged_size_bias_four_methods_findings.md.
-COMPLEXITY_PRIOR_LAMBDA = 0.02
+# lambda=0.10 (raised from 0.02) is the validated full-set optimum: exact offline sweep nets
+# +31 at 25%, live full run 86.21%→86.70% (lifts class-2 recall, suppresses small-concept
+# over-fire); plateau 0.10–0.12. See researches/complexity_preference_rule_findings.md (Phase 2/3).
+COMPLEXITY_PRIOR_LAMBDA = 0.10
+
+# Image-relative coverage penalty (per-message tunable). adjusted_sim = sim * coverage^alpha,
+# coverage = min(concept_complexity / image_complexity, 1.0). alpha=0 disables (baseline).
+# Penalizes a small concept matching a large image (the small-concept over-fire) without
+# penalizing the same concept on a same-size image.
+COVERAGE_ALPHA = 0.0
 
 logging.basicConfig(level=logging.DEBUG)
+
+
+def complexity_adjusted_score(result: ClassificationResult) -> float:
+    """Ranking score = similarity (× optional coverage penalty) + log-complexity prior.
+
+    Reads the module-level COMPLEXITY_PRIOR_LAMBDA / COVERAGE_ALPHA at call time, so
+    `_cost_config_override` and debug tools see the same value production ranks with.
+    """
+    base = result.similarity or 0.0
+    c = max(result.concept_complexity or 1, 1)
+    if COVERAGE_ALPHA > 0.0 and (result.image_complexity or 0) > 0:
+        coverage = min(c / result.image_complexity, 1.0)
+        base = base * (coverage ** COVERAGE_ALPHA)
+    return base + COMPLEXITY_PRIOR_LAMBDA * math.log2(c)
 
 
 def _build_comparator(
@@ -131,13 +152,8 @@ class ClassificationOrchestrator:
             logging.warning(f"No classification results for image {image_id}")
             return []
 
-        def _complexity_adjusted_score(r: ClassificationResult) -> float:
-            base = r.similarity or 0.0
-            c = max(r.concept_complexity or 1, 1)
-            return base + COMPLEXITY_PRIOR_LAMBDA * math.log2(c)
-
         results.sort(
-            key=lambda x: (x.is_minor, _complexity_adjusted_score(x)),
+            key=lambda x: (x.is_minor, complexity_adjusted_score(x)),
             reverse=True,
         )
 
@@ -147,7 +163,7 @@ class ClassificationOrchestrator:
             logging.info(
                 f"Top concept={top.concept_id}, sim={top.similarity}, "
                 f"concept_complexity={top.concept_complexity}, "
-                f"adjusted_score={_complexity_adjusted_score(top):.4f}"
+                f"adjusted_score={complexity_adjusted_score(top):.4f}"
             )
         logging.info(
             f"Found {matching} matching concepts out of {len(results)} processed"

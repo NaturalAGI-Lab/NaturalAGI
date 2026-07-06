@@ -80,6 +80,24 @@ class EndpointReductionStrategy(AbstractReductionStrategy):
             )
         )
 
+        # A concept/image endpoint pair that is each other's nearest neighbour is
+        # a genuine match, not an unmatched spur — keep it even if its distance
+        # is just over the removal threshold. Deleting such a pair both destroys
+        # the correspondence and, when the survivor sits on an intersection-free
+        # arc, leaves no spur to prune (crash). Only the truly unmatched excess
+        # endpoint should be reduced here.
+        mutual_pairs = self.distance_matrix_calculator.find_mutual_nearest_pairs(
+            distance_matrix
+        )
+        matched_concept = {concept_endpoints[row] for row, _ in mutual_pairs}
+        matched_image = {image_endpoints[col] for _, col in mutual_pairs}
+        concept_endpoints_above_threshold = [
+            ep for ep in concept_endpoints_above_threshold if ep not in matched_concept
+        ]
+        image_endpoints_above_threshold = [
+            ep for ep in image_endpoints_above_threshold if ep not in matched_image
+        ]
+
         if concept_endpoints_above_threshold:
             self.logger.info(
                 f"Concept endpoints below threshold ({len(concept_endpoints_above_threshold)}): {concept_endpoints_above_threshold}"

@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import logging
 import os
+import subprocess
 import time
 from typing import Dict
 
@@ -125,6 +126,41 @@ def wait_for_kafka_idle(
         consumer.close()
 
 
+def wait_for_neo4j_session(
+    session_id: str,
+    stable_for: float = 10.0,
+    timeout: int = 180,
+    poll_interval: float = 2.0,
+    uri: str = _NEO4J_URI,
+    user: str = _NEO4J_USER,
+    password: str = _NEO4J_PASS,
+) -> None:
+    """Block until distinct image_id count for session_id stops growing for stable_for seconds."""
+    driver = GraphDatabase.driver(uri, auth=(user, password))
+    deadline = time.time() + timeout
+    last_count = -1
+    stable_since: float | None = None
+    try:
+        while time.time() < deadline:
+            with driver.session() as neo4j_session:
+                result = neo4j_session.run(
+                    "MATCH (n:Point {session_id: $sid}) RETURN count(DISTINCT n.image_id) AS c",
+                    sid=session_id,
+                )
+                count = result.single()["c"]
+            if count != last_count:
+                print(f"Neo4j {session_id}: {count} images", flush=True)
+                last_count = count
+                stable_since = time.time()
+            elif count > 0 and stable_since is not None and (time.time() - stable_since) >= stable_for:
+                print(f"Neo4j {session_id}: stable at {count} — done.", flush=True)
+                return
+            time.sleep(poll_interval)
+    finally:
+        driver.close()
+    raise TimeoutError(f"Session {session_id}: only {last_count} images in Neo4j after {timeout}s")
+
+
 def clean_kafka_topics(
     bootstrap_servers: str = "localhost:29092",
     topics: list[str] | None = None,
@@ -162,6 +198,24 @@ def clean_kafka_topics(
 # ---------------------------------------------------------------------------
 # Neo4j cleanup
 # ---------------------------------------------------------------------------
+
+def clear_session_nodes(
+    session_id: str,
+    uri: str = _NEO4J_URI,
+    user: str = _NEO4J_USER,
+    password: str = _NEO4J_PASS,
+) -> None:
+    """Delete all nodes tagged with session_id (training images, not concepts)."""
+    driver = GraphDatabase.driver(uri, auth=(user, password))
+    with driver.session() as neo4j_session:
+        result = neo4j_session.run(
+            "MATCH (n {session_id: $sid}) DETACH DELETE n RETURN count(n) AS deleted",
+            sid=session_id,
+        )
+        deleted = result.single()["deleted"]
+    driver.close()
+    print(f"Cleared {deleted} nodes for session_id={session_id}", flush=True)
+
 
 def clean_neo4j_db(
     uri: str = _NEO4J_URI,
@@ -209,3 +263,19 @@ def delete_test_neo4j_nodes(
         session.run("MATCH (n {session_id: 'test'}) DETACH DELETE n")
     driver.close()
     print("Test nodes deleted.")
+
+
+# ---------------------------------------------------------------------------
+# Classification instance control
+# ---------------------------------------------------------------------------
+
+def reload_concept_cache() -> None:
+    """Fan out a concept-cache reload to every running classification instance.
+
+    Classification caches concepts per-instance in init_context(), so retrained
+    concepts are invisible until the cache is refreshed. Call this after retraining
+    (or right before a test session) to pick up new concepts WITHOUT a redeploy.
+    Delegates to the `reload_concepts` Make target (single source of truth).
+    """
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    subprocess.run(["make", "reload_concepts"], cwd=project_root, check=True)

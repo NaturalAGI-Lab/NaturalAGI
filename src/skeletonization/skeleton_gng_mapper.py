@@ -8,6 +8,11 @@ import gng
 from settings import Settings
 from network_simplification import NetworkSimplification
 from converter import Converter
+from junction_merge import (
+    merge_short_junction_bridges,
+    estimate_stroke_width,
+    BRIDGE_MERGE_FACTOR,
+)
 from normalization import normalize_graph
 from common import timed
 
@@ -55,6 +60,9 @@ class SkeletonGNGMapper:
                         net = self.fit_gng(points)
                         simplified = self._simplify_network(net)
                         graph = self._convert_to_networkx(simplified)
+                        graph = self._merge_junction_bridges(
+                            graph, image, current_threshold, skeleton
+                        )
                         graph = self._normalize(graph)
 
                         connected = nx.is_connected(graph)
@@ -159,6 +167,16 @@ class SkeletonGNGMapper:
         span = trace.get_current_span()
         span.set_attribute("node_count", graph.number_of_nodes())
         span.set_attribute("edge_count", graph.number_of_edges())
+        return graph
+
+    @_tracer.start_as_current_span("skeletonization.merge_junction_bridges")
+    def _merge_junction_bridges(self, graph, image, threshold, skeleton):
+        binary = self.binary_image(image, threshold)
+        stroke_width = estimate_stroke_width(binary, skeleton)
+        graph = merge_short_junction_bridges(graph, BRIDGE_MERGE_FACTOR * stroke_width)
+        span = trace.get_current_span()
+        span.set_attribute("stroke_width", stroke_width)
+        span.set_attribute("node_count", graph.number_of_nodes())
         return graph
 
     @_tracer.start_as_current_span("skeletonization.normalize")

@@ -14,12 +14,12 @@ volumes:
 
 services:
 
-  server1:
+  neo4j:
     # Docker image to be used
     image: ${NEO4J_DOCKER_IMAGE}
 
     # Hostname
-    hostname: server1
+    hostname: neo4j
 
     # Service-level network, which specifies the networks, from the list of the top-level networks (in this case only neo4j-internal), that the server will connect to.
     # Adds a network alias (used in neo4j.conf when configuring the discovery members)
@@ -123,18 +123,18 @@ services:
       - neo4j-internal
     <<: *default-logging
 
-  kafka-ui:
-    image: ghcr.io/kafbat/kafka-ui:v1.4.2
-    networks:
-      - neo4j-internal
-    depends_on:
-      - kafka
-    ports:
-      - "8080:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${HOST_IP}:29092
-    <<: *default-logging
+  # kafka-ui:
+  #   image: ghcr.io/kafbat/kafka-ui:v1.4.2
+  #   networks:
+  #     - neo4j-internal
+  #   depends_on:
+  #     - kafka
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     KAFKA_CLUSTERS_0_NAME: local
+  #     KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: ${HOST_IP}:29092
+  #   <<: *default-logging
 
   postgres:
     image: postgres:16-alpine

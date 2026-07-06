@@ -142,6 +142,12 @@ class StartPointService:
         return None
 
     def _determine_structure_type(self, graph: nx.Graph) -> str:
+        # Concept-driven regime: the concept's expected_start_degree says whether its anchor
+        # is a junction (>1 -> "Closed") or a tail (==1 -> "Open"). Honoring it keeps the
+        # image's anchor consistent with the concept's, so a single noise spur cannot flip a
+        # closed double-loop ("8") into the open regime and pin the start on the spur.
+        if self.expected_start_degree is not None:
+            return "Open" if int(self.expected_start_degree) <= 1 else "Closed"
         return (
             "Open"
             if any(nx.degree(graph, node) == 1 for node in graph.nodes)

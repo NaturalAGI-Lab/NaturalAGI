@@ -1,5 +1,5 @@
 import logging
-from typing import List, Any, Optional, Set
+from typing import List, Any, Optional, Set, Tuple
 import numpy as np
 import networkx as nx
 from scipy.optimize import linear_sum_assignment
@@ -160,6 +160,35 @@ class DistanceMatrixCalculator:
                 
         return points_above_threshold
     
+    def find_mutual_nearest_pairs(
+        self, distance_matrix: np.ndarray
+    ) -> List[Tuple[int, int]]:
+        """Find (row, col) index pairs that are each other's nearest neighbour.
+
+        A row r and column c form a mutual-nearest pair when c is the nearest
+        column to r AND r is the nearest row to c. Such a pair is a genuine
+        match: it must not be treated as an unmatched, removable point even when
+        its distance exceeds the removal threshold.
+
+        Args:
+            distance_matrix: Shape (n_rows, n_cols).
+
+        Returns:
+            List of (row_index, col_index) mutual-nearest pairs.
+        """
+        if distance_matrix.size == 0:
+            return []
+
+        nearest_col_for_row = np.argmin(distance_matrix, axis=1)
+        nearest_row_for_col = np.argmin(distance_matrix, axis=0)
+
+        pairs: List[Tuple[int, int]] = []
+        for row in range(distance_matrix.shape[0]):
+            col = int(nearest_col_for_row[row])
+            if int(nearest_row_for_col[col]) == row:
+                pairs.append((row, col))
+        return pairs
+
     def find_points_for_difference(
         self,
         distance_matrix: np.ndarray,
@@ -232,16 +261,27 @@ class DistanceMatrixCalculator:
         distance_matrix: np.ndarray,
         points_large: List[Any],
         difference: int,
+        orientation: Optional[str] = None,
     ) -> List[Any]:
         """Find points to remove using order-preserving matching.
 
-        Uses DP to find the minimum-cost assignment that respects the sequential
-        order of points along a path, then returns the unmatched (excess) points.
+        The monotone DP respects the sequential order of points along a path, but
+        that only yields the right matching when both sequences share one traversal
+        orientation. The two loops of a figure-8 can be emitted in opposite angular
+        order, where the geometrically correct match is a crossing the forward DP
+        cannot express.
+
+        Orientation handling:
+            "forward"/"reverse" — caller decided the orientation geometrically
+                (e.g. by loop winding) and forces it.
+            None — fall back to the cost heuristic: run both orientations and keep
+                the one with the lower matched cost.
 
         Args:
             distance_matrix: Shape (m, n) where m > n. Rows = large set, cols = small set.
             points_large: Point IDs for the larger set (rows), in path order.
             difference: Number of points to remove (m - n).
+            orientation: "forward", "reverse", or None (cost-based).
 
         Returns:
             List of point IDs from points_large that were not matched.
@@ -252,21 +292,55 @@ class DistanceMatrixCalculator:
         if distance_matrix.size == 0:
             raise ValueError("Distance matrix is empty.")
 
+        m, _ = distance_matrix.shape
+
+        fwd_cost, fwd_matched = self._ordered_match(distance_matrix)
+        rev_cost, rev_matched = self._ordered_match(distance_matrix[::-1])
+        # Reversed matches are in flipped-row space; map back to original indices.
+        rev_matched = {m - 1 - i for i in rev_matched}
+
+        if orientation == "forward":
+            matched_indices, chosen = fwd_matched, "forward(forced)"
+        elif orientation == "reverse":
+            matched_indices, chosen = rev_matched, "reverse(forced)"
+        elif rev_cost < fwd_cost:
+            matched_indices, chosen = rev_matched, "reversed"
+        else:
+            matched_indices, chosen = fwd_matched, "forward"
+
+        unmatched_points = [
+            points_large[i] for i in range(m) if i not in matched_indices
+        ]
+
+        self.logger.info(
+            f"Order-preserving matching ({chosen}): "
+            f"{len(matched_indices)} matched, {len(unmatched_points)} to remove"
+        )
+        for idx in range(m):
+            status = "matched" if idx in matched_indices else "REMOVE"
+            min_dist = float(np.min(distance_matrix[idx, :]))
+            self.logger.info(f"  Point {points_large[idx]}: min_dist={min_dist:.4f} [{status}]")
+
+        return unmatched_points
+
+    @staticmethod
+    def _ordered_match(distance_matrix: np.ndarray) -> Tuple[float, Set[int]]:
+        """Minimum-cost monotone matching of every column to a subsequence of rows.
+
+        Returns (total_matched_cost, matched_row_indices).
+        """
         m, n = distance_matrix.shape
 
-        # dp[i][j] = min cost to match first j small-set points
-        # using a subset of the first i large-set points
+        # dp[i][j] = min cost to match first j cols using a subset of first i rows
         dp = np.full((m + 1, n + 1), np.inf)
         dp[:, 0] = 0.0
-
         for i in range(1, m + 1):
             for j in range(1, min(i, n) + 1):
                 skip = dp[i - 1][j]
                 match = dp[i - 1][j - 1] + distance_matrix[i - 1][j - 1]
                 dp[i][j] = min(skip, match)
 
-        # Backtrack to find which large-set points were matched
-        matched_indices = set()
+        matched_indices: Set[int] = set()
         i, j = m, n
         while j > 0:
             if i == 0:
@@ -278,14 +352,4 @@ class DistanceMatrixCalculator:
                 i -= 1
                 j -= 1
 
-        unmatched_points = [
-            points_large[i] for i in range(m) if i not in matched_indices
-        ]
-
-        self.logger.info(f"Order-preserving matching: {n} matched, {len(unmatched_points)} to remove")
-        for idx in range(m):
-            status = "matched" if idx in matched_indices else "REMOVE"
-            min_dist = float(np.min(distance_matrix[idx, :]))
-            self.logger.info(f"  Point {points_large[idx]}: min_dist={min_dist:.4f} [{status}]")
-
-        return unmatched_points
+        return float(dp[m][n]), matched_indices
