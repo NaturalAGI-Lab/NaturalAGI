@@ -76,6 +76,9 @@ def run(exp_id: str, fraction: float) -> None:
     extra_kwargs = {}
     if exp.get("structure_filter") is not None:
         extra_kwargs["structure_filter"] = tuple(exp["structure_filter"])
+    for _key in ("manifest_path", "local_path_template", "nuclio_volume_path_template"):
+        if exp.get(_key) is not None:
+            extra_kwargs[_key] = exp[_key]
 
     def _run_test():
         return test_mnist_all(
