@@ -52,6 +52,15 @@ def _range_width(v) -> float:
     return 0.0
 
 
+def _json_default(o):
+    if isinstance(o, (set, frozenset)):
+        return sorted(o)
+    try:
+        return float(o)
+    except (TypeError, ValueError):
+        return str(o)
+
+
 # ---------------------------------------------------------------------------
 # helper: load node-link JSON graphs from a directory
 # ---------------------------------------------------------------------------
@@ -63,6 +72,10 @@ def _load_graphs_from_dir(samples_dir: Path) -> dict[str, nx.Graph]:
             data = json.load(fh)
         G = nx.node_link_graph(data)
         G.graph.setdefault("graph_id", f.stem)
+        # node-link serialization moves the "id" attribute into the node key;
+        # formation code (Point.from_node_data) requires it as an attribute
+        for n, d in G.nodes(data=True):
+            d.setdefault("id", n)
         graphs[f.stem] = G
     return graphs
 
@@ -161,6 +174,7 @@ def _run_offline(
     steps: Optional[int],
     step_ref: list[int],
     capture_failure: bool = False,
+    recorder: Optional[FormationRecorder] = None,
 ) -> ConceptResult:
     image_ids = list(image_graphs.keys())
     steps_debug = []
@@ -215,6 +229,16 @@ def _run_offline(
             break
 
         concept_graph = result_graph
+
+        if recorder is not None:
+            recorder.emit({
+                "type": "cpp_iterations",
+                "step": i,
+                "image_id": img_id,
+                "iterations": getattr(
+                    service.critical_point_preprocessor, "last_iteration_count", None
+                ),
+            })
 
         steps_debug.append(ConceptFormationStep(
             current_concept=concept_old,
@@ -349,9 +373,18 @@ def main():
     mode.add_argument("--session", help="Neo4j session ID (Neo4j mode)")
     mode.add_argument("--samples-dir", help="Directory of node-link JSON graphs (offline mode)")
     parser.add_argument("--concept-id", default="probe")
-    parser.add_argument("--steps", type=int, default=None)
+    parser.add_argument("--steps", type=int, default=None,
+                        help="Use only the first N samples (after ordering)")
+    parser.add_argument("--order-seed", type=int, default=None,
+                        help="Shuffle sample order with this seed (offline mode only)")
+    parser.add_argument("--capture-failure", action="store_true",
+                        help="Record a failed merge as a terminal step instead of raising")
     parser.add_argument("--out", default=None, help="Output directory")
     args = parser.parse_args()
+
+    if args.session and args.order_seed is not None:
+        parser.error("--order-seed is offline-only: the Neo4j-mode sample order "
+                     "comes from the repository (ORDER BY image_id)")
 
     concept_id = args.concept_id
     out_dir = Path(args.out) if args.out else (_PROBE_DIR / "output" / concept_id)
@@ -382,6 +415,12 @@ def main():
             print(f"No JSON graphs found in {samples_path}", file=sys.stderr)
             sys.exit(1)
 
+        if args.order_seed is not None:
+            import random
+            ids = list(image_graphs)
+            random.Random(args.order_seed).shuffle(ids)
+            image_graphs = {i: image_graphs[i] for i in ids}
+
         service = _build_offline_service()
 
         # Attach instrumentation FIRST so StartPointModifier.change_start_point
@@ -392,7 +431,10 @@ def main():
         image_graphs = _determine_start_point(image_graphs, logger)
         step_ref[0] = 1  # reset to formation step counter
 
-        result = _run_offline(service, image_graphs, args.steps, step_ref)
+        result = _run_offline(
+            service, image_graphs, args.steps, step_ref,
+            capture_failure=args.capture_failure, recorder=recorder,
+        )
 
     recorder.close()
 
@@ -400,6 +442,11 @@ def main():
     mean_xy, _ = _write_range_evolution(result, out_dir)
     summ = _write_summary(recorder, result, mean_xy, out_dir)
     _write_report(summ, recorder, mean_xy, out_dir)
+
+    (out_dir / "concept.json").write_text(json.dumps(
+        nx.node_link_data(result.concept_graph, edges="edges"),
+        default=_json_default,
+    ))
 
     print(f"\nResults written to {out_dir}/")
     print(f"  summary.json  — {summ['total_merges']} merges, "

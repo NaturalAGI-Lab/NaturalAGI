@@ -72,6 +72,7 @@ class ConceptCreationRepository:
         query = """
             MATCH (n {session_id: $session_id})
             RETURN DISTINCT n.image_id AS image_id
+            ORDER BY image_id
         """
         result = tx.run(query, session_id=session_id)
         return [

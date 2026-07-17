@@ -73,10 +73,15 @@ def run(exp_id: str, fraction: float) -> None:
     except ImportError:
         mlflow = None
 
+    extra_kwargs = {}
+    if exp.get("structure_filter") is not None:
+        extra_kwargs["structure_filter"] = tuple(exp["structure_filter"])
+
     def _run_test():
         return test_mnist_all(
             exp["classes"], exp["params"],
             sample_fraction=fraction, description=description,
+            **extra_kwargs,
         )
 
     if mlflow is not None:
