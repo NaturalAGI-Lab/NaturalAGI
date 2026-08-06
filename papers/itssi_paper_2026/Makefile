@@ -1,4 +1,4 @@
-PYTHON := ../../natural-agi/bin/python
+PYTHON := ../../.venv/bin/python
 SOFFICE := /Applications/LibreOffice.app/Contents/MacOS/soffice
 PDFINFO := /opt/homebrew/bin/pdfinfo
 

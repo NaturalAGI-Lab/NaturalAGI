@@ -17,7 +17,7 @@ Takes the revised English copy (`Стаття_Паржин_2026_revised.docx`) a
      (References must remain in Latin script per ITSSI rules).
 
 Run:
-    natural-agi/bin/python papers/itssi_paper_2026/make_ua_version.py
+    .venv/bin/python papers/itssi_paper_2026/make_ua_version.py
 """
 
 from __future__ import annotations

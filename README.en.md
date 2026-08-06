@@ -28,24 +28,25 @@ cd NaturalAGI
 curl -LsSf https://astral.sh/uv/install.sh | sh
 ```
 
-3. Create and activate the virtual environment:
+3. Create the standard uv project environment and install core dependencies:
 ```bash
-uv venv natural-agi --python 3.12
-source natural-agi/bin/activate  # On Windows: natural-agi\Scripts\activate
+uv sync --python 3.12 --no-dev
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
 ```
 
-4. Install dependencies:
+4. Add optional dependencies when needed:
 ```bash
-uv sync              # Core dependencies only
 uv sync --all-extras # All dependencies including ML and dev tools
 ```
+
+> `uv sync` without `--no-dev` installs the default development dependency group.
 
 ### Optional Dependency Groups
 
 | Group | Description | Install Command |
 |-------|-------------|-----------------|
-| dev | Jupyter notebooks, visualization, linting | `uv sync --extra dev` |
-| ml | PyTorch, torch-geometric, deep learning tools | `uv sync --extra ml` |
+| dev | Jupyter notebooks and visualization | `uv sync --extra dev` |
+| ml | PyTorch, torch-geometric, deep learning tools | `uv sync --no-dev --extra ml` |
 
 
 ## Quick Start
@@ -72,7 +73,7 @@ Walks through the full image → skeleton → graph pipeline with step-by-step v
 > ```
 
 ```bash
-source natural-agi/bin/activate
+source .venv/bin/activate
 jupyter notebook src/skeletonization/experiments.ipynb
 ```
 
@@ -85,7 +86,7 @@ Runs MNIST training across digit classes and evaluates concept-based classificat
 > ⚠️ Launch Jupyter from the **project root directory** — the notebook uses relative paths and spawns subprocesses with `cwd="."`:
 > ```bash
 > cd /path/to/NaturalAGI
-> source natural-agi/bin/activate
+> source .venv/bin/activate
 > jupyter notebook src/training/training.ipynb
 > ```
 

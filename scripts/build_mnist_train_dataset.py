@@ -4,7 +4,7 @@ Mirrors the datasets/mnist_all pipeline: PNG per class dir, LANCZOS upscale to
 100x100, heuristic completeness annotation (no manual review — stated caveat).
 
 Usage:
-    natural-agi/bin/python scripts/build_mnist_train_dataset.py [--limit N]
+    .venv/bin/python scripts/build_mnist_train_dataset.py [--limit N]
 """
 import argparse
 import csv

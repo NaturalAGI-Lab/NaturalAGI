@@ -5,7 +5,7 @@ The existing datasets/train/<cid>/ files are already augmented (\"*_augN.png\",
 default to avoid compounding distortions.
 
 Usage:
-    natural-agi/bin/python scripts/augment_train.py --dst datasets/train_aug2x --per-image 1
+    .venv/bin/python scripts/augment_train.py --dst datasets/train_aug2x --per-image 1
 """
 import argparse
 import random
