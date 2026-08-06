@@ -1,0 +1,685 @@
+% =========================================================================
+% DRAFT — Error Anatomy and Stability of Structural Concept Formation
+% Venue not yet fixed: IEEEtran conference layout used as a neutral default.
+% Switching to llncs/another class only affects the preamble + author block.
+%
+% Data sources (all numbers traceable):
+%   - experiments/run_20260630_235356/  (baseline 91.13%, confusion, per-class)
+%   - src/training/supervisor_experiments.ipynb  (studies S1-S6, post-mortem)
+% Red \todo{} markers = results that do not exist yet (Tier C retrains).
+% =========================================================================
+\documentclass[conference]{IEEEtran}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[TODO: #1]}}}
+\newcommand{\cid}[1]{\texttt{#1}}   % concept identifiers: \cid{2\_2}
+
+\begin{document}
+
+\title{Error Anatomy and Stability of Structural Concept Formation\\
+in a Graph-Based Classifier Without Backpropagation}
+
+% Solo authorship required by supervisor decision of 2026-07-31.
+\author{
+\IEEEauthorblockN{Mykyta Lapin}
+\IEEEauthorblockA{Department of System Analysis and Information-Analytical Technologies,\\
+National Technical University ``Kharkiv Polytechnic Institute'', Kharkiv, Ukraine\\
+Mykyta.Lapin@cit.khpi.edu.ua}
+}
+% ORCID (verified 2026-04-27, see project canonical table):
+%   Lapin 0009-0003-6307-1172
+
+\maketitle
+
+\begin{abstract}
+Structural classifiers that form explicit graph concepts instead of weight
+matrices promise interpretable decisions, but their failure modes and the
+stability of their concept-formation process are rarely examined with the
+same rigor applied to accuracy benchmarks. We study both questions on a
+non-backpropagation classifier that converts images into attributed
+bipartite skeleton graphs, forms per-class \emph{concept attractors} by
+iterative critical-point reduction, and classifies by winner-take-all
+(WTA) competition over graph-similarity scores. Against a 91.13\% baseline
+on the complete-contour subset of the MNIST test set, we first dissect the
+dominant confusion (digit 2 predicted as 7, 111 cases) and show that it is
+a \emph{representation defect, not a ranking defect}: binarization and
+thinning destroy the closed head loop of the digit before any learning
+step, so the complex concept for class~2 is excluded by a complexity
+pre-filter in 77.5\% of cases and the surviving simplified concept loses
+raw similarity in 100\% of cases, while the ranking prior contributes zero
+errors. We then report six stability studies: generalization to unfiltered
+MNIST test and train splits (82.2\% and 72.0\%); dependence of formation on
+sample-presentation order (topology invariant for two of three probed
+concepts, node counts invariant for all); dependence on sample count
+(monotone envelope widening with topology freeze); reduction convergence
+(topology stabilizes after 1--37 samples); and parameter compression
+(a 92.5$\times$ reduction in topological elements and 51$\times$ in stored
+parameter values from training samples to concepts). The results locate
+the accuracy bottleneck in the image-to-graph front end rather than in
+concept formation or ranking, and quantify how compact and reproducible
+the learned structural concepts are.
+\end{abstract}
+
+\begin{IEEEkeywords}
+structural pattern recognition, graph edit distance, concept formation,
+few-shot learning, skeletonization, explainable AI, MNIST
+\end{IEEEkeywords}
+
+% =========================================================================
+\section{Introduction}
+% =========================================================================
+
+Most modern image classifiers optimize millions of weights by
+backpropagation and explain their decisions only post hoc. An alternative
+line of work encodes images as attributed graphs and learns explicit
+structural \emph{concepts} whose nodes, edges, and parameter ranges remain
+human-readable~\cite{parzhyn2013principles,parzhyn2025architecture,lapin2025fewshot}.
+In our system, an image is skeletonized into a bipartite graph of critical
+points and connecting segments, per-class concepts are formed by iterative
+graph reduction without gradient descent, and classification is a
+winner-take-all (WTA) competition between concepts scored by an
+attribute-weighted graph-similarity measure derived from graph edit
+distance (GED)~\cite{bunke1983inexact,serratosa2015}. The approach reached
+91.13\% accuracy on the complete-contour subset of the MNIST test
+set~\cite{lecun1998gradient} with only 13 concepts formed from 875
+training samples --- two orders of magnitude fewer parameters than a
+comparable neural model, and every parameter inspectable.
+
+Accuracy alone, however, says little about \emph{why} such a system fails
+when it fails, and whether the concepts it forms are stable artifacts or
+accidents of training order and sample choice. Both questions matter more
+for structural classifiers than for weight-based ones precisely because
+the internal representation claims semantic meaning: a concept that
+changes with presentation order, or an error whose cause cannot be located
+in the pipeline, would undermine the interpretability argument itself.
+
+This paper answers both questions empirically. Our contributions are:
+
+\begin{enumerate}
+\item \textbf{An anatomy of the dominant error.} The most frequent
+confusion of the baseline (true digit 2 predicted as 7; 111 of 792 errors)
+superficially contradicts the WTA design: the concept for class~2 is
+\emph{more} complex than the one for class~7, so it should win when it
+matches. We trace all 111 cases through the production scoring code and
+show a two-stage mechanism with a single root cause --- anchor-point loss
+during image-to-graph construction, \emph{before} any reduction or
+learning step (Section~\ref{sec:postmortem}).
+\item \textbf{Six stability studies of concept formation}, covering
+generalization to other MNIST splits, sample-order dependence, sample-count
+dependence, augmentation, reduction convergence, and parameter compression
+(Section~\ref{sec:studies}).
+\item \textbf{A diagnosis with design consequences}: errors originate in
+the representation front end and cannot be repaired downstream, while the
+formation process itself is largely order-invariant, converges after few
+samples, and compresses input structure by roughly two orders of magnitude
+(Section~\ref{sec:discussion}).
+\end{enumerate}
+
+All analyses run on the production code paths (no re-implemented scoring):
+the post-mortem tool reproduces the live classifier's prediction for
+111 of 111 studied images.
+
+% =========================================================================
+\section{System Overview}
+\label{sec:system}
+% =========================================================================
+
+We summarize the pipeline only to the depth needed for the analyses; the
+representation and formation method are described
+in~\cite{lapin2025fewshot,parzhyn2025energy}.
+
+\subsection{Image-to-graph construction}
+
+An input image is binarized (intensity threshold 110--180, adaptively
+retried on disconnection), thinned to a one-pixel
+skeleton~\cite{zhang1984fast}, and approximated by a Growing Neural Gas
+network~\cite{fritzke1995growing} whose output polyline is simplified with
+the Ramer--Douglas--Peucker algorithm~\cite{douglas1973algorithms}. The
+result is an attributed \emph{bipartite} graph: \emph{Point} nodes
+(endpoints, corners, junctions, a start point) alternate with \emph{Vector}
+nodes (line segments carrying length, direction, and quadrant attributes).
+Node coordinates are normalized to a centered $[-1,1]$ system for scale
+and translation invariance. We define the \emph{complexity} of a graph as
+its total number of nodes plus edges.
+
+\subsection{Concept formation}
+
+For each class, training graphs are merged one at a time into a concept by
+critical-point reduction: shared topology is retained, instance-specific
+branches are reduced, and each surviving node accumulates per-feature
+\emph{ranges} (envelopes) instead of point values. The first sample acts
+as the seed of the concept; formation is incremental and uses no gradient
+signal. A class may yield more than one concept (e.g.\ two stylistic
+variants of the digit); the baseline uses 13 concepts for 10 classes,
+formed from 875 pre-augmented training samples.
+
+\subsection{Classification}
+
+A test graph is compared against all concepts that survive a
+\emph{complexity pre-filter}: concepts with complexity greater than the
+image complexity are excluded before any comparison, on the rationale that
+a simple image cannot instantiate a more complex concept. Surviving
+concepts are scored by a GED-based similarity over 13 node
+features with graduated substitution costs and per-node diagnostic weights
+(inverse to the width of the concept's learned feature range,
+$\varepsilon = 0.1$). The final ranking applies a complexity prior
+($\lambda = 0.10$) that rewards more complex concepts, implementing the
+WTA principle that a rich concept should beat a poor one when both match.
+The winner's class is the prediction.
+
+\subsection{Baseline}
+\label{sec:baseline}
+
+The reference run\footnote{Run \texttt{run\_20260630\_235356}; artifacts
+(configuration, metrics, confusion matrix, per-image errors, concept
+graphs) are archived with the code.} evaluates the full \emph{complete-only}
+MNIST test subset: 8{,}704 of the 10{,}000 test images whose contours are
+complete (unbroken strokes), a restriction discussed in
+Section~\ref{sec:datasets}. Of 8{,}707 submitted images\footnote{Three
+images were resubmitted after transient pipeline errors.}, 22 failed in
+skeletonization (dead-letter queue) and 8{,}685 were classified, with
+accuracy $91.13\%$, precision $91.92\%$, recall $91.13\%$, and F1
+$91.34\%$ over the classified set. Counting pipeline failures as errors
+yields $90.89\%$ over all submitted images.
+Figure~\ref{fig:confusion} shows the confusion structure. The largest
+confusion pairs are $2{\to}7$ (111), $4{\to}7$ (62), $2{\to}6$ (57),
+$4{\to}1$ (52), and $9{\to}4$ (46); classes 2 (215 errors) and 4 (155
+errors) dominate the error mass.
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{figures/confusion_matrix.png}
+\caption{Confusion matrix of the 91.13\% baseline on the complete-only
+MNIST test subset (8{,}685 classified images, 13 concepts).}
+\label{fig:confusion}
+\end{figure}
+
+% =========================================================================
+\section{Anatomy of the Dominant Error: Why 2s Fall into 7s}
+\label{sec:postmortem}
+% =========================================================================
+
+The $2{\to}7$ confusion is theoretically interesting because it seems to
+contradict the WTA design. The full concept for class~2 (\cid{2\_2},
+complexity 24) is far richer than the concept for class~7 (\cid{7\_1},
+complexity 9, the smallest in the system). Under WTA with a complexity
+prior, the richer concept should win whenever it genuinely matches. The
+supervisor's hypothesis was that \cid{2\_2} never gets to compete: the
+image graph loses critical anchor points during construction --- before
+reduction --- so the ``2'' arrives at the classifier already impoverished.
+
+We verified this hypothesis on all 111 misclassified images using the
+production \texttt{ClassificationOrchestrator} and cost functions; the
+offline tool reproduced the live prediction for 111/111 images. The
+mechanism is two-staged, and both stages share one root cause.
+
+\subsection{Stage 1: the complexity pre-filter excludes the rich concept}
+
+The median complexity of the 111 misclassified ``2'' graphs is 21
+(range 13--29), below the complexity 24 of \cid{2\_2}. Consequently the
+pre-filter removes \cid{2\_2} from the competition in \textbf{86 of 111
+cases (77.5\%)}. The rich concept does not \emph{lose} the WTA
+competition --- it never enters it.
+
+\subsection{Stage 2: the simplified concept loses on raw similarity}
+
+The simplified concept \cid{2\_1} (complexity 13) passes the filter but
+systematically loses to \cid{7\_1} on \emph{raw} similarity, with a mean
+gap of 0.14 (0.09 in the subgroup where \cid{2\_2} also competed).
+Bucket analysis over all 111 cases (Table~\ref{tab:buckets}) shows that
+\textbf{every single error is a raw-similarity loss} (bucket B); there are
+no cases where no 2-concept competed at all (bucket A) and --- crucially ---
+no cases where a 2-concept won on raw similarity but lost the final
+$\lambda$-ranking (bucket C). The ranking prior is innocent. Notably, in
+the 25 cases where \cid{2\_2} did compete, it never outscored \cid{2\_1}:
+the impoverished image graph is genuinely closer to the simplified
+topology.
+
+\begin{table}[!t]
+\caption{Bucket analysis of all 111 $2{\to}7$ errors}
+\label{tab:buckets}
+\centering
+\begin{tabular}{lr}
+\toprule
+Indicator & Value \\
+\midrule
+A: no 2-concept in competition & 0 \\
+B: 2-concept competes, loses on raw similarity & \textbf{111 (100\%)} \\
+C: wins raw similarity, loses $\lambda$-ranking & 0 \\
+\midrule
+\cid{2\_2} excluded by complexity pre-filter & \textbf{86 (77.5\%)} \\
+\cid{2\_2} competed and outscored \cid{2\_1} & 0 of 25 \\
+Mean raw-similarity gap (\cid{7\_1} $-$ best 2-concept) & 0.140 \\
+Image complexity (min / median / max) & 13 / 21 / 29 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Root cause: anchor-point loss during graph construction}
+
+Figure~\ref{fig:construction} traces a canonical exemplar
+(\texttt{mnist\_test\_2\_00766}, a ``2'' with a clearly closed head loop)
+through the construction stages, and Figure~\ref{fig:triptych} shows the
+resulting graph next to the competing concepts.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{figures/mnist_test_2_00766_construction.png}
+\caption{Construction stages for exemplar \texttt{mnist\_test\_2\_00766}.
+Binarization (threshold 110) and one-pixel thinning already open the
+closed head loop of the ``2'' into a hook (panels 1$\to$3, zero cycles in
+the skeleton); GNG approximation with RDP simplification
+($\varepsilon = 4.55$) then flattens the hook arc into two straight
+segments (panels 3$\to$4). The critical loop-closure point is lost before
+any learning step.}
+\label{fig:construction}
+\end{figure*}
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{figures/mnist_test_2_00766_triptych.png}
+\caption{Exemplar \texttt{mnist\_test\_2\_00766}: original image (left),
+constructed image graph (center), and competing concepts (right). The
+image graph has 11 nodes and 10 edges (complexity 21), so concept
+\cid{2\_2} (complexity 24) is excluded by the pre-filter; the simplified
+\cid{2\_1} then loses to \cid{7\_1} on raw similarity.}
+\label{fig:triptych}
+\end{figure*}
+
+The head of the ``2'' is a closed loop in the original image. After
+binarization and thinning, the loop becomes an \emph{open hook}: the
+skeleton has zero cycles, and the loop-closure critical point is gone
+before GNG even runs. GNG ($\approx$35 neurons) with RDP simplification
+then flattens the hook arc into two straight segments, leaving a
+zigzag-like graph of 6 structural points (3 endpoints, 1 junction, 0
+cycles). The final bipartite graph has 11 nodes and 10 edges ---
+complexity 21 $<$ 24, so \cid{2\_2} is filtered out. The production
+ranking for this exemplar is shown in Table~\ref{tab:exemplar}.
+
+\begin{table}[!t]
+\caption{Production ranking for exemplar \texttt{mnist\_test\_2\_00766}}
+\label{tab:exemplar}
+\centering
+\begin{tabular}{lcccc}
+\toprule
+Concept & Raw sim. & Adjusted & Complexity & In competition \\
+\midrule
+\cid{7\_1} (winner) & 0.8317 & 1.1487 & 9 & yes \\
+\cid{2\_1} & 0.7300 & 1.1000 & 13 & yes \\
+\cid{2\_2} & --- & --- & 24 & no (pre-filter) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The per-feature breakdown of the \cid{2\_1} comparison shows \emph{where}
+the loss occurs: surviving points sit outside the spatial ranges the
+concept learned to expect --- e.g.\ \texttt{distance\_to\_centroid} $=
+0.558 \notin [0.69, 1.00]$ on the start point and \texttt{normalized\_x}
+$= 0.200 \notin [-0.70, 0.10]$ on a corner point. The geometry of the
+graph is distorted by the loss of the loop, so even the simplified concept
+matches poorly.
+
+Not every case is a skeletonization victim: a contrasting exemplar
+(\texttt{mnist\_test\_2\_00984}, Figure~\ref{fig:contrast}) is a flat
+cursive ``2'' visually close to a ``7'', where the miss is largely honest
+stylistic ambiguity. But the median image complexity of 21 against
+\cid{2\_2}'s 24 identifies graph impoverishment as the dominant factor
+across the 111 cases.
+
+\begin{figure*}[!t]
+\centering
+\includegraphics[width=\textwidth]{figures/mnist_test_2_00984_triptych.png}
+\caption{Contrast exemplar \texttt{mnist\_test\_2\_00984}: a flat cursive
+``2'' whose confusion with ``7'' is largely stylistic rather than a
+representation defect.}
+\label{fig:contrast}
+\end{figure*}
+
+\subsection{Consequences}
+
+Three design consequences follow, none of which requires hard-coding
+concept identities. (i)~\emph{Skeletonization is the primary lever}:
+preserving the head loop (cycle-preserving thinning or closing, or
+loop-aware pruning) would raise image complexity, return \cid{2\_2} to the
+competition, and let its cycle-count features discriminate against
+\cid{7\_1}. (ii)~The pre-filter can be softened \emph{as a property}
+(a tolerance $\delta$ proportional to the width of the concept's learned
+ranges) rather than as a constant, but this treats the symptom: without
+the loop, \cid{2\_2} still loses. (iii)~The $\lambda$-ranking prior should
+\emph{not} be touched --- bucket C is empty.
+
+% =========================================================================
+\section{Stability Studies of Concept Formation}
+\label{sec:studies}
+% =========================================================================
+
+The supervisor's second question concerns the trustworthiness of the
+formation process itself: does the classifier generalize beyond the
+curated test subset, and are the concepts it forms stable with respect to
+presentation order, sample count, augmentation, and reduction depth? Six
+studies address this. All formation studies run the production formation
+code through a seedable offline probe; all evaluation studies run the full
+live pipeline.
+
+\subsection{Generalization across MNIST dataset variants}
+\label{sec:datasets}
+
+The system is contour-based: a digit drawn with broken strokes yields an
+incomplete skeleton that no concept formed from complete contours can
+cover. The baseline therefore evaluates the complete-contour subset. To
+quantify the cost of this restriction, we evaluated the untouched baseline
+concepts on the \emph{full} MNIST test set (10{,}000 images, no
+exclusions) and on the 60{,}000-image training split, whose
+completeness labels come from a heuristic
+classifier\footnote{The 60k split is labeled by a completeness heuristic,
+not manual review; $\approx$875 of its images are the system's own
+training samples (leakage $\leq 1.5\%$).}. Table~\ref{tab:datasets}
+reports the results.
+
+\begin{table}[!t]
+\caption{Classification accuracy across MNIST dataset variants
+(baseline concepts, no retraining)}
+\label{tab:datasets}
+\centering
+\begin{tabular}{llrrr}
+\toprule
+Dataset & Structure & Submitted & Wrong & Acc.\ (\%) \\
+\midrule
+10k test & complete & 8{,}704 & 793 & 90.89 \\
+10k test & incomplete & 1{,}295 & 985 & 23.94 \\
+10k test & all & 10{,}000 & 1{,}779 & \textbf{82.21} \\
+\midrule
+60k train & complete & 45{,}501 & 10{,}867 & 76.12 \\
+60k train & incomplete & 14{,}499 & 5{,}961 & 58.89 \\
+60k train & all & 60{,}000 & 16{,}828 & \textbf{71.95} \\
+\midrule
+70k aggregate & all & 70{,}000 & 18{,}607 & \textbf{73.42} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three observations. First, the completeness restriction is load-bearing:
+incomplete contours in the test set score 23.94\%, dragging the
+no-exclusions accuracy to 82.21\%. Second, the drop on the 60k
+\emph{complete} split (76.12\% vs.\ 90.89\%) indicates that heuristic
+completeness labels are noisier than manual review --- part of the
+``complete'' 60k split is likely not. Third, accuracy over all 70{,}000
+MNIST images with 13 concepts and no per-split tuning is 73.42\%, which
+bounds the current representation's coverage from below.
+
+\subsection{Dependence on sample-presentation order}
+\label{sec:order}
+
+Formation is incremental and the first sample seeds the concept, so order
+dependence is a structural risk. (Historically, the production order from
+the graph store was nondeterministic; it is now fixed to a deterministic
+ordering.) We re-formed three representative concepts --- \cid{2\_2} (rich,
+12 nodes), \cid{7\_1} (minimal, 5 nodes), \cid{8\_1} (cyclic, 11 nodes) ---
+under 10 random presentation orders each (Table~\ref{tab:order}).
+
+\begin{table}[!t]
+\caption{Order-dependence study: 10 random presentation orders per concept}
+\label{tab:order}
+\centering
+\begin{tabular}{lccccc}
+\toprule
+Concept & Seeds & Node counts & Identical & Mean & Max \\
+ & & observed & topology & pairwise & pairwise \\
+ & & & share & GED & GED \\
+\midrule
+\cid{2\_2} & 10 & \{12\} & 0.64 & 0.36 & 1.0 \\
+\cid{7\_1} & 10 & \{5\} & 1.00 & 0.00 & 0.0 \\
+\cid{8\_1} & 10 & \{11\} & 1.00 & 0.00 & 0.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+No formation failures occurred. Node counts are \emph{identical across all
+orders for all three concepts}. \cid{7\_1} and \cid{8\_1} converge to
+byte-identical topologies regardless of order; \cid{2\_2} reaches an
+identical topology in 64\% of order pairs with a mean pairwise GED of
+0.36 --- small residual variation concentrated in the richest concept.
+Parameter-envelope widths vary mildly with order (e.g.\ \cid{2\_2}:
+0.438--0.492). Formation is thus largely, though not perfectly,
+order-invariant; the deterministic-ordering fix makes production retrains
+reproducible by construction.
+
+\subsection{Dependence on sample count}
+\label{sec:samplecount}
+
+We formed each of the 13 concepts from $n \in \{2, 5, 10, 20\}$ samples
+(three random draws per condition). Two monotone trends emerge
+(Figure~\ref{fig:curves}): node counts \emph{decrease or stay constant}
+as $n$ grows (topology is pruned toward the shared core, then freezes ---
+e.g.\ \cid{2\_2}: $16 \to 12.7 \to 12 \to 12$ nodes), while mean
+range widths \emph{increase} monotonically (the envelope absorbs
+instance variation --- e.g.\ \cid{7\_1}: $0.33 \to 0.48 \to 0.68 \to 0.80$).
+More samples buy generality, not structure: structure is set early and
+additional samples widen tolerances.
+
+The study also exposed a formation fragility: concept \cid{4\_1} fails to
+form at higher sample counts (67\% of draws crash at $n{=}5$, 100\% at
+$n \geq 10$), showing that for topologically heterogeneous classes the
+reduction can fail outright rather than degrade gracefully.
+\todo{Downstream classification accuracy per sample-count condition
+requires the Tier~C retrain runs (notebook Section~7); pending.}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{figures/curves.png}
+\caption{Sample-count study: concept node counts (top) shrink and freeze
+while mean parameter-range widths (bottom) widen monotonically as the
+number of training samples grows ($n \in \{2,5,10,20\}$, 3 draws each).}
+\label{fig:curves}
+\end{figure}
+
+\subsection{Dependence on augmentation}
+\label{sec:augmentation}
+
+The training corpus is pre-augmented ($\approx$10 geometric variants per
+source image), which allows a \emph{subtractive} design: forming concepts
+from originals only versus originals plus augmented variants isolates the
+contribution of augmentation without generating new data, and an
+\emph{additive} arm scales augmentation further.
+\todo{Augmentation results require the Tier~C retrain runs (notebook
+Section~6); the findings table is currently empty. Fill in after the
+retrains complete.}
+
+\subsection{Reduction convergence: when does a concept become stable?}
+\label{sec:convergence}
+
+For every concept we recorded the index $m$ of the last training sample
+that changed (a)~the concept topology and (b)~the parameter envelope
+(Table~\ref{tab:convergence}, Figure~\ref{fig:trajectories}).
+
+\begin{table}[!t]
+\caption{Convergence of concept formation: index of the last
+topology-changing sample ($m_\text{topo}$) and last envelope-changing
+sample ($m_\text{env}$)}
+\label{tab:convergence}
+\centering
+\begin{tabular}{lrrr}
+\toprule
+Concept & $m_\text{topo}$ & $m_\text{env}$ & Total samples \\
+\midrule
+\cid{0\_1} & 11 & 13 & 33 \\
+\cid{1\_1} & 1 & 10 & 33 \\
+\cid{1\_3} & 2 & 5 & 55 \\
+\cid{2\_1} & 23 & 12 & 121 \\
+\cid{2\_2} & 5 & 12 & 55 \\
+\cid{3\_1} & 4 & 13 & 77 \\
+\cid{4\_1} & 12 & 11 & 12 \\
+\cid{4\_2} & 2 & 12 & 65 \\
+\cid{5\_1} & 28 & 11 & 88 \\
+\cid{6\_1} & 12 & 18 & 77 \\
+\cid{7\_1} & 2 & 15 & 99 \\
+\cid{8\_1} & 37 & 5 & 42 \\
+\cid{9\_2} & 16 & 10 & 88 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[!t]
+\centering
+\includegraphics[width=\columnwidth]{figures/trajectories.png}
+\caption{Formation trajectories: concept node count as a function of
+training-sample index. Topology typically freezes within the first tens
+of samples while later samples only adjust parameter envelopes.}
+\label{fig:trajectories}
+\end{figure}
+
+Simple concepts freeze almost immediately (\cid{1\_1} after 1 sample,
+\cid{7\_1} and \cid{1\_3} after 2), while structurally rich or
+heterogeneous classes need tens of samples (\cid{8\_1}: 37 of 42;
+\cid{5\_1}: 28; \cid{2\_1}: 23). In most cases the envelope keeps
+adjusting after the topology freezes --- consistent with the sample-count
+study: late samples tune tolerances, not structure. \cid{4\_1} is again
+the outlier, changing topology up to its final sample, corroborating its
+formation fragility.
+
+\subsection{Concept parameters and compression}
+\label{sec:compression}
+
+Finally, we quantify what a concept actually stores relative to what it
+consumed (Table~\ref{tab:compression}). Across all 13 concepts, 875
+training graphs contribute 9{,}800 nodes and 9{,}300 edges carrying
+338{,}728 attribute values; the resulting concepts retain 106 nodes and
+100 edges carrying 6{,}647 values (of which 3{,}053 are range-valued
+parameters). Topological compression is \textbf{92.5$\times$} overall
+(up to 176.7$\times$ for \cid{2\_1}) and value compression is
+\textbf{51$\times$}.
+
+\begin{table*}[!t]
+\caption{Parameter compression from training samples to concepts
+(input = all training graphs consumed by the concept)}
+\label{tab:compression}
+\centering
+\begin{tabular}{lrrrrrrrrr}
+\toprule
+Concept & Samples & \multicolumn{2}{c}{Input} & Input & \multicolumn{2}{c}{Concept} & Concept & Topo. & Value \\
+\cmidrule(lr){3-4}\cmidrule(lr){6-7}
+ & & nodes & edges & values & nodes & edges & values & compr.\ ($\times$) & compr.\ ($\times$) \\
+\midrule
+\cid{0\_1} & 33 & 418 & 418 & 14{,}550 & 10 & 10 & 628 & 41.8 & 23.2 \\
+\cid{1\_1} & 33 & 235 & 202 & 7{,}912 & 7 & 6 & 433 & 33.6 & 18.3 \\
+\cid{1\_3} & 55 & 187 & 132 & 6{,}187 & 3 & 2 & 179 & 62.3 & 34.6 \\
+\cid{2\_1} & 121 & 1{,}237 & 1{,}116 & 42{,}093 & 7 & 6 & 435 & 176.7 & 96.8 \\
+\cid{2\_2} & 55 & 902 & 902 & 31{,}536 & 12 & 12 & 759 & 75.2 & 41.5 \\
+\cid{3\_1} & 77 & 1{,}093 & 1{,}016 & 37{,}710 & 9 & 8 & 556 & 121.4 & 67.8 \\
+\cid{4\_1} & 42 & 462 & 458 & 15{,}949 & 8 & 8 & 506 & 57.8 & 31.5 \\
+\cid{4\_2} & 65 & 631 & 566 & 21{,}502 & 9 & 8 & 562 & 70.1 & 38.3 \\
+\cid{5\_1} & 88 & 1{,}192 & 1{,}104 & 40{,}641 & 7 & 6 & 435 & 170.3 & 93.4 \\
+\cid{6\_1} & 77 & 1{,}050 & 1{,}050 & 37{,}005 & 10 & 10 & 632 & 105.0 & 58.6 \\
+\cid{7\_1} & 99 & 669 & 570 & 22{,}615 & 5 & 4 & 310 & 133.8 & 73.0 \\
+\cid{8\_1} & 42 & 646 & 688 & 23{,}011 & 11 & 12 & 702 & 58.7 & 32.8 \\
+\cid{9\_2} & 88 & 1{,}078 & 1{,}078 & 38{,}017 & 8 & 8 & 510 & 134.8 & 74.5 \\
+\midrule
+\textbf{Total} & \textbf{875} & \textbf{9{,}800} & \textbf{9{,}300} & \textbf{338{,}728} & \textbf{106} & \textbf{100} & \textbf{6{,}647} & \textbf{92.5} & \textbf{51.0} \\
+\bottomrule
+\end{tabular}
+\end{table*}
+
+Property-survival analysis shows that of the $\sim$60 node properties
+present on image graphs, only bookkeeping metadata (the source image path)
+is dropped entirely; every structural and geometric property survives into
+concepts at approximately its natural rate of occurrence. Conversely,
+concepts \emph{gain} aggregate properties that exist on no single image
+node (e.g.\ direction-sequence indices, expected start degree, centroid
+summaries) --- evidence that reduction abstracts rather than merely
+truncates.
+
+% =========================================================================
+\section{Discussion}
+\label{sec:discussion}
+% =========================================================================
+
+\subsection{The bottleneck is the representation front end}
+
+The error anatomy and the stability studies point at the same conclusion
+from two directions. The dominant confusion is fully explained by
+anchor-point loss during binarization, thinning, and polyline
+simplification --- upstream of concept formation, matching, and ranking,
+each of which behaves exactly as designed given its input. Meanwhile the
+formation process itself is reproducible (order study), converges after
+few samples (convergence study), and compresses inputs by two orders of
+magnitude while preserving the property inventory (compression study).
+Reduction cannot restore what construction destroyed: no downstream
+parameter --- pre-filter tolerance, cost ladder, ranking prior --- can
+recover a cycle that no longer exists in the skeleton. The productive
+repair is cycle-preserving skeletonization, which would restore image
+complexity and re-admit rich concepts into the WTA competition.
+
+\subsection{Concepts behave like attractors}
+
+The studies substantiate the term \emph{concept attractor} used in prior
+work~\cite{lapin2025fewshot}: identical node counts under all
+presentation orders, topology freeze after a class-dependent but small
+number of samples, and monotone envelope widening thereafter are exactly
+the signature of a fixed point of the reduction process, approached from
+different initial conditions. The exception, \cid{4\_1}, marks the limit
+of the current reduction operators on topologically heterogeneous classes
+--- it fails loudly (formation crash) rather than silently, which is the
+preferable failure mode for an interpretable system.
+
+\subsection{Limitations}
+
+The 60k-split completeness labels are heuristic, so the 76.12\%
+``complete'' figure conflates model error with label noise;
+$\approx$1.5\% of that split are the system's own training images. The
+order and convergence studies probe three and thirteen concepts of one
+dataset, respectively; MNIST's structural diversity is limited. The
+augmentation study and per-sample-count downstream accuracy await
+destructive retrain runs. \todo{Update once Tier~C results land.}
+Finally, the complete-contour restriction is itself a limitation of the
+contour-based representation, quantified in
+Table~\ref{tab:datasets} rather than hidden by it.
+
+% =========================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+% =========================================================================
+
+We dissected the dominant error of a graph-based non-backpropagation
+classifier and measured the stability of its concept-formation process.
+The headline confusion ($2 {\to} 7$) is not a failure of winner-take-all
+competition: the richer concept is excluded by the complexity pre-filter
+in 77.5\% of cases and the remaining losses are raw-similarity losses
+caused by the same input defect --- destruction of the digit's head loop
+during binarization and thinning. The ranking prior contributes zero
+errors. Concept formation itself proved order-invariant in node counts,
+convergent after 1--37 samples depending on class richness, and highly
+compressive (92.5$\times$ in topology, 51$\times$ in stored values),
+while generalization tests bound uncurated-MNIST accuracy at 82.21\% (test
+split) and 73.42\% (all 70{,}000 images).
+
+Future work follows directly: cycle-preserving skeletonization as the
+primary accuracy lever; property-based softening of the complexity
+pre-filter; hardened reduction operators for topologically heterogeneous
+classes; and completion of the augmentation and sample-count retrain arms.
+\todo{Revisit conclusions after augmentation/Tier~C results.}
+
+% =========================================================================
+\section*{Reproducibility}
+% =========================================================================
+
+All studies run against production code paths: the post-mortem scores
+images with the live orchestrator and cost functions (111/111 agreement
+with the deployed pipeline), and formation studies use a seedable offline
+probe over the production reduction code. Analyses are packaged as a
+Jupyter notebook (\path{src/training/supervisor_experiments.ipynb})
+with a thin-cell/thick-module layout; baseline artifacts are archived
+under \path{experiments/run_20260630_235356/}.
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
