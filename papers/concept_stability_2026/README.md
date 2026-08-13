@@ -1,41 +1,51 @@
 # Error Anatomy and Stability of Structural Concept Formation (2026)
 
-**Status: DRAFT** — venue not yet selected; IEEEtran conference layout used
-as a neutral default (switching class affects only preamble + author block).
+Solo-author paper (M. Lapin), deadline 2026-08-15. Venue: AIS (Advanced
+Information Systems) journal, Harvard citations; the IEEEtran layout is
+the interim working format (AIS itself takes Word .doc, Times 10 pt,
+minimum 4 full pages, no stated maximum). Current build: 9 pages, no open
+TODOs in the text.
 
 ## Scope
 
-Answers the supervisor's two questions against the 91.13% baseline
-(`experiments/run_20260630_235356/`):
-
-1. **Why do 2s fall into 7s** despite the WTA design favoring the more
-   complex concept — Section III (post-mortem of all 111 errors, exemplar
-   figures: image → construction stages → graph → concepts).
-2. **Six stability studies** — Section IV:
-   - S1 dataset variants (10k full / 60k train / 70k aggregate)
-   - S2 sample-presentation order
-   - S3 sample count
-   - S4 augmentation — **results pending Tier C retrains** (red TODO)
-   - S5 reduction convergence
-   - S6 concept parameters & compression
+1. **Anatomy of the dominant 2→7 error** (Section IV): stage-localized
+   root cause — lower-loop hole absent in the binarized mask 110/111
+   (fixed threshold 110), lost at GNG+RDP vectorization 1/111, reduction
+   0/111; pre-filter ablation (2_2 wins 0/111, similarity 0.0 via
+   intersection gate); cost implementation verified consistent by replay
+   (13/13 self-recognition); the similarity function's suitability is
+   stated as the open downstream question.
+2. **Five stability studies** (Section V): S1 dataset variants, S2
+   presentation order, S3 sample count (offline), S5 reduction
+   convergence, S6 compression. Augmentation (S4) and per-sample-count
+   downstream accuracy are declared future work (require destructive
+   retrains).
 
 ## Data provenance
 
-Every number comes from committed run artifacts or the supervisor
-experiments notebook (`src/training/supervisor_experiments.ipynb`,
-kernel `natural-agi`). No values were re-derived by hand.
-Figures are copies of the notebook outputs (see `figures/`).
+Numbers come from committed run artifacts (`experiments/run_20260630_235356/`),
+the supervisor experiments notebook caches
+(`src/training/training_results/formation_probes/`), the dataset-variant
+run exports (`src/training/training_results/run_20260717_{161201,162928,180330}/`),
+and the 2026-08-01 meeting evidence CSVs (PhD vault,
+`raw/evidence/2026-08-01_blue_remarks/`). No values re-derived by hand.
 
-## Open TODOs (marked in red in the PDF)
+## Figures
 
-- S4 augmentation table (notebook Section 6, Tier C retrain required)
-- S3 downstream accuracy per sample-count condition (notebook Section 7)
-- **Regenerate Figures 2–4 with English panel titles** — current PNGs are
-  notebook outputs with Ukrainian labels («Стадії побудови графа»,
-  «Оригінал», «Бінаризація» etc.); re-run post-mortem figure cells with
-  English label strings
-- Venue selection → adjust class/author block/page budget
-- Related-work pass (grounding via NotebookLM + arXiv before submission)
+All figures are English. Regenerate with:
+
+```bash
+.venv/bin/python papers/concept_stability_2026/render_figures.py
+```
+
+Triptychs need Neo4j up with the baseline image graphs; the rest renders
+offline from probe caches. Host venv needs `scikit-image==0.26.0`
+(production image version) for the construction figure.
+
+## Remaining before submission
+
+- Convert to AIS requirements (Harvard citations, class/author block/page budget)
+- Open the repository read-only and link it from the paper
 
 ## Build
 
