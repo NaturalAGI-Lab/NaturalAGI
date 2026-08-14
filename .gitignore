@@ -193,6 +193,12 @@ CLAUDE.md
 /researches
 
 .claude/
+
+# Codex twins of the Claude config above (.codex/config.toml holds the Neo4j password)
+AGENTS.md
+.agents/
+.codex/
+
 src/training/experiments/*
 
 fin_prog/
