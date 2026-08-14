@@ -866,15 +866,21 @@ Formation proved order-invariant in node counts for the three probed
 concepts; node and edge counts froze
 after 1--37 samples across the thirteen concepts, with node
 compression of 91.9$\times$ and stored-value compression of 50.6$\times$.
+On the complete-contour test subset --- the input domain the contour
+representation is built for --- the system reaches 91.13\% on classified
+images, which supports the structural-concept design in its current scope.
 Generalization tests bound uncurated-MNIST end-to-end accuracy at 82.21\%
 on the test
-split and 73.42\% over all 70{,}000 images.
+split and 73.42\% over all 70{,}000 images; the drop is carried by the
+incomplete-contour slice (23.94\%), which no concept formed from complete
+contours can cover. Recovering broken contours is a separate line of our
+research, associative recognition, in which a concept acts as a template
+that predicts the missing contour element and the completed input graph is
+reduced again, leaving the concept itself unchanged.
 
 The front-end change of Section~\ref{sec:consequences} is the most direct
 accuracy lever for future work, and a redesign of the similarity
-projection is the open downstream alternative. The augmentation and
-per-sample-count retrain studies await a rebuild of the production concept
-store.
+projection is the open downstream alternative.
 
 % =========================================================================
 \section*{Reproducibility}
@@ -887,12 +893,10 @@ code tree), and the formation studies
 use a seedable offline probe over the production reduction code. The
 baseline run artifacts
 (configuration, metrics, confusion matrix, per-image errors, and concept
-snapshots) are committed to the project
-repository\footnote{\url{https://github.com/kbokh/NaturalAGI}, being
-prepared for public read-only access at the time of writing.}; the
-analysis notebooks, the offline probe caches, and the dataset-variant run
-exports are available from the author on request until that release is
-complete.
+snapshots), the analysis notebooks, the offline probe caches, and the
+dataset-variant run exports are available in the \texttt{main} branch of
+the project
+repository\footnote{\url{https://github.com/kbokh/NaturalAGI}}.
 
 \bibliographystyle{IEEEtran}
 \bibliography{references}
