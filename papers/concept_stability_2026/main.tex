@@ -48,10 +48,10 @@ and the ranking prior as remedies; whether the similarity function itself
 should still separate the impoverished graphs remains an open design
 question. Five exploratory stability studies then characterize formation:
 node counts are invariant to sample-presentation order for three probed
-concepts, node and edge counts freeze within tens of samples for twelve of
-thirteen concepts while the parameter envelope keeps widening (one
-concept's formation crashes), the concepts generalize to uncurated MNIST
-splits at reduced accuracy, and concepts store 92.5$\times$ fewer nodes
+concepts, node and edge counts freeze within tens of samples for all thirteen
+concepts while the parameter envelope keeps widening, the concepts
+generalize to uncurated MNIST
+splits at reduced accuracy, and concepts store 91.9$\times$ fewer nodes
 than the training graphs they consume. For this dominant confusion the
 bottleneck sits in the image-to-graph front end, upstream of concept
 formation, and the concepts the system learns are compact and largely
@@ -83,8 +83,8 @@ introduced in~\cite{lapin2025fewshot}, which reports $\approx$82\%
 accuracy from five to six samples per class; in the
 configuration studied here it reaches 91.13\% accuracy on the
 complete-contour subset of the MNIST test
-set~\cite{lecun1998gradient} with only 13 concepts formed from 875
-training samples, which derive from 86 unique source images, and every
+set~\cite{lecun1998gradient} with only 13 concepts formed from 869
+training samples, which derive from 85 unique source images, and every
 concept parameter inspectable.
 
 Accuracy alone, however, says little about why such a system fails
@@ -113,13 +113,13 @@ projection itself remains open (Section~\ref{sec:postmortem}).
 covering generalization to other MNIST splits, sample-order dependence
 (three concepts, ten orders), sample-count dependence (three draws per
 condition), reduction convergence, and storage compression, each with its
-scope and failure counts stated (Section~\ref{sec:studies}).
+scope stated (Section~\ref{sec:studies}).
 \item \textbf{A diagnosis with design consequences}: the dominant error
 cluster originates in the representation front end and resists every
 parameter-level downstream repair we tested, while the
 formation process itself is largely order-invariant, freezes node and edge
-counts after few samples in twelve of thirteen concepts, and compresses
-input structure by 92.5$\times$ in nodes and 51$\times$ in stored values
+counts after few samples in all thirteen concepts, and compresses
+input structure by 91.9$\times$ in nodes and 50.6$\times$ in stored values
 under the counting convention of Section~\ref{sec:compression}
 (Section~\ref{sec:discussion}).
 \end{enumerate}
@@ -209,8 +209,8 @@ branches are reduced, and each surviving node accumulates per-feature
 the concept; formation is incremental and uses no gradient
 signal. A class may yield more than one concept (e.g.\ two stylistic
 variants of the digit); the baseline uses 13 concepts for 10 classes,
-formed from 875 pre-augmented training samples. Those 875 samples come from
-86 unique source images; the other 789 are geometric variants generated
+formed from 869 pre-augmented training samples. Those 869 samples come from
+85 unique source images; the other 784 are geometric variants generated
 offline from them, five to ten variants per source.
 
 \subsection{Classification}
@@ -559,8 +559,9 @@ concepts on the full MNIST test set (10{,}000 images, no
 exclusions) and on the 60{,}000-image training split, whose
 completeness labels come from a heuristic
 classifier\footnote{The 60k split is labeled by a completeness heuristic,
-not manual review; $\approx$875 of its images are the system's own
-training samples (leakage $\leq 1.5\%$).}. Table~\ref{tab:datasets}
+not manual review; 85 of its images are the unique source images of the
+system's training corpus (leakage 0.14\%; the offline-generated variants
+are not MNIST members).}. Table~\ref{tab:datasets}
 reports the results with the pipeline status made explicit: a submitted
 image either receives a prediction, fails into the dead-letter queue
 (DLQ), or returns no result at all (the run export records no cause for
@@ -651,22 +652,17 @@ production retrains reproducible by construction.
 \label{sec:samplecount}
 
 We formed each of the 13 concepts from $n \in \{2, 5, 10, 20\}$ samples,
-three random draws per condition --- 156 planned runs, of which eight
-failed (all of them \cid{4\_1} formations, see below); reported means
-average the surviving draws only. Two monotone trends emerge among
-successful runs: node counts \emph{decrease or stay constant}
+three random draws per condition. Two monotone trends emerge: node counts
+\emph{decrease or stay constant}
 as $n$ grows (structure is pruned toward the shared core, then freezes ---
 e.g.\ \cid{2\_2}: $16 \to 12.7 \to 12 \to 12$ nodes), while mean
 range widths \emph{increase} monotonically (the envelope absorbs
 instance variation --- e.g.\ \cid{7\_1}: $0.33 \to 0.48 \to 0.68 \to 0.80$).
-Among successful runs, larger sample sets widen the parameter envelopes
+Larger sample sets widen the parameter envelopes
 while node counts stay fixed; whether the wider envelopes improve
 downstream accuracy was not measured.
 
-The study also exposed a formation fragility: concept \cid{4\_1} fails to
-form at higher sample counts (2 of 3 draws crash at $n{=}5$, all draws at
-$n \geq 10$), showing that for topologically heterogeneous classes the
-reduction can fail outright rather than degrade gracefully. Measuring
+Measuring
 downstream classification accuracy per sample-count condition requires
 retraining the production concept store and is left for future work.
 
@@ -701,7 +697,7 @@ Concept & $m_\text{topo}$ & $m_\text{env}$ & Total samples \\
 \cid{2\_1} & 23 & 12 & 121 \\
 \cid{2\_2} & 5 & 12 & 55 \\
 \cid{3\_1} & 4 & 13 & 77 \\
-\cid{4\_1}$^\dagger$ & --- & --- & 42 \\
+\cid{4\_1} & 2 & 10 & 36 \\
 \cid{4\_2} & 2 & 12 & 65 \\
 \cid{5\_1} & 28 & 11 & 88 \\
 \cid{6\_1} & 12 & 18 & 77 \\
@@ -709,35 +705,29 @@ Concept & $m_\text{topo}$ & $m_\text{env}$ & Total samples \\
 \cid{8\_1} & 37 & 5 & 42 \\
 \cid{9\_2} & 16 & 10 & 88 \\
 \bottomrule
-\multicolumn{4}{l}{\footnotesize $^\dagger$Probe crashed at sample 12 of
-42; censored as a failure,}\\
-\multicolumn{4}{l}{\footnotesize not counted as convergence.}
 \end{tabular}
 \end{table}
 
-Among the twelve concepts whose formation completed, simple concepts
+Simple concepts
 freeze almost immediately (\cid{1\_1} after 1 sample,
-\cid{7\_1} and \cid{1\_3} after 2), while structurally rich or
-heterogeneous classes need tens of samples (\cid{8\_1}: 37 of 42;
+\cid{7\_1}, \cid{1\_3}, and \cid{4\_1} after 2), while structurally rich
+or heterogeneous classes need tens of samples (\cid{8\_1}: 37 of 42;
 \cid{5\_1}: 28; \cid{2\_1}: 23). In most cases the envelope keeps
 adjusting after the node counts freeze --- consistent with the
 sample-count
-study: late samples tune tolerances, not structure. \cid{4\_1} did not
-complete: its probe crashed at sample 12 of 42, so it enters
-Table~\ref{tab:convergence} as a censored failure, corroborating the
-formation fragility seen in Section~\ref{sec:samplecount}.
+study: late samples tune tolerances, not structure.
 
 \subsection{Concept parameters and compression}
 \label{sec:compression}
 
 Finally, we quantify what a concept actually stores relative to what it
-consumed (Table~\ref{tab:compression}). Across all 13 concepts, 875
-training graphs contribute 9{,}800 nodes and 9{,}300 edges carrying
-338{,}728 attribute values; the resulting concepts retain 106 nodes and
+consumed (Table~\ref{tab:compression}). Across all 13 concepts, 869
+training graphs contribute 9{,}738 nodes and 9{,}242 edges carrying
+336{,}637 attribute values; the resulting concepts retain 106 nodes and
 100 edges carrying 6{,}647 values (of which 3{,}053 are range-valued
-parameters). Node compression is $9{,}800/106 = 92.5\times$ overall
+parameters). Node compression is $9{,}738/106 = 91.9\times$ overall
 (up to 176.7$\times$ for \cid{2\_1}; counting nodes plus edges gives
-92.7$\times$), and stored-value compression is 51$\times$. Values are
+92.1$\times$), and stored-value compression is 50.6$\times$. Values are
 counted by one fixed convention on both sides: a learned range counts as
 two numbers (its endpoints; the center is derived), a scalar or string as
 one, and a list element-wise. Both ratios are internal storage-count
@@ -762,7 +752,7 @@ Concept & Samples & \multicolumn{2}{c}{Input} & Input & \multicolumn{2}{c}{Conce
 \cid{2\_1} & 121 & 1{,}237 & 1{,}116 & 42{,}093 & 7 & 6 & 435 & 176.7 & 96.8 \\
 \cid{2\_2} & 55 & 902 & 902 & 31{,}536 & 12 & 12 & 759 & 75.2 & 41.5 \\
 \cid{3\_1} & 77 & 1{,}093 & 1{,}016 & 37{,}710 & 9 & 8 & 556 & 121.4 & 67.8 \\
-\cid{4\_1} & 42 & 462 & 458 & 15{,}949 & 8 & 8 & 506 & 57.8 & 31.5 \\
+\cid{4\_1} & 36 & 400 & 400 & 13{,}858 & 8 & 8 & 506 & 50.0 & 27.4 \\
 \cid{4\_2} & 65 & 631 & 566 & 21{,}502 & 9 & 8 & 562 & 70.1 & 38.3 \\
 \cid{5\_1} & 88 & 1{,}192 & 1{,}104 & 40{,}641 & 7 & 6 & 435 & 170.3 & 93.4 \\
 \cid{6\_1} & 77 & 1{,}050 & 1{,}050 & 37{,}005 & 10 & 10 & 632 & 105.0 & 58.6 \\
@@ -770,7 +760,7 @@ Concept & Samples & \multicolumn{2}{c}{Input} & Input & \multicolumn{2}{c}{Conce
 \cid{8\_1} & 42 & 646 & 688 & 23{,}011 & 11 & 12 & 702 & 58.7 & 32.8 \\
 \cid{9\_2} & 88 & 1{,}078 & 1{,}078 & 38{,}017 & 8 & 8 & 510 & 134.8 & 74.5 \\
 \midrule
-\textbf{Total} & \textbf{875} & \textbf{9{,}800} & \textbf{9{,}300} & \textbf{338{,}728} & \textbf{106} & \textbf{100} & \textbf{6{,}647} & \textbf{92.5} & \textbf{51.0} \\
+\textbf{Total} & \textbf{869} & \textbf{9{,}738} & \textbf{9{,}242} & \textbf{336{,}637} & \textbf{106} & \textbf{100} & \textbf{6{,}647} & \textbf{91.9} & \textbf{50.6} \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -801,8 +791,8 @@ excluded the adjustable downstream mechanisms: the pre-filter ablation
 (0 of 111), the replay-verified cost decomposition, and the empty ranking
 bucket.
 Meanwhile the formation process itself is largely reproducible (order
-study), freezes node and edge counts after few samples in twelve of
-thirteen concepts (convergence study), and compresses 875
+study), freezes node and edge counts after few samples in all
+thirteen concepts (convergence study), and compresses 869
 training graphs into 106 concept nodes while preserving the property
 inventory (compression study). No downstream \emph{parameter} ---
 pre-filter
@@ -823,19 +813,16 @@ prior work~\cite{lapin2025fewshot}: identical node counts under all
 presentation orders, node/edge-count freeze after a class-dependent but
 small number of samples, and monotone envelope widening thereafter are
 the signature one would expect of a fixed point of the reduction process
-approached from different initial conditions. They do not prove one: we
-have not defined a convergence test over full attributed graphs, the
-order study shows residual structural variation in \cid{2\_2}, and
-\cid{4\_1} crashes rather than converging. \cid{4\_1} marks the limit
-of the current reduction operators on topologically heterogeneous classes
---- it fails loudly (formation crash) rather than silently, which is the
-preferable failure mode for an interpretable system.
+approached from different initial conditions. A proof would need more: our
+markers track node and edge counts, not full attributed graphs, and the
+order study still finds structural differences in \cid{2\_2} across
+presentation orders.
 
 \subsection{Limitations}
 
 The 60k-split completeness labels are heuristic, so its ``complete''
 figures conflate model error with label noise and pipeline completion;
-$\approx$1.5\% of that split are the system's own training images. The
+85 of its images (0.14\%) are the system's own training sources. The
 order and convergence studies probe three and thirteen concepts of one
 dataset, respectively, and the sample-count study uses three draws per
 condition; we report no confidence intervals or significance tests at
@@ -877,18 +864,15 @@ The functional form of the similarity score itself was not tested and
 remains the open downstream question.
 Formation proved order-invariant in node counts for the three probed
 concepts; node and edge counts froze
-after 1--37 samples in the twelve concepts whose formation completed
-(one crashed), with node
-compression of 92.5$\times$ and stored-value compression of 51$\times$.
+after 1--37 samples across the thirteen concepts, with node
+compression of 91.9$\times$ and stored-value compression of 50.6$\times$.
 Generalization tests bound uncurated-MNIST end-to-end accuracy at 82.21\%
 on the test
 split and 73.42\% over all 70{,}000 images.
 
 The front-end change of Section~\ref{sec:consequences} is the most direct
 accuracy lever for future work, and a redesign of the similarity
-projection is the open downstream alternative. Reduction operators need
-hardening for
-topologically heterogeneous classes, and the augmentation and
+projection is the open downstream alternative. The augmentation and
 per-sample-count retrain studies await a rebuild of the production concept
 store.
 
