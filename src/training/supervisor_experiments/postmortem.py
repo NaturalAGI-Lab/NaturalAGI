@@ -222,9 +222,26 @@ def _draw_graph(ax, g: nx.Graph, title: str) -> None:
     ax.axis("off")
 
 
+TRIPTYCH_LABELS = {
+    "uk": {"image": "Зображення", "graph": "Граф зображення (до редукції)",
+           "graph_stats": "{n} вузлів, {e} ребер → складність {cx}",
+           "concept": "Концепт {cid}",
+           "filtered": "складність {cx} > {image_cx} → ВІДФІЛЬТРОВАНО",
+           "competes": "складність {cx} ≤ {image_cx} → конкурує",
+           "suptitle": "Чому «2» впала у «7»: концепт 2_2 не пройшов пре-фільтр складності"},
+    "en": {"image": "Image", "graph": "Image graph (before reduction)",
+           "graph_stats": "{n} nodes, {e} edges → complexity {cx}",
+           "concept": "Concept {cid}",
+           "filtered": "complexity {cx} > {image_cx} → PRE-FILTERED",
+           "competes": "complexity {cx} ≤ {image_cx} → competes",
+           "suptitle": "Why a “2” falls into “7”: concept 2_2 fails the complexity pre-filter"},
+}
+
+
 def triptych(image_id: str, row: pd.Series, concepts: dict, params: dict,
-             concept_ids: tuple[str, str] = ("2_2", "7_1")):
+             concept_ids: tuple[str, str] = ("2_2", "7_1"), lang: str = "uk"):
     """Original image | pre-reduction image graph | expected vs winning concepts."""
+    labels = TRIPTYCH_LABELS[lang]
     gcs = GraphComplexityService()
     img_graph = ged_breakdown.get_image_graph_if_present(driver(), image_id)
     image_cx = gcs.get_default_graph_complexity(img_graph)
@@ -233,28 +250,42 @@ def triptych(image_id: str, row: pd.Series, concepts: dict, params: dict,
     path = resolve_image_path(row)
     if path:
         axes[0].imshow(Image.open(path).convert("L"), cmap="gray")
-    axes[0].set_title(f"Зображення\n{Path(str(row['image_path'])).name}",
+    axes[0].set_title(f"{labels['image']}\n{Path(str(row['image_path'])).name}",
                       fontsize=10, fontweight="bold")
     axes[0].axis("off")
 
     _draw_graph(axes[1], img_graph,
-                f"Граф зображення (до редукції)\n{img_graph.number_of_nodes()} вузлів, "
-                f"{img_graph.number_of_edges()} ребер → складність {image_cx}")
+                labels["graph"] + "\n" + labels["graph_stats"].format(
+                    n=img_graph.number_of_nodes(),
+                    e=img_graph.number_of_edges(), cx=image_cx))
 
     for ax, cid in zip(axes[2:], concept_ids):
         g = concepts[cid]
         cx = gcs.get_default_graph_complexity(g)
-        verdict = (f"складність {cx} > {image_cx} → ВІДФІЛЬТРОВАНО"
-                   if cx > image_cx else f"складність {cx} ≤ {image_cx} → конкурує")
-        _draw_graph(ax, g, f"Концепт {cid}\n{verdict}")
+        verdict_key = "filtered" if cx > image_cx else "competes"
+        verdict = labels[verdict_key].format(cx=cx, image_cx=image_cx)
+        _draw_graph(ax, g, labels["concept"].format(cid=cid) + "\n" + verdict)
 
-    fig.suptitle("Чому «2» впала у «7»: концепт 2_2 не пройшов пре-фільтр складності",
-                 fontsize=13, fontweight="bold")
+    fig.suptitle(labels["suptitle"], fontsize=13, fontweight="bold")
     fig.tight_layout()
     return fig
 
 
-def construction_figure(row: pd.Series, params: dict):
+CONSTRUCTION_LABELS = {
+    "uk": {"original": "1. Оригінал {name}", "binary": "2. Бінаризація (поріг {threshold})",
+           "skeleton": "3. Скелет 1px + pruning", "gng": "4. GNG + RDP: {n} вузлів",
+           "pre_merge": "5. Граф до junction-merge", "post_merge": "6. Після junction-merge",
+           "stats": "{n} вузлів, {ep} endpoints, {jn} junctions, {cy} циклів",
+           "suptitle": "Стадії побудови графа: де губляться якірні точки"},
+    "en": {"original": "1. Original {name}", "binary": "2. Binarization (threshold {threshold})",
+           "skeleton": "3. 1-px skeleton + pruning", "gng": "4. GNG + RDP: {n} nodes",
+           "pre_merge": "5. Graph before junction merge", "post_merge": "6. After junction merge",
+           "stats": "{n} nodes, {ep} endpoints, {jn} junctions, {cy} cycles",
+           "suptitle": "Graph-construction stages: where the anchor points are lost"},
+}
+
+
+def construction_figure(row: pd.Series, params: dict, lang: str = "uk"):
     """Production skeletonization stages for one image — where anchor points get lost."""
     skel_dir = str(REPO / "src" / "skeletonization")
     if skel_dir not in sys.path:
@@ -295,14 +326,15 @@ def construction_figure(row: pd.Series, params: dict):
         raise RuntimeError("No threshold produced a connected graph")
     threshold, binary, skeleton, points, raw_graph, merged = stages
 
+    labels = CONSTRUCTION_LABELS[lang]
     fig, axes = plt.subplots(2, 3, figsize=(15, 10))
     axes = axes.flatten()
     axes[0].imshow(image, cmap="gray")
-    axes[0].set_title(f"1. Оригінал {path.name}", fontweight="bold")
+    axes[0].set_title(labels["original"].format(name=path.name), fontweight="bold")
     axes[1].imshow(binary, cmap="gray")
-    axes[1].set_title(f"2. Бінаризація (поріг {threshold})", fontweight="bold")
+    axes[1].set_title(labels["binary"].format(threshold=threshold), fontweight="bold")
     axes[2].imshow(skeleton, cmap="gray")
-    axes[2].set_title("3. Скелет 1px + pruning", fontweight="bold")
+    axes[2].set_title(labels["skeleton"], fontweight="bold")
     for ax in axes[:3]:
         ax.axis("off")
 
@@ -310,13 +342,13 @@ def construction_figure(row: pd.Series, params: dict):
     for a, b in raw_graph.edges:
         axes[3].plot([raw_graph.nodes[a]["x"], raw_graph.nodes[b]["x"]],
                      [raw_graph.nodes[a]["y"], raw_graph.nodes[b]["y"]], "r-", lw=1.5)
-    axes[3].set_title(f"4. GNG + RDP: {raw_graph.number_of_nodes()} вузлів", fontweight="bold")
+    axes[3].set_title(labels["gng"].format(n=raw_graph.number_of_nodes()), fontweight="bold")
     axes[3].invert_yaxis()
     axes[3].axis("equal")
 
     for ax, (g, label) in zip(
         axes[4:6],
-        [(raw_graph, "5. Граф до junction-merge"), (merged, "6. Після junction-merge")],
+        [(raw_graph, labels["pre_merge"]), (merged, labels["post_merge"])],
     ):
         pos = {n: (g.nodes[n]["x"], g.nodes[n]["y"]) for n in g.nodes}
         endpoints = [n for n in g.nodes if g.degree(n) == 1]
@@ -329,12 +361,12 @@ def construction_figure(row: pd.Series, params: dict):
         nx.draw_networkx_nodes(g, pos, nodelist=junctions, ax=ax, node_size=110,
                                node_color="blue", edgecolors="darkblue")
         cycles = len(nx.cycle_basis(g))
-        ax.set_title(f"{label}\n{g.number_of_nodes()} вузлів, {len(endpoints)} endpoints, "
-                     f"{len(junctions)} junctions, {cycles} циклів", fontweight="bold")
+        stats = labels["stats"].format(n=g.number_of_nodes(), ep=len(endpoints),
+                                       jn=len(junctions), cy=cycles)
+        ax.set_title(f"{label}\n{stats}", fontweight="bold")
         ax.invert_yaxis()
         ax.axis("equal")
 
-    fig.suptitle("Стадії побудови графа: де губляться якірні точки",
-                 fontsize=13, fontweight="bold")
+    fig.suptitle(labels["suptitle"], fontsize=13, fontweight="bold")
     fig.tight_layout()
     return fig

@@ -92,19 +92,40 @@ def stability_table(concepts: list[str] = ALL_CONCEPTS) -> pd.DataFrame:
                          if (probe_dir(c) / "summary.json").exists()])
 
 
-def plot_trajectories(concepts: list[str] = ALL_CONCEPTS):
+TRAJECTORY_LABELS = {
+    "uk": {"xlabel": "зразок №", "nodes": "вузлів у концепті",
+           "topo_title": "Топологія: вузли vs номер зразка",
+           "width": "середня ширина діапазону (x,y)",
+           "env_title": "Конверти: насичення діапазонів"},
+    "en": {"xlabel": "training-sample index", "nodes": "nodes in concept",
+           "topo_title": "Topology: node count vs sample index",
+           "width": "mean parameter-range width (x,y)",
+           "env_title": "Envelopes: range saturation"},
+}
+
+
+def plot_trajectories(concepts: list[str] = ALL_CONCEPTS, lang: str = "uk"):
+    labels = TRAJECTORY_LABELS[lang]
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
     for cid in concepts:
         if not (probe_dir(cid) / "summary.json").exists():
             continue
         traj = step_trajectory(cid)
+        crashed = traj[(traj["nodes"] == 0) & (traj["edges"] == 0)]
+        traj = traj[(traj["nodes"] > 0) | (traj["edges"] > 0)]
         ax1.plot(traj["step"], traj["nodes"], marker=".", label=cid)
+        if len(crashed):
+            crash_step = int(crashed.iloc[0]["step"])
+            last_nodes = int(traj.iloc[-1]["nodes"])
+            ax1.plot(crash_step, last_nodes,
+                     marker="x", color=ax1.get_lines()[-1].get_color(),
+                     markersize=9, markeredgewidth=2)
         env = envelope_trajectory(cid)
         ax2.plot(env["step"], env["width_xy"], marker=".", label=cid)
-    ax1.set_xlabel("зразок №"); ax1.set_ylabel("вузлів у концепті")
-    ax1.set_title("Топологія: вузли vs номер зразка")
-    ax2.set_xlabel("зразок №"); ax2.set_ylabel("середня ширина діапазону (x,y)")
-    ax2.set_title("Конверти: насичення діапазонів")
+    ax1.set_xlabel(labels["xlabel"]); ax1.set_ylabel(labels["nodes"])
+    ax1.set_title(labels["topo_title"])
+    ax2.set_xlabel(labels["xlabel"]); ax2.set_ylabel(labels["width"])
+    ax2.set_title(labels["env_title"])
     ax1.legend(fontsize=7, ncol=2); ax2.legend(fontsize=7, ncol=2)
     fig.tight_layout()
     return fig

@@ -59,8 +59,22 @@ def aggregate(df: pd.DataFrame) -> pd.DataFrame:
             .reset_index())
 
 
-def plot_curves(df: pd.DataFrame, full_reference: pd.DataFrame | None = None):
+CURVE_LABELS = {
+    "uk": {"xlabel": "кількість зразків N", "nodes": "вузлів у концепті",
+           "topo_title": "Топологія концепту vs N",
+           "width": "середня ширина діапазону (x,y)",
+           "env_title": "Ширина конвертів vs N (ризик catch-all)"},
+    "en": {"xlabel": "number of training samples N", "nodes": "nodes in concept",
+           "topo_title": "Concept topology vs N",
+           "width": "mean parameter-range width (x,y)",
+           "env_title": "Envelope width vs N (catch-all risk)"},
+}
+
+
+def plot_curves(df: pd.DataFrame, full_reference: pd.DataFrame | None = None,
+                lang: str = "uk"):
     """full_reference: convergence-run df (all samples) to extend the curves."""
+    labels = CURVE_LABELS[lang]
     agg = aggregate(df)
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(14, 5))
     for cid, grp in agg.groupby("concept_id"):
@@ -68,17 +82,18 @@ def plot_curves(df: pd.DataFrame, full_reference: pd.DataFrame | None = None):
         nodes = list(grp.nodes_mean)
         widths = list(grp.width_mean)
         if full_reference is not None:
-            ref = full_reference[full_reference.concept_id == cid]
+            ref = full_reference[(full_reference.concept_id == cid)
+                                 & (full_reference.final_nodes > 0)]
             if len(ref):
                 xs.append(int(ref.iloc[0]["samples"]))
                 nodes.append(float(ref.iloc[0]["final_nodes"]))
                 widths.append(float(ref.iloc[0]["mean_xy_width"]))
         ax1.plot(xs, nodes, marker="o", label=cid)
         ax2.plot(xs, widths, marker="o", label=cid)
-    ax1.set_xlabel("кількість зразків N"); ax1.set_ylabel("вузлів у концепті")
-    ax1.set_title("Топологія концепту vs N")
-    ax2.set_xlabel("кількість зразків N"); ax2.set_ylabel("середня ширина діапазону (x,y)")
-    ax2.set_title("Ширина конвертів vs N (ризик catch-all)")
+    ax1.set_xlabel(labels["xlabel"]); ax1.set_ylabel(labels["nodes"])
+    ax1.set_title(labels["topo_title"])
+    ax2.set_xlabel(labels["xlabel"]); ax2.set_ylabel(labels["width"])
+    ax2.set_title(labels["env_title"])
     ax1.legend(fontsize=7, ncol=2); ax2.legend(fontsize=7, ncol=2)
     fig.tight_layout()
     return fig
