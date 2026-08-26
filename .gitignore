@@ -229,3 +229,6 @@ saved_graphs/
 
 # Neo4j DB dumps (backups, not run artifacts; run_* dirs are still tracked)
 experiments/neo4j_backup_*/
+
+# Playwright MCP scratch output
+.playwright-mcp/
