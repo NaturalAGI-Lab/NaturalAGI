@@ -1,0 +1,61 @@
+% Traceable Decisions Without Backpropagation: Graph Concept Attractors
+% for Handwritten Digit Recognition
+\documentclass[conference,a4paper]{IEEEtran}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{graphicx}
+\usepackage{amsmath,amssymb}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage[hidelinks]{hyperref}
+\usepackage{fancyhdr}
+
+\newcommand{\cid}[1]{\texttt{#1}}   % concept identifiers: \cid{2\_2}
+
+% DESSERT running header, added to the stock IEEE A4 conference template.
+\setlength{\headheight}{28pt}
+\pagestyle{fancy}
+\fancyhf{}
+\renewcommand{\headrulewidth}{0pt}
+\fancyhead[C]{\footnotesize\shortstack{%
+  The 16th IEEE International Conference on Dependable Systems, Services and Technologies, DESSERT'2026\\
+  2--4 October, 2026, Corfu, Greece}}
+
+\begin{document}
+
+\title{Traceable Decisions Without Backpropagation:\\
+Graph Concept Attractors for Handwritten Digit Recognition}
+
+\author{
+\IEEEauthorblockN{Mykyta Lapin\IEEEauthorrefmark{1},
+Kostiantyn Bokhan\IEEEauthorrefmark{1},
+Yurii Parzhyn\IEEEauthorrefmark{2},
+Kyrylo Perevoznyk\IEEEauthorrefmark{1},
+Tetiana Aleksandrova\IEEEauthorrefmark{1}}
+\IEEEauthorblockA{\IEEEauthorrefmark{1}Department of Systems Analysis and Information-Analytical Technologies,\\
+National Technical University ``Kharkiv Polytechnic Institute'', Kharkiv, Ukraine\\
+Mykyta.Lapin@cit.khpi.edu.ua, kostiantyn.bokhan@khpi.edu.ua,\\
+kyrylo.perevoznyk@cs.khpi.edu.ua, Tetiana.Aleksandrova@khpi.edu.ua}
+\IEEEauthorblockA{\IEEEauthorrefmark{2}School of Computer and Cyber Sciences, Augusta University, Augusta, GA, USA\\
+yparzhyn@augusta.edu}
+}
+% ORCID (verified, see project canonical table):
+%   Lapin        0009-0003-6307-1172
+%   Bokhan       0000-0003-3375-2527
+%   Parzhyn      0000-0001-5727-1918
+%   Perevoznyk   0009-0009-2327-1501
+%   Aleksandrova 0000-0001-9596-0669
+
+\maketitle
+\thispagestyle{fancy}
+
+\input{sections/front}
+\input{sections/back}
+
+\bibliographystyle{IEEEtran}
+\bibliography{references}
+
+\end{document}
