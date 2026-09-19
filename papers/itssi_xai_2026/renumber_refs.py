@@ -58,6 +58,7 @@ SOURCES: dict[str, tuple[str, tuple[str, ...]]] = {
         "Few-shot learning of a graph-based",
         ("(Lapin and Bokhan, 2025)",),
     ),
+    "lapin_isl": ("Invariant structural learning", ("(Lapin et al., 2026)",)),
     "zhang": ("Zhang, T., Suen", ("(Zhang and Suen, 1984)",)),
     "fritzke": ("Fritzke, B. (1995)", ("(Growing Neural Gas, GNG; Fritzke, 1995)",)),
     "douglas": ("Douglas, D., Peucker", ("(Douglas and Peucker, 1973)",)),
@@ -202,6 +203,14 @@ NEW_REFS: dict[str, str] = {
         "\"Backpropagation-free spiking neural networks with the "
         "forward–forward algorithm\", *Scientific Reports*, Vol. 16, "
         "No. 1, 14294. DOI: https://doi.org/10.1038/s41598-026-41671-4"
+    ),
+    "lapin_isl": (
+        "Lapin, M., Parzhyn, Y., Bokhan, K., Perevoznyk, K., "
+        "Aleksandrova, T. (2026), \"Invariant structural learning: concept "
+        "formation as hypergraph attractor dynamics\", *Innovative "
+        "Technologies and Scientific Solutions for Industries*, No. "
+        "2(36), pp. 70–94. DOI: "
+        "https://doi.org/10.30837/2522-9818.2026.2.070"
     ),
 }
 
