@@ -1,0 +1,140 @@
+{
+  "timestamp": "2026-09-10T11:39:41.664818+00:00",
+  "quick": false,
+  "repo_git": {
+    "commit": "89b8cc13ce443ad38b1d237693a4aecd3eea24b6",
+    "branch": "feature/supervisor-research-2026",
+    "dirty": true
+  },
+  "archive_commit": "f34b049",
+  "package_versions": {
+    "torch": "2.14.0",
+    "scikit_learn": "1.7.2",
+    "numpy": "2.3.5",
+    "pandas": "2.3.3",
+    "pillow": "12.0.0"
+  },
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "hyperparameters": {
+    "svm": {
+      "kernel": "rbf"
+    },
+    "knn": {
+      "k_values": [
+        1,
+        3,
+        5
+      ]
+    },
+    "nearest_centroid": {},
+    "mlp": {
+      "hidden": [
+        512,
+        256
+      ],
+      "activation": "relu"
+    },
+    "cnn": {
+      "channels": [
+        32,
+        64
+      ],
+      "kernel_size": 3,
+      "pool": "2x2_max",
+      "head": "flatten_fc128"
+    },
+    "optimizer": {
+      "name": "adam",
+      "lr": 0.001,
+      "batch_size": 32
+    },
+    "convergence": {
+      "max_epochs": 200,
+      "patience": 10,
+      "validation_scheme": "grouped_by_original_one_per_class",
+      "validation_originals_held_out": 10
+    }
+  },
+  "epochs_run": {
+    "mlp_1epoch": [
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "mlp_converged": [
+      13,
+      20,
+      19,
+      15,
+      15
+    ],
+    "cnn_1epoch": [
+      1,
+      1,
+      1,
+      1,
+      1
+    ],
+    "cnn_converged": [
+      23,
+      19,
+      21,
+      17,
+      29
+    ]
+  },
+  "train_set": {
+    "originals": 76,
+    "instances": 805,
+    "concept_dirs": 13
+  },
+  "test_set": {
+    "expected_count": 8708,
+    "resolved_count": 8708,
+    "archive_allowed_per_class": {
+      "0": 830,
+      "1": 1129,
+      "2": 956,
+      "3": 969,
+      "4": 954,
+      "5": 796,
+      "6": 742,
+      "7": 1014,
+      "8": 582,
+      "9": 736
+    },
+    "baseline_run_allowed_per_class": {
+      "0": 830,
+      "1": 1129,
+      "2": 956,
+      "3": 969,
+      "4": 953,
+      "5": 796,
+      "6": 742,
+      "7": 1014,
+      "8": 582,
+      "9": 736
+    },
+    "manifest_delta": {
+      "class": 4,
+      "archive_count": 954,
+      "baseline_run_count": 953,
+      "note": "run_20260630_235356 was dirty and scored against a manifest edited after f34b049; the excluded image is not identifiable from the run's artefacts, only its count is. These baselines are scored on the archive's reproducible 8,708."
+    }
+  },
+  "isl_reference": {
+    "total_submitted": 8707,
+    "dlq_failures": 22,
+    "classified": 8685,
+    "correct": 7915,
+    "source_run": "run_20260630_235356"
+  }
+}
