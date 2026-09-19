@@ -83,7 +83,22 @@ _NS = {"w": NS_W, "m": NS_M}
 _MATH_RE = re.compile(r"\$\$(.+?)\$\$|\$([^$\n]+?)\$", re.DOTALL)
 _ITALIC_RE = re.compile(r"\*(.+?)\*")
 
+_NBSP = "\u00a0"
+_THOUSANDS_SPACE_RE = re.compile(r"(?<=\d) (?=\d{3}(?!\d))")
+_PERCENT_SPACE_RE = re.compile(r"(?<=\d) (?=%)")
+_FIG_TABLE_SPACE_RE = re.compile(r"(рис\.|табл\.|Рис\.|Табл\.) (?=\d)")
+_UNIT_S_SPACE_RE = re.compile(r"(?<=\d) (?=с\b)")
+
 _OMATH_CACHE: dict[str, etree._Element] = {}
+
+
+def _nbsp(text: str) -> str:
+    """Replace ordinary spaces that must not become a line break with U+00A0."""
+    text = _THOUSANDS_SPACE_RE.sub(_NBSP, text)
+    text = _PERCENT_SPACE_RE.sub(_NBSP, text)
+    text = _FIG_TABLE_SPACE_RE.sub(lambda m: m.group(1) + _NBSP, text)
+    text = _UNIT_S_SPACE_RE.sub(_NBSP, text)
+    return text
 
 
 def _collect_math_expressions(*paragraph_lists: list[str]) -> set[str]:
@@ -217,14 +232,14 @@ def new_paragraph(
 def add_text(p, text: str, **style) -> None:
     """Add text to paragraph; expand $...$ markers into inline OMML equations."""
     if "$" not in text:
-        run = p.add_run(text)
+        run = p.add_run(_nbsp(text))
         style_run(run, **style)
         return
 
     pos = 0
     for match in _MATH_RE.finditer(text):
         if match.start() > pos:
-            run = p.add_run(text[pos:match.start()])
+            run = p.add_run(_nbsp(text[pos:match.start()]))
             style_run(run, **style)
         latex = (match.group(1) or match.group(2)).strip()
         omath = _omath_for(latex)
@@ -235,7 +250,7 @@ def add_text(p, text: str, **style) -> None:
             style_run(run, **style)
         pos = match.end()
     if pos < len(text):
-        run = p.add_run(text[pos:])
+        run = p.add_run(_nbsp(text[pos:]))
         style_run(run, **style)
 
 
@@ -294,7 +309,7 @@ def _style_cell(cell, text: str, *, bold: bool = False, align=None) -> None:
     pf.line_spacing = 1.0
     pf.space_before = Pt(0)
     pf.space_after = Pt(0)
-    run = p.add_run(text)
+    run = p.add_run(_nbsp(text))
     style_run(run, size=TABLE_SIZE_PT, bold=bold)
 
 
@@ -480,8 +495,8 @@ CITATION_MARKERS: tuple[tuple[str, str], ...] = (
     ),
     ("(Baniecki and Biecek, 2024; Bello et al., 2025)", "[6, 7]"),
     (
-        "(Growing Neural Gas, GNG; Fritzke, 1995)",
-        "(Growing Neural Gas, GNG) [38]",
+        "Growing Neural Gas (GNG; Fritzke, 1995)",
+        "Growing Neural Gas (GNG) [38]",
     ),
     ("(García-Cuesta et al., 2025)", "[11]"),
     ("(Rajabi and Etminani, 2024)", "[8]"),
