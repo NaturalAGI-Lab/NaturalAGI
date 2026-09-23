@@ -20,6 +20,7 @@
 build/
 */build/
 
-# PDFs (exclude from version control)
+# Derived export formats (regenerate from .docx / .tex)
 *.pdf
+*.doc
 

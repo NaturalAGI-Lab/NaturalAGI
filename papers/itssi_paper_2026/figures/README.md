@@ -86,7 +86,7 @@ cd papers/itssi_paper_2026/figures
 # Fig 2 (hybrid — needs two steps)
 /Applications/draw.io.app/Contents/MacOS/draw.io \
   -x -f png -b 20 --width 1700 -o /tmp/fig_2_graph_half_clean.png fig_2_digit7_graph.drawio
-../../../natural-agi/bin/python compose_fig_2.py     # combines digit7_sample.png + /tmp graph half
+../../../.venv/bin/python compose_fig_2.py     # combines digit7_sample.png + /tmp graph half
 ```
 
 The `-e` flag embeds the diagram XML inside the PNG (so the PNG itself is round-trippable back to `.drawio`). For the assembly stage in Fig 2 we omit `-e` because PIL/matplotlib cannot parse the embedded-XML PNG chunks.
@@ -95,7 +95,7 @@ Fig 4 is regenerated from the run artefacts:
 
 ```bash
 # from the project root
-natural-agi/bin/python src/training/evaluation/build_confusion_matrix.py \
+.venv/bin/python src/training/evaluation/build_confusion_matrix.py \
   --run experiments/run_20260427_144233 \
   --out papers/itssi_paper_2026/figures/fig_4_confusion_matrix.png
 ```

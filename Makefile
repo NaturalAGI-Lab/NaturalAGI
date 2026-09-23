@@ -69,9 +69,9 @@ USE_ENERGY_MINIMIZATION ?= true
 # Kafka-related targets
 .PHONY: create_kafka_topics list_kafka_topics
 
-VENV := natural-agi/bin
-PYTHON := $(VENV)/python
-PIP := $(VENV)/pip3
+VENV := .venv
+PYTHON := $(VENV)/bin/python
+PIP := uv pip --python $(PYTHON)
 
 COMMON_DIR := common
 COMMON_VENV := $(COMMON_DIR)/.venv/bin
@@ -258,10 +258,10 @@ repack_dataset:
 	@echo -e "${GREEN}Run 'git add datasets.zip' and commit to persist.${NC}"
 
 dashboard:
-	cd src/training && streamlit run dashboard.py --server.port 8501
+	cd src/training && ../../$(PYTHON) -m streamlit run dashboard.py --server.port 8501
 
 formation_viz:
-	cd src/concept_creator && ../../natural-agi/bin/python -m streamlit run visualization/formation_viz_app.py --server.port 8502
+	cd src/concept_creator && ../../$(PYTHON) -m streamlit run visualization/formation_viz_app.py --server.port 8502
 
 help:
 	@echo "Available targets:"

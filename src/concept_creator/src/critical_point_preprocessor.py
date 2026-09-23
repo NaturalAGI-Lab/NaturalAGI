@@ -77,6 +77,7 @@ class CriticalPointPreprocessor:
             self.logger.info(
                 "Critical point graphs are isomorphic, no reductions needed"
             )
+            self.last_iteration_count = 0
 
         return graph1_mod, graph2_mod
 
@@ -117,6 +118,10 @@ class CriticalPointPreprocessor:
                 self.logger.warning("Reached maximum reduction iterations, stopping")
                 raise ValueError("Reached maximum reduction iterations, stopping")
 
+        self.last_iteration_count = iteration
+        self.logger.info(
+            f"Critical-point reduction converged in {iteration} iteration(s)"
+        )
         return graph1, graph2
 
     def save_graphs(

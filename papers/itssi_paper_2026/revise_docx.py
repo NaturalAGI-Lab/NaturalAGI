@@ -16,7 +16,7 @@ Operations:
      order: degree → title → org → position.
 
 Run:
-    natural-agi/bin/python papers/itssi_paper_2026/revise_docx.py
+    .venv/bin/python papers/itssi_paper_2026/revise_docx.py
 """
 
 from __future__ import annotations

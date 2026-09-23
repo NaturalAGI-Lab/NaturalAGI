@@ -149,7 +149,7 @@ make preview
 make pages
 
 # Validate abstract length, reference quotas, TODO leakage
-/Users/mlapin/Development/personal/NaturalAGI/natural-agi/bin/python -c "
+../../.venv/bin/python -c "
 import content as c
 ua = sum(len(getattr(c, f'ABSTRACT_UA_{k}')) for k in ['SUBJECT','GOAL','TASKS','METHODS','RESULTS','CONCLUSIONS'])
 en = sum(len(getattr(c, f'ABSTRACT_EN_{k}')) for k in ['SUBJECT','GOAL','TASKS','METHODS','RESULTS','CONCLUSIONS'])

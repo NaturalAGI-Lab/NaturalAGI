@@ -1,7 +1,7 @@
 """IEEE KhPI Week 2026 paper generator (.docx).
 
 Usage:
-    natural-agi/bin/python papers/ieee_khpi_week_2026/generate_paper.py
+    .venv/bin/python papers/ieee_khpi_week_2026/generate_paper.py
 
 What it does:
 - Loads the official KhPIWeek_conference_template.docx as a starting point so

@@ -10,7 +10,7 @@ Two steps before running this:
            fig_2_digit7_graph.drawio
 
 Then run this script with the venv interpreter:
-    natural-agi/bin/python papers/itssi_paper_2026/figures/compose_fig_2.py
+    .venv/bin/python papers/itssi_paper_2026/figures/compose_fig_2.py
 """
 from pathlib import Path
 
