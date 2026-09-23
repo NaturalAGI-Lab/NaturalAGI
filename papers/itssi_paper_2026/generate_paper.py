@@ -1,7 +1,7 @@
 """ITSSI-2026 генератор статті у форматі .docx.
 
 Використання:
-    natural-agi/bin/python papers/itssi_paper_2026/generate_paper.py
+    .venv/bin/python papers/itssi_paper_2026/generate_paper.py
 
 Що робить:
 - Зчитує content.py (весь змістовний текст + метадані + бібліографію)

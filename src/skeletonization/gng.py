@@ -27,9 +27,11 @@ def _fit_numpy_optimized(
     alpha: float,
     delta: float,
     T: int,
+    seed: int = 42,
 ) -> tuple:
     ndata = data.shape[0]
     ndim = data.shape[1]
+    np.random.seed(seed)
     np.random.shuffle(data)
 
     xmin = np.amin(data, axis=0)
@@ -131,10 +133,13 @@ if _NUMBA_AVAILABLE:
 
     @_njit(cache=True)
     def _fit_numba(
-        data, N, maxit, L, epsilon_b, epsilon_n, alpha, delta, T
+        data, N, maxit, L, epsilon_b, epsilon_n, alpha, delta, T, seed
     ):
         ndata = data.shape[0]
         ndim = data.shape[1]
+
+        # Seed for deterministic shuffle and neuron init
+        np.random.seed(seed)
 
         # Fisher-Yates shuffle (np.random.shuffle not supported in njit)
         for idx in range(ndata - 1, 0, -1):
@@ -324,16 +329,17 @@ def fit(data: np.ndarray, params: Settings) -> structure:
     alpha_val = params.alpha
     delta_val = params.delta
     T = params.T
+    seed = getattr(params, "seed", 42)
 
     if _NUMBA_AVAILABLE:
         w, C, t, E = _fit_numba(
             data.astype(np.float64), N, maxit, L,
-            epsilon_b, epsilon_n, alpha_val, delta_val, T,
+            epsilon_b, epsilon_n, alpha_val, delta_val, T, seed,
         )
     else:
         w, C, t, E = _fit_numpy_optimized(
             data, N, maxit, L,
-            epsilon_b, epsilon_n, alpha_val, delta_val, T,
+            epsilon_b, epsilon_n, alpha_val, delta_val, T, seed,
         )
 
     net = structure()

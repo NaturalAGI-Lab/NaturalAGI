@@ -47,6 +47,25 @@ class ConceptMinorClassifier:
         self.graph_complexity_service = GraphComplexityService()
         self.start_point_preprocessor = start_point_preprocessor
 
+    def preprocess_pair(self, image_graph: nx.Graph, concept_graph: nx.Graph):
+        image_graph = copy.deepcopy(image_graph)
+        image_graph = self.start_point_preprocessor.preprocess(
+            inference_graph=image_graph,
+            concept_graph=concept_graph,
+        )
+        GraphAnalyzer(
+            graph=image_graph,
+            visitors=[
+                AngleVisitor(image_graph),
+                QuadrantVisitor(image_graph),
+                DirectionVisitor(image_graph),
+            ],
+        ).analyze()
+        return self.critical_point_preprocessor.preprocess_graphs(
+            inference_graph=image_graph,
+            concept_graph=concept_graph,
+        )
+
     @timed(label="check_single_concept")
     def check_single_concept(
         self,
@@ -59,23 +78,8 @@ class ConceptMinorClassifier:
 
         try:
             logging.info("Preprocessing image graph")
-            image_graph = self.start_point_preprocessor.preprocess(
-                inference_graph=image_graph,
-                concept_graph=concept_graph,
-            )
-            GraphAnalyzer(
-                graph=image_graph,
-                visitors=[
-                    AngleVisitor(image_graph),
-                    QuadrantVisitor(image_graph),
-                    DirectionVisitor(image_graph),
-                ],
-            ).analyze()
-            preprocessed_image_graph, preprocessed_concept_graph = (
-                self.critical_point_preprocessor.preprocess_graphs(
-                    inference_graph=image_graph,
-                    concept_graph=concept_graph,
-                )
+            preprocessed_image_graph, preprocessed_concept_graph = self.preprocess_pair(
+                image_graph, concept_graph
             )
             similarity = self.comparator.compare(
                 image_graph=preprocessed_image_graph,

@@ -3,11 +3,13 @@ from typing import Tuple, List, Any
 
 import numpy as np
 import networkx as nx
+from scipy.optimize import linear_sum_assignment
 from node_similarity_calculator import NodeSimilarityCalculator
 from common.graph_utils import GraphUtils
 from common.critical_point import CriticalPointType
 from services.synced_traversal_service import SyncedTraversalService
 from optimal_path_matcher import OptimalPathMatcher, PathCandidate
+from graph_similarity.cost_functions import node_subst_cost
 
 from .abstract_strategy import AbstractReductionStrategy
 
@@ -266,14 +268,15 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
             points_large = image_corner_points
             points_small = concept_corner_points
 
-        similarity_matrix = self.calculate_similarity_matrix(
-            graph_large, graph_small, points_large, points_small
+        cost_matrix = self._corner_substitution_cost_matrix(
+            image_nodes=points_large,
+            concept_nodes=points_small,
+            image_graph=graph_large,
+            concept_graph=graph_small,
         )
 
-        difference = abs(len_concept_corner_points - len_image_corner_points)
-
         points_to_remove = self._identify_corner_points_to_remove(
-            similarity_matrix, points_large, difference
+            cost_matrix, points_large
         )
 
         if points_to_remove:
@@ -282,23 +285,42 @@ class CornerPointReductionStrategy(AbstractReductionStrategy):
             )
             self._apply_reduction(image_graph, points_to_remove)
 
+    def _corner_substitution_cost_matrix(
+        self,
+        image_nodes: List[Any],
+        concept_nodes: List[Any],
+        image_graph: nx.Graph,
+        concept_graph: nx.Graph,
+    ) -> np.ndarray:
+        # Score each (image corner, concept corner) pair by the SAME range-membership
+        # substitution cost the downstream GED uses. The corners we keep are then the ones
+        # GED would actually match cheaply, instead of the ones a separate center-based
+        # similarity metric happens to rank high. Image corners still carry the CornerPoint
+        # label at this stage, so the concept-subset label check passes and the cost is a
+        # real feature cost rather than IMPOSSIBLE.
+        cost_matrix = np.zeros((len(image_nodes), len(concept_nodes)))
+        for i, image_node in enumerate(image_nodes):
+            for j, concept_node in enumerate(concept_nodes):
+                cost_matrix[i, j] = node_subst_cost(
+                    image_graph.nodes[image_node], concept_graph.nodes[concept_node]
+                )
+        return cost_matrix
+
     def _identify_corner_points_to_remove(
-        self, similarity_matrix: np.ndarray, nodes: List[Any], difference: int
+        self, cost_matrix: np.ndarray, nodes: List[Any]
     ) -> List[Any]:
-        if difference <= 0:
-            return []
+        if cost_matrix.size == 0:
+            self.logger.error("Cost matrix is empty. Raising error.", exc_info=True)
+            raise ValueError("Cost matrix is empty.")
 
-        if similarity_matrix.size == 0:
-            self.logger.error(
-                "Similarity matrix is empty. Raising error.", exc_info=True
-            )
-            raise ValueError("Similarity matrix is empty.")
-
-        max_similarities_per_large_point = np.max(similarity_matrix, axis=1)
-        indexed_similarities = list(enumerate(max_similarities_per_large_point))
-        indexed_similarities.sort(key=lambda x: x[1])
-        indices_to_remove = [idx for idx, sim in indexed_similarities[:difference]]
-        nodes_to_remove = [nodes[i] for i in indices_to_remove]
+        # Keep exactly one image corner per concept corner slot via an optimal one-to-one
+        # assignment that minimizes total substitution cost; demote the rest. This replaces
+        # the previous greedy `max(similarity, axis=1)` selection, which had no distinct-slot
+        # constraint and could keep two corners both nearest the same concept slot, starving
+        # another slot and forcing GED into a high-cost substitution.
+        row_ind, _ = linear_sum_assignment(cost_matrix)
+        keep = set(int(r) for r in row_ind)
+        nodes_to_remove = [nodes[i] for i in range(len(nodes)) if i not in keep]
 
         self.logger.debug(f"Nodes identified for removal: {nodes_to_remove}")
         return nodes_to_remove

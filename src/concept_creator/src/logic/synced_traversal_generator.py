@@ -1,12 +1,19 @@
-import logging
-from typing import Any, List, Tuple, Set, FrozenSet, Dict
-import networkx as nx
 import collections
+import logging
+from typing import Any, Dict, FrozenSet, List, Optional, Set, Tuple
+
+import networkx as nx
 import numpy as np
 from scipy.optimize import linear_sum_assignment
+
 from common.critical_point import CriticalPointType
 from common.graph_utils import GraphUtils
 from src.node_similarity_calculator import NodeSimilarityCalculator
+
+
+# Normalized coordinates are bounded around [-1, 1], so max point distance is
+# about 2.83; 1000 makes destination distance dominate exit-neighbor tiebreaks.
+DESTINATION_DISTANCE_COST_MULTIPLIER = 1000.0
 
 
 class SyncedTraversalGenerator:
@@ -76,6 +83,8 @@ class SyncedTraversalGenerator:
         # This allows parallel paths between the same pair of critical points
         # (e.g., two arcs of a figure-8 upper loop) to be traversed separately.
         processed_intersection_exits: Set[Tuple[Any, Any]] = set()
+        processed_intersection_image_exits: Set[Tuple[Any, Any]] = set()
+        processed_intersection_image_destinations: Set[Tuple[Any, Any]] = set()
 
         # Queue stores (node_c, node_i, path_id, prev_c, prev_i)
         # The prev_* values help avoid immediate backtracking
@@ -111,12 +120,30 @@ class SyncedTraversalGenerator:
                         f"Multi-branch start point: {current_c}, {current_i} (degree={G_c.degree(current_c)})"
                     )
                 self.logger.info(f"Intersection point found: {current_c}, {current_i}")
+                previously_processed_concept_exits = (
+                    self._get_processed_items_for_intersection(
+                        processed_intersection_exits, current_c
+                    )
+                )
+                previously_processed_image_exits = (
+                    self._get_processed_items_for_intersection(
+                        processed_intersection_image_exits, current_i
+                    )
+                )
+                previously_processed_image_destinations = (
+                    self._get_processed_items_for_intersection(
+                        processed_intersection_image_destinations, current_i
+                    )
+                )
                 matched_branches = (
                     self._get_matched_intersection_point_critical_neighbors(
                         G_c=G_c,
                         G_i=G_i,
                         intersection_c=current_c,
                         intersection_i=current_i,
+                        excluded_concept_exits=previously_processed_concept_exits,
+                        excluded_image_exits=previously_processed_image_exits,
+                        excluded_image_destinations=previously_processed_image_destinations,
                     )
                 )
 
@@ -130,7 +157,21 @@ class SyncedTraversalGenerator:
                             f"Exit branch ({current_c}, {exit_c}) already processed, skipping."
                         )
                         continue
+                    image_exit_key = (current_i, exit_i)
+                    if image_exit_key in processed_intersection_image_exits:
+                        self.logger.debug(
+                            f"Image exit branch ({current_i}, {exit_i}) already processed, skipping."
+                        )
+                        continue
+                    image_destination_key = (current_i, image_neighbor_cp)
+                    if image_neighbor_cp in previously_processed_image_destinations:
+                        self.logger.debug(
+                            f"Image destination ({current_i}, {image_neighbor_cp}) already processed, skipping."
+                        )
+                        continue
                     processed_intersection_exits.add(exit_key)
+                    processed_intersection_image_exits.add(image_exit_key)
+                    processed_intersection_image_destinations.add(image_destination_key)
                     self.logger.debug(f"Processing exit branch ({current_c}, {exit_c}) -> {concept_neighbor_cp}.")
 
                     # Create a new path ID
@@ -247,6 +288,9 @@ class SyncedTraversalGenerator:
         G_i: nx.Graph,
         intersection_c: Any,
         intersection_i: Any,
+        excluded_concept_exits: Optional[Set[Any]] = None,
+        excluded_image_exits: Optional[Set[Any]] = None,
+        excluded_image_destinations: Optional[Set[Any]] = None,
     ) -> List[Tuple[Any, Any, Any, Any]]:
         """Get matched critical point-neighbor branches of the current intersection point.
 
@@ -262,6 +306,11 @@ class SyncedTraversalGenerator:
         # Build branch info: (exit_neighbor, destination_critical_point)
         branches_c: List[Tuple[Any, Any]] = []
         for neighbor_c in neighbors_c:
+            if (
+                excluded_concept_exits is not None
+                and neighbor_c in excluded_concept_exits
+            ):
+                continue
             next_c_critical_point = GraphUtils.find_next_critical_point_bfs(
                 G_c,
                 start_point=neighbor_c,
@@ -273,6 +322,8 @@ class SyncedTraversalGenerator:
 
         branches_i: List[Tuple[Any, Any]] = []
         for neighbor_i in neighbors_i:
+            if excluded_image_exits is not None and neighbor_i in excluded_image_exits:
+                continue
             next_i_critical_point = GraphUtils.find_next_critical_point_bfs(
                 G_i,
                 start_point=neighbor_i,
@@ -280,6 +331,11 @@ class SyncedTraversalGenerator:
                 supported_types=self.critical_point_types,
             )
             if next_i_critical_point is not None:
+                if (
+                    excluded_image_destinations is not None
+                    and next_i_critical_point in excluded_image_destinations
+                ):
+                    continue
                 branches_i.append((neighbor_i, next_i_critical_point))
 
         self.logger.debug(
@@ -300,10 +356,11 @@ class SyncedTraversalGenerator:
         branches_c: List[Tuple[Any, Any]],
         branches_i: List[Tuple[Any, Any]],
     ) -> List[Tuple[Any, Any, Any, Any]]:
-        """Match concept and image branches by destination type and exit neighbor similarity.
+        """Match concept and image branches by destination type and geometry.
 
-        When multiple branches lead to the same critical point type (parallel paths),
-        uses exit neighbor spatial properties with Hungarian algorithm to pair them.
+        Multi-branch groups primarily use destination critical-point distance. Exit
+        neighbor distance only breaks ties, such as parallel arcs sharing a
+        destination critical point.
 
         Args:
             branches_c: List of (exit_neighbor, destination_cp) from concept intersection.
@@ -341,36 +398,62 @@ class SyncedTraversalGenerator:
                     f"Matched unique branch of type {cp_type}: {dest_c} -> {dest_i}"
                 )
             else:
-                # Multiple branches of the same type: match by exit neighbor similarity
+                # Multiple same-type branches: destination dominates, exit breaks ties.
                 n_c, n_i = len(c_group), len(i_group)
-                distance_matrix = np.zeros((n_c, n_i))
+                destination_distance_matrix = np.zeros((n_c, n_i))
+                exit_distance_matrix = np.zeros((n_c, n_i))
+                cost_matrix = np.zeros((n_c, n_i))
 
-                for idx_c, (exit_c, _) in enumerate(c_group):
-                    for idx_i, (exit_i, _) in enumerate(i_group):
-                        c_x = self._get_node_coord(G_c.nodes[exit_c], 'x')
-                        c_y = self._get_node_coord(G_c.nodes[exit_c], 'y')
-                        i_x = self._get_node_coord(G_i.nodes[exit_i], 'x')
-                        i_y = self._get_node_coord(G_i.nodes[exit_i], 'y')
-                        distance_matrix[idx_c, idx_i] = np.sqrt(
-                            (c_x - i_x) ** 2 + (c_y - i_y) ** 2
+                for idx_c, (exit_c, dest_c) in enumerate(c_group):
+                    for idx_i, (exit_i, dest_i) in enumerate(i_group):
+                        destination_distance = self._get_node_distance(
+                            G_c.nodes[dest_c], G_i.nodes[dest_i]
+                        )
+                        exit_distance = self._get_node_distance(
+                            G_c.nodes[exit_c], G_i.nodes[exit_i]
+                        )
+                        destination_distance_matrix[idx_c, idx_i] = destination_distance
+                        exit_distance_matrix[idx_c, idx_i] = exit_distance
+                        cost_matrix[idx_c, idx_i] = (
+                            destination_distance
+                            * DESTINATION_DISTANCE_COST_MULTIPLIER
+                            + exit_distance
                         )
 
-                max_distance = np.sqrt(2 * (2 ** 2))
-                similarity_matrix = 1.0 - (distance_matrix / max_distance)
-                cost_matrix = -similarity_matrix
                 row_ind, col_ind = linear_sum_assignment(cost_matrix)
 
                 for r, c_idx in zip(row_ind, col_ind):
                     exit_c, dest_c = c_group[r]
                     exit_i, dest_i = i_group[c_idx]
-                    sim = similarity_matrix[r, c_idx]
+                    destination_distance = destination_distance_matrix[r, c_idx]
+                    exit_distance = exit_distance_matrix[r, c_idx]
                     matched.append((dest_c, dest_i, exit_c, exit_i))
                     self.logger.debug(
-                        f"Matched branch of type {cp_type} (similarity={sim:.2f}): "
+                        f"Matched branch of type {cp_type} "
+                        f"(destination_distance={destination_distance:.2f}, "
+                        f"exit_distance={exit_distance:.2f}): "
                         f"exit {exit_c} -> {dest_c} with exit {exit_i} -> {dest_i}"
                     )
 
         return matched
+
+    @staticmethod
+    def _get_processed_items_for_intersection(
+        processed_pairs: Set[Tuple[Any, Any]], intersection: Any
+    ) -> Set[Any]:
+        processed_items: Set[Any] = set()
+        for processed_intersection, processed_item in processed_pairs:
+            if processed_intersection == intersection:
+                processed_items.add(processed_item)
+        return processed_items
+
+    @classmethod
+    def _get_node_distance(cls, node_data_a: Dict, node_data_b: Dict) -> float:
+        a_x = cls._get_node_coord(node_data_a, 'x')
+        a_y = cls._get_node_coord(node_data_a, 'y')
+        b_x = cls._get_node_coord(node_data_b, 'x')
+        b_y = cls._get_node_coord(node_data_b, 'y')
+        return float(np.sqrt((a_x - b_x) ** 2 + (a_y - b_y) ** 2))
 
     @staticmethod
     def _get_node_coord(node_data: Dict, axis: str) -> float:

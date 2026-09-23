@@ -9,22 +9,42 @@ class GraphPersistenceService:
         self.driver = driver
         self.logger = logging.getLogger(__name__)
 
-    def save_graph_to_neo4j(self, graph: nx.Graph, image_id: str, session_id: str) -> None:
+    def save_graph_to_neo4j(
+        self,
+        graph: nx.Graph,
+        image_id: str,
+        session_id: str,
+        image_path: str | None = None,
+    ) -> None:
         point_types = {
             point.id: type(point).__name__
             for point in PointExtractor(graph).extract_points()
         }
         with self.driver.session() as session:
-            session.execute_write(self._save_graph, graph, image_id, session_id, point_types)
+            session.execute_write(
+                self._save_graph, graph, image_id, session_id, point_types, image_path
+            )
 
     def _save_graph(
-        self, tx, graph: nx.Graph, image_id: str, session_id: str, point_types: dict
+        self,
+        tx,
+        graph: nx.Graph,
+        image_id: str,
+        session_id: str,
+        point_types: dict,
+        image_path: str | None = None,
     ) -> None:
         by_label: dict[str | None, list[dict]] = {}
         for node_id, data in graph.nodes(data=True):
             label = point_types.get(node_id)
             by_label.setdefault(label, []).append(
-                {"id": node_id, "image_id": image_id, "session_id": session_id, **data}
+                {
+                    "id": node_id,
+                    "image_id": image_id,
+                    "session_id": session_id,
+                    "image_path": image_path,
+                    **data,
+                }
             )
 
         for label, nodes in by_label.items():
@@ -39,6 +59,7 @@ class GraphPersistenceService:
                 "length": data["length"],
                 "image_id": image_id,
                 "session_id": session_id,
+                "image_path": image_path,
             }
             for u, v, data in graph.edges(data=True)
         ]
@@ -53,7 +74,8 @@ class GraphPersistenceService:
                     x1: a.x, y1: a.y, x2: b.x, y2: b.y,
                     length: e.length,
                     image_id: e.image_id,
-                    session_id: e.session_id
+                    session_id: e.session_id,
+                    image_path: e.image_path
                 })
                 CREATE (a)-[:CONNECTED_TO]->(vec)
                 CREATE (vec)<-[:CONNECTED_TO]-(b)

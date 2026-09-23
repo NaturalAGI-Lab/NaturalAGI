@@ -14,11 +14,25 @@ from neo4j import GraphDatabase
 import networkx as nx
 from pyvis.network import Network
 import streamlit.components.v1 as components
+import sys
+from pathlib import Path
+
+_VIZ = Path(__file__).resolve().parents[1] / "concept_creator" / "visualization"
+if str(_VIZ) not in sys.path:
+    sys.path.insert(0, str(_VIZ))
+
+import plotting
+import ged_breakdown
 
 NEO4J_URI = os.environ.get("NEO4J_URI", "bolt://localhost:7687")
 NEO4J_USER = os.environ.get("NEO4J_USER", "neo4j")
 NEO4J_PASS = os.environ.get("NEO4J_PASS", "111122223333")
 RESULTS_DIR = "training_results"
+
+
+@st.cache_resource
+def get_driver():
+    return GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
 
 
 def get_run_dirs():
@@ -136,6 +150,41 @@ def load_concept_graph(concept_id: str) -> dict:
     return {"nodes": G.number_of_nodes(), "edges": G.number_of_edges(), "graph": G}
 
 
+def _classification_params_for_run(run: str) -> dict | None:
+    try:
+        with open(os.path.join(run, "run_config.json")) as f:
+            return json.load(f).get("classification_params")
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+@st.cache_data(ttl=300)
+def cached_breakdown(run: str, image_id: str, concept_id: str) -> dict | None:
+    graph = ged_breakdown.get_image_graph_if_present(get_driver(), image_id)
+    if graph is None:
+        return None
+    # Score against the run's persisted concept snapshot (the exact topologies it
+    # used), not the current Neo4j state — which changes on every retrain.
+    concepts = ged_breakdown.load_run_concepts(run)
+    concept_graph = concepts.get(concept_id)
+    if concept_graph is None:
+        # Run predates concept-snapshot persistence → fall back to live Neo4j.
+        concept_graph = ged_breakdown.get_concept_graph(get_driver(), concept_id)
+        concepts = None
+    return ged_breakdown.compute_breakdown(
+        graph, concept_id, concept_graph, all_concepts=concepts,
+        classification_params=_classification_params_for_run(run),
+    )
+
+
+@st.cache_data(ttl=300)
+def cached_image_skeleton(image_id: str) -> dict | None:
+    try:
+        return ged_breakdown.get_image_skeleton_payload(get_driver(), image_id)
+    except Exception:
+        return None
+
+
 @st.cache_data(ttl=300)
 def get_all_concept_ids() -> list:
     driver = GraphDatabase.driver(NEO4J_URI, auth=(NEO4J_USER, NEO4J_PASS))
@@ -170,6 +219,7 @@ selected_run = st.sidebar.selectbox(
 
 # Load run_config if available
 config_path = os.path.join(selected_run, "run_config.json")
+run_config: dict = {}
 if os.path.exists(config_path):
     with open(config_path) as f:
         run_config = json.load(f)
@@ -244,22 +294,135 @@ with tab_incorrect:
             with st.expander(
                 f"Image: {img_name} | Expected: {row['expected']}, Predicted: {row['predicted']}"
             ):
+                image_id = str(row["image_id"])
+                expected = str(row["expected"])
+
+                raw_results = row.get("classification_results")
+                parse_ok = True
+                if isinstance(raw_results, str):
+                    try:
+                        results_list = json.loads(raw_results)
+                    except json.JSONDecodeError:
+                        results_list = []
+                        parse_ok = False
+                else:
+                    # Column absent (leaner run schema) or NaN — not a parse failure.
+                    results_list = []
+                    parse_ok = False
+
                 try:
-                    results = json.loads(row["classification_results"])
-                    if results:
-                        results_df = pd.DataFrame(results)
-                        cols_order = ["concept_id", "is_minor", "similarity"]
-                        extra = [c for c in results_df.columns if c not in cols_order]
-                        results_df = results_df[
-                            [c for c in cols_order if c in results_df.columns] + extra
-                        ]
-                        st.dataframe(results_df, use_container_width=True)
+                    all_ids = get_all_concept_ids()
+                except Exception:
+                    all_ids = []
+                cand = ged_breakdown.expected_concepts(all_ids, results_list, expected)
+
+                # Sample PNG + raw skeleton (independent of concept selection).
+                host_path = ged_breakdown.resolve_sample_path(row.get("image_path", ""))
+                skeleton = cached_image_skeleton(image_id)
+
+                # Default expected concept → breakdown feeds the debug blob.
+                default_cid = cand[0]["concept_id"] if cand else None
+                default_bd = None
+                if default_cid:
+                    try:
+                        default_bd = cached_breakdown(selected_run, image_id, default_cid)
+                    except Exception:
+                        default_bd = None
+
+                blob = ged_breakdown.build_debug_blob(
+                    row, run_config, default_bd, default_cid, host_path,
+                    os.path.basename(selected_run), skeleton is not None,
+                )
+                components.html(ged_breakdown.copy_button_html(blob), height=40)
+
+                c_img, c_skel = st.columns([1, 2])
+                with c_img:
+                    if host_path is not None:
+                        st.image(str(host_path),
+                                 caption=os.path.basename(str(host_path)), width=160)
                     else:
-                        st.info("No classification results")
-                except (json.JSONDecodeError, TypeError):
+                        st.info("Sample PNG not found on host.")
+                with c_skel:
+                    if skeleton is not None:
+                        sk_fig = plotting.single_graph_figure(
+                            skeleton,
+                            title="Original skeleton (Neo4j, pre-preprocessing)",
+                            height=300,
+                        )
+                        components.html(
+                            plotting.figure_html(sk_fig, include_plotlyjs="cdn"),
+                            height=int(sk_fig.layout.height or 300) + 8,
+                            scrolling=False,
+                        )
+                        st.caption(
+                            "⚠︎ Skeleton + breakdown image graph come from **live** "
+                            "Neo4j by image_id. If a later run reused this image_id "
+                            "(deterministic ids + delete_image_nodes=False), this may "
+                            "not be the graph this run actually scored."
+                        )
+                    else:
+                        st.info(
+                            "Skeleton not in Neo4j (run cleaned / "
+                            "delete_image_nodes=True)."
+                        )
+
+                if not parse_ok:
                     st.warning(
                         "Cannot parse classification_results — run with JSON serialization fix first"
                     )
+                elif results_list:
+                    results_df = pd.DataFrame(results_list)
+                    cols_order = ["concept_id", "is_minor", "similarity"]
+                    extra = [c for c in results_df.columns if c not in cols_order]
+                    results_df = results_df[
+                        [c for c in cols_order if c in results_df.columns] + extra
+                    ]
+                    st.dataframe(results_df, use_container_width=True)
+                else:
+                    st.info("No classification results")
+
+                st.markdown("---")
+                st.caption("Image vs. expected concept — GED penalty breakdown")
+                if not cand:
+                    st.info(f"No concept of class {expected} in Neo4j.")
+                else:
+                    labels = [
+                        f"{c['concept_id']} "
+                        + (f"(sim {c['similarity']:.3f})" if c["similarity"] is not None
+                           else "(pre-filtered)")
+                        for c in cand
+                    ]
+                    pick = st.selectbox("Expected concept", labels, key=f"exp_{idx}")
+                    concept_id = cand[labels.index(pick)]["concept_id"]
+                    try:
+                        bd = cached_breakdown(selected_run, image_id, concept_id)
+                    except Exception as e:
+                        bd = None
+                        st.warning(f"Breakdown unavailable: {e}")
+                    if bd is None:
+                        st.info(
+                            "Image graph not in Neo4j (run cleaned / "
+                            "delete_image_nodes=True). Re-run classification with "
+                            "delete_image_nodes=False to enable the breakdown."
+                        )
+                    else:
+                        st.caption(
+                            f"GED cost {bd['cost']:.2f} · n1 {bd['n1']} · n2 {bd['n2']} "
+                            f"· similarity {bd['similarity']:.3f}"
+                        )
+                        fig = plotting.comparison_figure(
+                            bd["image_nodelink"], bd["concept_nodelink"], bd["edit_ops"]
+                        )
+                        components.html(
+                            plotting.figure_html(fig),
+                            height=int(fig.layout.height or 420) + 8,
+                            scrolling=False,
+                        )
+                        ops_df = pd.DataFrame([
+                            o for o in bd["edit_ops"] if o["op"] != "MATCH"
+                        ])
+                        if not ops_df.empty:
+                            st.dataframe(ops_df, use_container_width=True)
     else:
         st.info("No incorrect_results.csv found for this run.")
 

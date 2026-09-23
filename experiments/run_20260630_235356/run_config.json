@@ -1,0 +1,112 @@
+{
+  "timestamp": "2026-06-30T23:53:57.296093",
+  "git": {
+    "commit": "f34b049cb08efe0099f116a6ba0baded54802302",
+    "branch": "feature/concept-creator-fixes",
+    "dirty": true
+  },
+  "common_lib_version": "0.1.0",
+  "classification_params": {
+    "ged_timeout": 5,
+    "skeletonization_threshold": 110,
+    "simplification_epsilon": 4.55,
+    "diagnostic_weight_epsilon": 0.1,
+    "delete_image_nodes": false,
+    "node_costs": {
+      "NO_COST": 0.0,
+      "MINOR": 0.25,
+      "GENERAL": 0.5,
+      "SEVERE": 0.8,
+      "NO_MATCH": 1,
+      "IMPOSSIBLE": 6
+    },
+    "features": [
+      "normalized_x",
+      "normalized_y",
+      "distance_to_centroid",
+      "horizontal_direction",
+      "vertical_direction",
+      "angle_with_ox",
+      "junction_angle_min",
+      "is_endpoint",
+      "is_corner",
+      "length_ratio_to_max",
+      "avg_neighbor_vector_length",
+      "neighbor_endpoint_count",
+      "neighbor_junction_count"
+    ]
+  },
+  "sample_fraction": 1.0,
+  "classes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "concepts": {
+    "0_1": 10,
+    "1_1": 7,
+    "1_3": 3,
+    "2_1": 7,
+    "2_2": 12,
+    "3_1": 9,
+    "4_1": 8,
+    "4_2": 9,
+    "5_1": 7,
+    "6_1": 10,
+    "7_1": 5,
+    "8_1": 11,
+    "9_2": 8
+  },
+  "manifest": {
+    "manifest_path": "datasets/mnist_all_manifest.csv",
+    "structure_filter": [
+      "complete"
+    ],
+    "allowed_per_class": {
+      "0": 830,
+      "1": 1129,
+      "2": 956,
+      "3": 969,
+      "4": 953,
+      "5": 796,
+      "6": 742,
+      "7": 1014,
+      "8": 582,
+      "9": 736
+    },
+    "total_allowed": 8707
+  },
+  "features": {
+    "features": [
+      "normalized_x",
+      "normalized_y",
+      "distance_to_centroid",
+      "horizontal_direction",
+      "vertical_direction",
+      "angle_with_ox",
+      "junction_angle_min",
+      "is_endpoint",
+      "is_corner",
+      "length_ratio_to_max",
+      "avg_neighbor_vector_length",
+      "neighbor_endpoint_count",
+      "neighbor_junction_count"
+    ],
+    "diagnostic_weight_epsilon": 0.1,
+    "node_costs": {
+      "NO_COST": 0.0,
+      "MINOR": 0.25,
+      "GENERAL": 0.5,
+      "SEVERE": 0.8,
+      "NO_MATCH": 1,
+      "IMPOSSIBLE": 6
+    }
+  }
+}

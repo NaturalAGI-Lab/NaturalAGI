@@ -30,8 +30,7 @@ class StructuralFeatureAnalyzer(BaseAnalyzer):
 
     def analyze(self) -> dict[str, dict]:
         node_types = self._classify_all_nodes()
-        cx, cy = self._compute_centroid()
-        max_dist = self._compute_max_centroid_distance(cx, cy)
+        cx, cy, half_diameter = self._compute_diameter_anchor()
         cycle_nodes = self._compute_cycle_nodes()
         centralities = self._compute_centralities()
         total_length, max_length = self._compute_length_aggregates()
@@ -51,7 +50,7 @@ class StructuralFeatureAnalyzer(BaseAnalyzer):
                 "is_on_cycle": 1 if node in cycle_nodes else 0,
                 "distance_to_centroid": h_k(
                     "distance_to_centroid",
-                    self._normalized_distance(data["x"], data["y"], cx, cy, max_dist),
+                    self._normalized_distance(data["x"], data["y"], cx, cy, half_diameter),
                 ),
                 "avg_neighbor_vector_length": h_k(
                     "avg_neighbor_vector_length", self._avg_neighbor_length(node)
@@ -183,30 +182,32 @@ class StructuralFeatureAnalyzer(BaseAnalyzer):
                 types[node] = "P"
         return types
 
-    def _compute_centroid(self) -> tuple[float, float]:
-        xs, ys = [], []
-        for _, data in self.graph.nodes(data=True):
-            xs.append(data["x"])
-            ys.append(data["y"])
-        if not xs:
-            return 0.0, 0.0
-        return sum(xs) / len(xs), sum(ys) / len(ys)
-
-    def _compute_max_centroid_distance(self, cx: float, cy: float) -> float:
-        max_d = 0.0
-        for _, data in self.graph.nodes(data=True):
-            d = math.hypot(data["x"] - cx, data["y"] - cy)
-            if d > max_d:
-                max_d = d
-        return max_d
+    def _compute_diameter_anchor(self) -> tuple[float, float, float]:
+        """Diameter-relative anchor: center = midpoint of the two mutually-farthest
+        nodes (the shape's diameter), scale = diameter / 2. Unlike the mean centroid,
+        this is invariant to interior corners, so both extreme endpoints normalize to
+        1.0 regardless of where intermediate critical points fall."""
+        coords = [(data["x"], data["y"]) for _, data in self.graph.nodes(data=True)]
+        if len(coords) < 2:
+            cx, cy = coords[0] if coords else (0.0, 0.0)
+            return cx, cy, 1.0
+        diameter, p, q = 0.0, coords[0], coords[0]
+        for a, b in combinations(coords, 2):
+            d = math.hypot(a[0] - b[0], a[1] - b[1])
+            if d > diameter:
+                diameter, p, q = d, a, b
+        cx = (p[0] + q[0]) / 2.0
+        cy = (p[1] + q[1]) / 2.0
+        half = diameter / 2.0 if diameter > 1e-9 else 1.0
+        return cx, cy, half
 
     @staticmethod
     def _normalized_distance(
-        x: float, y: float, cx: float, cy: float, max_dist: float
+        x: float, y: float, cx: float, cy: float, scale: float
     ) -> float:
-        if max_dist < 1e-9:
+        if scale < 1e-9:
             return 0.0
-        return round(math.hypot(x - cx, y - cy) / max_dist, 4)
+        return round(min(math.hypot(x - cx, y - cy) / scale, 1.0), 4)
 
     def _compute_cycle_nodes(self) -> set:
         try:

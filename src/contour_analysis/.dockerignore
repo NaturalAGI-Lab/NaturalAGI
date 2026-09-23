@@ -1,0 +1,10 @@
+# Keep the Nuclio build context minimal: ship only runtime source.
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+*.ipynb
+test_*.py
+docs/

@@ -14,12 +14,10 @@ spec:
   handler: "nuclio_handler:handler"
   runtime: "python:3.12"
   build:
-    baseImage: "python:3.12"
+    baseImage: "naturalagi-base:latest"
     commands:
-      - "apt-get update -y --fix-missing"
-      - "apt-get install -y libgl1-mesa-dev libglib2.0-0"
-      - "pip install numpy==2.4.2 pydantic-settings==2.13.1 kafka-python==2.3.0 rdp==0.8 scikit-image==0.26.0 networkx==3.6.1 ypstruct==0.0.2 opencv-python==4.13.0.92 skan==0.13.0 msgpack==1.1.2 opentelemetry-api==1.40.0 opentelemetry-sdk==1.40.0 opentelemetry-exporter-otlp-proto-http==1.40.0 numba==0.64.0"
-      - "mkdir -p /home/nuclio/bin/py3.12-whl && pip download msgpack==1.1.2 --only-binary=:all: -d /home/nuclio/bin/py3.12-whl --no-deps"
+      # Shared deps (numpy/networkx/kafka/msgpack/OTEL/...) live in naturalagi-base.
+      - "pip install --no-cache-dir rdp==0.8 scikit-image==0.26.0 ypstruct==0.0.2 opencv-python==4.13.0.92 skan==0.13.0 numba==0.64.0"
       - "pip install --upgrade natural-agi-common==0.1.55"
   env:
     - name: OTEL_EXPORTER_OTLP_ENDPOINT

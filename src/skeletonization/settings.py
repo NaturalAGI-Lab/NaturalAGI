@@ -21,6 +21,7 @@ class Settings(BaseSettings):
     cnr_threshold: float = 0
     skeletonization_threshold: float = 170
     simplification_epsilon: float = 2
+    gng_seed: int = 42
 
 
 def gng_parameters(settings: Settings):
@@ -35,5 +36,6 @@ def gng_parameters(settings: Settings):
     params.alpha = settings.alpha
     params.delta = settings.delta
     params.T = settings.T
+    params.seed = settings.gng_seed
 
     return params

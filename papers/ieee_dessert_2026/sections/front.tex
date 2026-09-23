@@ -1,0 +1,104 @@
+\begin{abstract}
+Post-hoc explanation methods approximate a trained model from the outside, and a model can be built so that the explanation hides the behaviour it is meant to expose. We build a recogniser whose decision is already an inspectable object. Each grey-scale image is converted into an attributed bipartite graph: Point nodes mark the endpoints, corners and intersections of the contour skeleton, and Vector nodes mark the straight segments between them. For every class we form a concept attractor by structural reduction, merging training graphs one at a time and generalizing attribute values to intervals. No gradient is computed and no backpropagation is used. A test image is classified by graph edit distance against every concept attractor, with a winner-take-all rule. We evaluate on the MNIST test images whose contours are complete: the completeness filter admits 8,707 of 10,000, and every reported metric is conditional on it. Thirteen concept attractors formed from 76 unique training samples (805 images after augmentation) classify 8,685 images with 91.13\% accuracy, 91.92\% precision, 91.13\% recall and 91.34\% F1 score. We trace one decision from the input image through the winning concept attractor down to the per-feature costs, and we report inference cost measured per pipeline stage; the classification stage has a median of 167 ms on a profiled subset of 770 misclassified images, which is not a typical-case estimate. We report a research prototype and make no comparison with neural classifiers.
+\end{abstract}
+
+\begin{IEEEkeywords}
+explainable artificial intelligence, graph-based image representation, concept attractor, structural reduction, graph edit distance, traceable decision
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Recognition systems reach high accuracy and return a label without showing the evidence behind it. Where a decision has to be justified to an operator, a clinician or an auditor, that opacity is a separate problem from how often the model is correct.
+
+The usual remedy is a post-hoc explanation. LIME builds a local linear approximation of a trained model around one example \cite{ribeiro2016}. SHAP distributes feature contributions using a cooperative-game scheme \cite{lundberg2017}. Both work from outside the model and treat it as a black box, so the explanation describes a surrogate function. Slack et al.\ showed that the gap can be exploited: a classifier with an explicit bias can be built so that LIME and SHAP hide that bias \cite{slack2020}. Rudin argues that high-stakes decisions call for a model interpretable by construction \cite{rudin2019}. We take that position.
+
+In our system the structure of the representation carries the explanation. The contour of an image is encoded as an attributed graph whose nodes are characteristic points and the segments between them, with geometric and semantic attributes stored on the nodes themselves. A cycle in the graph corresponds to a closed contour, node degree describes branching, and an attribute interval states how far that feature may vary inside a class. We build no explanation module on top of the classifier.
+
+The system is a prototype built for research. It does not claim the accuracy of neural classifiers on benchmark data and we do not compare it against them. Our question is whether recognition is possible without backpropagation, from a small number of training samples, with a decision path a reader can follow from end to end.
+
+The paper contributes: (i) a graph representation and a concept formation procedure that use no gradient and no backpropagation; (ii) an evaluation on MNIST under a completeness filter we state in full, with its per-class skew; (iii) a worked decision trace that explains one correct decision and the dominant error; and (iv) inference cost measured per pipeline stage on run artefacts.
+
+\section{Related Work}
+
+Baniecki and Biecek survey attacks on explanations: explanations can be manipulated, fooled or fairwashed, and the survey catalogues the resulting insecurities \cite{baniecki2024}. The alternative design direction is a model interpretable by construction \cite{rudin2019}. Forest et al.\ apply concept bottleneck models to prognostics, taking degradation modes as the intermediate concepts so a prediction decomposes per component \cite{forest2025}; the mapping from input to concept is still a trained network. Garc\'ia-Cuesta et al.\ show that the prototypes of prototype-based networks can be altered while the explanation keeps its plausibility \cite{garciacuesta2025}. Interpretability by construction therefore needs representation elements with a geometric meaning outside any learned embedding space.
+
+Structural representations of shape are long established. Vision GNN treats an image as a graph of patch nodes and runs message passing over it \cite{han2022}. Chatbri et al.\ compare contours and skeletons for matching binary images \cite{chatbri2016}; Shen et al.\ combine the two, recognising shapes from a bag of skeleton-associated contour parts \cite{shen2016}. Gan et al.\ represent handwritten Chinese characters by skeleton graphs and run a graph transformer over them \cite{gan2023}; by choice of representation this is the closest prior work to ours. There the network weights determine the decision; here the image graph is matched against a concept attractor and the answer is a list of node substitutions with their costs.
+
+Conte et al.\ survey thirty years of exact and approximate graph matching \cite{conte2004}. Graph edit distance (GED) gives a dissimilarity that decomposes into elementary operations on nodes and edges. Riesen and Bunke approximate GED by bipartite assignment, which made it usable at practical graph sizes \cite{riesen2009}. Wang et al.\ learn the A* search heuristic for GED and recover the edit path \cite{wang2021}, and Piao et al.\ recover the edit path from a predicted matching matrix, noting that models which reduce GED to similarity regression produce no operation sequence \cite{piao2023}. In formulations that regress similarity directly, an elementary operation has no predefined cost, so a single cost term does not say which feature separates two matched nodes.
+
+Work on alternatives to backpropagation continues. The Forward-Forward algorithm replaces the backward pass with two forward passes and a local objective \cite{hinton2022}, and a survey of neuro-symbolic integration describes systems in which an explicit symbolic part carries explainability and formal reasoning \cite{nawaz2025}. Few-shot learning is dominated by meta-learning: prototypical networks build a class prototype as a centroid in a learned embedding space \cite{snell2017}, MAML learns initial weights that a few gradient steps adapt to a new task \cite{finn2017}, and Lake et al.\ learn a character from one example with a generative program model \cite{lake2015}. We cite these as context for the problem setting and make no accuracy comparison against them. The paper continues our own graph model of few-shot learning without backpropagation \cite{lapin2025fewshot} and the information-architecture frame behind it \cite{parzhyn2025architecture}.
+
+The reviewed work leaves three conditions unmet at once. The structure of the representation should carry both the decision and the explanation. Matching costs should be tied to predefined geometric properties instead of being learned from data. The result should come from tens of training samples without backpropagation. This paper addresses that combination.
+
+\section{Method}
+
+\subsection{Graph Representation}
+
+We represent a digit image by an attributed bipartite graph whose two kinds of node alternate: a Point node is a characteristic point of the contour, a Vector node the straight segment between two neighbouring points. Links are bidirectional, so every traversal has the form Point $\rightarrow$ Vector $\rightarrow$ Point; no two Point nodes are joined directly. Pixel values are not used after the graph is built. Making a segment a node rather than an edge gives it attributes of its own --- length, direction, orientation --- so it takes part in comparison like a point.
+
+Point nodes have four types: an EndPoint terminates an open contour, a CornerPoint marks a sharp change of direction and stores the angle, an IntersectionPoint marks a crossing of lines, and a StartPoint fixes where traversal begins. One node can carry several of these labels at once.
+
+A Point node stores its $x$ and $y$ coordinates and their normalized values. A Vector node stores both endpoints, the length, the quadrant (I--IV, or $-1$ for an axis-aligned segment), the horizontal direction (LEFT, RIGHT, NONE) and the vertical direction (TOP, BOTTOM, NONE); quadrant and directions describe orientation without absolute coordinates. Coordinates are normalized to a centred range from $-1$ to $1$ by~\eqref{eq:norm}:
+\begin{equation}\label{eq:norm}
+x_{norm} = \frac{x - c_x}{\rho}, \qquad y_{norm} = \frac{y - c_y}{\rho}
+\end{equation}
+where $(c_x, c_y)$ is the centre of the bounding box of the graph's points and $\rho = \sqrt{h_w^2 + h_h^2}$ its half-diagonal, built from the half-width $h_w$ and the half-height $h_h$; the denominator is the same for both axes and values are rounded to one decimal. Because the centre and the scale come from the graph's own bounding box, the normalized coordinates do not depend on where the digit sits in the image or how large it is drawn.
+
+\subsection{Image-to-Graph Pipeline}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=\textwidth]{figures/fig_pipeline.png}
+\caption{The six stages that turn a $100 \times 100$ grey-scale image into an attributed bipartite graph: binarization at $\theta = 110$, thinning to one pixel, growing neural gas, Ramer--Douglas--Peucker simplification at $\varepsilon = 4.55$, construction of the Point and Vector nodes, and attribute extraction with coordinate normalization.}
+\label{fig:pipeline}
+\end{figure*}
+
+MNIST images are grey-scale and are upscaled from $28 \times 28$ to $100 \times 100$ pixels by Lanczos resampling. The graph is built in six stages (Fig.~\ref{fig:pipeline}). The image is binarized at $\theta = 110$. The binary mask is cleaned by small-object removal and morphological closing, then thinned to one-pixel width by the Zhang--Suen algorithm \cite{zhang1984}; skeleton branches shorter than 8\% of the total skeleton length are pruned. The skeleton is approximated by a growing neural gas \cite{fritzke1995}, whose network of nodes reproduces the topology of the skeleton lines. That network is simplified by the Ramer--Douglas--Peucker algorithm with $\varepsilon = 4.55$ \cite{douglas1973}, which drops nodes lying almost on a straight line. The bipartite graph of Point and Vector nodes is built on the simplified network, and the last stage computes node attributes and normalizes coordinates.
+
+$\theta = 110$ is the starting threshold of a retry ladder: if the resulting skeleton graph is disconnected, the pipeline re-runs at $\theta - 5$, down to 20; only $\varepsilon = 4.55$ is fixed. The same pipeline runs on training images during concept formation and on test images during classification.
+
+\subsection{Concept Formation by Structural Reduction}
+
+A concept attractor is formed iteratively, one training sample at a time. Its initial value is the graph of the first sample, $C_0 = G_1$, and each further sample refines it by a custom reduction operation (CRO), \eqref{eq:cro}:
+\begin{equation}\label{eq:cro}
+C_{i+1} = \mathrm{CRO}(C_i,\, G_{i+1}), \quad i = 1, \ldots, n-1
+\end{equation}
+where $C_i$ is the current state, $G_{i+1}$ the graph of the next sample and $n$ the number of samples. Processing one sample aligns the start points, applies the reduction strategies to critical points, traverses both graphs synchronously, and merges the properties of corresponding nodes. The synchronous traversal finds a maximum common minor of the two graphs, so a stroke of three nodes in one sample can match five in another. The reduction leaves the structure that repeats in every sample of the class.
+
+Three reduction strategies are applied. Endpoint removal deletes an EndPoint with no counterpart in the second graph, together with the path from it to the nearest critical point. Intersection merging reclassifies an IntersectionPoint of degree at most two as a CornerPoint or an EndPoint and deletes surplus intersections, least similar first. Corner-point reduction matches sub-paths between non-corner critical points and removes surplus CornerPoints from the longer path, lowest similarity first. The intersection strategy demotes a node from IntersectionPoint to CornerPoint to Point. At inference a concept node matches an image node only if the concept node's labels are a subset of the image node's labels, so a concept attractor is never more specific than the images it matches. StartPoint is never reduced; it fixes the entry point of traversal.
+
+Attributes are generalized with the structure. A numeric attribute becomes an interval with three values: minimum, maximum and centre. A categorical attribute survives only if it agrees across all samples, and label lists are replaced by their intersection.
+
+The procedure consumes every sample it is given, in a fixed order by image identifier. The number of samples per concept attractor was chosen during authoring by one criterion: further samples no longer changed the concept attractor. The procedure follows the energy model of concept formation in our earlier work \cite{parzhyn2025energy}; its invariant formulation, with concept formation as hypergraph attractor dynamics, is in \cite{lapin2026invariant}.
+
+\subsection{Training Data and Sample-Selection Policy}
+
+The alphabet holds 13 concept attractors for 10 digit classes. Classes 1, 2 and 4 have two each --- \cid{1\_1} and \cid{1\_3}, \cid{2\_1} and \cid{2\_2}, \cid{4\_1} and \cid{4\_2} --- because these digits are written in two topologically different styles that no reduction turns into one another; the other seven classes have one each. Sizes run from 3 to 12 nodes: the largest is \cid{2\_2} with 12, the smallest \cid{1\_3} with 3; the single concept attractor of digit 7, \cid{7\_1}, has 5.
+
+The 13 concept attractors were formed from 76 unique MNIST \cite{lecun1998} training samples, 3 to 9 each. The count per concept attractor follows from the criterion in Section III-C; no quota was fixed in advance. Each sample carries about ten augmented variants --- a small random rotation and translation --- giving 805 training images.
+
+We chose the samples by hand. They are not a random draw from the training split; the criterion was the least distorted writings, with no gaps in the contour. The choice rests on an assumption: an instance of a class that a person reads correctly already carries all the structural and topological features of that class. Formation then needs a small number of structurally complete writings rather than a representative sample of the distribution. Variation enters through augmentation --- the chosen samples fix the structure, and their augmented variants set the bounds of the parameter intervals.
+
+The limits of this assumption are only partly known: we did not measure how sensitive accuracy is to the specific choice of samples, so we cannot say how much a different selection would change the result.
+
+\subsection{Classification by Graph Edit Distance}
+
+Classification matches the image graph against every concept attractor in the alphabet. A complexity pre-filter runs first: the complexity of a graph is $\kappa = |V| + |E|$, and concept attractors more complex than the image graph are dropped before any distance is computed.
+
+GED is the minimum total cost of the insertions, deletions and substitutions of nodes and edges that turn one graph into another. Exact GED is NP-hard, so practical systems approximate it \cite{riesen2009}. We use an anytime solver with a deadline of 5 s per comparison, which returns the best edit path found by then. Substitution costs follow a monotone ladder: NO\_COST $= 0$, MINOR $= 0.25$, GENERAL $= 0.5$, SEVERE $= 0.8$, NO\_MATCH $= 1.0$ and IMPOSSIBLE $= 6.0$. IMPOSSIBLE is assigned to incompatible node types; its cost blocks the substitution in practice. Inserting a node costs IMPOSSIBLE, so a concept attractor node without an image counterpart blocks the match; deleting a node costs MINOR. Deleting an edge costs MINOR, inserting one NO\_COST, and edges themselves are not compared.
+
+Node comparison uses 13 features: normalized $x$, normalized $y$, distance to centroid, horizontal direction, vertical direction, angle with the $x$ axis, minimum junction angle, endpoint indicator, corner indicator, length ratio to maximum, average neighbouring vector length, neighbouring endpoint count and neighbouring junction count. Nine of them store an interval in the concept attractor node and take a diagnostic weight, \eqref{eq:weight}:
+\begin{equation}\label{eq:weight}
+w_f = \frac{s_f}{\Delta_f + \varepsilon_w}
+\end{equation}
+where $\Delta_f$ is the interval width, $\varepsilon_w = 0.1$ smooths the denominator and $s_f = 1$. A narrow interval means the feature was stable across the training samples, so it weighs more; a wide interval barely affects the cost. The other four features are categorical and have no interval: the two directions take $s_f = 0.6$, the endpoint and corner indicators $0.4$. Weights are normalised over the features present on both nodes, $\tilde w_f = w_f / \sum_g w_g$. A value inside the interval costs $\tilde w_f\,|v - c_f| / (\Delta_f / 2)$, zero at the centre $c_f$ and $\tilde w_f$ at the edge. A value outside costs the full NO\_MATCH penalty of 1.0, unweighted. A node's substitution cost is the sum over its features, so one out-of-range feature alone lifts it above 1.0.
+
+The total edit cost $c$ becomes a similarity by~\eqref{eq:sim}:
+\begin{equation}\label{eq:sim}
+\mathrm{sim}(G_1, G_2) = 1 - \frac{c}{c + \max(\kappa_1,\, \kappa_2)}
+\end{equation}
+where $\kappa_1$ and $\kappa_2$ are the complexities of the two graphs. Similarity lies between 0 and 1; normalizing by the larger graph keeps it comparable across concept attractors of different size. Selection is winner-take-all on a score corrected for complexity, \eqref{eq:score}:
+\begin{equation}\label{eq:score}
+\mathrm{score} = \mathrm{sim} + \lambda \log_2 \kappa
+\end{equation}
+with $\lambda = 0.10$, a mild preference for more complex concept attractors when similarities are close. The highest score among the concept attractors that passed the pre-filter wins. If none activates, the image is marked unrecognized.

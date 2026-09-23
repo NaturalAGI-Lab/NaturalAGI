@@ -1,7 +1,7 @@
 """Generate figs 1, 2, 3 PNGs for the ITSSI 2026 paper.
 
 Run once with the project venv:
-    natural-agi/bin/python papers/itssi_paper_2026/render_figures.py
+    .venv/bin/python papers/itssi_paper_2026/render_figures.py
 
 Outputs to papers/itssi_paper_2026/figures/:
   fig_1_pipeline.png       — matplotlib flowchart
