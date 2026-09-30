@@ -5,7 +5,9 @@
 # plus the frequently-changing natural-agi-common lib on top.
 #
 # Build with: make base   (cached after first build; rebuilds only when this file changes)
-FROM python:3.12
+# PYTHON_IMAGE is overridable: `make PROFILE=lowspec base` builds FROM python:3.12-slim (~800 MB smaller).
+ARG PYTHON_IMAGE=python:3.12
+FROM ${PYTHON_IMAGE}
 
 # Runtime libs for OpenCV (libgl1, NOT the -dev package) + glib. --no-install-recommends
 # keeps the layer lean; clean apt lists so they don't bloat the image.
