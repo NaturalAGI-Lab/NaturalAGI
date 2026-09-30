@@ -232,3 +232,6 @@ experiments/neo4j_backup_*/
 
 # Playwright MCP scratch output
 .playwright-mcp/
+
+# Per-machine make settings (e.g. PROFILE = lowspec, HOST_IP = ...)
+local.mk

@@ -63,7 +63,8 @@ services:
 
   nuclio-dashboard:
 
-    image: quay.io/nuclio/dashboard:1.15.20-arm64
+    # arm64 for Apple Silicon; Intel/AMD machines: NUCLIO_DASHBOARD_IMAGE=quay.io/nuclio/dashboard:1.15.20-amd64
+    image: ${NUCLIO_DASHBOARD_IMAGE:-quay.io/nuclio/dashboard:1.15.20-arm64}
 
     hostname: nuclio-dashboard
     container_name: nuclio-dashboard

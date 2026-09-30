@@ -1,0 +1,11 @@
+# Keep Unix line endings for everything a Linux shell or container reads, even when the
+# repo is checked out on Windows with core.autocrlf=true (CRLF breaks make, bash and Docker).
+Makefile      text eol=lf
+*.mk          text eol=lf
+*.sh          text eol=lf
+*.yaml        text eol=lf
+*.yml         text eol=lf
+*.cypher      text eol=lf
+*.py          text eol=lf
+Dockerfile*   text eol=lf
+.env          text eol=lf

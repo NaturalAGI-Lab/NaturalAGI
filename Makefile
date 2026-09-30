@@ -2,6 +2,15 @@
 include .env
 export
 
+# Per-machine settings (untracked). E.g. `echo "PROFILE = lowspec" > local.mk`.
+-include local.mk
+
+# PROFILE=lowspec: 8 GB RAM / Windows-WSL2 laptops, see docs/WINDOWS_LOWSPEC.md.
+PROFILE ?= default
+ifeq ($(PROFILE),lowspec)
+include mk/lowspec.mk
+endif
+
 # Default goal
 .DEFAULT_GOAL := all
 
@@ -38,7 +47,22 @@ GREEN := \033[0;32m
 RED := \033[0;31m
 NC := \033[0m # No Color
 
-HOST_IP := $(shell ipconfig getifaddr en0)
+# macOS: en0 address. Linux / WSL2: first address of `hostname -I`.
+# Override on the command line or in local.mk: make HOST_IP=192.168.1.10 ...
+HOST_IP := $(shell ipconfig getifaddr en0 2>/dev/null || hostname -I 2>/dev/null | awk '{print $$1}')
+ifeq ($(strip $(HOST_IP)),)
+$(warning HOST_IP could not be detected; pass it explicitly: make HOST_IP=<your LAN/WSL IP> ...)
+endif
+
+# docker compose with the profile's override files (lowspec adds docker-compose.lowspec.yaml).
+COMPOSE_FILES ?=
+COMPOSE := docker compose $(COMPOSE_FILES)
+
+# Extra -e flags added to every function deploy (lowspec: disable OTLP tracing).
+EXTRA_FN_ENV ?=
+
+# Python image the shared base image is built FROM (lowspec: python:3.12-slim).
+BASE_PYTHON_IMAGE ?= python:3.12
 KAFKA_BROKERS := ${HOST_IP}:29092
 NEO4J_PASS=111122223333
 
@@ -64,7 +88,7 @@ PARAMS ?= {}
 USE_ENERGY_MINIMIZATION ?= true
 
 # Phony targets
-.PHONY: all deploy unpack_dataset repack_dataset train classify send_random_image clean docker_clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
+.PHONY: doctor all deploy unpack_dataset repack_dataset train classify send_random_image clean docker_clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
 
 # Kafka-related targets
 .PHONY: create_kafka_topics list_kafka_topics
@@ -105,62 +129,62 @@ lib:
 
 start_services:
 	@echo -e "${BLUE}Starting Docker services...${NC}"
-	@HOST_IP=${HOST_IP} docker compose up -d
+	@HOST_IP=${HOST_IP} $(COMPOSE) up -d
 	@echo -e "${GREEN}Docker services started.${NC}"
-	@make create_neo4j_indexes
+	@$(MAKE) create_neo4j_indexes
 
 create_kafka_topics:
 	@echo -e "${BLUE}Waiting for Kafka to be ready...${NC}"
-	@until docker compose exec -T kafka kafka-topics --list --bootstrap-server ${HOST_IP}:29092 &> /dev/null; do \
+	@until $(COMPOSE) exec -T kafka kafka-topics --list --bootstrap-server ${HOST_IP}:29092 &> /dev/null; do \
 		echo "Waiting for Kafka to be ready..."; \
 		sleep 5; \
 	done
 	@echo -e "${BLUE}Creating Kafka topics...${NC}"
-	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CONNECTOR_KAFKA_TOPIC}" --partitions $(PARTITIONS_CONNECTOR) --replication-factor 1 || echo "Failed to create topic: ${CONNECTOR_KAFKA_TOPIC}"
-	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${SKELETONIZATION_KAFKA_TOPIC}" --partitions $(PARTITIONS_SKEL) --replication-factor 1 || echo "Failed to create topic: ${SKELETONIZATION_KAFKA_TOPIC}"
-	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CONTOUR_ANALYSIS_KAFKA_TOPIC}" --partitions $(PARTITIONS_CONTOUR) --replication-factor 1 || echo "Failed to create topic: ${CONTOUR_ANALYSIS_KAFKA_TOPIC}"
-	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CLASSIFICATION_KAFKA_TOPIC}" --partitions $(PARTITIONS_CLASSIFICATION) --replication-factor 1 || echo "Failed to create topic: ${CLASSIFICATION_KAFKA_TOPIC}"
-	@docker compose exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${DLQ_TOPIC}" --partitions $(PARTITIONS_DLQ) --replication-factor 1 || echo "Failed to create topic: ${DLQ_TOPIC}"
+	@$(COMPOSE) exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CONNECTOR_KAFKA_TOPIC}" --partitions $(PARTITIONS_CONNECTOR) --replication-factor 1 || echo "Failed to create topic: ${CONNECTOR_KAFKA_TOPIC}"
+	@$(COMPOSE) exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${SKELETONIZATION_KAFKA_TOPIC}" --partitions $(PARTITIONS_SKEL) --replication-factor 1 || echo "Failed to create topic: ${SKELETONIZATION_KAFKA_TOPIC}"
+	@$(COMPOSE) exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CONTOUR_ANALYSIS_KAFKA_TOPIC}" --partitions $(PARTITIONS_CONTOUR) --replication-factor 1 || echo "Failed to create topic: ${CONTOUR_ANALYSIS_KAFKA_TOPIC}"
+	@$(COMPOSE) exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${CLASSIFICATION_KAFKA_TOPIC}" --partitions $(PARTITIONS_CLASSIFICATION) --replication-factor 1 || echo "Failed to create topic: ${CLASSIFICATION_KAFKA_TOPIC}"
+	@$(COMPOSE) exec -T kafka kafka-topics --create --bootstrap-server ${HOST_IP}:29092 --if-not-exists --topic "${DLQ_TOPIC}" --partitions $(PARTITIONS_DLQ) --replication-factor 1 || echo "Failed to create topic: ${DLQ_TOPIC}"
 	@echo -e "${GREEN}Kafka topics creation attempt completed.${NC}"
 
 recreate_kafka_topics:
 	@echo -e "${BLUE}Deleting all Kafka topics...${NC}"
 	@for topic in $(TOPICS); do \
 		echo "Deleting topic: $$topic"; \
-		docker compose exec -T kafka kafka-topics --delete --bootstrap-server ${HOST_IP}:29092 --topic "$$topic" 2>/dev/null || echo "  Topic $$topic does not exist"; \
+		$(COMPOSE) exec -T kafka kafka-topics --delete --bootstrap-server ${HOST_IP}:29092 --topic "$$topic" 2>/dev/null || echo "  Topic $$topic does not exist"; \
 	done
 	@echo -e "${BLUE}Waiting for topics to be fully deleted...${NC}"
 	@for topic in $(TOPICS); do \
-		while docker compose exec -T kafka kafka-topics --list --bootstrap-server ${HOST_IP}:29092 2>/dev/null | grep -qx "$$topic"; do \
+		while $(COMPOSE) exec -T kafka kafka-topics --list --bootstrap-server ${HOST_IP}:29092 2>/dev/null | grep -qx "$$topic"; do \
 			sleep 1; \
 		done; \
 	done
 	@echo -e "${BLUE}Resetting consumer group offsets...${NC}"
 	@for group in skeletonization-group contour-analysis-group classification-group; do \
 		echo "  Deleting group $$group..."; \
-		docker compose exec -T kafka kafka-consumer-groups --bootstrap-server ${HOST_IP}:29092 --group "$$group" --delete 2>/dev/null || true; \
+		$(COMPOSE) exec -T kafka kafka-consumer-groups --bootstrap-server ${HOST_IP}:29092 --group "$$group" --delete 2>/dev/null || true; \
 	done
-	@make create_kafka_topics
+	@$(MAKE) create_kafka_topics
 
 list_kafka_topics:
 	@echo -e "${BLUE}Listing Kafka topics...${NC}"
-	@docker compose exec kafka kafka-topics --list --bootstrap-server ${HOST_IP}:29092 || echo -e "${RED}Failed to list Kafka topics${NC}"
+	@$(COMPOSE) exec kafka kafka-topics --list --bootstrap-server ${HOST_IP}:29092 || echo -e "${RED}Failed to list Kafka topics${NC}"
 	@echo -e "${BLUE}Expected topics:${NC}"
 	@for topic in $(TOPICS); do echo "  $$topic"; done
 
 create_neo4j_indexes:
 	@echo -e "${BLUE}Waiting for Neo4j to be ready...${NC}"
-	@until docker compose exec -T neo4j cypher-shell -u neo4j -p ${NEO4J_PASS} "RETURN 1" &> /dev/null; do \
+	@until $(COMPOSE) exec -T neo4j cypher-shell -u neo4j -p ${NEO4J_PASS} "RETURN 1" &> /dev/null; do \
 		echo "Waiting for Neo4j Bolt to be ready..."; \
 		sleep 3; \
 	done
 	@echo -e "${BLUE}Creating Neo4j property indexes...${NC}"
-	@docker compose exec -T neo4j cypher-shell -u neo4j -p ${NEO4J_PASS} < scripts/neo4j_indexes.cypher
+	@$(COMPOSE) exec -T neo4j cypher-shell -u neo4j -p ${NEO4J_PASS} < scripts/neo4j_indexes.cypher
 	@echo -e "${GREEN}Neo4j indexes created.${NC}"
 
 list_neo4j_indexes:
 	@echo -e "${BLUE}Listing Neo4j indexes...${NC}"
-	@docker compose exec -T neo4j cypher-shell -u neo4j -p ${NEO4J_PASS} \
+	@$(COMPOSE) exec -T neo4j cypher-shell -u neo4j -p ${NEO4J_PASS} \
 		"SHOW INDEXES YIELD name, type, labelsOrTypes, properties, state" \
 		|| echo -e "${RED}Failed to list Neo4j indexes${NC}"
 
@@ -263,6 +287,30 @@ dashboard:
 formation_viz:
 	cd src/concept_creator && ../../$(PYTHON) -m streamlit run visualization/formation_viz_app.py --server.port 8502
 
+# Environment check: prints what will be used and what is missing. Safe to run any time.
+doctor:
+	@echo -e "${BLUE}NaturalAGI environment check (PROFILE=$(PROFILE))${NC}"
+	@echo "  HOST_IP                 : $(if $(strip $(HOST_IP)),$(HOST_IP),NOT DETECTED - pass HOST_IP=...)"
+	@echo "  compose                 : $(COMPOSE)"
+	@echo "  instances skel/cont/cls : $(INSTANCES_SKEL)/$(INSTANCES_CONTOUR)/$(INSTANCES_CLASSIFICATION)"
+	@echo "  deploy parallelism      : $(DEPLOY_PARALLELISM)"
+	@echo "  base python image       : $(BASE_PYTHON_IMAGE)"
+	@for c in docker nuctl curl unzip; do \
+		if command -v $$c >/dev/null 2>&1; then echo -e "  $$c: ${GREEN}ok${NC}"; \
+		else echo -e "  $$c: ${RED}missing${NC}"; fi; \
+	done
+	@docker info >/dev/null 2>&1 && echo -e "  docker daemon: ${GREEN}running${NC}" || echo -e "  docker daemon: ${RED}not reachable${NC} (sudo service docker start?)"
+	@$(COMPOSE) config -q 2>/dev/null && echo -e "  compose config: ${GREEN}valid${NC}" || echo -e "  compose config: ${RED}invalid${NC}"
+	@if [ -r /proc/meminfo ]; then \
+		mem=$$(awk '/MemTotal/ {printf "%.1f", $$2/1048576}' /proc/meminfo); \
+		echo "  RAM visible to Linux    : $$mem GB (lowspec needs >= 5; raise memory= in .wslconfig)"; \
+	fi
+	@free_gb=$$(df -Pk . | awk 'NR==2 {printf "%.1f", $$4/1048576}'); \
+		echo "  free disk here          : $$free_gb GB (full build needs ~7 GB)"
+	@if grep -qi microsoft /proc/version 2>/dev/null; then \
+		case "$$(pwd)" in /mnt/*) echo -e "  ${RED}repo is on a Windows drive (/mnt/...): clone it into ~ inside WSL instead${NC}";; *) echo -e "  WSL2 checkout location: ${GREEN}ok${NC}";; esac; \
+	fi
+
 help:
 	@echo "Available targets:"
 	@echo "  all                - Deploy functions, create Kafka topics, and run training (default)"
@@ -280,6 +328,7 @@ help:
 	@echo "  unpack_dataset     - Unpack datasets.zip (skips if already unpacked)"
 	@echo "  repack_dataset     - Rebuild datasets.zip from current datasets/ (then git add)"
 	@echo "  help               - Show this help message"
+	@echo "  doctor             - Check tools, memory, disk, HOST_IP for the current PROFILE"
 	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
 	@echo ""
 	@echo "Configuration options:"
@@ -289,6 +338,9 @@ help:
 	@echo "  USE_ENERGY_MINIMIZATION - Use energy minimization for concept formation (default: true)"
 	@echo ""
 	@echo "Example: make deploy INSTANCES_SKEL=1 INSTANCES_CONTOUR=2 INSTANCES_CLASSIFICATION=5"
+	@echo ""
+	@echo "Weak laptop / Windows (WSL2): make PROFILE=lowspec doctor, then make PROFILE=lowspec"
+	@echo "  (or put 'PROFILE = lowspec' into local.mk once). See docs/WINDOWS_LOWSPEC.md"
 
 train_prepared_samples_%:
 	$(eval subclass := $(filter-out $@,$(MAKECMDGOALS)))
@@ -332,7 +384,8 @@ SKEL_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e SIMPLIFICATION_EPSILON=5 \
 	-e SKELETONIZATION_THRESHOLD=160 \
 	-e KAFKA_TOPIC="${SKELETONIZATION_KAFKA_TOPIC}" \
-	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
+	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}" \
+	$(EXTRA_FN_ENV)
 
 SKEL_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONNECTOR_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "skeletonization-group"}}}'
 
@@ -342,7 +395,8 @@ CONTOUR_ENV = -e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 	-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e DLQ_TOPIC="${DLQ_TOPIC}" \
 	-e KAFKA_TOPIC="${CONTOUR_ANALYSIS_KAFKA_TOPIC}" \
-	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
+	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}" \
+	$(EXTRA_FN_ENV)
 
 CONTOUR_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${SKELETONIZATION_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "contour-analysis-group"}}}'
 
@@ -353,7 +407,8 @@ CLASS_ENV = -e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 	-e NEO4J_USER=neo4j \
 	-e NEO4J_PASS=${NEO4J_PASS} \
 	-e GED_TIMEOUT=15 \
-	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
+	-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}" \
+	$(EXTRA_FN_ENV)
 
 CLASS_TRIGGERS = --triggers '{"kafka-trigger": {"kind": "kafka-cluster", "attributes": {"initialOffset": "earliest", "topics": ["${CONTOUR_ANALYSIS_KAFKA_TOPIC}"], "brokers": ["${KAFKA_BROKERS}"], "consumerGroup": "classification-group"}}}'
 
@@ -370,7 +425,8 @@ BASE_DOCKERFILE := docker/Dockerfile.base
 
 base:
 	@echo -e "${BLUE}Building shared base image ($(BASE_IMAGE))...${NC}"
-	@DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build -f $(BASE_DOCKERFILE) -t $(BASE_IMAGE) docker/
+	@DOCKER_BUILDKIT=$(DOCKER_BUILDKIT) docker build -f $(BASE_DOCKERFILE) \
+		--build-arg PYTHON_IMAGE=$(BASE_PYTHON_IMAGE) -t $(BASE_IMAGE) docker/
 	@echo -e "${GREEN}Base image ready.${NC}"
 
 dep_conn: base
@@ -383,7 +439,8 @@ dep_conn: base
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 		-e DLQ_TOPIC="${DLQ_TOPIC}" \
 		-e KAFKA_TOPIC="${CONNECTOR_KAFKA_TOPIC}" \
-		-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
+		-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}" \
+		$(EXTRA_FN_ENV)
 	@echo -e "${GREEN}Connector deployed.${NC}"
 
 redep_conn:
@@ -398,7 +455,8 @@ redep_conn:
 		-e KAFKA_BOOTSTRAP_SERVERS="${KAFKA_BROKERS}" \
 		-e DLQ_TOPIC="${DLQ_TOPIC}" \
 		-e KAFKA_TOPIC="${CONNECTOR_KAFKA_TOPIC}" \
-		-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}"
+		-e OTEL_EXPORTER_OTLP_ENDPOINT="${OTEL_ENDPOINT}" \
+		$(EXTRA_FN_ENV)
 	@echo -e "${GREEN}Connector redeployed from cached image.${NC}"
 
 dep_skel: base
@@ -466,7 +524,8 @@ dep_concept: base
 		-e NEO4J_DSN=bolt://${HOST_IP}:7687 \
 		-e NEO4J_USER=neo4j \
 		-e NEO4J_PASS=${NEO4J_PASS} \
-		-e USE_ENERGY_MINIMIZATION=${USE_ENERGY_MINIMIZATION}
+		-e USE_ENERGY_MINIMIZATION=${USE_ENERGY_MINIMIZATION} \
+		$(EXTRA_FN_ENV)
 	@echo -e "${GREEN}Concept creator deployed.${NC}"
 
 dep_classification: base

@@ -92,6 +92,8 @@ Runs MNIST training across digit classes and evaluates concept-based classificat
 
 ### Windows Notes
 
+> 💡 **Weak laptop (8 GB RAM) or Windows:** step-by-step WSL2 setup and the light `make PROFILE=lowspec` profile — [docs/WINDOWS_LOWSPEC.md](docs/WINDOWS_LOWSPEC.md) (Ukrainian).
+
 - Install [Docker Desktop](https://www.docker.com/products/docker-desktop/) and enable the **WSL 2 backend**
 - `make` is **not available natively** on Windows — use [WSL2](https://learn.microsoft.com/en-us/windows/wsl/) or run the underlying commands manually:
   ```powershell

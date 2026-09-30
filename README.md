@@ -100,6 +100,8 @@ jupyter notebook src/skeletonization/experiments.ipynb
 
 ### Примітки для Windows
 
+> 💡 **Слабкий ноутбук (8 ГБ RAM) або Windows:** покрокова інструкція через WSL2 і легкий профіль `make PROFILE=lowspec` — [docs/WINDOWS_LOWSPEC.md](docs/WINDOWS_LOWSPEC.md).
+
 - Встановіть [Docker Desktop](https://www.docker.com/products/docker-desktop/) та увімкніть **WSL 2 backend**
 - `make` **недоступний нативно** на Windows — використовуйте [WSL2](https://learn.microsoft.com/en-us/windows/wsl/) або запускайте команди вручну:
   ```powershell
