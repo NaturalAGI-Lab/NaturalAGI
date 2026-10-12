@@ -393,7 +393,127 @@ def build_fig3_confusion() -> Path:
     return _save(fig, "fig_confusion.png")
 
 
+# ---------------------------------------------------------------------------
+# Per-class metrics vs. share retained by the contour-completeness filter
+# ---------------------------------------------------------------------------
+
+MNIST_TEST_TOTALS = {
+    "0": 980, "1": 1135, "2": 1032, "3": 1010, "4": 982,
+    "5": 892, "6": 958, "7": 1028, "8": 974, "9": 1009,
+}
+
+
+def _load_per_class_metrics():
+    with open(RUN_DIR / "per_class_metrics.csv", newline="", encoding="utf-8") as f:
+        return {row["class"]: row for row in csv.DictReader(f)}
+
+
+def build_fig_class_metrics() -> Path:
+    metrics = _load_per_class_metrics()
+    dlq = {c: 0 for c in CLASSES}
+    for r in _load_incorrect_rows():
+        if r["status"] != "success":
+            dlq[r["expected"]] += 1
+    admitted = {c: int(metrics[c]["support"]) + dlq[c] for c in CLASSES}
+    assert sum(admitted.values()) == 8707, "admitted total must be 8707"
+
+    retained = [100 * admitted[c] / MNIST_TEST_TOTALS[c] for c in CLASSES]
+    precision = [float(metrics[c]["precision"]) for c in CLASSES]
+    recall = [float(metrics[c]["recall"]) for c in CLASSES]
+
+    series = [
+        ("Збережено фільтром повноти", retained, "#bdbdbd", ""),
+        ("Влучність", precision, "#636363", ""),
+        ("Повнота", recall, "white", "////"),
+    ]
+
+    fig_w_in = TEXT_WIDTH_CM * CM_TO_IN
+    fig, ax = plt.subplots(figsize=(fig_w_in, fig_w_in * 0.40))
+    x = np.arange(len(CLASSES))
+    bar_w = 0.27
+    for k, (label, values, color, hatch) in enumerate(series):
+        ax.bar(
+            x + (k - 1) * bar_w, values, width=bar_w * 0.92, label=label,
+            color=color, edgecolor="black", linewidth=0.5, hatch=hatch,
+        )
+
+    ax.axhline(91.13, color="black", linestyle="--", linewidth=0.8, label="Загальна точність 91,13 %")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(CLASSES, fontsize=9)
+    ax.set_xlabel("Клас", fontsize=10)
+    ax.set_ylabel("%", fontsize=10)
+    ax.set_ylim(50, 104)
+    ax.set_xlim(-0.6, len(CLASSES) - 0.4)
+    ax.yaxis.grid(True, color="lightgray", linewidth=0.5)
+    ax.set_axisbelow(True)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(axis="y", labelsize=8.5)
+    ax.legend(
+        loc="lower center", bbox_to_anchor=(0.5, 1.0), ncol=4, frameon=False, fontsize=8, handlelength=1.6, columnspacing=1.0,
+    )
+    fig.tight_layout()
+    return _save(fig, "fig_class_metrics.png")
+
+
+# ---------------------------------------------------------------------------
+# Most frequent confusion pairs
+# ---------------------------------------------------------------------------
+
+def build_fig_error_pairs(top_n: int = 15, highlight_n: int = 10) -> Path:
+    rows = [r for r in _load_incorrect_rows() if r["status"] == "success"]
+    counts = {}
+    for r in rows:
+        predicted = r["predicted"].strip()
+        label = "не розп." if predicted.lower() == "not classified" else predicted
+        key = f"{r['expected']} → {label}"
+        counts[key] = counts.get(key, 0) + 1
+    misassigned_total = sum(
+        v for k, v in counts.items() if not k.endswith("не розп.")
+    )
+    assert misassigned_total == 726, "misassigned total must be 726"
+
+    ranked = sorted(counts.items(), key=lambda kv: -kv[1])[:top_n]
+    labels = [k for k, _ in ranked]
+    values = [v for _, v in ranked]
+    top_misassigned = [kv for kv in sorted(counts.items(), key=lambda kv: -kv[1])
+                       if not kv[0].endswith("не розпізнано")][:highlight_n]
+    top_keys = {k for k, _ in top_misassigned}
+    top_sum = sum(v for _, v in top_misassigned)
+    assert top_sum == 490, "top-10 misassigned pairs must sum to 490"
+
+    fig_w_in = TEXT_WIDTH_CM * CM_TO_IN
+    fig, ax = plt.subplots(figsize=(fig_w_in, fig_w_in * 0.42))
+    x = np.arange(len(labels))
+    colors = ["#636363" if k in top_keys else "#d9d9d9" for k in labels]
+    ax.bar(x, values, width=0.72, color=colors, edgecolor="black", linewidth=0.5)
+    for xi, v in zip(x, values):
+        ax.text(xi, v + 1.5, str(v), ha="center", va="bottom", fontsize=7.5)
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, rotation=45, ha="right", fontsize=8)
+    ax.set_ylabel("Кількість помилок", fontsize=10)
+    ax.set_xlabel("Справжній клас → передбачений", fontsize=10)
+    ax.set_ylim(0, max(values) * 1.15)
+    ax.yaxis.grid(True, color="lightgray", linewidth=0.5)
+    ax.set_axisbelow(True)
+    for side in ("top", "right"):
+        ax.spines[side].set_visible(False)
+    ax.tick_params(axis="y", labelsize=8.5)
+    ax.text(
+        len(labels) - 0.5, max(values) * 1.05,
+        f"темні стовпці: 10 найчастіших пар хибного віднесення,\n"
+        f"{top_sum} з {misassigned_total} ({100 * top_sum / misassigned_total:.1f} %)".replace(".", ","),
+        ha="right", va="top", fontsize=8,
+    )
+    fig.tight_layout()
+    return _save(fig, "fig_error_pairs.png")
+
+
 if __name__ == "__main__":
+    print("wrote", build_fig_class_metrics())
+    print("wrote", build_fig_error_pairs())
     p1 = build_fig1_pipeline()
     print("wrote", p1)
     p2 = build_fig2_trace()
