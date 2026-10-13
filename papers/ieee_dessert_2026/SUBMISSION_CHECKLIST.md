@@ -19,7 +19,7 @@ Deadline **25 Aug 2026** (late slot opened by the organiser via K. Bokhan). Sour
 - [ ] Create the CMT account, add all five co-authors with the emails printed in the paper, pick the subject area above, upload the PDF.
 - [ ] Confirm with K. Bokhan that the organiser's late-slot agreement covers CMT (the portal shows no closing marker, but the published deadline was 12 Aug).
 - [ ] On acceptance: IEEE copyright form and camera-ready via CMT (expected, not published on the site); registration by 12 Sep.
-- [ ] Repository URL `https://github.com/kbokh/NaturalAGI` is cited in the Conclusion — it must resolve throughout review; if the repository moves to an organisation account, keep a redirect.
+- [ ] Repository URL `https://github.com/NaturalAGI-Lab/NaturalAGI` is cited in the Conclusion — it must resolve when the proceedings are published.
 
 ## Build
 
@@ -32,7 +32,7 @@ make build     # latexmk → build/main.pdf
 
 ## Known limits stated in the paper (do not remove in camera-ready)
 
-- Metric conditional on the hand-annotated completeness filter (8,707 of 10,000 admitted).
-- Timing from the 770 misclassified images only; no per-comparison GED time; no end-to-end throughput.
+- Metric conditional on the hand-annotated completeness filter (8,707 of 10,000 admitted); full-test-set figures (coverage 86.41%, selective risk 8.40%, 82.21% without the filter) stay next to it.
+- End-to-end timing from the three runs of 25 Sep 2026 (`experiments/timing_20260925_171425/`); per-stage timing from the 770 misclassified images only; no per-comparison GED time, memory or scaling measurement.
 - Augmentation parameters of the training corpus are not recoverable; the paper says "small rotation and translation" on purpose.
 - No comparison with neural classifiers; the word "competitive" must not return.
