@@ -1,0 +1,113 @@
+{
+  "timestamp": "2026-09-25T18:26:10.203270",
+  "git": {
+    "commit": "db0a2f91fab84f146932cb7958a7e4c5a2fc248d",
+    "branch": "development",
+    "dirty": true
+  },
+  "common_lib_version": "0.1.0",
+  "classification_params": {
+    "ged_timeout": 5,
+    "skeletonization_threshold": 110,
+    "simplification_epsilon": 4.55,
+    "diagnostic_weight_epsilon": 0.1,
+    "delete_image_nodes": false,
+    "node_costs": {
+      "NO_COST": 0.0,
+      "MINOR": 0.25,
+      "GENERAL": 0.5,
+      "SEVERE": 0.8,
+      "NO_MATCH": 1,
+      "IMPOSSIBLE": 6
+    },
+    "features": [
+      "normalized_x",
+      "normalized_y",
+      "distance_to_centroid",
+      "horizontal_direction",
+      "vertical_direction",
+      "angle_with_ox",
+      "junction_angle_min",
+      "is_endpoint",
+      "is_corner",
+      "length_ratio_to_max",
+      "avg_neighbor_vector_length",
+      "neighbor_endpoint_count",
+      "neighbor_junction_count"
+    ]
+  },
+  "sample_fraction": 1.0,
+  "classes": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9
+  ],
+  "concepts": {
+    "0_1": 10,
+    "1_1": 7,
+    "1_3": 3,
+    "2_1": 7,
+    "2_2": 12,
+    "3_1": 9,
+    "4_1": 8,
+    "4_2": 9,
+    "5_1": 7,
+    "6_1": 10,
+    "7_1": 5,
+    "8_1": 11,
+    "9_2": 8
+  },
+  "manifest": {
+    "manifest_path": "experiments/.cache/f34b049_datasets/datasets/mnist_all_manifest.csv",
+    "structure_filter": [
+      "complete"
+    ],
+    "allowed_per_class": {
+      "0": 830,
+      "1": 1129,
+      "2": 956,
+      "3": 969,
+      "4": 954,
+      "5": 796,
+      "6": 742,
+      "7": 1014,
+      "8": 582,
+      "9": 736
+    },
+    "total_allowed": 8708
+  },
+  "features": {
+    "error": "Could not read /Users/mlapin/Development/personal/NaturalAGI/src/training/../classification/graph_similarity/cost_functions.py: No module named 'common.feature_scales'",
+    "features": [
+      "normalized_x",
+      "normalized_y",
+      "distance_to_centroid",
+      "horizontal_direction",
+      "vertical_direction",
+      "angle_with_ox",
+      "junction_angle_min",
+      "is_endpoint",
+      "is_corner",
+      "length_ratio_to_max",
+      "avg_neighbor_vector_length",
+      "neighbor_endpoint_count",
+      "neighbor_junction_count"
+    ],
+    "node_costs": {
+      "NO_COST": 0.0,
+      "MINOR": 0.25,
+      "GENERAL": 0.5,
+      "SEVERE": 0.8,
+      "NO_MATCH": 1,
+      "IMPOSSIBLE": 6
+    },
+    "diagnostic_weight_epsilon": 0.1
+  }
+}

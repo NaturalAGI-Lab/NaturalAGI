@@ -1,0 +1,9 @@
+Metric,Value
+Total Images,8708.0
+Failed (DLQ),22.0
+Successfully Classified,8686.0
+Success Rate (%),100.0
+Accuracy (%),90.92793000230256
+Precision (%),91.69062812657597
+Recall (%),90.92793000230256
+F1 Score (%),91.1367926393628
