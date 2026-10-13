@@ -1,5 +1,5 @@
 \begin{abstract}
-Post-hoc explanation methods approximate a trained model from the outside, and a model can be built so that the explanation hides the behaviour it is meant to expose. We build a recogniser whose decision is already an inspectable object. Each grey-scale image is converted into an attributed bipartite graph: Point nodes mark the endpoints, corners and intersections of the contour skeleton, and Vector nodes mark the straight segments between them. For every class we form a concept attractor by structural reduction, merging training graphs one at a time and generalizing attribute values to intervals. No gradient is computed and no backpropagation is used. A test image is classified by graph edit distance against every concept attractor, with a winner-take-all rule. We evaluate on the MNIST test images whose contours are complete: the completeness filter admits 8,707 of 10,000, and every reported metric is conditional on it. Thirteen concept attractors formed from 76 unique training samples (805 images after augmentation) classify 8,685 images with 91.13\% accuracy, 91.92\% precision, 91.13\% recall and 91.34\% F1 score. We trace one decision from the input image through the winning concept attractor down to the per-feature costs, and we report inference cost measured per pipeline stage; the classification stage has a median of 167 ms on a profiled subset of 770 misclassified images, which is not a typical-case estimate. We report a research prototype and make no comparison with neural classifiers.
+Post-hoc explanation methods approximate a trained model from the outside, and a model can be built so that the explanation hides the behaviour it is meant to expose. We build a recogniser whose decision is already an inspectable object. Each grey-scale image is converted into an attributed bipartite graph: Point nodes mark the endpoints, corners and intersections of the contour skeleton, and Vector nodes mark the straight segments between them. For every class we form a concept attractor by structural reduction, merging training graphs one at a time and generalizing attribute values to intervals. No gradient is computed and no backpropagation is used. A test image is classified by graph edit distance against every concept attractor, with a winner-take-all rule. We evaluate on the MNIST test images whose contours are complete: the completeness filter admits 8,707 of 10,000, and the headline metrics are conditional on it. Thirteen concept attractors formed from 76 unique training samples (805 images after augmentation) classify 8,685 images with 91.13\% accuracy, 91.92\% precision, 91.13\% recall and 91.34\% F1 score. Counted over all 10,000 test images, the system assigns a class to 86.41\% of them at a selective risk of 8.40\%; run with no filter, it classifies 82.21\% of the test set correctly. We trace one decision from the input image through the winning concept attractor down to the per-feature costs. End-to-end inference over the evaluation set took 147 to 232 ms per image on one workstation. We report a research prototype and make no comparison with neural classifiers or with other structural methods.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -16,7 +16,7 @@ In our system the structure of the representation carries the explanation. The c
 
 The system is a prototype built for research. It does not claim the accuracy of neural classifiers on benchmark data and we do not compare it against them. Our question is whether recognition is possible without backpropagation, from a small number of training samples, with a decision path a reader can follow from end to end.
 
-The paper contributes: (i) a graph representation and a concept formation procedure that use no gradient and no backpropagation; (ii) an evaluation on MNIST under a completeness filter we state in full, with its per-class skew; (iii) a worked decision trace that explains one correct decision and the dominant error; and (iv) inference cost measured per pipeline stage on run artefacts.
+The paper contributes: (i) a graph representation and a concept formation procedure that use no gradient and no backpropagation; (ii) an evaluation on MNIST under a completeness filter we state in full, with its per-class skew and with figures over the full test set; (iii) a worked decision trace that explains one correct decision and the dominant error; and (iv) inference cost measured end to end and per pipeline stage on run artefacts.
 
 \section{Related Work}
 
@@ -63,13 +63,46 @@ A concept attractor is formed iteratively, one training sample at a time. Its in
 \begin{equation}\label{eq:cro}
 C_{i+1} = \mathrm{CRO}(C_i,\, G_{i+1}), \quad i = 1, \ldots, n-1
 \end{equation}
-where $C_i$ is the current state, $G_{i+1}$ the graph of the next sample and $n$ the number of samples. Processing one sample aligns the start points, applies the reduction strategies to critical points, traverses both graphs synchronously, and merges the properties of corresponding nodes. The synchronous traversal finds a maximum common minor of the two graphs, so a stroke of three nodes in one sample can match five in another. The reduction leaves the structure that repeats in every sample of the class.
+where $C_i$ is the current state, $G_{i+1}$ the graph of the next sample and $n$ the number of samples. Fig.~\ref{fig:formation} gives the procedure. One CRO step reduces the two graphs until their critical graphs are isomorphic, traverses both synchronously, and merges the properties of corresponding nodes. The critical graph keeps the nodes labelled StartPoint, EndPoint, IntersectionPoint or CornerPoint and joins two of them when a path of other nodes connects them; isomorphism requires equal label sets. The result is a maximum common minor of the two graphs, so a stroke of three nodes in one sample can match five in another. The reduction leaves the structure that repeats in every sample of the class.
 
-Three reduction strategies are applied. Endpoint removal deletes an EndPoint with no counterpart in the second graph, together with the path from it to the nearest critical point. Intersection merging reclassifies an IntersectionPoint of degree at most two as a CornerPoint or an EndPoint and deletes surplus intersections, least similar first. Corner-point reduction matches sub-paths between non-corner critical points and removes surplus CornerPoints from the longer path, lowest similarity first. The intersection strategy demotes a node from IntersectionPoint to CornerPoint to Point. At inference a concept node matches an image node only if the concept node's labels are a subset of the image node's labels, so a concept attractor is never more specific than the images it matches. StartPoint is never reduced; it fixes the entry point of traversal.
+\begin{figure}[t]
+\footnotesize
+\begin{algorithmic}[1]
+\Require sample graphs $G_1, \ldots, G_n$ of one concept
+\State derive the start-point rule from all $G_j$ and mark the StartPoint of each
+\State $C \gets G_1$
+\For{$j = 2, \ldots, n$}
+  \State $A \gets C$;\; $B \gets G_j$;\; $r \gets 0$
+  \While{the critical graphs of $A$ and $B$ are not isomorphic}
+    \State \textbf{if} $r = 5$ \textbf{then} fail
+    \State apply endpoint reduction to $(A, B)$
+    \State apply intersection reduction to $(A, B)$
+    \State apply corner reduction to $(A, B)$;\; $r \gets r + 1$
+  \EndWhile
+  \State $S \gets$ synchronous traversal of $A$ and $B$ from the StartPoints
+  \State $C \gets$ empty graph
+  \For{each two consecutive matched critical points in $S$}
+    \State take the most similar pair of paths joining them
+    \State align the inner nodes one to one, in path order
+    \State add each aligned pair to $C$ with merged attributes
+  \EndFor
+  \State \textbf{if} $C$ is empty \textbf{then} fail
+\EndFor
+\State \Return $C$
+\end{algorithmic}
+\caption{Formation of one concept attractor. Nodes of $C$ keep the identifiers of the concept side, $A$.}
+\label{fig:formation}
+\end{figure}
+
+The start-point rule is derived once from all samples of the concept. If every sample graph has a node of degree one, the candidates are EndPoints; otherwise they are CornerPoints and IntersectionPoints. OPTICS clustering groups the candidates of all samples by normalized position. A cluster qualifies when at least 90\% of the samples contribute to it. Among qualifying clusters of a closed class an intersection cluster is preferred to a corner cluster, and the cluster with the smallest $2\bar{x} + \bar{y}$ then wins, where $(\bar{x}, \bar{y})$ is its mean position. In each sample the cluster member nearest the cluster centroid becomes the StartPoint.
+
+Each round applies three reduction strategies in a fixed order. Endpoint reduction compares the EndPoints of the two graphs by a distance that weights position at 0.7, stroke direction at 0.15 and branch corner density at 0.15. It removes an EndPoint whose nearest counterpart is farther than 0.31, unless the two are mutual nearest neighbours; if the counts still differ, it removes the surplus EndPoints with the largest assigned distance. Removal deletes the EndPoint and the path back to the nearest intersection. Intersection reduction relabels an IntersectionPoint of degree two as a CornerPoint and one of degree one as an EndPoint. If the counts still differ, the graph with more loses the surplus IntersectionPoints whose best similarity to the other graph's intersections is lowest. Corner reduction matches the sub-paths between non-corner critical points. Where two matched sub-paths differ in corner count, an order-preserving minimum-distance matching keeps the corners of the longer one that pair with the shorter, and the rest lose the CornerPoint label. At inference a concept node matches an image node only if the concept node's labels are a subset of the image node's labels, so a concept attractor is never more specific than the images it matches. StartPoint is never reduced; it fixes the entry point of traversal.
+
+The traversal walks both reduced graphs breadth-first from their StartPoints over critical points. At an intersection it pairs the outgoing branches by the type of the critical point each leads to and, within one type, by the distance between those points. Between two consecutive matched critical points it takes the pair of connecting paths with the highest mean node similarity. A dynamic program aligns the inner nodes of the two paths one to one in path order, pairing only nodes that share a label; it maximizes the number of pairs first and their total similarity second. Unpaired nodes of the longer path are dropped. Every comparison is strict, so a tie goes to the first candidate in node enumeration order.
 
 Attributes are generalized with the structure. A numeric attribute becomes an interval with three values: minimum, maximum and centre. A categorical attribute survives only if it agrees across all samples, and label lists are replaced by their intersection.
 
-The procedure consumes every sample it is given, in a fixed order by image identifier. The number of samples per concept attractor was chosen during authoring by one criterion: further samples no longer changed the concept attractor. The procedure follows the energy model of concept formation in our earlier work \cite{parzhyn2025energy}; its invariant formulation, with concept formation as hypergraph attractor dynamics, is in \cite{lapin2026invariant}.
+The procedure consumes every sample it is given, in the order the graph database returns them. The current code sorts by a random identifier assigned to each image at submission, so the order is arbitrary with respect to the samples and differs between formation runs; the order behind the baseline alphabet was not recorded. Section IV-D reports how far the result moved across three such runs. The number of samples per concept attractor was chosen during authoring by one criterion: further samples no longer changed the concept attractor. The procedure follows the energy model of concept formation in our earlier work \cite{parzhyn2025energy}; its invariant formulation, with concept formation as hypergraph attractor dynamics, is in \cite{lapin2026invariant}.
 
 \subsection{Training Data and Sample-Selection Policy}
 
@@ -79,7 +112,7 @@ The 13 concept attractors were formed from 76 unique MNIST \cite{lecun1998} trai
 
 We chose the samples by hand. They are not a random draw from the training split; the criterion was the least distorted writings, with no gaps in the contour. The choice rests on an assumption: an instance of a class that a person reads correctly already carries all the structural and topological features of that class. Formation then needs a small number of structurally complete writings rather than a representative sample of the distribution. Variation enters through augmentation --- the chosen samples fix the structure, and their augmented variants set the bounds of the parameter intervals.
 
-The limits of this assumption are only partly known: we did not measure how sensitive accuracy is to the specific choice of samples, so we cannot say how much a different selection would change the result.
+The limits of this assumption are only partly known. Section IV-D reports what we measured about the choice and order of samples and what we did not.
 
 \subsection{Classification by Graph Edit Distance}
 

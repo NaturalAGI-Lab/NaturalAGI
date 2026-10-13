@@ -6,17 +6,26 @@ We evaluate on the MNIST test set \cite{lecun1998}, 10,000 handwritten digit
 images rendered at 100$\times$100 pixels. The completeness filter is a per-image
 annotation made by hand before any classification run and recorded in
 \texttt{mnist\_all\_manifest.csv} in the public repository: an image is marked
-complete when its stroke has no break and incomplete otherwise. The annotation
+complete when its stroke has no break and incomplete otherwise. The annotator
+saw three panels per image, the grey-scale original, the binary mask at
+$\theta = 110$ and the one-pixel skeleton, and marked the image complete when
+the digit is fully drawn with all strokes connected. The annotation
 uses only that structural property, not the class label and not the
-classifier's output. A broken stroke
+classifier's output. Each image carries one label, and inter-rater agreement
+was not measured. Other revisions of the manifest list 8,704 and 8,708
+complete images, so the labels of a few images are unstable. The system does
+not detect completeness itself. The repository holds a heuristic detector built
+on connected components, erosion and skeleton endpoints; its agreement with the
+manual labels was not measured, and the evaluation does not use it. A broken stroke
 violates the assumption the graph representation of Section~III rests on, and
 the graph built from such an image describes a different figure. Recognising
 broken structures needs a separate mechanism, associative recognition, which
 the system does not implement.
 
 The filter admits 8,707 of the 10,000 test images and excludes 1,293, or
-12.9\%. The accuracy reported below is therefore conditional on the filter
-and does not transfer to full MNIST. The filter also acts unevenly across
+12.9\%. The accuracy reported first is therefore conditional on the filter
+and does not transfer to full MNIST; Section IV-B adds the figures over the
+full test set. The filter also acts unevenly across
 classes (Table~\ref{tab:perclass}). Class~1 keeps 1,129 of its 1,135 test
 images (99.5\%), while class~8 keeps 582 of 974 (59.8\%). Per-class figures
 therefore rest on samples of very different size, and class~8 has the narrowest
@@ -35,31 +44,33 @@ figures are weighted by class support; the unweighted macro averages over the
 ten classes are 92.22\%, 91.22\% and 91.54\%.
 
 \begin{table}[t]
-\caption{Per-class evaluation. ``Admitted'' is the count passing the
-completeness filter and ``share'' its fraction of that class in the MNIST test
-set. ``Classified'' is the count that produced a classification decision;
-precision, recall and F1 are computed on that column and the totals are
-support-weighted.}
+\caption{Per-class evaluation. ``Test'' is the class size in the MNIST test
+set, ``Adm.'' the count passing the completeness filter and ``Clas.'' the count
+that produced a classification decision. ``Cov.'' is the share of the class
+that received a class label. Precision, recall and F1 are computed on the
+classified images, with support-weighted totals. ``Full'' is the recall over
+all test images of the class in the run without the filter. The last five
+columns are percentages.}
 \label{tab:perclass}
 \centering
 \footnotesize
-\setlength{\tabcolsep}{3pt}
-\begin{tabular}{lrrrrrr}
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{@{}lrrrrrrrr@{}}
 \toprule
-Class & Admitted & Classified & Share, \% & Prec., \% & Recall, \% & F1, \% \\
+Class & Test & Adm. & Clas. & Cov. & Prec. & Recall & F1 & Full \\
 \midrule
-0     & 830   & 830   & 84.7 & 99.87 & 91.93 & 95.73 \\
-1     & 1,129 & 1,122 & 99.5 & 93.69 & 96.52 & 95.08 \\
-2     & 956   & 955   & 92.6 & 92.28 & 77.59 & 84.30 \\
-3     & 969   & 968   & 95.9 & 91.78 & 95.76 & 93.73 \\
-4     & 953   & 950   & 97.0 & 92.15 & 84.00 & 87.89 \\
-5     & 796   & 796   & 89.2 & 93.97 & 91.96 & 92.95 \\
-6     & 742   & 741   & 77.5 & 84.88 & 92.44 & 88.50 \\
-7     & 1,014 & 1,011 & 98.6 & 82.01 & 95.15 & 88.10 \\
-8     & 582   & 581   & 59.8 & 98.74 & 94.49 & 96.57 \\
-9     & 736   & 731   & 72.9 & 92.85 & 92.34 & 92.59 \\
+0     & 980    & 830   & 830   & 84.4 & 99.87 & 91.93 & 95.73 & 81.33 \\
+1     & 1,135  & 1,129 & 1,122 & 98.9 & 93.69 & 96.52 & 95.08 & 95.68 \\
+2     & 1,032  & 956   & 955   & 92.1 & 92.28 & 77.59 & 84.30 & 72.87 \\
+3     & 1,010  & 969   & 968   & 95.8 & 91.78 & 95.76 & 93.73 & 94.36 \\
+4     & 982    & 953   & 950   & 96.7 & 92.15 & 84.00 & 87.89 & 83.10 \\
+5     & 892    & 796   & 796   & 89.1 & 93.97 & 91.96 & 92.95 & 88.79 \\
+6     & 958    & 742   & 741   & 75.7 & 84.88 & 92.44 & 88.50 & 74.01 \\
+7     & 1,028  & 1,014 & 1,011 & 98.3 & 82.01 & 95.15 & 88.10 & 94.84 \\
+8     & 974    & 582   & 581   & 58.2 & 98.74 & 94.49 & 96.57 & 62.11 \\
+9     & 1,009  & 736   & 731   & 72.0 & 92.85 & 92.34 & 92.59 & 72.94 \\
 \midrule
-Total & 8,707 & 8,685 & 87.1 & 91.92 & 91.13 & 91.34 \\
+Total & 10,000 & 8,707 & 8,685 & 86.4 & 91.92 & 91.13 & 91.34 & 82.21 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -74,6 +85,28 @@ differently, with class~2 (77.59\%) and class~4 (84.00\%) at the bottom.
 The system made 770 wrong decisions: 726 assigned the image to a wrong class,
 and in 44 no concept activated and the image was left unrecognised, mostly in
 class~6 (16) and class~8 (14).
+
+Counted against all 10,000 test images, three mechanisms reject an image: the
+filter (1,293 images, 12.93\%), failed graph construction (22, 0.22\%) and no
+activated concept (44, 0.44\%). Only the last two are automatic. The reject
+rate is 13.59\% and the coverage 86.41\%: 8,641 images receive a class. The
+selective risk, the error rate among those 8,641, is 8.40\% (726 errors). With
+every rejected image counted as an error, accuracy over the full test set is
+79.15\% (7,915 of 10,000). Coverage runs from 58.2\% for class~8 to 98.9\% for
+class~1 (Table~\ref{tab:perclass}), and the error rate among the labelled
+images of a class from 3.2\% for class~8 to 22.0\% for class~2.
+
+A separate run submitted all 10,000 test images with no filter, using the same
+13 concept attractors and the same parameters. Graph construction failed for 58
+images, 54 activated no concept and 1,667 received a wrong class, so 8,221 are
+correct: 82.21\% of the full test set. On the 9,942 classified images accuracy
+is 82.69\%, precision 84.57\%, recall 82.69\% and F1 82.83\%. The last column
+of Table~\ref{tab:perclass} gives the per-class recall of this run over all test
+images; class~8 falls to 62.11\%. The manifest revision of this run lists 1,295
+incomplete images, and the run is correct for 310 of them, or 23.94\%. The run used a later code revision, which softens the
+out-of-range penalty of Section III-E for narrow intervals. On the images
+annotated complete it scores 90.89\%, against 90.90\% for the baseline run
+counted the same way.
 
 \begin{figure}[t]
 \centering
@@ -159,30 +192,68 @@ errors, \cid{2\_1} entered the comparison every time and lost on similarity
 every time, by a mean margin of 0.14. In none of the 111 cases did a concept of
 digit~2 win on similarity and then lose after the complexity prior was applied.
 
+\subsection{Sensitivity and Ablations}
+
+No single-factor ablation was run on the baseline configuration; the results
+below come from other runs.
+
+Three back-to-back retrains on later revisions of the code and of the
+training corpus (869 images from 85 samples) each consumed the samples in a
+different order. All
+three reproduced the node count of every concept attractor in the baseline
+alphabet. Accuracy on the classified images was 90.68\%, 89.93\% and 90.93\%.
+In an offline study, ten shuffled orders gave \cid{7\_1} and \cid{8\_1} the
+same labelled topology every time; \cid{2\_2} kept 12 nodes, and 64\% of its
+order pairs had identical topology. We did not form concepts from a random draw
+of the training split, did not vary the number of concept attractors, and did
+not vary augmentation. The effect of those three choices on accuracy is
+unknown.
+
+The previous configuration scored 85.80\% under the same protocol. It used
+the cost ladder 0, 0.65, 0.75, 1.0, 1.5, 10, $\varepsilon_w = 1.0$, 14 features
+and a 15\,s GED deadline, and it preceded one change to skeletonization and the
+re-formation of five concept attractors. The gain of 5.33 points cannot be
+split among these six changes. The later code revision of Section IV-B softens the out-of-range penalty and
+leaves accuracy on complete images within 0.02 points, though it carries other
+code changes as well. On an earlier configuration and a 3,000-image sample,
+removing the complexity prior of \eqref{eq:score} lowered accuracy by about 3
+points, to 72.00\%. For the 111 2$\rightarrow$7 errors, lifting the complexity
+pre-filter changed no decision (Section V). We did not run the evaluation set
+without the pre-filter and did not test a soft pre-filter.
+
 \subsection{Inference Cost}
 
 An image is compared against at most 13 concepts, each comparison under a
 5\,s deadline, so the theoretical upper bound is 65\,s per image. The measured
-stage times stay far below it.
+times stay far below it.
 
-The pipeline ran on a single workstation in 24 Docker containers: four
-skeletonization instances, four contour analysis instances and sixteen
-classification instances. Per-stage medians come from the profiling records:
-skeletonization 52.8\,ms with a maximum of 533\,ms, contour analysis
-211.5\,ms with a maximum of 1,905\,ms, and the classification stage, meaning
-all GED comparisons for one image together, 167.1\,ms with a 99th percentile of
-about 0.84\,s and a maximum of 1,414\,ms. No profiled image came close to the
-5\,s deadline of a single comparison. On the profiled images the solver
-therefore finished its search before the deadline, and the reported distances
-are completed results, not deadline-truncated ones.
+We measured end-to-end time over the whole evaluation set on one Apple M1 Pro
+workstation (10 cores, 32\,GB) running the pipeline in 26 Docker containers: a
+connector, four skeletonization, four contour analysis and sixteen
+classification instances, and the concept creator. The clock runs from the
+first HTTP submission to the last result and includes database writes and
+message-queue hops. The three runs of Section IV-D took 1,279\,s, 1,431\,s and
+2,018\,s for 8,704 to 8,708 images, which is 147, 164 and 232\,ms per image.
+These are throughput figures with the stages running in parallel; the latency
+of a single image was not recorded. Each run was slower than the one before.
+Every run leaves its test graphs in the database, which held 514k nodes after
+the third; that growth is the likely cause, but we did not isolate it. Forming
+the 13 concept attractors took 528\,s, 746\,s and 966\,s.
 
-One caveat limits the use of these medians. Profiling records exist only for
-the 770 misclassified images, so the profiled subset is biased and
-correctly classified images are absent from it. The available data does not fix
-the direction of the bias. The number of GED comparisons per image is set by
-the complexity pre-filter, not by the correctness of the final decision. The medians are therefore not a typical-case estimate.
-The run does not record its own total duration, and the system does not store
-the time of an individual GED comparison.
+Per-stage times exist only for the 770 misclassified images of the baseline
+run, because a run stores profiling records only for those. Their medians are
+52.8\,ms for skeletonization (maximum 533\,ms), 211.5\,ms for contour analysis
+(maximum 1,905\,ms) and 167.1\,ms for the classification stage, meaning all GED
+comparisons for one image together (99th percentile about 0.84\,s, maximum
+1,414\,ms). No profiled image came close to the 5\,s deadline of a single
+comparison, so on those images the solver finished its search and the reported
+distances are completed results. The subset holds no correctly classified
+image, so these medians are not a typical-case estimate.
+
+Three quantities were not measured: the time of an individual GED comparison,
+memory use, and the growth of inference time with the number of concept
+attractors. The number of comparisons per image is at most the number of
+concept attractors that pass the pre-filter.
 
 \section{Discussion}
 
@@ -225,17 +296,29 @@ numbers are not comparable, since the class set, the test set size and the
 formation procedure all differ.
 
 Several limitations bound the result. The headline metric is conditional on the
-completeness filter, which excludes 12.9\% of the test set unevenly across
-classes. The inference cost is measured, but the profiled subset holds only
-misclassified images, and per-comparison timing does not exist. The 76 training
-samples were selected by hand and the sensitivity of accuracy to that selection
-was not measured, so part of the accuracy may come from a fortunate choice. The
-training samples were chosen on the same completeness criterion as the test
-filter, so the evaluation measures the system inside the regime it was built
-for, and the exclusion does the most work in the classes with the lowest
-admission rates (8, 9 and 6). Sensitivity of a concept attractor to the
-order of its samples was not measured in this study. Tolerance to rotation is
-limited to the small range covered by augmentation. The contour representation
+completeness filter, a manual annotation with one label per image and no
+measured inter-rater agreement, which excludes 12.9\% of the test set unevenly
+across classes. The training samples were chosen on the same completeness
+criterion as the test filter, so the evaluation measures the system inside the
+regime it was built for, and the exclusion does the most work in the classes
+with the lowest admission rates (8, 9 and 6). The 76 training samples were
+selected by hand. A different sample order moved accuracy by about one point
+(Section IV-D), but random selection, the number of concept attractors and
+augmentation were not varied, so part of the accuracy may come from a fortunate
+choice. We ran no non-neural structural baseline: no classifier on contour or
+skeleton descriptors, no template matcher, and no nearest-neighbour GED against
+the unreduced training graphs. The last one would show what the reduction to 13
+concept attractors contributes. The paper therefore supports no claim that
+concept attractors outperform other structural methods. No single-factor
+ablation of the edit costs, the feature weights, the complexity prior or the
+pre-filter was run on the baseline configuration. Inference time is measured
+end to end, but per-stage records cover only misclassified images, and
+per-comparison time, memory use and scaling with the number of concept
+attractors were not measured. The evaluation covers MNIST only. We evaluated no
+second dataset and none of the application tasks named above, so the paper
+does not establish generalization beyond handwritten digits or dependability in
+those workflows. Tolerance to rotation
+is limited to the small range covered by augmentation. The contour representation
 discards texture and gradients, which confines the method to silhouette and
 stroke images. Broken contours need associative
 recognition, which the system does not have.
@@ -248,12 +331,14 @@ variants, with no backpropagation anywhere in the procedure. Classification by g
 distance with interval-based feature weighting recognises 8,685
 complete-contour MNIST images at 91.13\% accuracy, 91.92\% precision,
 91.13\% recall and 91.34\% F1. The evaluation is stated with its filter:
-12.9\% of the test set is excluded and the metric does not carry over to
-full MNIST. Each decision decomposes into a named concept, a list of
+12.9\% of the test set is excluded. Counted over all 10,000 test images the
+system assigns a class to 86.41\% at a selective risk of 8.40\%, and without the
+filter it classifies 82.21\% correctly. Each decision decomposes into a named concept, a list of
 node substitutions and a per-feature cost, and the dominant 2$\rightarrow$7
-error was traced through that decomposition over all 111 cases. Inference cost
-was measured per pipeline stage, and on the profiled images the 5\,s deadline of a
-single comparison was not reached. Work ahead covers associative recognition for broken
-contours, per-comparison timing on the full test set, and a sensitivity study
-of the training sample choice. The source code and the run artefacts are public
-at \url{https://github.com/kbokh/NaturalAGI}.
+error was traced through that decomposition over all 111 cases. End-to-end
+inference took 147 to 232\,ms per image, and on the profiled images the 5\,s
+deadline of a single comparison was not reached. Work ahead covers associative
+recognition for broken contours, a nearest-neighbour GED baseline on the
+unreduced training graphs, single-factor ablations of the matching costs, and
+formation from randomly drawn training samples. The source code and the run
+artefacts are public at \url{https://github.com/NaturalAGI-Lab/NaturalAGI}.
