@@ -264,14 +264,16 @@ these 8{,}704 images; 22 submissions failed in
 skeletonization (dead-letter queue) and 8{,}685 were classified, with
 accuracy $91.13\%$, precision $91.92\%$, recall $91.13\%$, and F1
 $91.34\%$ over the classified set. Counting every submission in the
-denominator yields the end-to-end accuracy $7{,}915/8{,}707 = 90.90\%$.
+denominator yields the end-to-end accuracy $7{,}915/8{,}707 = 90.90\%$,
+that is, 792 failures: 770 among the classified images and the 22
+dead-letter submissions.
 Throughout the paper we keep both readings apart: \emph{conditional}
 accuracy is measured over classified images, \emph{end-to-end} accuracy
 over everything submitted.
 Figure~\ref{fig:confusion} shows the confusion structure. The largest
 confusion pairs are $2{\to}7$ (111), $4{\to}7$ (62), $2{\to}6$ (57),
-$4{\to}1$ (52), and $9{\to}4$ (46); classes 2 (215 errors) and 4 (155
-errors) dominate the error mass.
+$4{\to}1$ (52), and $9{\to}4$ (46); classes 2 (214 errors) and 4 (152
+errors) dominate the error mass of the classified set.
 
 \begin{figure}[!t]
 \centering
