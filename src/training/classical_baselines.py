@@ -9,10 +9,12 @@ import argparse
 import csv
 import json
 import os
+import platform
 import re
 import subprocess
 import sys
 import tempfile
+import time
 import zipfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -45,8 +47,11 @@ EXPERIMENTS_DIR = os.path.join(_PROJECT_ROOT, "experiments")
 IMAGE_SIZE = (100, 100)
 CLASSES = list(range(10))
 
-EXPECTED_TRAIN_ORIGINALS = 76
-EXPECTED_TRAIN_INSTANCES = 805
+# Training reads the live datasets/train/ folder, the corpus ISL concept formation succeeds on;
+# ISL cannot form 4_1 from the f34b049 archive's train split. The test set stays frozen.
+TRAIN_DIR = os.path.join(_PROJECT_ROOT, "datasets", "train")
+EXPECTED_TRAIN_ORIGINALS = 85
+EXPECTED_TRAIN_INSTANCES = 869
 EXPECTED_TRAIN_CONCEPT_DIRS = 13
 EXPECTED_TEST_IMAGES = 8708
 
@@ -113,6 +118,8 @@ class SeedMetrics:
     recall: float
     f1: float
     y_pred: np.ndarray
+    fit_s: float = 0.0
+    predict_s: float = 0.0
 
 
 @dataclass
@@ -263,9 +270,14 @@ def run_deterministic_models(train: Split, test: Split) -> dict[str, SeedMetrics
         models[f"knn_k{k}"] = KNeighborsClassifier(n_neighbors=k)
     results: dict[str, SeedMetrics] = {}
     for name, model in models.items():
+        fit_start = time.perf_counter()
         model.fit(train.X, train.y)
+        predict_start = time.perf_counter()
         y_pred = model.predict(test.X)
-        results[name] = _score(test.y, y_pred)
+        predict_end = time.perf_counter()
+        metrics = _score(test.y, y_pred)
+        metrics.fit_s, metrics.predict_s = predict_start - fit_start, predict_end - predict_start
+        results[name] = metrics
     return results
 
 
@@ -409,11 +421,17 @@ def _run_budget(
     seed_metrics: list[SeedMetrics] = []
     epochs_run: list[int] = []
     for seed in seeds:
+        fit_start = time.perf_counter()
         if converge:
             model, epochs = train_to_convergence(model_fn, train, seed, max_epochs)
         else:
             model, epochs = train_one_epoch(model_fn, train, seed), 1
-        seed_metrics.append(_score(test.y, predict_torch(model, test)))
+        predict_start = time.perf_counter()
+        y_pred = predict_torch(model, test)
+        predict_end = time.perf_counter()
+        metrics = _score(test.y, y_pred)
+        metrics.fit_s, metrics.predict_s = predict_start - fit_start, predict_end - predict_start
+        seed_metrics.append(metrics)
         epochs_run.append(epochs)
     return TorchRunResult(seed_metrics, epochs_run)
 
@@ -437,11 +455,16 @@ def aggregate_seed_metrics(seed_metrics: list[SeedMetrics]) -> dict[str, float |
     precision, precision_sd = mean_sd([m.precision for m in seed_metrics])
     recall, recall_sd = mean_sd([m.recall for m in seed_metrics])
     f1, f1_sd = mean_sd([m.f1 for m in seed_metrics])
+    fit_s, fit_s_sd = mean_sd([m.fit_s for m in seed_metrics])
+    predict_s, predict_s_sd = mean_sd([m.predict_s for m in seed_metrics])
     return {
         "accuracy": accuracy, "accuracy_sd": accuracy_sd,
         "precision": precision, "precision_sd": precision_sd,
         "recall": recall, "recall_sd": recall_sd,
         "f1": f1, "f1_sd": f1_sd,
+        "fit_s": fit_s, "fit_s_sd": fit_s_sd,
+        "predict_s": predict_s, "predict_s_sd": predict_s_sd,
+        "predict_ms_per_image": 1000 * predict_s / len(seed_metrics[0].y_pred),
     }
 
 
@@ -450,13 +473,9 @@ def build_metrics_rows(
 ) -> list[dict[str, Any]]:
     rows: list[dict[str, Any]] = []
     for name, metrics in det_results.items():
-        rows.append({
-            "model": name, "budget": "single_fit", "n_seeds": 1,
-            "accuracy": metrics.accuracy, "accuracy_sd": None,
-            "precision": metrics.precision, "precision_sd": None,
-            "recall": metrics.recall, "recall_sd": None,
-            "f1": metrics.f1, "f1_sd": None,
-        })
+        row = {"model": name, "budget": "single_fit", "n_seeds": 1}
+        row.update(aggregate_seed_metrics([metrics]))
+        rows.append(row)
     for name, result in torch_results.items():
         base_name, budget = name.rsplit("_", 1)
         row = {"model": base_name, "budget": budget, "n_seeds": len(seeds)}
@@ -529,6 +548,20 @@ def package_versions() -> dict[str, str]:
     }
 
 
+def hardware_info() -> dict[str, Any]:
+    cpu = subprocess.run(
+        ["sysctl", "-n", "machdep.cpu.brand_string"], capture_output=True, text=True, check=False
+    ).stdout.strip()
+    ram = subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True, check=False).stdout.strip()
+    return {
+        "platform": platform.platform(),
+        "cpu": cpu or platform.processor(),
+        "cpu_count": os.cpu_count(),
+        "ram_gb": round(int(ram) / 2**30) if ram.isdigit() else None,
+        "torch_threads": torch.get_num_threads(),
+    }
+
+
 def build_run_config(
     quick: bool, seeds: list[int], resolved_test_count: int,
     torch_results: dict[str, TorchRunResult], convergence_max_epochs: int,
@@ -539,6 +572,7 @@ def build_run_config(
         "repo_git": repo_git_info(),
         "archive_commit": ARCHIVE_COMMIT,
         "package_versions": package_versions(),
+        "hardware": hardware_info(),
         "seeds": seeds,
         "hyperparameters": {
             "svm": {"kernel": "rbf"},
@@ -561,6 +595,7 @@ def build_run_config(
         "train_set": {
             "originals": EXPECTED_TRAIN_ORIGINALS,
             "instances": EXPECTED_TRAIN_INSTANCES,
+            "train_dir": os.path.relpath(TRAIN_DIR, _PROJECT_ROOT),
             "concept_dirs": EXPECTED_TRAIN_CONCEPT_DIRS,
         },
         "test_set": {
@@ -661,7 +696,7 @@ def main() -> None:
     convergence_max_epochs = QUICK_CONVERGENCE_EPOCHS if args.quick else CONVERGENCE_MAX_EPOCHS
 
     datasets_root = ensure_frozen_corpus(CACHE_DIR)
-    train_images = load_train_set(os.path.join(datasets_root, "train"))
+    train_images = load_train_set(TRAIN_DIR)
     test_images = load_test_set(os.path.join(datasets_root, "mnist_all_manifest.csv"), datasets_root)
     if args.quick:
         test_images = subsample_split(test_images, QUICK_TEST_SUBSAMPLE, seed=0)
