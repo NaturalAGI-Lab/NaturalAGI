@@ -13,6 +13,7 @@ import random
 import re
 import subprocess
 import sys
+import time
 import uuid
 from datetime import datetime
 from typing import Any, Dict, Iterable, List, Set, Tuple
@@ -418,12 +419,22 @@ def test_mnist_all(
         else:
             pbar = _PrintProgress(total=total_images, desc="Classifying")
         stream_input = [(path, img_id, img_params) for path, img_id, _, img_params in all_images]
+        last_arrival = {"t": 0.0}
+
+        def _on_result(_img_id: str, result: Dict[str, Any]) -> None:
+            # Timeouts are reported after the idle tail, so they must not move the clock.
+            if result["status"] in ("success", "error"):
+                last_arrival["t"] = time.perf_counter()
+            pbar.update(1)
+
+        stream_start = time.perf_counter()
         stream_results = classify_images_stream(
             stream_input,
-            on_result=lambda img_id, _r: pbar.update(1),
+            on_result=_on_result,
             kafka_bootstrap_servers=kafka_bootstrap_servers,
         )
         pbar.close()
+        _save_timing(run_dir, stream_start, last_arrival["t"], total_images)
 
         for img_id, result in stream_results.items():
             expected_name = id_to_expected[img_id]
@@ -513,6 +524,19 @@ def test_mnist_all(
                 _quiet_state["warn_ctx"].__exit__(None, None, None)
 
     return all_results, all_y_true, all_y_pred, run_dir
+
+
+def _save_timing(run_dir: str, stream_start: float, last_arrival: float, total_images: int) -> None:
+    # Wall-clock from the first submission to the last result; the collector's idle tail is excluded.
+    wall_s = last_arrival - stream_start
+    timing = {
+        "wall_s": wall_s,
+        "images": total_images,
+        "images_per_s": total_images / wall_s,
+        "ms_per_image": 1000 * wall_s / total_images,
+    }
+    with open(os.path.join(run_dir, "timing.json"), "w") as f:
+        json.dump(timing, f, indent=2)
 
 
 def _build_run_config(

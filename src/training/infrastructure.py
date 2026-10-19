@@ -96,8 +96,8 @@ def wait_for_kafka_idle(
     topic: str,
     idle_timeout: int = 30,
     bootstrap_servers: str = "localhost:29092",
-) -> None:
-    """Block until a Kafka topic has been idle for *idle_timeout* seconds."""
+) -> float:
+    """Block until a Kafka topic has been idle for *idle_timeout* seconds; return the last message's epoch time."""
     consumer = KafkaConsumer(
         topic,
         bootstrap_servers=bootstrap_servers,
@@ -119,7 +119,7 @@ def wait_for_kafka_idle(
                 idle_duration = current_time - last_message_time
                 if idle_duration >= idle_timeout:
                     print(f"Idle for {idle_timeout}s — done.")
-                    return
+                    return last_message_time
                 if idle_duration >= 5:
                     print(f"No messages for {int(idle_duration)}s…")
     finally:
