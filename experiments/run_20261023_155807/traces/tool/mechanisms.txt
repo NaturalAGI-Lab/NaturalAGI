@@ -1,0 +1,19 @@
+DLQ 21, not classified 44, wrong class 820
+mechanisms: {'gate': 312, 'sim': 383, 'prior': 125}
+  2->7   n= 93  {'sim': 90, 'gate': 3}
+  4->7   n= 80  {'gate': 36, 'sim': 44}
+  4->5   n= 71  {'sim': 45, 'gate': 26}
+  2->6   n= 65  {'gate': 56, 'sim': 9}
+  5->3   n= 56  {'prior': 55, 'sim': 1}
+  0->6   n= 52  {'sim': 46, 'gate': 6}
+  4->1   n= 41  {'gate': 40, 'sim': 1}
+  2->3   n= 31  {'prior': 10, 'sim': 21}
+  9->4   n= 27  {'sim': 27}
+  7->2   n= 26  {'prior': 21, 'sim': 5}
+gate reasons (per true-class concept):
+   141  Preprocessing failed: Concept has endpoints but image does not.
+   115  Preprocessing failed: Concept has corner points but image does not.
+   111  Preprocessing failed: Concept has intersection points but image does not.
+    39  Preprocessing failed: Reached maximum reduction iterations, stopping
+    37  Preprocessing failed: Concept has more corner points than image.
+     5  Preprocessing failed: Concept has more endpoints than image.

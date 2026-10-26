@@ -1,0 +1,88 @@
+
+=== Ranking (production): raw similarity vs adjusted score (λ=0.1, α=0.0) ===
+  concept   raw_sim  adjusted  cx  minor   flag
+  1_1        0.5815    0.9515  13   True   PREDICTED
+  7_1        0.5973    0.9143   9   True   
+  1_3        0.6489    0.8811   5   True   
+  2_1        0.0000    0.0000   0  False   
+  3_1        0.0000    0.0000   0  False   
+  4_1        0.0000    0.0000   0  False   expected-class
+  4_2        0.0000    0.0000   0  False   expected-class
+  5_1        0.0000    0.0000   0  False   
+  9_2        0.0000    0.0000   0  False   
+  NOTE: prediction = top by ADJUSTED score. If a correct-class concept has the
+        higher raw_sim but lower adjusted, the complexity prior caused the miss.
+
+=== Per-feature substitution costs vs concept 1_1 (GED cost 9.36, sim 0.5815, NO_MATCH=1.0) ===
+
+── SUBSTITUTE [Point|StartPoint]  node_subst_cost = 0.121  (0 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  distance_to_centroid      in-range         1.000         [0.59,1.00]  0.054  0.054
+  normalized_x              in-range        -0.600       [-0.70,-0.30]  0.056  0.037
+  normalized_y              in-range         0.300        [-0.30,0.40]  0.035  0.030
+  is_endpoint               in-range         1.000         [1.00,1.00]  0.011  0.000
+  is_corner                 in-range         0.000         [0.00,0.00]  0.011  0.000
+  avg_neighbor_vector_lengthin-range         1.000         [1.00,1.00]  0.278  0.000
+  neighbor_endpoint_count   in-range         0.000         [0.00,0.00]  0.278  0.000
+  neighbor_junction_count   in-range         1.000         [1.00,1.00]  0.278  0.000
+
+── SUBSTITUTE [Point|EndPoint]  node_subst_cost = 0.080  (0 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  normalized_y              in-range         0.800         [0.80,1.00]  0.074  0.074
+  normalized_x              in-range        -0.100        [-0.40,0.40]  0.025  0.006
+  distance_to_centroid      in-range         1.000         [1.00,1.00]  0.221  0.000
+  is_endpoint               in-range         1.000         [1.00,1.00]  0.009  0.000
+  is_corner                 in-range         0.000         [0.00,0.00]  0.009  0.000
+  avg_neighbor_vector_lengthin-range         1.000         [1.00,1.00]  0.221  0.000
+  neighbor_endpoint_count   in-range         0.000         [0.00,0.00]  0.221  0.000
+  neighbor_junction_count   in-range         1.000         [1.00,1.00]  0.221  0.000
+
+── SUBSTITUTE [Point|EndPoint]  node_subst_cost = 0.094  (0 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  normalized_y              in-range        -0.800       [-1.00,-0.80]  0.073  0.073
+  normalized_x              in-range         0.600         [0.10,0.70]  0.031  0.021
+  distance_to_centroid      in-range         1.000         [1.00,1.00]  0.219  0.000
+  is_endpoint               in-range         1.000         [1.00,1.00]  0.009  0.000
+  is_corner                 in-range         0.000         [0.00,0.00]  0.009  0.000
+  avg_neighbor_vector_lengthin-range         1.000         [1.00,1.00]  0.219  0.000
+  neighbor_endpoint_count   in-range         0.000         [0.00,0.00]  0.219  0.000
+  neighbor_junction_count   in-range         1.000         [1.00,1.00]  0.219  0.000
+
+── SUBSTITUTE [Point|IntersectionPoint]  node_subst_cost = 2.058  (2 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  normalized_x              OUT-of-range    -0.100        [-0.00,0.30]  0.063  1.000
+  normalized_y              OUT-of-range     0.100       [-0.60,-0.20]  0.050  1.000
+  junction_angle_min        in-range         0.353         [0.06,0.36]  0.062  0.054
+  distance_to_centroid      in-range         0.460         [0.22,0.60]  0.053  0.004
+  is_endpoint               in-range         0.000         [0.00,0.00]  0.010  0.000
+  is_corner                 in-range         0.000         [0.00,0.00]  0.010  0.000
+  avg_neighbor_vector_lengthin-range         1.000         [1.00,1.00]  0.251  0.000
+  neighbor_endpoint_count   in-range         1.000         [1.00,1.00]  0.251  0.000
+  neighbor_junction_count   in-range         0.000         [0.00,0.00]  0.251  0.000
+
+── SUBSTITUTE [Vector|HorizontalVector]  node_subst_cost = 2.444  (2 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  normalized_x              OUT-of-range    -0.300       [-0.20,-0.00]  0.277  1.000
+  normalized_y              OUT-of-range     0.200        [-0.40,0.10]  0.139  1.000
+  angle_with_ox             in-range         0.111         [0.11,0.22]  0.394  0.394
+  length_ratio_to_max       in-range         0.295         [0.11,0.93]  0.091  0.050
+  horizontal_direction      in-range         2.000         [2.00,2.00]  0.050  0.000
+  vertical_direction        in-range         1.000         [1.00,1.00]  0.050  0.000
+
+── SUBSTITUTE [Vector|VerticalVector]  node_subst_cost = 2.178  (2 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  normalized_y              OUT-of-range     0.500         [0.20,0.30]  0.234  1.000
+  length_ratio_to_max       OUT-of-range     0.721         [1.00,1.00]  0.468  1.000
+  normalized_x              in-range        -0.100        [-0.10,0.20]  0.117  0.117
+  angle_with_ox             in-range         0.500         [0.39,0.67]  0.124  0.033
+  horizontal_direction      in-range         2.000         [1.00,2.00]  0.028  0.028
+  vertical_direction        in-range         2.000         [2.00,2.00]  0.028  0.000
+
+── SUBSTITUTE [Vector|VerticalVector]  node_subst_cost = 2.381  (2 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  normalized_y              OUT-of-range    -0.400       [-0.80,-0.50]  0.215  1.000
+  length_ratio_to_max       OUT-of-range     1.000         [0.26,0.75]  0.146  1.000
+  angle_with_ox             in-range         0.278         [0.28,0.44]  0.322  0.286
+  normalized_x              in-range         0.200         [0.10,0.40]  0.215  0.095
+  horizontal_direction      in-range         2.000         [2.00,2.00]  0.051  0.000
+  vertical_direction        in-range         1.000         [1.00,1.00]  0.051  0.000

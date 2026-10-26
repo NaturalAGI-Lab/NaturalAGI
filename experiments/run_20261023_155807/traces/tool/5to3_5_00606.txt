@@ -1,0 +1,105 @@
+
+=== Ranking (production): raw similarity vs adjusted score (λ=0.1, α=0.0) ===
+  concept   raw_sim  adjusted  cx  minor   flag
+  3_1        0.7614    1.1701  17   True   PREDICTED
+  5_1        0.7880    1.1580  13   True   expected-class
+  2_1        0.6755    1.0455  13   True   
+  7_1        0.6865    1.0035   9   True   
+  1_3        0.6817    0.9139   5   True   
+  0_1        0.0000    0.0000   0  False   
+  1_1        0.0000    0.0000   0  False   
+  2_2        0.0000    0.0000   0  False   
+  4_1        0.0000    0.0000   0  False   
+  4_2        0.0000    0.0000   0  False   
+  6_1        0.0000    0.0000   0  False   
+  8_1        0.0000    0.0000   0  False   
+  9_2        0.0000    0.0000   0  False   
+  NOTE: prediction = top by ADJUSTED score. If a correct-class concept has the
+        higher raw_sim but lower adjusted, the complexity prior caused the miss.
+
+=== Per-feature substitution costs vs concept 5_1 (GED cost 6.73, sim 0.7880, NO_MATCH=1.0) ===
+
+── SUBSTITUTE [Point|EndPoint]  node_subst_cost = 0.083  (0 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  distance_to_centroid      in-range         1.000         [0.77,1.00]  0.084  0.056
+  normalized_x              in-range         0.800         [0.00,0.90]  0.028  0.021
+  normalized_y              in-range        -0.600       [-0.90,-0.20]  0.035  0.007
+  is_endpoint               in-range         1.000         [1.00,1.00]  0.011  0.000
+  is_corner                 in-range         0.000         [0.00,0.00]  0.011  0.000
+  avg_neighbor_vector_lengthin-range         1.000         [1.00,1.00]  0.277  0.000
+  neighbor_endpoint_count   in-range         0.000         [0.00,0.00]  0.277  0.000
+  neighbor_junction_count   in-range         0.000         [0.00,0.00]  0.277  0.000
+
+── SUBSTITUTE [Point|StartPoint]  node_subst_cost = 0.111  (0 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  distance_to_centroid      in-range         1.000         [0.42,1.00]  0.058  0.047
+  normalized_x              in-range        -0.800       [-0.90,-0.00]  0.040  0.029
+  neighbor_junction_count   in-range         0.000         [0.00,1.00]  0.036  0.024
+  normalized_y              in-range         0.400         [0.10,0.90]  0.044  0.011
+  is_endpoint               in-range         1.000         [1.00,1.00]  0.016  0.000
+  is_corner                 in-range         0.000         [0.00,0.00]  0.016  0.000
+  avg_neighbor_vector_lengthin-range         1.000         [1.00,1.00]  0.395  0.000
+  neighbor_endpoint_count   in-range         0.000         [0.00,0.00]  0.395  0.000
+
+── DELETE (image) [Point] cost 0.25 (unmatched — structural difference, not a feature mismatch)
+
+── DELETE (image) [Point] cost 0.25 (unmatched — structural difference, not a feature mismatch)
+
+── SUBSTITUTE [Point|CornerPoint]  node_subst_cost = 1.205  (1 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  normalized_x              OUT-of-range     0.500       [-0.80,-0.10]  0.065  1.000
+  neighbor_endpoint_count   in-range         0.000         [0.00,0.50]  0.087  0.058
+  neighbor_junction_count   in-range         0.000         [0.00,0.50]  0.087  0.058
+  normalized_y              in-range         0.000        [-0.70,0.10]  0.058  0.038
+  junction_angle_min        in-range         0.470         [0.29,0.81]  0.084  0.034
+  is_corner                 in-range         1.000         [0.00,1.00]  0.021  0.014
+  distance_to_centroid      in-range         0.567         [0.23,1.00]  0.060  0.004
+  is_endpoint               in-range         0.000         [0.00,0.00]  0.021  0.000
+  avg_neighbor_vector_lengthin-range         1.000         [1.00,1.00]  0.519  0.000
+
+── DELETE (image) [Point] cost 0.25 (unmatched — structural difference, not a feature mismatch)
+
+── SUBSTITUTE [Point|CornerPoint]  node_subst_cost = 0.119  (0 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  neighbor_endpoint_count   in-range         0.500         [0.00,0.50]  0.061  0.041
+  normalized_x              in-range        -0.500        [-0.50,0.70]  0.028  0.024
+  distance_to_centroid      in-range         0.964         [0.19,1.00]  0.040  0.023
+  junction_angle_min        in-range         0.712         [0.47,0.87]  0.074  0.018
+  is_corner                 in-range         1.000         [0.00,1.00]  0.015  0.010
+  normalized_y              in-range         0.600        [-0.20,0.90]  0.031  0.004
+  is_endpoint               in-range         0.000         [0.00,0.00]  0.015  0.000
+  avg_neighbor_vector_lengthin-range         1.000         [1.00,1.00]  0.368  0.000
+  neighbor_junction_count   in-range         0.000         [0.00,0.00]  0.368  0.000
+
+── DELETE (image) [Vector|HorizontalVector|HorizontalVector] cost 0.25 (unmatched — structural difference, not a feature mismatch)
+
+── SUBSTITUTE [Vector]  node_subst_cost = 0.607  (0 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  normalized_y              in-range        -0.300       [-0.80,-0.20]  0.227  0.177
+  normalized_x              in-range         0.200        [-0.70,0.30]  0.144  0.116
+  angle_with_ox             in-range         0.444         [0.00,0.56]  0.242  0.097
+  length_ratio_to_max       in-range         0.395         [0.29,1.00]  0.196  0.091
+  horizontal_direction      in-range         2.000         [1.00,2.00]  0.095  0.064
+  vertical_direction        in-range         1.000         [1.00,2.00]  0.095  0.064
+
+── SUBSTITUTE [Vector]  node_subst_cost = 0.507  (0 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  length_ratio_to_max       in-range         0.608         [0.44,1.00]  0.228  0.168
+  angle_with_ox             in-range         0.833         [0.44,1.00]  0.229  0.137
+  normalized_y              in-range        -0.100        [-0.40,0.20]  0.214  0.071
+  horizontal_direction      in-range         1.000         [1.00,2.00]  0.090  0.060
+  vertical_direction        in-range         1.000         [1.00,2.00]  0.090  0.060
+  normalized_x              in-range         0.300        [-0.30,0.60]  0.150  0.011
+
+── DELETE (image) [Vector|VerticalVector|VerticalVector] cost 0.25 (unmatched — structural difference, not a feature mismatch)
+
+── DELETE (image) [Vector|HorizontalVector|HorizontalVector] cost 0.25 (unmatched — structural difference, not a feature mismatch)
+
+── SUBSTITUTE [Vector]  node_subst_cost = 0.343  (0 OUT-of-range × 1.0 dominate; residual +0.000) ──
+  feature                   kind             image    concept[min,max]    wgt   cost
+  normalized_x              in-range        -0.700        [-0.70,0.40]  0.134  0.122
+  length_ratio_to_max       in-range         0.436         [0.30,1.00]  0.203  0.098
+  vertical_direction        in-range         2.000         [1.00,2.00]  0.097  0.064
+  angle_with_ox             in-range         0.222         [0.00,0.50]  0.269  0.040
+  normalized_y              in-range         0.500         [0.10,0.80]  0.201  0.019
+  horizontal_direction      in-range         2.000         [2.00,2.00]  0.097  0.000
