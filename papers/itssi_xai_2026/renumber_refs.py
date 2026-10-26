@@ -38,17 +38,29 @@ SOURCES: dict[str, tuple[str, tuple[str, ...]]] = {
     "rudin": ("Rudin, C. (2019)", ("Rudin (2019)",)),
     "rajabi": ("Rajabi, E., Etminani", ("(Rajabi and Etminani, 2024)",)),
     "han": ("Han, K., Wang", ("(Han et al., 2022)",)),
-    "chatbri": ("Chatbri, H.", ("Chatbri et al. (2016)",)),
-    "shen": ("Shen, W., Jiang", ("Shen et al. (2016)",)),
-    "conte": ("Conte, D., Foggia", ("Conte et al. (2004)",)),
+    "chatbri": (
+        "Chatbri, H.",
+        ("Chatbri et al. (2016)", "(Chatbri et al., 2016)"),
+    ),
+    "shen": ("Shen, W., Jiang", ("Shen et al. (2016)", "(Shen et al., 2016)")),
+    "conte": (
+        "Conte, D., Foggia",
+        ("Conte et al. (2004)", "(Conte et al., 2004)"),
+    ),
     "riesen": (
         "Riesen, K., Bunke",
         ("(Riesen and Bunke, 2009)", "Riesen and Bunke (2009)"),
     ),
-    "wang": ("Wang, R., Zhang", ("Wang et al. (2021)",)),
+    "wang": (
+        "Wang, R., Zhang",
+        ("Wang et al. (2021)", "(Wang et al., 2021)"),
+    ),
     "snell": ("Snell, J., Swersky", ("(Snell et al., 2017)",)),
     "finn": ("Finn, C., Abbeel", ("(Finn et al., 2017)",)),
-    "lake": ("Lake, B., Salakhutdinov", ("Lake et al. (2015)",)),
+    "lake": (
+        "Lake, B., Salakhutdinov",
+        ("Lake et al. (2015)", "(Lake et al., 2015)"),
+    ),
     "hinton": ("Hinton, G. (2022)", ("(Hinton, 2022)",)),
     "nawaz": ("Nawaz, U.", ("(Nawaz et al., 2025)",)),
     "parzhyn_energy": ("Parzhyn, Y., Lapin", ("(Parzhyn et al., 2025)",)),
@@ -60,7 +72,10 @@ SOURCES: dict[str, tuple[str, tuple[str, ...]]] = {
     ),
     "lapin_isl": ("Invariant structural learning", ("(Lapin et al., 2026)",)),
     "zhang": ("Zhang, T., Suen", ("(Zhang and Suen, 1984)",)),
-    "fritzke": ("Fritzke, B. (1995)", ("(Growing Neural Gas, GNG; Fritzke, 1995)",)),
+    "fritzke": (
+        "Fritzke, B. (1995)",
+        ("Growing Neural Gas (GNG; Fritzke, 1995)",),
+    ),
     "douglas": ("Douglas, D., Peucker", ("(Douglas and Peucker, 1973)",)),
     "lecun": ("LeCun, Y., Bottou", ("(LeCun et al., 1998)",)),
     "baniecki": (
@@ -95,10 +110,26 @@ SOURCES: dict[str, tuple[str, tuple[str, ...]]] = {
     "dong": ("Dong, Y., Wu", ("Dong et al. (2026)", "(Dong et al., 2026)")),
     "ji": ("Ji, Z., Wei", ("Ji et al. (2026)", "(Ji et al., 2026)")),
     "ghader": ("Ghader, M.", ("Ghader et al. (2026)", "(Ghader et al., 2026)")),
+    "wilson": ("Wilson, E. (1927)", ("(Wilson, 1927)",)),
+    "belongie": (
+        "Belongie, S.",
+        ("Belongie et al. (2002)", "(Belongie et al., 2002)"),
+    ),
+    "dutta": (
+        "Dutta, A., Sahbi",
+        ("Dutta and Sahbi (2019)", "(Dutta and Sahbi, 2019)"),
+    ),
+    "xu": (
+        "Xu, M., Mestetskiy",
+        ("Xu and Mestetskiy (2025)", "(Xu and Mestetskiy, 2025)"),
+    ),
+    "li": ("Li, O., Liu", ("Li et al. (2018)", "(Li et al., 2018)")),
+    "nauta": ("Nauta, M.", ("Nauta et al. (2023)", "(Nauta et al., 2023)")),
 }
 
 # Multi-source parentheticals: literal -> member keys, in printed order.
 GROUPS: dict[str, tuple[str, ...]] = {
+    "(Chatbri et al., 2016; Shen et al., 2016)": ("chatbri", "shen"),
     "(Baniecki and Biecek, 2024; Bello et al., 2025)": ("baniecki", "bello"),
     "(Forest et al., 2025; Sovatzidi et al., 2026; García-Cuesta et al., 2025)": (
         "forest",
@@ -212,6 +243,46 @@ NEW_REFS: dict[str, str] = {
         "2(36), pp. 70–94. DOI: "
         "https://doi.org/10.30837/2522-9818.2026.2.070"
     ),
+    "wilson": (
+        "Wilson, E. (1927), \"Probable inference, the law of succession, "
+        "and statistical inference\", *Journal of the American Statistical "
+        "Association*, Vol. 22, No. 158, pp. 209–212. DOI: "
+        "https://doi.org/10.1080/01621459.1927.10502953"
+    ),
+    "belongie": (
+        "Belongie, S., Malik, J., Puzicha, J. (2002), \"Shape matching and "
+        "object recognition using shape contexts\", *IEEE Transactions on "
+        "Pattern Analysis and Machine Intelligence*, Vol. 24, No. 4, pp. "
+        "509–522. DOI: https://doi.org/10.1109/34.993558"
+    ),
+    "dutta": (
+        "Dutta, A., Sahbi, H. (2019), \"Stochastic graphlet embedding\", "
+        "*IEEE Transactions on Neural Networks and Learning Systems*, "
+        "Vol. 30, No. 8, pp. 2369–2382. DOI: "
+        "https://doi.org/10.1109/TNNLS.2018.2884700"
+    ),
+    "xu": (
+        "Xu, M., Mestetskiy, L. (2025), \"An approach to searching for "
+        "hieroglyphs in Chinese manuscript archives based on morphological "
+        "analysis\", *The International Archives of the Photogrammetry, "
+        "Remote Sensing and Spatial Information Sciences*, Vol. "
+        "XLVIII-2/W9-2025, pp. 283–288. DOI: "
+        "https://doi.org/10.5194/isprs-archives-XLVIII-2-W9-2025-283-2025"
+    ),
+    "li": (
+        "Li, O., Liu, H., Chen, C., Rudin, C. (2018), \"Deep learning for "
+        "case-based reasoning through prototypes: a neural network that "
+        "explains its predictions\", *Proceedings of the AAAI Conference "
+        "on Artificial Intelligence*, Vol. 32, No. 1. DOI: "
+        "https://doi.org/10.1609/aaai.v32i1.11771"
+    ),
+    "nauta": (
+        "Nauta, M., Schlötterer, J., van Keulen, M., Seifert, C. (2023), "
+        "\"PIP-Net: patch-based intuitive prototypes for interpretable "
+        "image classification\", *2023 IEEE/CVF Conference on Computer "
+        "Vision and Pattern Recognition (CVPR)*, pp. 2744–2753. DOI: "
+        "https://doi.org/10.1109/CVPR52729.2023.00269"
+    ),
 }
 
 # Narrative literals keep the author name and replace only the year paren.
@@ -280,8 +351,8 @@ def resolve_reference_texts() -> dict[str, str]:
 
 
 def marker_for(literal: str, number: int) -> str:
-    if literal.startswith("(Growing Neural Gas"):
-        return f"(Growing Neural Gas, GNG) [{number}]"
+    if literal.startswith("Growing Neural Gas ("):
+        return f"Growing Neural Gas (GNG) [{number}]"
     if literal.startswith("("):
         return f"[{number}]"
     m = _NARRATIVE_RE.match(literal)
@@ -290,11 +361,27 @@ def marker_for(literal: str, number: int) -> str:
     return f"{m.group('name')} [{number}]"
 
 
+def join_numbers(numbers: list[int]) -> str:
+    """Join with ", "; a run of three or more consecutive numbers becomes a-b."""
+    parts: list[str] = []
+    i = 0
+    while i < len(numbers):
+        j = i
+        while j + 1 < len(numbers) and numbers[j + 1] == numbers[j] + 1:
+            j += 1
+        if j - i >= 2:
+            parts.append(f"{numbers[i]}–{numbers[j]}")
+        else:
+            parts.extend(str(n) for n in numbers[i:j + 1])
+        i = j + 1
+    return ", ".join(parts)
+
+
 def build_markers(order: list[str]) -> list[tuple[str, str]]:
     number = {key: i for i, key in enumerate(order, 1)}
     pairs: list[tuple[str, str]] = []
     for group, members in GROUPS.items():
-        joined = ", ".join(str(number[m]) for m in members)
+        joined = join_numbers([number[m] for m in members])
         pairs.append((group, f"[{joined}]"))
     for key, (_, literals) in SOURCES.items():
         for literal in literals:

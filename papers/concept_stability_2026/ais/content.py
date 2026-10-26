@@ -242,12 +242,15 @@ SECTIONS = [
      "(dead-letter queue) and 8,685 were classified, with accuracy 91.13%, "
      "precision 91.92%, recall 91.13%, and F1 91.34% over the classified set. "
      "Counting every submission in the denominator yields the end-to-end "
-     "accuracy 7,915/8,707 = 90.90%. Throughout the paper we keep both readings "
+     "accuracy 7,915/8,707 = 90.90%, that is, 792 failures: 770 among the "
+     "classified images and the 22 dead-letter submissions. "
+     "Throughout the paper we keep both readings "
      "apart: *conditional* accuracy is measured over classified images, "
      "*end-to-end* accuracy over everything submitted. Fig. 1 shows the "
      "confusion structure. The largest confusion pairs are 2→7 (111), "
      "4→7 (62), 2→6 (57), 4→1 (52), and 9→4 (46); classes 2 "
-     "(215 errors) and 4 (155 errors) dominate the error mass."),
+     "(214 errors) and 4 (152 errors) dominate the error mass of the "
+     "classified set."),
    ("fig", "confusion_matrix.png", 1,
     "Confusion matrix of the 91.13% baseline on the complete-only MNIST test "
     "subset (8,685 classified images, 13 concepts)", "column"),

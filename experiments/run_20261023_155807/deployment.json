@@ -1,0 +1,8 @@
+{
+  "code_commit": "a25d24a",
+  "classification_env": {"CLASSIFICATION_RANGE_GATE_REL_WIDTH": 0.0, "GED_TIMEOUT": 15},
+  "instances": {"skeletonization": 4, "contour_analysis": 4, "classification": 16},
+  "concepts_retrained_by": "src/training/retrain_all_concepts.py, experiments/timing_20261023_152531",
+  "train_corpus": "datasets.zip (commit f292d11): datasets/train, 869 PNG",
+  "image_nodes_kept_in_neo4j": true
+}
