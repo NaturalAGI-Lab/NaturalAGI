@@ -56,8 +56,9 @@ ABSTRACT = [
      "higher raw similarity, and 125 because the complexity prior reverses a "
      "true-class lead. Traced cases show where each mechanism starts: "
      "skeleton pruning that removes a stroke end, a spur that gives a zero "
-     "the topology of a six, and a prior term larger than the similarity "
-     "gap."),
+     "the topology of a six, a junction of an open four lost in graph "
+     "construction, deletions cheaper than missed feature ranges, and a "
+     "prior term larger than the similarity gap."),
     ("Conclusions.", "Formation settles within tens of samples, and a "
      "stopping rule must watch structure and envelopes separately. Most "
      "errors originate before scoring, in graph construction and in the "
@@ -458,9 +459,59 @@ SECTIONS = [
      "decides wherever the similarity cannot separate two concepts, and "
      "whether it decides correctly depends on which of the two is the "
      "richer one."),
-   ("h2", "Class 4"),
-   ("p", "[Trace of one 4→1 gate error and one 4→7 error to be added after "
-     "the Neo4j check; task 3 of the plan.]"),
+   ("h2", "Class 4: a lost junction and a cheaper small concept"),
+   ("p", "Class 4 gives 209 of the 820 wrong-class answers, second only to "
+     "class 2 with 216, through both gate and similarity. Image mnist_test_4_00755 is an "
+     "open 4 classified as 1_1 (Fig. 8). No branch was pruned. The "
+     "skeleton has two junctions about 24 px apart, one where the left stroke "
+     "meets the crossbar and one where the crossbar crosses the main "
+     "stroke, but the graph keeps a single intersection of degree 4 with "
+     "four endpoints and no corner. Concept 4_2 needs a corner, so it is "
+     "rejected with «concept has corner points but image does not». "
+     "Concept 4_1 has an intersection, two corners and no endpoint besides "
+     "S. Endpoint reduction strips the image branches until no endpoint "
+     "remains and takes the intersection with them, so 4_1 is rejected "
+     "with «concept has intersection points but image does not». Only "
+     "1_1, 7_1 and 1_3 reach comparison. 1_3 leads on raw similarity "
+     "(0.6489 against 0.5973 and 0.5815), and the prior moves 1_1 to the "
+     "top with an adjusted score of 0.9515."),
+   ("p", "This image is typical of its pair. All 40 gate errors 4→1 carry "
+     "the same two messages, 39 of their graphs have no corner point, 28 "
+     "have exactly four endpoints and one intersection, and 11 have five "
+     "endpoints and one intersection; 1_1 wins 37 of them and 1_3 the "
+     "other 3. The same pair of messages rejects class 4 in 35 of the 36 "
+     "gate errors 4→7. Here the class is lost before scoring, and the "
+     "prior only picks among wrong concepts."),
+   ("fig", "anatomy/case6_pipeline.png", 8,
+    "mnist_test_4_00755: the two junctions of the skeleton become one "
+    "intersection I of degree 4, and the graph has no corner point", "full"),
+   ("p", "The similarity errors 4→7 show the opposite case: the image has "
+     "the right topology and still loses. Image mnist_test_4_00487 has "
+     "three endpoints, one corner and one intersection, the point "
+     "composition of concept 4_2, as do 21 of the 44 similarity errors "
+     "4→7. Under 4_2 preprocessing only turns one endpoint into S. GED "
+     "substitutes all nine nodes without a deletion or a label mismatch, "
+     "but eight features fall outside their ranges on four nodes, and "
+     "these four substitutions cost 1.4948 to 3.0611 each. GED is 10.6695 "
+     "and similarity 0.6144 (Fig. 9). Under 7_1 preprocessing removes the "
+     "branch above the intersection, the intersection becomes a corner, "
+     "and GED deletes two more nodes and three edges at 0.25 each. GED is "
+     "4.4255 with two out-of-range features, and similarity 0.7460. The "
+     "prior gives 4_2 0.0917 more than 7_1, less than the raw gap of "
+     "0.1316, and 7_1 wins with 1.0630 against 1.0231."),
+   ("p", "In every one of the 44 similarity errors 4→7 the winner is 7_1 "
+     "and the best class-4 concept is 4_2, with median similarities of "
+     "0.7428 and 0.6025. Under 7_1 none of the 44 pays a label mismatch, "
+     "and all 21 images with the composition of 4_2 are matched by five "
+     "substitutions and two deletions. Preprocessing for a smaller concept "
+     "cuts the image down to that concept, and a deletion costs less than "
+     "a node whose features miss the ranges. A smaller concept that "
+     "discards what does not fit then beats the correct concept that has "
+     "to match every node."),
+   ("fig", "anatomy/case8_matching.png", 9,
+    "mnist_test_4_00487: node matching under 4_2 (top, eight out-of-range "
+    "features on four nodes) and under 7_1 (bottom, two deleted nodes)",
+    "column"),
    ("h2", "The dominant pair 2→7"),
    ("p", "The pair 2→7 is the largest and the one we have studied longest "
      "[@lapin2026dessert]. In the 91.13% configuration it held 111 "
@@ -486,15 +537,18 @@ SECTIONS = [
   "blocks": [
    ("p", "**Where corrections belong.** The three mechanisms point to "
      "different parts of the system. Gate errors (38.0%) are decided "
-     "before any cost is computed. The traced case shows a front-end step, "
-     "pruning, removing a stroke end that the true concept requires; the "
-     "100 class-4 gate errors with neither corners nor intersections after "
-     "preprocessing call for the same kind of trace. Changing cost weights "
+     "before any cost is computed. The traced cases show front-end steps "
+     "removing what the true concept requires: pruning cuts the end of a "
+     "2, and graph construction merges the two junctions of an open 4 "
+     "into one, which leaves no corner for 4_2. Changing cost weights "
      "cannot repair these answers, because the true concept never receives "
      "a cost. Similarity errors (46.7%) include cases such as the zero "
      "with a spur, where the image graph genuinely has the topology of "
      "the predicted class; there the remedy is in graph construction, not "
-     "in scoring. Prior errors (15.2%) are the only group that a change of "
+     "in scoring. In the 4→7 errors the topology is right, and the loss "
+     "comes from preprocessing that cuts the image down to a smaller "
+     "concept at deletion costs below the cost of missed ranges; that part "
+     "is a scoring question. Prior errors (15.2%) are the only group that a change of "
      "the ranking rule could reverse directly, and the same rule rescues "
      "other answers, so any change has to be measured on both sides."),
    ("p", "**Stability and the theory.** The convergence markers agree with "
@@ -538,8 +592,9 @@ SECTIONS = [
      "mechanisms: the true concept never reaches comparison (312), it "
      "loses on similarity (383), or it leads on similarity and loses "
      "through the complexity prior (125). Traced cases tie each mechanism "
-     "to a step: skeleton pruning, a spur that changes the topology, and a "
-     "prior term larger than the similarity gap."),
+     "to a step: skeleton pruning, a spur that changes the topology, a "
+     "junction lost in graph construction, deletions cheaper than missed "
+     "feature ranges, and a prior term larger than the similarity gap."),
    ("p", "**Prospects.** The census sets the order of work. The class-4 gate "
      "errors and the pruning rule come first, since they remove the true "
      "concept from competition. The ranking prior should be revised only "
@@ -784,7 +839,9 @@ UA_ABSTRACT = [
      "сиру подібність, і 125 – тому, що поправка на складність перевертає "
      "перевагу концепту істинного класу. Простежені випадки показують, де "
      "починається кожен механізм: обрізання скелета, що прибирає кінець "
-     "штриха, відросток, що надає нулю топологію шістки, і доданок поправки, "
+     "штриха, відросток, що надає нулю топологію шістки, вузол розгалуження "
+     "відкритої четвірки, втрачений під час побудови графа, вилучення "
+     "вузлів, дешевші за вихід ознак за межі діапазонів, і доданок поправки, "
      "більший за різницю подібностей."),
     ("Висновки.", "Формування стабілізується за десятки прикладів, і "
      "правило зупинки має окремо стежити за структурою та оболонками. "
