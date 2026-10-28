@@ -530,7 +530,7 @@ SECTIONS = [
  {
   "title": "Results of the Current System Version",
   "blocks": [
-   ("p", "K. Perevoznyk rebuilt the classifier without the two constants "
+   ("p", "The current version of the classifier drops the two constants "
      "that had been fitted to the test set: the prior weight λ = 0.10 in "
      "(2) and a width gate of 0.33 that compares an envelope with the "
      "spread of the same feature over the concepts of all classes. Every "
