@@ -3,6 +3,7 @@
 # Copies <dir> to the GPU PC, runs the command there in tmux session <job> and streams its log live.
 # The command runs inside the copy of <dir> and writes its results into out/. When it ends, out/ and
 # logs/ (run.log, exit) are copied back into <dir>, and the script exits with the command's exit code.
+# Windows stays awake from the upload until the copy-back ends.
 # Host: ${PC_HOST:-gd-wsl}. Remote folder: ${PC_JOBS:-naturalagi-jobs}/<job> under the PC's $HOME.
 set -eu
 
@@ -48,6 +49,13 @@ esac
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/pc-run.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
+
+# Windows sleeps after 30 minutes without keyboard or mouse input, so it went down the moment the job's own
+# gd-awake let go, before the copy-back. This second gd-awake spans the whole run: its remote cat reads fd 4
+# of this script and ends, letting Windows go, when the script exits however it exits.
+mkfifo "$work/awake"
+ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=3 "$host" '$HOME/.local/bin/gd-awake cat > /dev/null' < "$work/awake" &
+exec 4> "$work/awake"
 
 quoted=""
 for arg in "$@"; do
