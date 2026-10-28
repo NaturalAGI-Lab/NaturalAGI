@@ -63,8 +63,13 @@ PARAMS ?= {}
 # Energy minimization option (default: true)
 USE_ENERGY_MINIMIZATION ?= true
 
+# GPU box: Windows PC, WSL2, RTX 3080 Ti 12 GB
+PC_HOST ?= gd-wsl
+PC_WAKE ?= gd-wake
+PC_SLEEP ?= gd-sleep
+
 # Phony targets
-.PHONY: all deploy unpack_dataset repack_dataset train classify send_random_image clean docker_clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes
+.PHONY: all deploy unpack_dataset repack_dataset train classify send_random_image clean docker_clean help start_services create_kafka_topics list_kafka_topics send_to_connector create_neo4j_indexes list_neo4j_indexes pc_wake pc_sleep pc_status pc_run
 
 # Kafka-related targets
 .PHONY: create_kafka_topics list_kafka_topics
@@ -263,6 +268,20 @@ dashboard:
 formation_viz:
 	cd src/concept_creator && ../../$(PYTHON) -m streamlit run visualization/formation_viz_app.py --server.port 8502
 
+pc_wake:
+	@$(PC_WAKE)
+
+pc_sleep:
+	@$(PC_SLEEP)
+
+pc_status: pc_wake
+	@ssh $(PC_HOST) 'nvidia-smi --query-gpu=name,memory.used,memory.total,utilization.gpu --format=csv,noheader; tmux ls 2>/dev/null || echo "no tmux sessions"'
+
+# Usage: make pc_run JOB=name DIR=path CMD='command args'
+# A compound command needs bash -c, and make eats a single $, so write $$: CMD="bash -c 'cd src && python run.py > ../out/r.txt'"
+pc_run: pc_wake
+	@PC_HOST=$(PC_HOST) scripts/pc_run.sh "$(JOB)" "$(DIR)" $(CMD)
+
 help:
 	@echo "Available targets:"
 	@echo "  all                - Deploy functions, create Kafka topics, and run training (default)"
@@ -279,6 +298,10 @@ help:
 	@echo "  docker_clean       - Remove dangling volumes, build cache, and stale Nuclio images"
 	@echo "  unpack_dataset     - Unpack datasets.zip (skips if already unpacked)"
 	@echo "  repack_dataset     - Rebuild datasets.zip from current datasets/ (then git add)"
+	@echo "  pc_wake            - Wake the GPU PC and wait for ssh"
+	@echo "  pc_sleep           - Put the GPU PC to sleep"
+	@echo "  pc_status          - Show GPU use and tmux sessions on the GPU PC"
+	@echo "  pc_run             - Run a job on the GPU PC (JOB=name DIR=path CMD='command args')"
 	@echo "  help               - Show this help message"
 	@echo "  send_to_connector  - Send data to connector (OPERATION=train|classify, CONCEPT_NAME=name)"
 	@echo ""
@@ -287,6 +310,7 @@ help:
 	@echo "  INSTANCES_CONTOUR   - Number of contour analysis instances (default: 2)"
 	@echo "  INSTANCES_CLASSIFICATION - Number of classification instances (default: 5)"
 	@echo "  USE_ENERGY_MINIMIZATION - Use energy minimization for concept formation (default: true)"
+	@echo "  PC_HOST             - ssh host of the GPU PC (default: gd-wsl)"
 	@echo ""
 	@echo "Example: make deploy INSTANCES_SKEL=1 INSTANCES_CONTOUR=2 INSTANCES_CLASSIFICATION=5"
 
