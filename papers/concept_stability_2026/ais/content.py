@@ -1,69 +1,73 @@
-"""Content of the AIS submission, ported from ../main.tex.
+"""Content of the AIS submission (NIK-369).
 
 Inline markup understood by build_docx.py:
     **bold**  *italic*  <sub>x</sub>  <sup>x</sup>
 
-Cross-references that LaTeX resolved by \\ref are written out by name here,
-because AIS prints unnumbered section headings.
+Citations are written as [@key] or [@key1, @key2]. At import time they are
+numbered in order of first appearance and REFERENCES is built in that order.
+
+Sources of every number:
+  stability   src/training/training_results/formation_probes/ (convergence,
+              sample_count), run_20260717_* exports, supervisor_program_2026_07
+  errors      experiments/run_20261023_155807 and the PhD vault
+              raw/analyses/itssi_xai_2026/traces_20261023/verification/
 """
+import re
 
 UDC = "UDC 004.93'1:004.932:004.032.26"
 
-TITLE = ("ERROR ANATOMY AND STABILITY OF STRUCTURAL CONCEPT FORMATION "
-         "IN A GRAPH-BASED CLASSIFIER WITHOUT BACKPROPAGATION")
+TITLE = ("FORMATION STABILITY AND ERROR MECHANISMS OF A GRAPH CONCEPT "
+         "CLASSIFIER TRAINED WITHOUT BACKPROPAGATION")
 
-AUTHORS = "Mykyta Lapin"
+AUTHORS = ("Mykyta Lapin<sup>1</sup>, Kostiantyn Bokhan<sup>1</sup>, "
+           "Yurii Parzhyn<sup>2</sup>, Kyrylo Perevoznyk<sup>1</sup>, "
+           "Tetiana Aleksandrova<sup>1</sup>")
 
 AFFILIATIONS = [
-    'National Technical University "Kharkiv Polytechnic Institute", '
-    "Kharkiv, Ukraine",
+    '<sup>1</sup> National Technical University "Kharkiv Polytechnic '
+    'Institute", Kharkiv, Ukraine',
+    "<sup>2</sup> Augusta University, Augusta, USA",
 ]
 
 ABSTRACT = [
-    ("Relevance.", "Structural classifiers that form explicit graph concepts "
-     "promise interpretable decisions, but their failure modes and the "
-     "stability of their concept formation receive little of the scrutiny "
-     "given to accuracy benchmarks. Both questions matter more for structural "
-     "classifiers than for weight-based ones precisely because the internal "
-     "representation claims semantic meaning."),
-    ("The object of research", "is a non-backpropagation classifier that "
-     "converts images into attributed bipartite skeleton graphs, forms "
-     "per-class concept attractors by iterative critical-point reduction, and "
-     "decides by winner-take-all competition over graph-similarity scores, "
-     "reaching 91.13% accuracy on classified images of the complete-contour "
-     "MNIST test subset (90.90% counting pipeline failures)."),
-    ("The subject of the research", "is the origin of the classifier's "
-     "dominant confusion and the stability of its concept-formation process "
-     "with respect to sample presentation order, sample count, and reduction "
-     "depth."),
-    ("The purpose of this paper", "is to localize the cause of the dominant "
-     "error stage by stage in the processing pipeline, to test by ablation "
-     "whether any downstream parameter can repair it, and to characterize how "
-     "reproducible, how compact, and how quickly converging the learned "
-     "concepts are."),
-    ("Research Results.", "The dominant confusion, digit 2 predicted as 7, "
-     "traces to the representation front end: at the run's binarization "
-     "threshold, the topological hole of the digit's lower-left loop is "
-     "already missing from the binarized image in 110 of 111 cases — the "
-     "loop is drawn open in the handwriting, or its small interior is flooded "
-     "by a thick stroke. Ablations exclude the complexity pre-filter and the "
-     "ranking prior as remedies; whether the similarity function itself should "
-     "still separate the impoverished graphs remains an open design question. "
-     "Five exploratory stability studies then characterize formation: node "
-     "counts are invariant to sample-presentation order for three probed "
-     "concepts, node and edge counts freeze within tens of samples for all "
-     "thirteen concepts while the parameter envelope keeps widening, the "
-     "concepts generalize to uncurated MNIST splits at reduced accuracy, and "
-     "concepts store 91.9× fewer nodes than the training graphs they "
-     "consume."),
-    ("Conclusions.", "For this dominant confusion the bottleneck sits in the "
-     "image-to-graph front end, upstream of concept formation, and the "
-     "concepts the system learns are compact and largely reproducible."),
+    ("Relevance.", "When every class of a classifier is kept as an explicit "
+     "graph, each step of a decision is open to inspection, but two questions decide whether that "
+     "inspection is worth anything: when does a stored class stop changing "
+     "as training samples arrive, and can every wrong answer be traced to "
+     "the stage that produced it."),
+    ("The object of research", "is a handwritten-digit classifier trained "
+     "without backpropagation. Each image becomes a skeleton graph with "
+     "attributes; the graphs of a subclass are merged by reduction into one "
+     "concept graph, "
+     "and decides by a similarity derived from graph edit distance plus a "
+     "prior on concept complexity."),
+    ("The subject of the research", "is the stabilization of concept graphs "
+     "during formation and the mechanisms that produce misclassifications."),
+    ("The purpose of this paper", "is to measure how early concepts stop "
+     "changing and what more samples do to them, and to assign every "
+     "wrong-class answer of a test run to the decision step that caused it."),
+    ("Research Results.", "Across thirteen concepts the node and edge counts "
+     "stop changing after 1 to 37 training files, while the coordinate "
+     "envelopes settle on a separate schedule; more samples give a smaller "
+     "graph with wider envelopes. Concepts keep 106 nodes out of 9,738 in "
+     "the 869 training graphs. Of 820 wrong-class answers on 8,683 classified "
+     "complete-contour MNIST test images, 312 arise because no concept of "
+     "the true class reaches comparison, 383 because the winner has the "
+     "higher raw similarity, and 125 because the complexity prior reverses a "
+     "true-class lead. Traced cases show where each mechanism starts: "
+     "skeleton pruning that removes a stroke end, a spur that gives a zero "
+     "the topology of a six, and a prior term larger than the similarity "
+     "gap."),
+    ("Conclusions.", "Formation settles within tens of samples, and a "
+     "stopping rule must watch structure and envelopes separately. Most "
+     "errors originate before scoring, in graph construction and in the "
+     "structural check, so the next corrections belong there rather than in "
+     "the cost weights."),
 ]
 
 KEYWORDS = ("structural pattern recognition; graph edit distance; concept "
-            "formation; few-shot learning; skeletonization; explainable AI; "
-            "MNIST")
+            "formation; explainable artificial intelligence; error analysis; "
+            "handwritten digit recognition; learning without backpropagation")
 
 # --------------------------------------------------------------------------
 # Body
@@ -73,490 +77,159 @@ SECTIONS = [
  {
   "title": "Introduction",
   "blocks": [
-   ("p", "Most modern image classifiers optimize millions of weights by "
-     "backpropagation and explain their decisions only post hoc. An "
-     "alternative line of work encodes images as attributed graphs and learns "
-     "explicit structural *concepts* whose nodes, edges, and parameter ranges "
-     "remain human-readable [1–3]. In our system, an image is skeletonized "
-     "into a bipartite graph of critical points and connecting segments, "
-     "per-class concepts are formed by iterative graph reduction without "
-     "gradient descent, and classification is a winner-take-all (WTA) "
-     "competition in which concepts are scored by an attribute-weighted "
-     "graph-similarity measure derived from graph edit distance (GED) [4, 5] "
-     "and ranked by that score plus a prior favoring the more complex concept. "
-     "The approach was introduced in [3], which reports ≈82% accuracy from "
-     "five to six samples per class; in the configuration studied here it "
-     "reaches 91.13% accuracy on the complete-contour subset of the MNIST test "
-     "set [6] with only 13 concepts formed from 869 training samples, which "
-     "derive from 85 unique source images, and every concept parameter "
-     "inspectable."),
-   ("p", "Accuracy alone, however, says little about why such a system fails "
-     "when it fails, and whether the concepts it forms are stable artifacts or "
-     "accidents of training order and sample choice. Both questions matter more "
-     "for structural classifiers than for weight-based ones precisely because "
-     "the internal representation claims semantic meaning: a concept that "
-     "changes with presentation order, or an error whose cause cannot be "
-     "located in the pipeline, would undermine the interpretability argument "
-     "itself."),
-   ("p", "This paper answers both questions empirically. Our contributions are "
-     "the following."),
-   ("p", "**An anatomy of the dominant error.** The most frequent confusion of "
-     "the baseline (true digit 2 predicted as 7; 111 of 792 failures, 14.0% of "
-     "the error mass) superficially contradicts the WTA design: the concept for "
-     "class 2 is more complex than the one for class 7, so it should win when "
-     "it matches. We trace all 111 cases through the production scoring code, "
-     "localize the anchor-point loss stage by stage (binarized mask: 110 of "
-     "111; vectorization: 1 of 111; reduction and inference: 0), exclude the "
-     "complexity pre-filter and the ranking prior by direct ablation, and "
-     "verify the cost implementation by replay; the suitability of the "
-     "similarity projection itself remains open."),
-   ("p", "**Five exploratory stability studies of concept formation**, covering "
-     "generalization to other MNIST splits, sample-order dependence (three "
-     "concepts, ten orders), sample-count dependence (three draws per "
-     "condition), reduction convergence, and storage compression, each with its "
-     "scope stated."),
-   ("p", "**A diagnosis with design consequences**: the dominant error cluster "
-     "originates in the representation front end and resists every "
-     "parameter-level downstream repair we tested, while the formation process "
-     "itself is largely order-invariant, freezes node and edge counts after few "
-     "samples in all thirteen concepts, and compresses input structure by "
-     "91.9× in nodes and 50.6× in stored values under the counting "
-     "convention of the compression study."),
-   ("p", "All analyses run on the production code paths, with no "
-     "re-implemented scoring."),
+   ("p", "**Problem statement.** Image classifiers trained by gradient "
+     "descent reach high accuracy but hold what they learn in weights that "
+     "no one can read. Post hoc explanations of such models describe the "
+     "model only approximately, and for decisions that need an audit an "
+     "inherently readable model is the safer choice [@rudin2019, "
+     "@rudin2022]. Our group develops one such model: a classifier that "
+     "stores each digit subclass as an attributed graph, forms that graph "
+     "by structural reduction of a few training graphs, and decides by "
+     "graph matching [@lapin2025asu, @parzhyn2025ais, @lapin2026itssi]. "
+     "Every node, edge and parameter range of a concept can be printed and "
+     "checked."),
+   ("p", "Readability alone does not make the model trustworthy. Two "
+     "properties still have to be measured. The first is stability: a "
+     "concept that keeps changing with every new sample cannot serve as a "
+     "fixed reference, and the theory behind the model claims that a "
+     "concept converges to an attractor in a bounded number of steps "
+     "[@lapin2026itssi]. The second is accountability of errors: if the "
+     "model is readable, each wrong answer should be traceable to the step "
+     "where it arose, and the errors as a whole should split into causes "
+     "that point to specific corrections."),
+   ("p", "Our earlier reports give accuracy and explain single decisions. "
+     "On MNIST test images whose contours are complete [@lecun1998] the "
+     "system decides 91.13% of the classified images correctly with 13 "
+     "concepts [@lapin2026dessert]. They trace the most frequent confusion, "
+     "a 2 read as a 7, to the binarized image, but they do not measure "
+     "formation over time and do not account for the remaining errors. "
+     "This paper closes both gaps."),
   ],
  },
  {
   "title": "Analysis of Recent Research and Publications",
   "blocks": [
-   ("p", "**Graph matching and GED.** Pattern recognition has used graphs as a "
-     "structural representation since the late 1970s [7], with graph edit "
-     "distance providing the standard error-tolerant similarity measure since "
-     "Bunke and Allermann [4]. Because exact GED is NP-hard, practical systems "
-     "rely on approximations such as bipartite matching [8] and its journal "
-     "refinement [5]. Our classifier uses an attribute-weighted, GED-derived "
-     "similarity as its scorer; this paper contributes a measured account of "
-     "how a complete GED-based classifier fails and how stable its learned "
-     "structures are — an analysis the graph-matching literature rarely "
-     "applies to end-to-end systems."),
-   ("p", "**Learning without backpropagation.** Interest in alternatives to "
-     "end-to-end gradient descent ranges from topology-learning networks such "
-     "as Growing Neural Gas [9] to Hinton's forward-forward algorithm [10]. The "
-     "system studied here descends from the modal-vector theory of formal "
-     "intelligence systems [1, 2] and its energy formulation [11]: concepts are "
-     "formed by deterministic graph reduction rather than weight updates. The "
-     "classifier itself was introduced in [3], which reports an earlier, "
-     "smaller-scale result; the present paper analyzes the full baseline and "
-     "supplies the missing error anatomy and stability evidence."),
-   ("p", "**Few-shot and prototype-based learning.** Learning a class from tens "
-     "of examples is the goal of few-shot methods such as prototypical networks "
-     "[12] and model-agnostic meta-learning [13], which position class "
-     "prototypes in a *learned embedding space*. Lake et al. [14] showed that "
-     "compositional, generative structure enables human-level one-shot "
-     "character learning. Our concepts play the prototype role but remain "
-     "explicit attributed graphs whose every node and range is inspectable "
-     "— closer in spirit to [14] than to embedding-based prototypes."),
-   ("p", "**Interpretability and error accountability.** Rudin's argument for "
-     "inherently interpretable models over post-hoc explanations [15] motivates "
-     "our evaluation standard: a model whose internal representation claims "
-     "semantic meaning must also support locating the cause of each error and "
-     "showing that its learned structures survive changes in training order. "
-     "The present work operationalizes that standard for a structural "
-     "classifier."),
+   ("p", "**Graph matching.** Graph edit distance (GED) is the usual "
+     "error-tolerant dissimilarity between attributed graphs. Exact GED is "
+     "NP-hard, and recent work follows two lines: approximations that "
+     "recast it as an assignment problem and compare heuristics on shared "
+     "benchmarks [@bougleux2017, @blumenthal2019], and distances learned "
+     "with graph neural networks [@riba2021]. Both lines judge a method by "
+     "retrieval or classification accuracy on benchmark collections. How a "
+     "complete classifier built on GED fails, error by error, is rarely "
+     "reported."),
+   ("p", "**Interpretable models.** Surveys of explainable artificial "
+     "intelligence separate post hoc explanation of opaque models from "
+     "models that are interpretable by construction [@barredo2020, "
+     "@rudin2022]. Few-shot image models often keep one prototype per "
+     "class, learned as a point in an embedding space by gradient descent "
+     "[@ji2020]. The stability of such a prototype as data accumulates is "
+     "tied to the optimizer and the backbone. A concept that is formed by "
+     "reduction alone, with no gradient step, raises the question of "
+     "convergence directly."),
+   ("p", "**Error analysis.** Aggregate accuracy can hide failures that "
+     "concentrate in a subgroup of inputs [@oakden2020], and deep models "
+     "fail systematically when they rely on shortcut features that do not "
+     "transfer [@geirhos2020]. In both lines the cause of a failure is "
+     "inferred from outside the model. In a structural model the decision "
+     "steps are explicit, so errors can be grouped by the step that "
+     "decided them."),
+   ("p", "**Skeleton graphs of handwriting.** Representing handwritten "
+     "characters as skeleton graphs makes recognition easier to interpret "
+     "[@gan2023], but the graph inherits every defect of the skeleton: "
+     "spurs, broken strokes and merged loops change the topology that later "
+     "stages rely on. Our pipeline builds the graph with a growing neural "
+     "gas over the skeleton [@fritzke1995], so its front end is exposed to "
+     "the same effects."),
+   ("p", "**Unsolved part.** No published study measures when the concept "
+     "graphs of a non-gradient structural classifier stop changing, and "
+     "none splits all errors of such a classifier into mechanisms tied to "
+     "its decision steps."),
   ],
  },
  {
-  "title": "System Overview",
+  "title": "Purpose and Tasks of the Article",
   "blocks": [
-   ("p", "We summarize the pipeline only to the depth needed for the analyses; "
-     "the representation and formation method are described in [3, 11]."),
-   ("h2", "Image-to-graph construction"),
-   ("p", "An input image is binarized (intensity threshold 110–180, "
-     "adaptively retried on disconnection), thinned to a one-pixel skeleton "
-     "[16], and approximated by a Growing Neural Gas network [9] whose output "
-     "polyline is simplified with the Ramer–Douglas–Peucker algorithm "
-     "[17]. The result is an attributed *bipartite* graph: *Point* nodes "
-     "(endpoints, corners, junctions, a start point) alternate with *Vector* "
-     "nodes (line segments carrying length, direction, and quadrant "
-     "attributes). Node coordinates are normalized to a centered [−1, 1] "
-     "system for scale and translation invariance. We define the *complexity* "
-     "of a graph as its total number of nodes plus edges."),
-   ("h2", "Concept formation"),
-   ("p", "For each class, training graphs are merged one at a time into a "
-     "concept by critical-point reduction: shared topology is retained, "
-     "instance-specific branches are reduced, and each surviving node "
-     "accumulates per-feature *ranges* (envelopes) instead of point values. The "
-     "first sample seeds the concept; formation is incremental and uses no "
-     "gradient signal. A class may yield more than one concept (e.g. two "
-     "stylistic variants of the digit); the baseline uses 13 concepts for 10 "
-     "classes, formed from 869 pre-augmented training samples. Those 869 "
-     "samples come from 85 unique source images; the other 784 are geometric "
-     "variants generated offline from them, five to ten variants per source."),
-   ("h2", "Classification"),
-   ("p", "Classification runs three stages before a winner is picked. A "
-     "*complexity pre-filter* first discards every concept whose complexity "
-     "exceeds the image complexity, before any comparison runs, on the "
-     "rationale that a simple image cannot instantiate a more complex concept. "
-     "Each surviving concept is then prepared against its own isolated copy of "
-     "the image graph: the concept's learned centroid direction and expected "
-     "start degree anchor a concept-specific start point in the image, and the "
-     "image graph is reduced by endpoint, intersection, and corner-point "
-     "operations until its critical-point structure is isomorphic to the "
-     "concept's. Every concept therefore scores against a differently anchored "
-     "and differently reduced version of the image. Preparation also enforces "
-     "*structural compatibility gates* for pairings the representation cannot "
-     "support, such as a concept containing intersection points matched against "
-     "an image that has none, or a concept with more corner points than the "
-     "image. A concept that hits a gate, or that cannot be reduced to "
-     "isomorphism within the iteration budget, receives no similarity score at "
-     "all and ranks below every scored concept; that outcome differs from "
-     "scoring low."),
-   ("p", "The prepared pair is then scored by a GED-derived similarity over 13 "
-     "node features. Substitution costs are attribute-weighted, each feature "
-     "weighted inversely to the width of the concept's learned interval "
-     "(ε = 0.1), so a narrow diagnostic range counts for more than a wide "
-     "one. Edit costs are asymmetric: inserting a concept node the image lacks "
-     "costs 6.0, deleting an image node the concept does not account for costs "
-     "0.25, and edge insertion is free, which biases the measure toward "
-     "subgraph containment — whether the image contains the concept. The "
-     "total edit cost *c* becomes a similarity"),
-   ("eq", "*s* = 1 − *c* / (*c* + max(*n*<sub>1</sub>, *n*<sub>2</sub>))",
+   ("p", "The purpose is to measure the stabilization of concept graphs "
+     "during formation and to assign every wrong-class answer of a test run "
+     "to the decision step that caused it. The tasks are:"),
+   ("p", "1) to record, for each concept, when its structure and its "
+     "parameter envelopes stop changing during one formation pass;"),
+   ("p", "2) to measure how structure and envelopes depend on the number of "
+     "training samples, how strongly formation compresses the training "
+     "graphs, and how the concepts transfer to other MNIST splits;"),
+   ("p", "3) to split all wrong-class answers of a test run into mechanisms "
+     "defined by the decision steps, and to trace representative cases of "
+     "each mechanism from pixels to ranking."),
+  ],
+ },
+ {
+  "title": "The Classifier",
+  "blocks": [
+   ("p", "The pipeline is described in detail in [@lapin2026itssi, "
+     "@lapin2026dessert]; this section fixes the terms used below. An "
+     "image of 100 × 100 pixels is binarized at threshold 110 and thinned "
+     "to a one-pixel skeleton. Branches that run from an intersection to a "
+     "free end and are shorter than max(8% of the skeleton length, 5 px) "
+     "are pruned. A growing neural gas places nodes on the skeleton, and "
+     "the result is a graph of points and vectors. Points are labelled as "
+     "endpoints E, corner points C and intersection points I; vectors are "
+     "the stroke segments between them. Thirteen geometric features, "
+     "mapped to [0, 1] when the graph is written, describe each node. The "
+     "complexity of a graph is its number of nodes plus edges."),
+   ("p", "A concept is formed from the training graphs of one subclass. "
+     "Each new graph is reduced to the structure it shares with the "
+     "current concept, and the concept stores, for each feature of each "
+     "node, the range of values seen so far. We call these ranges the "
+     "envelope of the concept. The 13 concepts of this paper cover the ten "
+     "digits; digits 1, 2, 4 and 9 have two subclasses each, of which 1_2 "
+     "and 9_1 are not in use."),
+   ("p", "Classification runs in four steps. The complexity pre-filter drops "
+     "every concept more complex than the image. For each remaining concept "
+     "a preprocessor places a start point S on the image graph and reduces "
+     "its endpoints, intersections and corners towards the concept's "
+     "structure; if this fails, the concept is rejected with a message such "
+     "as «concept has endpoints but image does not». The message describes "
+     "the image graph after this concept-specific preprocessing, not the "
+     "raw image. Accepted concepts are compared by GED with fixed costs: "
+     "deleting an image node or edge costs 0.25, inserting a concept node "
+     "6, substituting nodes of different labels 6, and substituting nodes "
+     "of the same label costs the weighted sum of feature deviations, with "
+     "1 for each feature outside the concept's range. The similarity is"),
+   ("eq", "*s* = 1 − *c* / (*c* + max(*n*<sub>1</sub>, *n*<sub>2</sub>)),",
     "1"),
-   ("p", "normalized by the larger graph, with *n*<sub>i</sub> counting nodes "
-     "plus edges. The winner-take-all step finally ranks the scored concepts by "
-     "the adjusted score"),
-   ("eq", "*ŝ* = *s* + λ log<sub>2</sub> *C*", "2"),
-   ("p", "with λ = 0.10, where *C* is the concept's complexity. This prior "
-     "states the design intent that among concepts which match adequately, the "
-     "more complex one should win: a small concept matches an arbitrary graph "
-     "more easily, so its similarity carries less evidence. The concept at the "
-     "top of this ranking is the winner and its class is the prediction."),
-   ("h2", "Baseline"),
-   ("p", "The reference run (run_20260630_235356; artifacts — "
-     "configuration, metrics, confusion matrix, per-image errors, concept "
-     "graphs — are archived with the code) evaluates the full "
-     "*complete-only* MNIST test subset: 8,704 of the 10,000 test images whose "
-     "contours are complete (unbroken strokes), a restriction discussed in the "
-     "dataset-variant study below. The run log records 8,707 submissions over "
-     "these 8,704 images; 22 submissions failed in skeletonization "
-     "(dead-letter queue) and 8,685 were classified, with accuracy 91.13%, "
-     "precision 91.92%, recall 91.13%, and F1 91.34% over the classified set. "
-     "Counting every submission in the denominator yields the end-to-end "
-     "accuracy 7,915/8,707 = 90.90%, that is, 792 failures: 770 among the "
-     "classified images and the 22 dead-letter submissions. "
-     "Throughout the paper we keep both readings "
-     "apart: *conditional* accuracy is measured over classified images, "
-     "*end-to-end* accuracy over everything submitted. Fig. 1 shows the "
-     "confusion structure. The largest confusion pairs are 2→7 (111), "
-     "4→7 (62), 2→6 (57), 4→1 (52), and 9→4 (46); classes 2 "
-     "(214 errors) and 4 (152 errors) dominate the error mass of the "
-     "classified set."),
-   ("fig", "confusion_matrix.png", 1,
-    "Confusion matrix of the 91.13% baseline on the complete-only MNIST test "
-    "subset (8,685 classified images, 13 concepts)", "column"),
+   ("p", "where *c* is the GED, and *n*<sub>1</sub> and *n*<sub>2</sub> "
+     "count the nodes and edges of the image graph and of the concept "
+     "after preprocessing. Accepted concepts "
+     "are ranked by the adjusted score"),
+   ("eq", "*ŝ* = *s* + λ log<sub>2</sub> *K*,", "2"),
+   ("p", "where *K* is the concept complexity and λ = 0.10. The prior term "
+     "favours the richer concept when two concepts match about equally "
+     "well. The winner names the class."),
   ],
  },
  {
-  "title": "Anatomy of the Dominant Error: Why 2s Fall into 7s",
+  "title": "Stabilization of Concept Formation",
   "blocks": [
-   ("p", "The 2→7 confusion seems to contradict the WTA design. The rich "
-     "concept for class 2 (2_2, complexity 24) is far more complex than the "
-     "concept for class 7 (7_1, complexity 9, the smallest in the system). "
-     "Under WTA with a complexity prior, the rich concept should win whenever "
-     "it genuinely matches. The working hypothesis was that 2_2 never gets to "
-     "compete: the image graph loses critical anchor points during construction "
-     "— before reduction — so the \"2\" arrives at the classifier "
-     "already impoverished."),
-   ("p", "We verified this hypothesis on all 111 misclassified images using the "
-     "production classification orchestrator and cost functions; the offline "
-     "tool reproduced the live prediction for 111/111 images. This replay runs "
-     "the current code tree, not a frozen copy of the June baseline: predicted "
-     "labels agree in all 111 cases, but raw similarity values drifted slightly "
-     "as the scoring code evolved (the primary exemplar's 2_1 similarity reads "
-     "0.7300 in the run log and 0.7469 in the replay), so the similarity values "
-     "reported below are replay values. The mechanism is two-staged, and both "
-     "stages share one root cause. Beyond verifying the hypothesis, we localize "
-     "the loss stage by stage with a topological measurement and ablate the two "
-     "adjustable downstream mechanisms — the complexity pre-filter and the "
-     "ranking prior — individually, testing whether either repair short of "
-     "fixing the input could flip the outcome."),
-   ("h2", "Stage 1: the complexity pre-filter excludes the rich concept"),
-   ("p", "The median complexity of the 111 misclassified \"2\" graphs is 21 "
-     "(range 13–29), below the complexity 24 of 2_2. Consequently the "
-     "pre-filter removes 2_2 from the competition in 86 of 111 cases (77.5%). "
-     "The rich concept does not *lose* the WTA competition — it never "
-     "enters it."),
-   ("p", "The obvious repair — remove or soften the pre-filter — was "
-     "tested by direct ablation: we disabled the pre-filter and scored 2_2 "
-     "against all 111 images with the production scoring code. It wins zero of "
-     "111 cases, and its raw similarity is 0.0 in all of them. The reason is "
-     "structural: 2_2 contains the crossing point where the descending stroke "
-     "curls back across the base stroke, while no image graph retains a "
-     "crossing after degree normalization. The constructed graphs do contain a "
-     "degree-3 T-junction node where the descending stroke meets the base "
-     "stroke (visible in the second panel of Fig. 3), but endpoint reduction "
-     "removes its short branch and demotes it to a corner point before the "
-     "gates apply, so the compatibility gate (\"concept has intersection points "
-     "but the image does not\") rejects the pairing before GED optimization "
-     "runs. The reported 0.0 is this gate outcome, not a computed GED score. "
-     "Impoverished graphs are small, so the pre-filter is a symptom of the same "
-     "degradation, not a cause of the error. Removing it changes nothing."),
-   ("h2", "Stage 2: the simplified concept loses on raw similarity"),
-   ("p", "The simplified concept 2_1 (complexity 13) is never pre-filtered "
-     "— it competes in all 111 cases — and loses to 7_1 on *raw* "
-     "similarity in all 111: mean raw similarity 0.673 against 0.813, a mean "
-     "gap of 0.140 and a minimum gap of 0.053. In 5 of 111 cases 2_1 is "
-     "additionally zeroed by a second compatibility gate (\"concept has more "
-     "corner points than the image\"). Bucket analysis over all 111 cases "
-     "(Table 1) shows that all 111 errors are raw-similarity losses (bucket B); "
-     "there are no cases where no 2-concept competed at all (bucket A) and no "
-     "cases where a 2-concept won on raw similarity but lost the final "
-     "λ-ranking (bucket C). The ranking prior is innocent. In the 25 cases "
-     "where 2_2 nominally competed, its similarity was 0.0 for the same "
-     "structural reason as in the ablation above, so it never outscored 2_1."),
+   ("p", "The stability measurements replay formation offline on the cached "
+     "training graphs with the production formation code and do not write "
+     "to the deployed concept store. They concern the 13 concepts of the "
+     "91.13% configuration [@lapin2026dessert], formed from 869 training "
+     "files. The 4_1 cohort holds 36 files: six files that mixed open and "
+     "closed shapes of the digit 4 were taken out, because formation could "
+     "not merge the two shapes into one concept."),
+   ("h2", "Two markers of convergence"),
+   ("p", "For each concept we record two markers over one formation pass. "
+     "The structural marker *m*<sub>topo</sub> is the last training file "
+     "that changed the node or edge count of the concept. It compares "
+     "counts only, so a rearrangement that keeps the counts is not seen. "
+     "For the envelope marker *m*<sub>env</sub> we take the file at which "
+     "a run of five consecutive files begins in which the mean envelope "
+     "width grows by less than 0.02 per file. It marks the onset of slow "
+     "growth: envelopes keep widening slowly after it."),
    ("tbl", 1,
-    "Anatomy of all 111 2→7 errors: buckets, stage localization of the "
-    "anchor-point loss, and ablation",
-    ["Indicator", "Value"],
-    [["A: no 2-concept in competition", "0"],
-     ["B: 2-concept competes, loses on raw similarity", "**111 (100%)**"],
-     ["C: wins raw similarity, loses λ-ranking", "0"],
-     ["Lower-loop hole absent already in binarized mask", "**110 (99.1%)**"],
-     ["Hole survives to skeleton, lost at vectorization", "1"],
-     ["Anchor points lost at reduction or inference", "0"],
-     ["Final graphs with zero cycles, no crossing point", "111 (100%)"],
-     ["2_2 excluded by complexity pre-filter", "**86 (77.5%)**"],
-     ["Ablation — pre-filter removed, 2_2 wins", "0 of 111"],
-     ["Ablation — 2_2 raw similarity", "0.0 in all 111"],
-     ["2_2 competed and outscored 2_1", "0 of 25"],
-     ["Mean raw similarity, 2_1 / 7_1", "0.673 / 0.813"],
-     ["Raw-similarity gap (mean / min)", "0.140 / 0.053"],
-     ["Image complexity (min / median / max)", "13 / 21 / 29"]],
-    "column", [0.72, 0.28], [3, 7]),
-   ("h2", "Root cause: the lower-loop hole never reaches the graph"),
-   ("p", "For each of the 111 images we measured, stage by stage, where the "
-     "topological hole of the lower-left loop disappears: holes of the "
-     "binarized mask (via its Euler characteristic), cycles of the one-pixel "
-     "skeleton, and cycles of the final graph. Stage measurements use the "
-     "production skeletonization code at the run's threshold (110) without the "
-     "live pipeline's adaptive threshold retries; final graphs are taken from "
-     "the database exactly as the live run produced them. The outcome "
-     "(Table 1): in 110 of 111 cases the binarized mask already contains no "
-     "hole. Two handwriting mechanisms produce this. Either the loop is drawn "
-     "open — the descending stroke never crosses the base stroke — or "
-     "the loop is filled with ink: its interior encloses only a few background "
-     "pixels, so a stroke of ordinary thickness floods it into a solid blob, "
-     "the eye \"reads\" a loop into the pixel pattern, but no topological hole "
-     "exists, and skeletonizing a solid blob yields a line, not a cycle (the "
-     "exemplars of Fig. 2 and Fig. 4). In the single remaining case "
-     "(mnist_test_2_00412) the mask carries two measured holes that survive "
-     "into the skeleton and are lost during GNG+RDP vectorization; an offline "
-     "rerun with a different GNG initialization preserved them, so loss at that "
-     "stage is stochastic rather than systematic. No case loses anchor points "
-     "at reduction or inference: after graph construction there is nothing left "
-     "to lose."),
-   ("p", "All 111 final graphs share the measured invariants of the zigzag "
-     "concept 7_1: zero cycles and, after degree normalization, no crossing "
-     "point. A human judges the pixel image and reads a loop into the ink; the "
-     "classifier sees only the graph, which never contained one."),
-   ("p", "Fig. 2 traces one canonical exemplar through the construction stages, "
-     "and Fig. 3 shows the resulting graph next to the competing concepts."),
-   ("fig", "mnist_test_2_00766_construction.png", 2,
-    "Construction stages for exemplar mnist_test_2_00766. The lower-left curl "
-    "reads as a loop in the grayscale image (panel 1), but its small interior "
-    "is flooded into a solid blob in the binarized mask (threshold 110, "
-    "panel 2) — the mask contains zero topological holes — so the "
-    "one-pixel skeleton is an open hook with zero cycles (panel 3). GNG "
-    "approximation with RDP simplification (ε = 4.55) then flattens the "
-    "hook arc into two straight segments (panel 4). The intersection anchor "
-    "point is never created; the defect precedes any learning step", "full"),
-   ("fig", "mnist_test_2_00766_triptych.png", 3,
-    "Exemplar mnist_test_2_00766, four panels: original image, constructed "
-    "image graph before reduction, and the two competing concepts 2_2 and 7_1. "
-    "The image graph has 11 nodes and 10 edges (complexity 21), so concept 2_2 "
-    "(complexity 24) is excluded by the pre-filter; the simplified 2_1 then "
-    "loses to 7_1 on raw similarity. The T-junction node shown in the second "
-    "panel is demoted to a corner point during degree normalization, before the "
-    "compatibility gates apply", "full"),
-   ("p", "The GNG approximation for this exemplar uses ≈35 neurons and "
-     "leaves a zigzag-like graph of 6 structural points (3 endpoints, 1 "
-     "junction, 0 cycles), whose complexity of 21 falls below the 24 of 2_2. "
-     "Table 2 gives the production ranking."),
-   ("tbl", 2,
-    "Replay ranking for exemplar mnist_test_2_00766 (current code tree, "
-    "prediction identical to the live run); the 2_2 similarity is from the "
-    "pre-filter-removed ablation",
-    ["Concept", "Raw sim.", "Adjusted", "Complexity", "In competition"],
-    [["7_1 (winner)", "0.8317", "1.1487", "9", "yes"],
-     ["2_1", "0.7469", "1.1169", "13", "yes"],
-     ["2_2", "0.0", "0.0", "24", "no (pre-filter)"]],
-    "column", [0.24, 0.16, 0.18, 0.21, 0.21], []),
-   ("p", "The per-feature breakdown of the 2_1 comparison shows where the loss "
-     "occurs: surviving points sit outside the ranges the concept learned to "
-     "expect, with full penalties on three features — e.g. "
-     "distance_to_centroid = 0.558 ∉ [0.69, 1.00] on the start point, "
-     "normalized_x = 0.200 ∉ [−0.70, 0.10] on a corner point, and "
-     "length_ratio_to_max on a segment — while every node of 7_1 "
-     "substitutes within its intervals. The geometry of the graph is distorted "
-     "by the loss of the loop, so the degraded zigzag is parametrically closer "
-     "to the tolerances of 7_1 than to the intervals of 2_1."),
-   ("p", "The contrast exemplar (mnist_test_2_00984, Fig. 4) shows the second "
-     "mechanism: a flat cursive \"2\" whose lower loop is filled with ink, so "
-     "the flooded blob skeletonizes into a zigzag visually close to a \"7\". "
-     "The median image complexity of 21 against 2_2's 24 identifies graph "
-     "impoverishment as the dominant factor across the 111 cases."),
-   ("fig", "mnist_test_2_00984_triptych.png", 4,
-    "Contrast exemplar mnist_test_2_00984 (same four-panel layout as Fig. 3): "
-    "a flat cursive \"2\" whose lower loop is filled with ink — the second "
-    "handwriting mechanism; the flooded loop leaves no topological hole, so the "
-    "graph is an open zigzag", "full"),
-   ("h2", "What the ablations exclude, and what they do not"),
-   ("p", "Since every downstream mechanism was suspect, we also checked the "
-     "scoring implementation. Decomposing each substitution cost by feature in "
-     "the replay reproduces the total cost with a residual of approximately "
-     "zero. A self-recognition test scores each concept against its own typical "
-     "feature values: all 13 concepts respond with similarity 1.00, and the "
-     "parametric layer separates even structurally isomorphic concept pairs "
-     "(2_1/5_1 and 4_1/9_2). These checks establish that the implementation "
-     "computes the specified similarity function consistently; they do not "
-     "establish that the specified function is the right projection of graph "
-     "evidence onto a scalar. The error graphs retain a short lower-left branch "
-     "that genuine 7s lack, and whether a similarity function should exploit it "
-     "to separate the classes on the impoverished input is an open question "
-     "these experiments do not answer."),
-   ("h2", "Consequences"),
-   ("p", "Three design consequences follow, none of which requires hard-coding "
-     "concept identities. (i) Graph construction is the only lever established "
-     "by measurement: hole-preserving binarization and skeletonization, and "
-     "topology-aware vectorization that controls cycles through GNG, RDP, and "
-     "junction merging, would let the lower loop reach the graph, raise image "
-     "complexity, return 2_2 to the competition, and let its intersection point "
-     "and cycle-count features discriminate against 7_1. One limit remains: "
-     "loops filled with ink are not recoverable from the binary mask alone and "
-     "would require intensity analysis inside the stroke. (ii) The two "
-     "parameter-level repairs are excluded by experiment: removing the "
-     "complexity pre-filter changes nothing (2_2 wins 0 of 111 with similarity "
-     "0.0), and the λ-ranking prior contributes zero errors. (iii) The "
-     "similarity function itself is the remaining downstream suspect: its "
-     "implementation is verified consistent above, but no experiment here tests "
-     "whether a different projection could exploit the surviving lower-left "
-     "branch, so a scoring redesign stays open as future work."),
-  ],
- },
- {
-  "title": "Stability Studies of Concept Formation",
-  "blocks": [
-   ("p", "The second question concerns the trustworthiness of the formation "
-     "process itself: does the classifier generalize beyond the curated test "
-     "subset, and are the concepts it forms stable with respect to presentation "
-     "order, sample count, and reduction depth? Five studies address this. All "
-     "formation studies run the production formation code through a seedable "
-     "offline probe; all evaluation studies run the full live pipeline."),
-   ("h2", "Generalization across MNIST dataset variants"),
-   ("p", "The system is contour-based: a digit drawn with broken strokes yields "
-     "an incomplete skeleton that no concept formed from complete contours can "
-     "cover. The baseline therefore evaluates the complete-contour subset. To "
-     "quantify the cost of this restriction, we evaluated the untouched "
-     "baseline concepts on the full MNIST test set (10,000 images, no "
-     "exclusions) and on the 60,000-image training split, whose completeness "
-     "labels come from a heuristic classifier. The 60k split is labeled by a "
-     "completeness heuristic, not manual review; 85 of its images are the "
-     "unique source images of the system's training corpus (leakage 0.14%; the "
-     "offline-generated variants are not MNIST members). Table 3 reports the "
-     "results with the pipeline status made explicit: a submitted image either "
-     "receives a prediction, fails into the dead-letter queue (DLQ), or returns "
-     "no result at all (the run export records no cause for the last group). "
-     "End-to-end accuracy counts every submission in the denominator; "
-     "conditional accuracy counts classified images only."),
-   ("tbl", 3,
-    "Accuracy across MNIST dataset variants (baseline concepts, no "
-    "retraining), decomposed by pipeline status",
-    ["Run / split", "Submitted", "Classified", "Completion", "Correct",
-     "Conditional", "End-to-end", "DLQ", "Other uncl."],
-    [["10k test, all", "10,000", "9,942", "99.42%", "8,221", "82.69%",
-      "**82.21%**", "58", "0"],
-     ["60k train, all", "60,000", "51,045", "85.08%", "43,172", "84.58%",
-      "**71.95%**", "293", "8,662"],
-     ["70k aggregate", "70,000", "60,987", "87.12%", "51,393", "84.27%",
-      "**73.42%**", "351", "8,662"],
-     ["60k train, complete-only rerun", "45,501", "44,812", "98.49%", "38,469",
-      "85.85%", "**84.55%**", "14", "675"]],
-    "full", [0.19, 0.10, 0.10, 0.12, 0.09, 0.12, 0.12, 0.07, 0.09], [],
-    "Completion is classified/submitted; end-to-end is correct/submitted, so "
-    "every unclassified case lowers it."),
-   ("p", "Three observations. First, the completeness restriction is "
-     "load-bearing: within the 10k run, the complete slice scores 7,911/8,704 = "
-     "90.89% end-to-end while the incomplete slice scores 310/1,295 = 23.94%, "
-     "dragging the no-exclusions figure to 82.21%. Second, per-slice accuracy "
-     "from the 60k all-split run conflates classifier error with pipeline "
-     "completion: that run left 8,662 submissions without any result "
-     "(completion 85.08%), and its complete slice reads 76.12% end-to-end, "
-     "whereas the dedicated rerun over the same 45,501 \"complete\" images "
-     "completed 98.49% and reached 85.85% conditional / 84.55% end-to-end. Both "
-     "are valid measurements of their executions; the disagreement means the "
-     "76.12% figure must not be read as model generalization. The residual gap "
-     "between 90.89% (test, manual review) and 84.55% (train, heuristic labels) "
-     "is consistent with heuristic label noise, though we did not isolate that "
-     "factor. Third, end-to-end accuracy over all 70,000 MNIST images with 13 "
-     "concepts and no per-split tuning is 73.42%, which bounds the current "
-     "representation's coverage from below."),
-   ("h2", "Dependence on sample-presentation order"),
-   ("p", "Formation is incremental and the first sample seeds the concept, so "
-     "order dependence is a structural risk. (Historically, the production "
-     "order from the graph store was nondeterministic; it is now fixed to a "
-     "deterministic ordering.) We re-formed three representative concepts "
-     "— 2_2 (rich, 12 nodes), 7_1 (minimal, 5 nodes), 8_1 (cyclic, 11 "
-     "nodes) — under 10 random presentation orders each (Table 4). Formed "
-     "concepts are compared by pairwise GED over node and edge labels only; "
-     "parameter attributes are compared separately through envelope widths."),
-   ("tbl", 4,
-    "Order-dependence study: 10 random presentation orders per concept, "
-    "compared by label-only pairwise GED (45 pairs per concept)",
-    ["Concept", "Seeds", "Node counts observed", "Zero-GED share",
-     "Mean pairwise GED", "Max pairwise GED"],
-    [["2_2", "10", "{12}", "0.64", "0.36", "1.0"],
-     ["7_1", "10", "{5}", "1.00", "0.00", "0.0"],
-     ["8_1", "10", "{11}", "1.00", "0.00", "0.0"]],
-    "full", [0.16, 0.12, 0.20, 0.16, 0.18, 0.18], []),
-   ("p", "No formation failures occurred. Node counts are identical across all "
-     "orders for all three concepts. 7_1 and 8_1 show zero label-only GED in "
-     "all 45 order pairs; 2_2 in 29 of 45 pairs (share 0.64) with a mean "
-     "pairwise GED of 0.36 — small residual variation concentrated in the "
-     "richest concept. The attributed concepts are not identical across orders: "
-     "parameter-envelope widths vary mildly (e.g. 2_2: 0.438–0.492), and "
-     "no two stored concept files coincide byte for byte. For these three "
-     "concepts, formation is thus largely, though not perfectly, "
-     "order-invariant in structure; the deterministic-ordering fix makes "
-     "production retrains reproducible by construction."),
-   ("h2", "Dependence on sample count"),
-   ("p", "We formed each of the 13 concepts from *n* ∈ {2, 5, 10, 20} "
-     "samples, three random draws per condition. Two monotone trends emerge: "
-     "node counts *decrease or stay constant* as *n* grows (structure is pruned "
-     "toward the shared core, then freezes — e.g. 2_2: 16 → 12.7 "
-     "→ 12 → 12 nodes), while mean range widths *increase* "
-     "monotonically (the envelope absorbs instance variation — e.g. 7_1: "
-     "0.33 → 0.48 → 0.68 → 0.80). Larger sample sets widen the "
-     "parameter envelopes while node counts stay fixed; whether the wider "
-     "envelopes improve downstream accuracy was not measured."),
-   ("p", "Measuring downstream classification accuracy per sample-count "
-     "condition requires retraining the production concept store and is left "
-     "for future work."),
-   ("h2", "Reduction convergence: when does a concept become stable?"),
-   ("p", "For every concept we recorded two markers over one formation pass "
-     "(Table 5). The structural marker *m*<sub>topo</sub> is the index of the "
-     "last training sample that changed the concept's node or edge count; it "
-     "compares counts, not full attributed graphs, so structural "
-     "rearrangements that preserve counts would escape it. The envelope marker "
-     "*m*<sub>env</sub> is the first sample that opens a run of five "
-     "consecutive samples whose mean envelope-width growth stays below 0.02 per "
-     "sample — an onset-of-slow-growth marker, not the last envelope "
-     "change: envelopes keep widening slowly afterwards, consistent with the "
-     "monotone widening of the sample-count study."),
-   ("tbl", 5,
-    "Convergence markers of concept formation: last node/edge-count change "
-    "(*m*<sub>topo</sub>) and onset of slow envelope growth "
-    "(*m*<sub>env</sub>)",
-    ["Concept", "*m*<sub>topo</sub>", "*m*<sub>env</sub>", "Total samples"],
+    "Convergence markers of concept formation",
+    ["Concept", "*m*<sub>topo</sub>", "*m*<sub>env</sub>", "Files"],
     [["0_1", "11", "13", "33"],
      ["1_1", "1", "10", "33"],
      ["1_3", "2", "5", "55"],
@@ -570,339 +243,557 @@ SECTIONS = [
      ["7_1", "2", "15", "99"],
      ["8_1", "37", "5", "42"],
      ["9_2", "16", "10", "88"]],
-    "column", [0.28, 0.24, 0.24, 0.24], []),
-   ("p", "Simple concepts freeze almost immediately (1_1 after 1 sample, 7_1, "
-     "1_3, and 4_1 after 2), while structurally rich or heterogeneous classes "
-     "need tens of samples (8_1: 37 of 42; 5_1: 28; 2_1: 23). In most cases the "
-     "envelope keeps adjusting after the node counts freeze — consistent "
-     "with the sample-count study: late samples tune tolerances, not "
-     "structure."),
-   ("h2", "Concept parameters and compression"),
-   ("p", "Finally, we quantify what a concept actually stores relative to what "
-     "it consumed (Table 6). Across all 13 concepts, 869 training graphs "
-     "contribute 9,738 nodes and 9,242 edges carrying 336,637 attribute values; "
-     "the resulting concepts retain 106 nodes and 100 edges carrying 6,647 "
-     "values (of which 3,053 are range-valued parameters). Node compression is "
-     "9,738/106 = 91.9× overall (up to 176.7× for 2_1; counting nodes "
-     "plus edges gives 92.1×), and stored-value compression is "
-     "50.6×. Values are counted by one fixed convention on both sides: a "
-     "learned range counts as two numbers (its endpoints; the center is "
-     "derived), a scalar or string as one, and a list element-wise. Both ratios "
-     "are internal storage-count ratios between what formation consumed and "
-     "what it retained; they are not comparable to parameter counts of neural "
-     "models, and we make no such comparison."),
-   ("tbl", 6,
-    "Parameter compression from training samples to concepts (input = all "
-    "training graphs consumed by the concept)",
-    ["Concept", "Samples", "Input nodes", "Input edges", "Input values",
-     "Concept nodes", "Concept edges", "Concept values",
-     "Node compr. (×)", "Value compr. (×)"],
-    [["0_1", "33", "418", "418", "14,550", "10", "10", "628", "41.8", "23.2"],
-     ["1_1", "33", "235", "202", "7,912", "7", "6", "433", "33.6", "18.3"],
-     ["1_3", "55", "187", "132", "6,187", "3", "2", "179", "62.3", "34.6"],
-     ["2_1", "121", "1,237", "1,116", "42,093", "7", "6", "435", "176.7",
-      "96.8"],
-     ["2_2", "55", "902", "902", "31,536", "12", "12", "759", "75.2", "41.5"],
-     ["3_1", "77", "1,093", "1,016", "37,710", "9", "8", "556", "121.4",
-      "67.8"],
-     ["4_1", "36", "400", "400", "13,858", "8", "8", "506", "50.0", "27.4"],
-     ["4_2", "65", "631", "566", "21,502", "9", "8", "562", "70.1", "38.3"],
-     ["5_1", "88", "1,192", "1,104", "40,641", "7", "6", "435", "170.3",
-      "93.4"],
-     ["6_1", "77", "1,050", "1,050", "37,005", "10", "10", "632", "105.0",
-      "58.6"],
-     ["7_1", "99", "669", "570", "22,615", "5", "4", "310", "133.8", "73.0"],
-     ["8_1", "42", "646", "688", "23,011", "11", "12", "702", "58.7", "32.8"],
-     ["9_2", "88", "1,078", "1,078", "38,017", "8", "8", "510", "134.8",
-      "74.5"],
-     ["**Total**", "**869**", "**9,738**", "**9,242**", "**336,637**",
-      "**106**", "**100**", "**6,647**", "**91.9**", "**50.6**"]],
-    "full", [0.10, 0.09, 0.09, 0.09, 0.11, 0.09, 0.09, 0.10, 0.12, 0.12], []),
-   ("p", "Property-survival analysis shows that of the ≈60 node properties "
-     "present on image graphs, only bookkeeping metadata (the source image "
-     "path) is dropped entirely; every structural and geometric property "
-     "survives into concepts at approximately its natural rate of occurrence. "
-     "Conversely, concepts gain aggregate properties that exist on no single "
-     "image node (e.g. direction-sequence indices, expected start degree, "
-     "centroid summaries) — evidence that reduction abstracts rather than "
-     "truncates."),
+    "column", [0.34, 0.22, 0.22, 0.22], []),
+   ("p", "The structural marker falls between 1 and 37 files (Table 1). "
+     "Concepts with a single open stroke settle at once: 1_1 after the "
+     "first file, 1_3, 4_1, 4_2 and 7_1 after the second. Concepts with "
+     "loops or several strokes take tens of files: 8_1 changes its counts "
+     "until file 37 of 42, 5_1 until 28 and 2_1 until 23. Every concept "
+     "settles well before its cohort is used up; 2_1, the largest cohort, "
+     "settles at file 23 of 121."),
+   ("p", "The envelope marker does not follow the structural one. For 8_1 "
+     "the widths flatten at file 5 while the graph keeps changing until "
+     "file 37. The same order holds for 2_1 (envelope at file 12, "
+     "structure at 23) and 5_1 (11 and 28). For 7_1 the order is "
+     "reversed: the structure is fixed at file 2 and the envelope settles "
+     "at file 15. A flat envelope is therefore not a safe signal that "
+     "formation has finished, and a stopping rule has to check both "
+     "markers (Fig. 1)."),
+   ("fig", "trajectories.png", 1,
+    "Node count and mean envelope width of each concept against the number "
+    "of training files consumed in one formation pass", "full"),
+   ("h2", "Dependence on the number of samples"),
+   ("p", "Three concepts of different kinds, 2_2 (loop and intersection), "
+     "7_1 (one open stroke) and 4_1 (closed four), were formed repeatedly "
+     "on random subsets of their cached files: three subsets each of size "
+     "2, 5, 10 and 20 (Fig. 2). More files move structure and envelope in opposite "
+     "directions. The node count of 2_2 falls from 16 at two files to 12.7 "
+     "at five and to 12 at ten and twenty: early concepts carry nodes that "
+     "later samples do not share, and reduction removes them. For 7_1 the "
+     "mean envelope width is 0.33, 0.48, 0.68 and 0.80 at 2, 5, 10 and 20 "
+     "files, since each sample adds its own variation. In 4_1 the "
+     "structure does not move at all: from the second file on the concept "
+     "has 8 nodes and 8 edges."),
+   ("fig", "curves.png", 2,
+    "Node count and mean envelope width against the number of training "
+    "files for 2_2, 7_1 and 4_1; three draws per condition", "full"),
+   ("p", "More samples buy a smaller graph and looser bands. These probe "
+     "concepts were not deployed, so the test does not say which of the two "
+     "effects helps recognition more; a classification run per condition "
+     "is the next step."),
+   ("h2", "Compression"),
+   ("p", "The 869 training graphs hold 9,738 nodes and 9,242 edges with "
+     "336,637 stored values; the 13 concepts keep 106 nodes and 100 edges "
+     "with 6,647 values, of which 3,053 are ranges. A range counts as two "
+     "values (its bounds), every scalar or string counts once, lists are "
+     "counted per element, and the rule is the same for input and concept. Node compression is 91.9 times overall and "
+     "reaches 176.7 times for 2_1; value compression is 50.6 times "
+     "(Table 2). These ratios compare what formation consumed with what it "
+     "kept. They are not parameter counts and are not comparable with the "
+     "size of a neural network. Image graphs carry about 60 node "
+     "properties, and formation drops only one of them, the path of the "
+     "source file; the concepts "
+     "gain aggregate properties that no single image node has, such as the "
+     "expected degree of the start point."),
+   ("tbl", 2,
+    "Compression from training graphs to concepts",
+    ["Concept", "Files", "Nodes in → kept", "Node ×", "Value ×"],
+    [["0_1", "33", "418 → 10", "41.8", "23.2"],
+     ["1_1", "33", "235 → 7", "33.6", "18.3"],
+     ["1_3", "55", "187 → 3", "62.3", "34.6"],
+     ["2_1", "121", "1,237 → 7", "176.7", "96.8"],
+     ["2_2", "55", "902 → 12", "75.2", "41.5"],
+     ["3_1", "77", "1,093 → 9", "121.4", "67.8"],
+     ["4_1", "36", "400 → 8", "50.0", "27.4"],
+     ["4_2", "65", "631 → 9", "70.1", "38.3"],
+     ["5_1", "88", "1,192 → 7", "170.3", "93.4"],
+     ["6_1", "77", "1,050 → 10", "105.0", "58.6"],
+     ["7_1", "99", "669 → 5", "133.8", "73.0"],
+     ["8_1", "42", "646 → 11", "58.7", "32.8"],
+     ["9_2", "88", "1,078 → 8", "134.8", "74.5"],
+     ["**Total**", "**869**", "**9,738 → 106**", "**91.9**", "**50.6**"]],
+    "column", [0.18, 0.16, 0.30, 0.18, 0.18], [13]),
+   ("h2", "Transfer to other MNIST splits"),
+   ("p", "The system reads contours, so a digit with a broken stroke gives a "
+     "skeleton that no concept formed from closed contours can cover. The "
+     "concepts were therefore also run, without retraining, on the whole "
+     "MNIST test set and on the 60,000-image training split (Table 3). A "
+     "submitted image is either classified, sent to the dead-letter queue "
+     "(DLQ) after a pipeline failure, or left without a result. Conditional "
+     "accuracy divides by classified images, end-to-end accuracy by all "
+     "submissions."),
+   ("tbl", 3,
+    "Concepts of the 91.13% configuration on other MNIST splits, no "
+    "retraining",
+    ["Split", "Submitted", "Classified", "Correct", "Conditional",
+     "End-to-end", "DLQ", "No result"],
+    [["Test, all", "10,000", "9,942", "8,221", "82.69%", "82.21%", "58",
+      "0"],
+     ["Train, all", "60,000", "51,045", "43,172", "84.58%", "71.95%", "293",
+      "8,662"],
+     ["Test + train", "70,000", "60,987", "51,393", "84.27%", "73.42%",
+      "351", "8,662"],
+     ["Train, complete", "45,501", "44,812", "38,469", "85.85%", "84.55%",
+      "14", "675"]],
+    "full", [0.17, 0.11, 0.11, 0.11, 0.13, 0.13, 0.11, 0.13], []),
+   ("p", "On the whole test set the complete slice scores 7,911 of 8,704 "
+     "(90.89%) end-to-end and the incomplete slice 310 of 1,295 (23.94%), "
+     "which brings the total to 82.21%. On the training split the "
+     "completeness labels come from a heuristic rather than manual review. "
+     "The first run over this split left 8,662 submissions without a "
+     "result; a dedicated rerun over its 45,501 complete images classified "
+     "98.49% of them at 85.85% conditional accuracy. The remaining gap to "
+     "the test figure fits label noise in the heuristic, which we did not "
+     "isolate. Over all 70,000 MNIST images the 13 concepts reach 73.42% "
+     "end-to-end with no per-split tuning."),
+  ],
+ },
+ {
+  "title": "Mechanisms of Misclassification",
+  "blocks": [
+   ("p", "The error analysis needs the full ranking of every concept for "
+     "every image, which the 91.13% run did not store, and its concepts "
+     "were retrained afterwards. We therefore repeated the test with "
+     "concepts retrained on the same 869 files and the same classification "
+     "parameters, storing every ranking. The run decided 7,819 of 8,683 "
+     "classified images correctly, 90.05% (95% Wilson interval "
+     "89.40–90.66%); 21 images failed in the pipeline and 44 were "
+     "rejected by all 13 concepts. All numbers in this section come from "
+     "this run, and every trace was recomputed with the production scoring "
+     "code and matched the stored ranking."),
+   ("h2", "Three mechanisms"),
+   ("p", "Each of the 820 wrong-class answers falls into exactly one of three "
+     "mechanisms, defined by the decision step that settled it:"),
+   ("p", "– **gate** (312, 38.0%): no concept of the true class reached "
+     "comparison. In 277 cases preprocessing rejected all of them, in 31 "
+     "the complexity pre-filter removed all of them, and in 4 the two "
+     "steps removed one each;"),
+   ("p", "– **similarity** (383, 46.7%): a true-class concept was compared "
+     "but its raw similarity was lower than the winner's;"),
+   ("p", "– **prior** (125, 15.2%): a true-class concept had a raw "
+     "similarity at least as high as the winner's and lost only after the "
+     "prior term of (2). Without the prior, 113 of these answers would be "
+     "correct; in the other 12 a third concept of another class leads on "
+     "raw similarity."),
+   ("p", "No ties occur on raw similarity between the true-class concept and "
+     "the winner, and none on the adjusted score among the 125 prior "
+     "cases, so the sort order never decides."),
+   ("fig", "anatomy/pop_pairs.png", 3,
+    "The ten most frequent confusion pairs split by mechanism; together "
+    "they hold 542 of the 820 wrong-class answers", "full"),
+   ("p", "The mechanisms concentrate in different pairs (Fig. 3). The ten "
+     "most frequent pairs hold 542 answers (66.1%). The pair 2→7 is almost "
+     "all similarity (90 of 93), as are 0→6 (46 of 52) and 9→4 (27 of 27). "
+     "The pairs 2→6 (56 of 65) and 4→1 (40 of 41) are almost all gate. "
+     "The prior dominates 5→3 (55 of 56) and 7→2 (21 of 26). Class 4 "
+     "mixes gate and similarity: 4→7 has 36 gate and 44 similarity cases, "
+     "4→5 has 26 and 45."),
+   ("p", "The gate messages show what preprocessing found missing in the "
+     "image graph (Fig. 4). Counted per rejected true-class concept, the "
+     "most common are «concept has endpoints but image does not» (141), "
+     "«concept has corner points but image does not» (115) and «concept "
+     "has intersection points but image does not» (111). Counted per "
+     "image, the pair «no corner points» plus «no intersection points» "
+     "accounts for 100 gate errors, all of class 4, and «no endpoints» "
+     "alone for 82, of which 56 are of class 2."),
+   ("fig", "anatomy/pop_gate_reasons.png", 4,
+    "Gate errors by the combination of rejection messages per image (top) "
+    "and by message per rejected true-class concept (bottom)", "full"),
+   ("h2", "Gate: a pruned stroke end (2 read as 6)"),
+   ("p", "Image mnist_test_2_00144 is a 2 classified as 6_1; both concepts "
+     "of class 2 were rejected before comparison (Fig. 5). Its skeleton "
+     "has 168 pixels. Pruning removed a 12.5 px branch from the "
+     "intersection at (57, 69) to the end at (67, 75), because it was "
+     "shorter than the threshold of 15.7 px, 8% of the 196.6 px skeleton "
+     "length. This branch was the tail of the base of the 2. Without it "
+     "the lower part of the digit is a closed loop, and the graph has one "
+     "free end, at the top of the upper stroke, one intersection of degree "
+     "3, six corners and one cycle."),
+   ("p", "Both class-2 concepts expect a start point S of degree 1 and one "
+     "more endpoint. The preprocessor turns the only free end into S, so "
+     "the image graph has no endpoint left, and both concepts are rejected "
+     "with «concept has endpoints but image does not». The concepts that "
+     "pass are 6_1, 9_2 and 4_1: each has a loop, an intersection and no "
+     "endpoint besides S. 6_1 wins with similarity 0.6892 against 0.6742 "
+     "and 0.6441, and the prior does not change the order. The error "
+     "starts at pruning, which removed an end that the 2 needs."),
+   ("fig", "anatomy/case2_pipeline.png", 5,
+    "mnist_test_2_00144: image, binary mask, skeleton with the pruned base "
+    "tail, and the graph with its single endpoint E", "full"),
+   ("h2", "Similarity: a spur turns a 0 into a 6"),
+   ("p", "Image mnist_test_0_00701 is a 0 classified as 6_1 (Fig. 6). A "
+     "15.4 px spur runs from the top of the loop to a free end; the pruning "
+     "threshold for this skeleton is 13.1 px, so the spur stays. The graph "
+     "has one endpoint, one intersection of degree 3, five corners and one "
+     "cycle, which is the topology of a 6. Concepts 6_1, 9_2, 4_1 and 0_1 "
+     "pass preprocessing. Under 0_1 the spur is deleted and S is placed on "
+     "the former intersection. That node then sits where no start point of "
+     "0_1 lies: four of the twelve out-of-range features fall on it, and "
+     "its substitution alone costs 4.1419. 0_1 reaches similarity 0.5868 "
+     "and ranks fourth; 6_1 has five out-of-range features and wins with "
+     "0.7120. Both concepts have complexity 20, so the prior adds the same "
+     "term to both. The error is decided by the similarity function on a "
+     "graph whose topology really is that of another class."),
+   ("fig", "anatomy/case3_pipeline.png", 6,
+    "mnist_test_0_00701: the spur at the top survives pruning and gives "
+    "the zero an endpoint and an intersection", "full"),
+   ("h2", "Prior: a correct lead lost by 0.0121"),
+   ("p", "Image mnist_test_5_00606 is a 5 classified as 3_1. Its graph is "
+     "one open stroke with two endpoints and five corners, complexity 25. "
+     "Concept 5_1 has GED 6.7259, one out-of-range feature and similarity "
+     "0.7880; concept 3_1 has GED 7.8362, two out-of-range features and "
+     "similarity 0.7614. The prior adds 0.3700 to 5_1 (complexity 13) and "
+     "0.4087 to 3_1 (complexity 17). 5_1 leads on raw similarity by "
+     "0.0266, the prior gives 3_1 0.0387 more, and 3_1 wins by 0.0121 "
+     "(Fig. 7)."),
+   ("fig", "anatomy/case1_ranking.png", 7,
+    "mnist_test_5_00606: raw similarity (circle) and adjusted score (dot) "
+    "of the compared concepts; rejected concepts are listed below",
+    "column"),
+   ("p", "The same term also repairs answers. In mnist_test_2_00030, a 2 "
+     "with a short spur at the intersection, 7_1 leads on raw similarity "
+     "with 0.7679 against 0.7591 for 2_1; the prior adds 0.3700 to 2_1 and "
+     "0.3170 to 7_1, and 2_1 wins by 0.0442. In both cases the raw gap is "
+     "smaller than the difference between the two prior terms. The prior "
+     "decides wherever the similarity cannot separate two concepts, and "
+     "whether it decides correctly depends on which of the two is the "
+     "richer one."),
+   ("h2", "Class 4"),
+   ("p", "[Trace of one 4→1 gate error and one 4→7 error to be added after "
+     "the Neo4j check; task 3 of the plan.]"),
+   ("h2", "The dominant pair 2→7"),
+   ("p", "The pair 2→7 is the largest and the one we have studied longest "
+     "[@lapin2026dessert]. In the 91.13% configuration it held 111 "
+     "errors. In 110 of them the lower loop of the 2 has no hole already "
+     "in the binary mask, because the loop is drawn open or its small "
+     "interior is filled by a thick stroke; in the remaining case the hole "
+     "is lost at vectorization. The 2 then has the open-stroke topology of "
+     "concept 7_1 and loses on similarity, which matches the 90 similarity "
+     "cases of 93 in the repeated run."),
+  ],
+ },
+ {
+  "title": "Results of the Current System Version",
+  "blocks": [
+   ("p", "[Section to be written from K. Perevoznyk's report: the model "
+     "version with the two constants removed that had been tuned on the "
+     "test set, its accuracy on the same 8,707 images, the list of changes, "
+     "and how the gate, similarity and prior counts move. Pending.]"),
   ],
  },
  {
   "title": "Discussion",
   "blocks": [
-   ("h2", "The dominant confusion points at the representation front end"),
-   ("p", "The error anatomy and the stability studies point at the same "
-     "conclusion from two directions. The dominant confusion is traced to "
-     "anchor-point loss at the representation front end — absent from the "
-     "binarized mask in 110 of 111 cases, lost during stochastic vectorization "
-     "in the remaining one — upstream of concept formation, matching, and "
-     "ranking. Direct experiment excluded the adjustable downstream mechanisms: "
-     "the pre-filter ablation (0 of 111), the replay-verified cost "
-     "decomposition, and the empty ranking bucket. Meanwhile the formation "
-     "process itself is largely reproducible (order study), freezes node and "
-     "edge counts after few samples in all thirteen concepts (convergence "
-     "study), and compresses 869 training graphs into 106 concept nodes while "
-     "preserving the property inventory (compression study). No downstream "
-     "*parameter* — pre-filter tolerance, cost ladder, ranking prior "
-     "— can recover a hole that never existed in the binarized image; "
-     "whether a different similarity *function* could separate the classes "
-     "without it is not settled by these experiments. Two scope limits apply: "
-     "this cluster is 111 of 792 baseline failures (14.0%), so it cannot alone "
-     "carry a system-wide bottleneck claim, and the stage localization was "
-     "measured at a fixed binarization threshold. The most direct repair is the "
-     "front-end change set out under Consequences above, which would restore "
-     "image complexity and re-admit rich concepts into the WTA competition."),
-   ("h2", "Concepts show attractor-like signatures"),
-   ("p", "The studies are consistent with the term *concept attractor* used in "
-     "prior work [3]: identical node counts under all presentation orders, "
-     "node/edge-count freeze after a class-dependent but small number of "
-     "samples, and monotone envelope widening thereafter are the signature one "
-     "would expect of a fixed point of the reduction process approached from "
-     "different initial conditions. A proof would need more: our markers track "
-     "node and edge counts, not full attributed graphs, and the order study "
-     "still finds structural differences in 2_2 across presentation orders."),
-   ("h2", "Limitations"),
-   ("p", "The 60k-split completeness labels are heuristic, so its \"complete\" "
-     "figures conflate model error with label noise and pipeline completion; 85 "
-     "of its images (0.14%) are the system's own training sources. The order "
-     "and convergence studies probe three and thirteen concepts of one dataset, "
-     "respectively, and the sample-count study uses three draws per condition; "
-     "we report no confidence intervals or significance tests at these sample "
-     "sizes, so the stability studies are exploratory evidence. The paper also "
-     "lacks a matched baseline: no neural or conventional classifier was "
-     "evaluated under the same complete-contour protocol, so the accuracy "
-     "figures place the system on MNIST but do not rank it against "
-     "alternatives. The curated complete-only subset excludes ≈13% of the "
-     "test set, and the exclusions are class-skewed. Two planned extensions "
-     "require destructive retraining of the production concept store and remain "
-     "future work: isolating the contribution of training-set augmentation (the "
-     "corpus is pre-augmented with ≈10 geometric variants per source image, "
-     "permitting a subtractive design) and measuring downstream accuracy per "
-     "sample-count condition. Finally, the complete-contour restriction is "
-     "itself a limitation of the contour-based representation, and Table 3 "
-     "quantifies it."),
+   ("p", "**Where corrections belong.** The three mechanisms point to "
+     "different parts of the system. Gate errors (38.0%) are decided "
+     "before any cost is computed. The traced case shows a front-end step, "
+     "pruning, removing a stroke end that the true concept requires; the "
+     "100 class-4 gate errors with neither corners nor intersections after "
+     "preprocessing call for the same kind of trace. Changing cost weights "
+     "cannot repair these answers, because the true concept never receives "
+     "a cost. Similarity errors (46.7%) include cases such as the zero "
+     "with a spur, where the image graph genuinely has the topology of "
+     "the predicted class; there the remedy is in graph construction, not "
+     "in scoring. Prior errors (15.2%) are the only group that a change of "
+     "the ranking rule could reverse directly, and the same rule rescues "
+     "other answers, so any change has to be measured on both sides."),
+   ("p", "**Stability and the theory.** The convergence markers agree with "
+     "the claim that a concept reaches a stable structure in a bounded "
+     "number of steps [@lapin2026itssi]: no concept changed its node or "
+     "edge count after file 37, and most settled within a few files. The "
+     "steps are not training epochs: each file passes through reduction "
+     "once, and further files only add evidence. The envelopes keep "
+     "widening slowly after the structure is fixed, so the bounded part of "
+     "convergence is the structure, while the envelopes keep absorbing "
+     "variation. Independence of the formed concept from the order of "
+     "samples follows from the commutativity of accumulation in the theory "
+     "[@lapin2026itssi]; a controlled experiment on it is left for a "
+     "separate study, after the pairing step of the implementation is made "
+     "to match each sample independently of the samples merged before it."),
+   ("p", "**Limitations.** The stability study and the error study use two "
+     "states of the system: the concepts of the 91.13% configuration and "
+     "concepts retrained on the same files, which reach 90.05%. The error "
+     "counts therefore describe the retrained concepts. The structural "
+     "marker compares counts, not attributed graphs. The sample-count "
+     "study covers three concepts and was not followed by classification "
+     "runs. The traces explain individual images; the census gives the "
+     "size of each mechanism but not the front-end cause of every case in "
+     "it. Further traced cases are published in the project repository "
+     "[@repo]."),
   ],
  },
  {
   "title": "Conclusions",
   "blocks": [
-   ("p", "We dissected the dominant error of a graph-based "
-     "non-backpropagation classifier and measured the stability of its "
-     "concept-formation process. The 2→7 confusion originates in the "
-     "representation front end. In 110 of 111 cases the binarized image already "
-     "contains no topological hole at the lower loop, because the descending "
-     "stroke either fails to cross the base stroke or floods the loop's small "
-     "interior into a solid blob; the one remaining case loses the hole during "
-     "stochastic vectorization. Every error graph therefore reaches the "
-     "classifier with zero cycles and no crossing point. Direct experiment then "
-     "excluded the adjustable downstream mechanisms. Removing the complexity "
-     "pre-filter changes nothing, since the rich concept scores zero similarity "
-     "on loop-free graphs. The substitution-cost implementation decomposes "
-     "exactly and passes self-recognition, and the ranking prior contributes "
-     "zero errors. The functional form of the similarity score itself was not "
-     "tested and remains the open downstream question."),
-   ("p", "Formation proved order-invariant in node counts for the three probed "
-     "concepts; node and edge counts froze after 1–37 samples across the "
-     "thirteen concepts, with node compression of 91.9× and stored-value "
-     "compression of 50.6×. On the complete-contour test subset — the "
-     "input domain the contour representation is built for — the system "
-     "reaches 91.13% on classified images, which supports the "
-     "structural-concept design in its current scope. Generalization tests "
-     "bound uncurated-MNIST end-to-end accuracy at 82.21% on the test split and "
-     "73.42% over all 70,000 images; the drop is carried by the "
-     "incomplete-contour slice (23.94%), which no concept formed from complete "
-     "contours can cover. Recovering broken contours is a separate line of our "
-     "research, associative recognition, in which a concept acts as a template "
-     "that predicts the missing contour element and the completed input graph "
-     "is reduced again, leaving the concept itself unchanged."),
-   ("p", "The front-end change set out under Consequences is the most direct "
-     "accuracy lever for future work, and a redesign of the similarity "
-     "projection is the open downstream alternative."),
-  ],
- },
- {
-  "title": "Reproducibility",
-  "blocks": [
-   ("p", "All studies run against production code paths: the post-mortem scores "
-     "images with the live classification orchestrator and cost functions "
-     "(111/111 prediction agreement with the deployed pipeline, on the current "
-     "code tree), and the formation studies use a seedable offline probe over "
-     "the production reduction code. The baseline run artifacts (configuration, "
-     "metrics, confusion matrix, per-image errors, and concept snapshots), the "
-     "analysis notebooks, the offline probe caches, and the dataset-variant run "
-     "exports are available in the main branch of the project repository at "
-     "https://github.com/kbokh/NaturalAGI."),
-   ("p", "**Conflict of interest.** The author declares no conflict of "
-     "interest."),
-   ("p", "**Funding.** This research received no external funding."),
+   ("p", "1. Concept formation settles its structure within 1 to 37 "
+     "training files per concept, well before each cohort is exhausted. "
+     "The parameter envelopes settle on a separate schedule, earlier or "
+     "later than the structure, so a stopping rule for formation has to "
+     "watch both."),
+   ("p", "2. More training samples give a smaller concept graph with wider "
+     "envelopes. The 13 concepts keep 106 of the 9,738 nodes of their "
+     "training graphs, a compression of 91.9 times in nodes and 50.6 "
+     "times in stored values."),
+   ("p", "3. All 820 wrong-class answers of the test run split into three "
+     "mechanisms: the true concept never reaches comparison (312), it "
+     "loses on similarity (383), or it leads on similarity and loses "
+     "through the complexity prior (125). Traced cases tie each mechanism "
+     "to a step: skeleton pruning, a spur that changes the topology, and a "
+     "prior term larger than the similarity gap."),
+   ("p", "**Prospects.** The census sets the order of work. The class-4 gate "
+     "errors and the pruning rule come first, since they remove the true "
+     "concept from competition. The ranking prior should be revised only "
+     "with its rescues counted. The sample-count study needs classification "
+     "runs per condition, and order independence needs its controlled "
+     "experiment once the pairing step is corrected."),
   ],
  },
 ]
 
 # --------------------------------------------------------------------------
-# References — AIS Harvard, numbered in order of first citation.
-# Every DOI verified against Crossref on 2026-08-14.
+# References — AIS Harvard. Keys are resolved in order of first citation.
 # --------------------------------------------------------------------------
 
-REFERENCES = [
- 'Parzhyn, Y. (2013), "Principles of modal and vector theory of formal '
- 'intelligence systems", arXiv, arXiv:1302.1334, available at: '
- 'https://arxiv.org/abs/1302.1334',
+REFERENCE_DB = {
+ "rudin2019":
+ 'Rudin, C. (2019), "Stop explaining black box machine learning models for '
+ 'high stakes decisions and use interpretable models instead", Nature Machine '
+ 'Intelligence, vol. 1, no. 5, pp. 206–215, doi: '
+ 'https://doi.org/10.1038/s42256-019-0048-x',
 
- 'Parzhyn, Y. (2025), "Architecture of Information", arXiv, arXiv:2503.21794, '
- 'doi: https://doi.org/10.48550/arXiv.2503.21794',
+ "rudin2022":
+ 'Rudin, C., Chen, C., Chen, Z., Huang, H., Semenova, L. and Zhong, C. '
+ '(2022), "Interpretable machine learning: Fundamental principles and 10 '
+ 'grand challenges", Statistics Surveys, vol. 16, pp. 1–85, doi: '
+ 'https://doi.org/10.1214/21-SS133',
 
+ "lapin2025asu":
  'Lapin, M. and Bokhan, K. (2025), "Few-shot learning of a graph-based neural '
  'network model without backpropagation", Management Information System and '
  'Devices, no. 187, pp. 103–122, doi: '
  'https://doi.org/10.30837/0135-1710.2025.187.103',
 
- 'Bunke, H. and Allermann, G. (1983), "Inexact graph matching for structural '
- 'pattern recognition", Pattern Recognition Letters, vol. 1, no. 4, '
- 'pp. 245–253, doi: https://doi.org/10.1016/0167-8655(83)90033-8',
+ "parzhyn2025ais":
+ 'Parzhyn, Y., Lapin, M. and Bokhan, K. (2025), "A new approach to building '
+ 'energy models of neural networks", Advanced Information Systems, vol. 9, '
+ 'no. 4, pp. 100–119, doi: https://doi.org/10.20998/2522-9052.2025.4.13',
 
- 'Riesen, K. and Bunke, H. (2009), "Approximate graph edit distance '
- 'computation by means of bipartite graph matching", Image and Vision '
- 'Computing, vol. 27, no. 7, pp. 950–959, doi: '
- 'https://doi.org/10.1016/j.imavis.2008.04.004',
+ "lapin2026itssi":
+ 'Lapin, M., Parzhyn, Y., Bokhan, K., Perevoznyk, K. and Aleksandrova, T. '
+ '(2026), "Invariant structural learning: concept formation as hypergraph '
+ 'attractor dynamics", Innovative Technologies and Scientific Solutions for '
+ 'Industries, no. 2(36), pp. 70–94, doi: '
+ 'https://doi.org/10.30837/2522-9818.2026.2.070',
 
+ "lecun1998":
  'LeCun, Y., Bottou, L., Bengio, Y. and Haffner, P. (1998), "Gradient-based '
  'learning applied to document recognition", Proceedings of the IEEE, vol. 86, '
  'no. 11, pp. 2278–2324, doi: https://doi.org/10.1109/5.726791',
 
- 'Conte, D., Foggia, P., Sansone, C. and Vento, M. (2004), "Thirty years of '
- 'graph matching in pattern recognition", International Journal of Pattern '
- 'Recognition and Artificial Intelligence, vol. 18, no. 3, pp. 265–298, '
- 'doi: https://doi.org/10.1142/S0218001404003228',
+ "lapin2026dessert":
+ 'Lapin, M., Bokhan, K., Parzhyn, Y., Perevoznyk, K. and Aleksandrova, T. '
+ '(2026), "Traceable decisions without backpropagation: graph concept '
+ 'attractors for handwritten digit recognition", Proceedings of the IEEE '
+ '7th International Conference on Dependable Systems, Services and '
+ 'Technologies (DESSERT 2026), Corfu, Greece, in press',
 
- 'Riesen, K., Neuhaus, M. and Bunke, H. (2007), "Bipartite graph matching for '
- 'computing the edit distance of graphs", Graph-Based Representations in '
- 'Pattern Recognition, Lecture Notes in Computer Science, vol. 4538, Springer, '
- 'Berlin, Heidelberg, pp. 1–12, doi: '
- 'https://doi.org/10.1007/978-3-540-72903-7_1',
-
+ "fritzke1995":
  'Fritzke, B. (1995), "A growing neural gas network learns topologies", '
  'Advances in Neural Information Processing Systems 7, MIT Press, Cambridge, '
  'MA, pp. 625–632, available at: '
  'https://proceedings.neurips.cc/paper/1994/hash/'
  'd56b9fc4b0f1be8871f5e1c40c0067e7-Abstract.html',
 
- 'Hinton, G. (2022), "The Forward-Forward Algorithm: Some Preliminary '
- 'Investigations", arXiv, arXiv:2212.13345, doi: '
- 'https://doi.org/10.48550/arXiv.2212.13345',
+ "repo":
+ 'NaturalAGI-Lab (2026), "NaturalAGI: structural pattern recognition '
+ 'without backpropagation", GitHub repository, available at: '
+ 'https://github.com/NaturalAGI-Lab/NaturalAGI',
 
- 'Parzhyn, Y., Lapin, M. and Bokhan, K. (2025), "A new approach to building '
- 'energy models of neural networks", Advanced Information Systems, vol. 9, '
- 'no. 4, pp. 100–119, doi: '
- 'https://doi.org/10.20998/2522-9052.2025.4.13',
+ "bougleux2017":
+ 'Bougleux, S., Brun, L., Carletti, V., Foggia, P., Gaüzère, B. and Vento, '
+ 'M. (2017), "Graph edit distance as a quadratic assignment problem", Pattern '
+ 'Recognition Letters, vol. 87, pp. 38–46, doi: '
+ 'https://doi.org/10.1016/j.patrec.2016.10.001',
 
- 'Snell, J., Swersky, K. and Zemel, R. (2017), "Prototypical Networks for '
- 'Few-shot Learning", arXiv, arXiv:1703.05175, doi: '
- 'https://doi.org/10.48550/arXiv.1703.05175',
+ "blumenthal2019":
+ 'Blumenthal, D. B., Boria, N., Gamper, J., Bougleux, S. and Brun, L. (2019), '
+ '"Comparing heuristics for graph edit distance computation", The VLDB '
+ 'Journal, vol. 29, no. 1, pp. 419–458, doi: '
+ 'https://doi.org/10.1007/s00778-019-00544-1',
 
- 'Finn, C., Abbeel, P. and Levine, S. (2017), "Model-agnostic meta-learning '
- 'for fast adaptation of deep networks", Proceedings of the 34th International '
- 'Conference on Machine Learning, PMLR, vol. 70, pp. 1126–1135, available '
- 'at: https://proceedings.mlr.press/v70/finn17a.html',
+ "riba2021":
+ 'Riba, P., Fischer, A., Lladós, J. and Fornés, A. (2021), "Learning graph '
+ 'edit distance by graph neural networks", Pattern Recognition, vol. 120, '
+ 'article 108132, doi: https://doi.org/10.1016/j.patcog.2021.108132',
 
- 'Lake, B., Salakhutdinov, R. and Tenenbaum, J. (2015), "Human-level concept '
- 'learning through probabilistic program induction", Science, vol. 350, '
- 'no. 6266, pp. 1332–1338, doi: https://doi.org/10.1126/science.aab3050',
+ "barredo2020":
+ 'Barredo Arrieta, A., Díaz-Rodríguez, N., Del Ser, J., Bennetot, A., Tabik, '
+ 'S., Barbado, A. et al. (2020), "Explainable Artificial Intelligence (XAI): '
+ 'Concepts, taxonomies, opportunities and challenges toward responsible AI", '
+ 'Information Fusion, vol. 58, pp. 82–115, doi: '
+ 'https://doi.org/10.1016/j.inffus.2019.12.012',
 
- 'Rudin, C. (2019), "Stop explaining black box machine learning models for '
- 'high stakes decisions and use interpretable models instead", Nature Machine '
- 'Intelligence, vol. 1, no. 5, pp. 206–215, doi: '
- 'https://doi.org/10.1038/s42256-019-0048-x',
+ "ji2020":
+ 'Ji, Z., Chai, X., Yu, Y., Pang, Y. and Zhang, Z. (2020), "Improved '
+ 'prototypical networks for few-shot learning", Pattern Recognition Letters, '
+ 'vol. 140, pp. 81–87, doi: https://doi.org/10.1016/j.patrec.2020.07.015',
 
- 'Zhang, T. and Suen, C. (1984), "A fast parallel algorithm for thinning '
- 'digital patterns", Communications of the ACM, vol. 27, no. 3, '
- 'pp. 236–239, doi: https://doi.org/10.1145/357994.358023',
+ "oakden2020":
+ 'Oakden-Rayner, L., Dunnmon, J., Carneiro, G. and Ré, C. (2020), "Hidden '
+ 'stratification causes clinically meaningful failures in machine learning '
+ 'for medical imaging", Proceedings of the ACM Conference on Health, '
+ 'Inference, and Learning, pp. 151–159, doi: '
+ 'https://doi.org/10.1145/3368555.3384468',
 
- 'Douglas, D. and Peucker, T. (1973), "Algorithms for the reduction of the '
- 'number of points required to represent a digitized line or its caricature", '
- 'Cartographica, vol. 10, no. 2, pp. 112–122, doi: '
- 'https://doi.org/10.3138/FM57-6770-U75U-7727',
-]
+ "geirhos2020":
+ 'Geirhos, R., Jacobsen, J.-H., Michaelis, C., Zemel, R., Brendel, W., '
+ 'Bethge, M. and Wichmann, F. A. (2020), "Shortcut learning in deep neural '
+ 'networks", Nature Machine Intelligence, vol. 2, no. 11, pp. 665–673, doi: '
+ 'https://doi.org/10.1038/s42256-020-00257-z',
+
+ "gan2023":
+ 'Gan, J., Chen, Y., Hu, B., Leng, J., Wang, W. and Gao, X. (2023), '
+ '"Characters as graphs: Interpretable handwritten Chinese character '
+ 'recognition via Pyramid Graph Transformer", Pattern Recognition, vol. 137, '
+ 'article 109317, doi: https://doi.org/10.1016/j.patcog.2023.109317',
+}
+
+_CITE = re.compile(r"\[(@[\w]+(?:,\s*@[\w]+)*)\]")
+
+
+def _number_citations() -> list:
+    order: list = []
+
+    def resolve(match: re.Match) -> str:
+        numbers = []
+        for key in re.findall(r"@(\w+)", match.group(1)):
+            if key not in order:
+                order.append(key)
+            numbers.append(str(order.index(key) + 1))
+        return "[" + ", ".join(numbers) + "]"
+
+    for section in SECTIONS:
+        blocks = section["blocks"]
+        for index, block in enumerate(blocks):
+            if block[0] in ("p", "h2"):
+                blocks[index] = (block[0], _CITE.sub(resolve, block[1]))
+    return [REFERENCE_DB[key] for key in order]
+
+
+REFERENCES = _number_citations()
 
 # --------------------------------------------------------------------------
 # Back matter
 # --------------------------------------------------------------------------
 
 RECEIVED = "Received (Надійшла)"
-ACCEPTED = ("Accepted for publication "
-            "(Прийнято до "
-            "друку)")
+ACCEPTED = "Accepted for publication (Прийнято до друку)"
+
+KHPI_UA = ("Національний технічний університет \"Харківський політехнічний "
+           "інститут\", Харків, Україна")
+KHPI_EN = ("National Technical University \"Kharkiv Polytechnic Institute\", "
+           "Kharkiv, Ukraine")
+DEPT_UA = "кафедри системного аналізу та інформаційно-аналітичних технологій"
+DEPT_EN = ("the Department of System Analysis and Information and Analytical "
+           "Technologies")
 
 AUTHOR_BLOCK = [
     {
      "ua_name": "Лапін Микита Олексійович",
-     "ua_body": "аспірант кафедри системного аналізу та інформаційно-"
-                "аналітичних технологій, Національний технічний університет "
-                "\"Харківський політехнічний інститут\", Харків, Україна;",
+     "ua_body": f"аспірант {DEPT_UA}, {KHPI_UA};",
      "en_name": "Mykyta Lapin",
-     "en_body": "Postgraduate Student of the Department of System Analysis "
-                "and Information and Analytical Technologies, National "
-                "Technical University \"Kharkiv Polytechnic Institute\", "
-                "Kharkiv, Ukraine.",
+     "en_body": f"Postgraduate Student of {DEPT_EN}, {KHPI_EN}.",
      "email": "Mykyta.Lapin@cit.khpi.edu.ua",
      "orcid": "https://orcid.org/0009-0003-6307-1172",
      "scopus": "https://www.scopus.com/authid/detail.uri?authorId=60171161300",
     },
+    {
+     "ua_name": "Бохан Костянтин Олександрович",
+     "ua_body": f"кандидат технічних наук, доцент {DEPT_UA}, {KHPI_UA};",
+     "en_name": "Kostiantyn Bokhan",
+     "en_body": f"Candidate of Technical Sciences, Associate Professor of "
+                f"{DEPT_EN}, {KHPI_EN}.",
+     "email": "[e-mail]",
+     "orcid": "https://orcid.org/0000-0003-3375-2527",
+     "scopus": "https://www.scopus.com/authid/detail.uri?authorId=57191592568",
+    },
+    {
+     "ua_name": "Паржин Юрій Володимирович",
+     "ua_body": "доктор технічних наук, Університет Огасти, Огаста, США;",
+     "en_name": "Yurii Parzhyn",
+     "en_body": "Doctor of Technical Sciences, School of Computer and Cyber "
+                "Sciences, Augusta University, Augusta, USA.",
+     "email": "[e-mail]",
+     "orcid": "https://orcid.org/0000-0001-5727-1918",
+     "scopus": "https://www.scopus.com/authid/detail.uri?authorId=57224412390",
+    },
+    {
+     "ua_name": "Перевозник Кирило Максимович",
+     "ua_body": f"аспірант {DEPT_UA}, {KHPI_UA};",
+     "en_name": "Kyrylo Perevoznyk",
+     "en_body": f"Postgraduate Student of {DEPT_EN}, {KHPI_EN}.",
+     "email": "[e-mail]",
+     "orcid": "https://orcid.org/0009-0009-2327-1501",
+     "scopus": "https://www.scopus.com/authid/detail.uri?authorId=59564678000",
+    },
+    {
+     "ua_name": "Александрова Тетяна Євгенівна",
+     "ua_body": f"доктор технічних наук, професор, завідувач {DEPT_UA}, "
+                f"{KHPI_UA};",
+     "en_name": "Tetiana Aleksandrova",
+     "en_body": f"Doctor of Technical Sciences, Professor, Head of {DEPT_EN}, "
+                f"{KHPI_EN}.",
+     "email": "[e-mail]",
+     "orcid": "[ORCID]",
+     "scopus": "[Scopus ID]",
+    },
 ]
 
-UA_TITLE = ("Анатомія помилок і стабільність формування структурних концептів "
-            "у графовому класифікаторі без зворотного поширення помилки")
+UA_TITLE = ("Стабільність формування та механізми помилок графового "
+            "класифікатора концептів, навченого без зворотного поширення "
+            "помилки")
 
-UA_AUTHORS = "М. О. Лапін"
+UA_AUTHORS = ("М. О. Лапін, К. О. Бохан, Ю. В. Паржин, К. М. Перевозник, "
+              "Т. Є. Александрова")
 
 UA_ABSTRACT = [
-    ("Актуальність.", "Структурні класифікатори, які формують явні графові "
-     "концепти, обіцяють інтерпретовні рішення, проте види їхніх відмов і "
-     "стабільність формування концептів досліджено значно менше, ніж "
-     "показники точності. Обидва питання важать для структурних "
-     "класифікаторів більше, ніж для вагових моделей, саме тому, що "
-     "внутрішнє подання претендує на семантичний зміст."),
-    ("Об’єкт дослідження", "— класифікатор без зворотного поширення "
-     "помилки, який перетворює зображення на атрибутовані дводольні "
-     "скелетні графи, формує для кожного класу концепти-атрактори "
-     "ітераційною редукцією критичних точок і ухвалює рішення конкуренцією "
-     "за принципом «переможець отримує все» на основі оцінок графової "
-     "подібності; він досягає точності 91,13 % на класифікованих "
-     "зображеннях підмножини тестового набору MNIST із повними контурами "
-     "(90,90 %, якщо враховувати й ті зображення, які не вдалося "
-     "опрацювати)."),
-    ("Предмет дослідження", "— походження домінантного сплутування класів "
-     "у класифікаторі та стабільність процесу формування концептів щодо "
-     "порядку подання прикладів, їхньої кількості та глибини редукції."),
-    ("Метою даної статті", "є постадійна локалізація причини домінантної "
-     "помилки в конвеєрі обробки, перевірка почерговим вимкненням того, чи "
-     "здатен хоч один із механізмів подальших стадій її виправити, а також "
-     "з’ясування, наскільки відтворюваними, компактними та швидко збіжними "
-     "є сформовані концепти."),
-    ("Результати дослідження.", "Домінантне сплутування — цифра 2, "
-     "розпізнана як 7, — походить із вхідної ланки формування подання: за "
-     "порога бінаризації, застосованого в цьому запуску, топологічна діра "
-     "нижньої лівої петлі відсутня вже на бінаризованому зображенні у 110 "
-     "зі 111 випадків — петля або написана розімкненою, або її малий "
-     "внутрішній простір залито товстим штрихом. Почергове вимкнення "
-     "префільтра складності та пріору ранжування показує, що жоден із них "
-     "помилки не усуває; чи має сама функція подібності розрізняти такі "
-     "збіднені графи, лишається відкритим питанням проєктування. П’ять "
-     "пошукових досліджень стабільності характеризують формування: "
-     "кількість вузлів інваріантна до порядку подання прикладів для трьох "
-     "перевірених концептів; кількості вузлів і ребер перестають "
-     "змінюватися вже після кількох десятків прикладів для всіх тринадцяти "
-     "концептів, тоді як параметрична оболонка продовжує розширюватися; "
-     "концепти узагальнюються на нефільтровані розбиття MNIST зі зниженою "
-     "точністю; а самі концепти зберігають у 91,9 раза менше вузлів, ніж "
-     "навчальні графи, з яких їх сформовано."),
-    ("Висновки.", "Для цього домінантного сплутування вузьке місце "
-     "перебуває у вхідній ланці перетворення зображення на граф, ще до "
-     "формування концептів, а концепти, які формує система, є компактними "
-     "та здебільшого відтворюваними."),
+    ("Актуальність.", "Класифікатор, що зберігає кожен клас як явний граф, "
+     "можна перевірити на кожному кроці, але цінність такої перевірки "
+     "залежить від двох питань: коли збережений клас перестає змінюватися з "
+     "надходженням навчальних прикладів і чи можна кожну хибну відповідь "
+     "простежити до етапу, який її спричинив."),
+    ("Об’єкт дослідження", "– класифікатор рукописних цифр, навчений без "
+     "зворотного поширення помилки. Він перетворює зображення на "
+     "атрибутований скелетний граф, зводить графи одного підкласу до "
+     "одного графа-концепту й ухвалює рішення за подібністю на основі "
+     "редакційної відстані між графами з поправкою на складність "
+     "концепту."),
+    ("Предмет дослідження", "– стабілізація графів-концептів під час "
+     "формування та механізми, що породжують хибні класифікації."),
+    ("Мета статті", "– виміряти, як рано концепти перестають змінюватися і "
+     "що з ними роблять додаткові приклади, та віднести кожну відповідь із "
+     "хибним класом до кроку рішення, який її спричинив."),
+    ("Результати дослідження.", "Для тринадцяти концептів кількості вузлів "
+     "і ребер перестають змінюватися після 1–37 навчальних файлів, тоді як "
+     "координатні оболонки стабілізуються за окремим графіком; більше "
+     "прикладів дає менший граф із ширшими оболонками. Концепти зберігають "
+     "106 вузлів із 9 738 у 869 навчальних графах. Із 820 відповідей із "
+     "хибним класом на 8 683 класифікованих тестових зображеннях MNIST із "
+     "повними контурами 312 виникають тому, що жоден концепт істинного "
+     "класу не доходить до порівняння, 383 – тому, що переможець має вищу "
+     "сиру подібність, і 125 – тому, що поправка на складність перевертає "
+     "перевагу концепту істинного класу. Простежені випадки показують, де "
+     "починається кожен механізм: обрізання скелета, що прибирає кінець "
+     "штриха, відросток, що надає нулю топологію шістки, і доданок поправки, "
+     "більший за різницю подібностей."),
+    ("Висновки.", "Формування стабілізується за десятки прикладів, і "
+     "правило зупинки має окремо стежити за структурою та оболонками. "
+     "Більшість помилок виникає до обчислення подібності – під час побудови "
+     "графа і структурної перевірки, тож наступні виправлення належать "
+     "туди, а не до ваг вартостей."),
 ]
 
 UA_KEYWORDS = ("структурне розпізнавання образів; редакційна відстань між "
-               "графами; формування концептів; навчання на малій вибірці; "
-               "скелетизація; пояснюваний штучний інтелект; MNIST")
+               "графами; формування концептів; пояснюваний штучний інтелект; "
+               "аналіз помилок; розпізнавання рукописних цифр; навчання без "
+               "зворотного поширення помилки")
