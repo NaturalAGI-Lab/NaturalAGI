@@ -379,9 +379,6 @@ SECTIONS = [
    ("p", "No ties occur on raw similarity between the true-class concept and "
      "the winner, and none on the adjusted score among the 125 prior "
      "cases, so the sort order never decides."),
-   ("fig", "anatomy/pop_pairs.png", 3,
-    "The ten most frequent confusion pairs split by mechanism; together "
-    "they hold 542 of the 820 wrong-class answers", "full"),
    ("p", "The mechanisms concentrate in different pairs (Fig. 3). The ten "
      "most frequent pairs hold 542 answers (66.1%). The pair 2→7 is almost "
      "all similarity (90 of 93), as are 0→6 (46 of 52) and 9→4 (27 of 27). "
@@ -397,9 +394,12 @@ SECTIONS = [
      "image, the pair «no corner points» plus «no intersection points» "
      "accounts for 100 gate errors, all of class 4, and «no endpoints» "
      "alone for 82, of which 56 are of class 2."),
+   ("fig", "anatomy/pop_pairs.png", 3,
+    "The ten most frequent confusion pairs split by mechanism; together "
+    "they hold 542 of the 820 wrong-class answers", "full"),
    ("fig", "anatomy/pop_gate_reasons.png", 4,
     "Gate errors by the combination of rejection messages per image (top) "
-    "and by message per rejected true-class concept (bottom)", "full"),
+    "and by message per rejected true-class concept (bottom)", "full", 0.85),
    ("h2", "Gate: a pruned stroke end (2 read as 6)"),
    ("p", "Image mnist_test_2_00144 is a 2 classified as 6_1; both concepts "
      "of class 2 were rejected before comparison (Fig. 5). Its skeleton "

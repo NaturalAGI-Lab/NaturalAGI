@@ -271,8 +271,8 @@ def switch_columns(doc: Document, count: int):
 
 
 def add_figure(doc: Document, filename: str, number: int, caption: str,
-               placement: str) -> None:
-    width = TEXT_WIDTH if placement == "full" else COL_WIDTH
+               placement: str, scale: float = 1.0) -> None:
+    width = int((TEXT_WIDTH if placement == "full" else COL_WIDTH) * scale)
     p = doc.add_paragraph()
     p.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
     p.paragraph_format.space_before = Pt(6)
@@ -365,12 +365,27 @@ def add_table(doc: Document, number: int, caption: str, header: list,
             add_runs(cp, text, size)
         if row_index in rules:
             _rule_above(table.rows[-1])
+    _keep_table_on_one_page(table)
 
     tail = doc.add_paragraph()
     tail.paragraph_format.space_after = Pt(8)
     tail.paragraph_format.line_spacing = 1.0
     if note:
         _style_run(tail.add_run(note), 8)
+
+
+def _keep_table_on_one_page(table) -> None:
+    """Rows never split, the header repeats, and every row but the last keeps
+    with the next, so a short table moves whole instead of breaking."""
+    for index, row in enumerate(table.rows):
+        tr_pr = row._tr.get_or_add_trPr()
+        tr_pr.append(_el("w:cantSplit"))
+        if index == 0:
+            tr_pr.append(_el("w:tblHeader"))
+        if index < len(table.rows) - 1:
+            for cell in row.cells:
+                for p in cell.paragraphs:
+                    p.paragraph_format.keep_with_next = True
 
 
 def _rule_above(row) -> None:
@@ -431,7 +446,7 @@ def body(doc: Document) -> None:
                 columns = wanted
 
             if kind == "fig":
-                add_figure(doc, block[1], block[2], block[3], block[4])
+                add_figure(doc, *block[1:])
             else:
                 number, caption, header, rows, placement, weights = block[1:7]
                 note = block[8] if len(block) > 8 else None
