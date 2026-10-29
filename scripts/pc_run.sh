@@ -4,11 +4,14 @@
 # The command runs inside the copy of <dir> and writes its results into out/. When it ends, out/ and
 # logs/ (run.log, exit) are copied back into <dir>, and the script exits with the command's exit code.
 # Windows stays awake from the upload until the copy-back ends.
+# Before the upload it waits until the PC runs no gd-* tmux session and uses less than
+# ${PC_GPU_FREE_MIB:-2048} MiB of VRAM, so a job never starts on top of a Golden Delta render.
 # Host: ${PC_HOST:-gd-wsl}. Remote folder: ${PC_JOBS:-naturalagi-jobs}/<job> under the PC's $HOME.
 set -eu
 
 host="${PC_HOST:-gd-wsl}"
 jobs_root="${PC_JOBS:-naturalagi-jobs}"
+gpu_limit="${PC_GPU_FREE_MIB:-2048}"
 
 usage() {
   echo "usage: pc_run.sh <job> <dir> <command...>" >&2
@@ -46,6 +49,41 @@ case "$(session_state)" in
     exit 1
     ;;
 esac
+
+# Prints "<gd-* session count> <VRAM used in MiB>", or nothing when ssh fails.
+gpu_state() {
+  ssh -o ConnectTimeout=10 "$host" \
+    "echo \$(tmux ls -F '#{session_name}' 2>/dev/null | grep -c '^gd-') \$(nvidia-smi --query-gpu=memory.used --format=csv,noheader,nounits 2>/dev/null | head -n 1)" \
+    2>/dev/null || true
+}
+
+# Windows desktop alone holds about 1 GB of VRAM after a wake, hence the 2048 MiB default.
+last_state=""
+failures=0
+while :; do
+  state="$(gpu_state)"
+  if [ -z "$state" ]; then
+    failures=$((failures + 1))
+    if [ "$failures" -ge 5 ]; then
+      echo "lost $host while waiting for its GPU: run make pc_wake" >&2
+      exit 1
+    fi
+  else
+    failures=0
+    read -r gd_sessions vram <<< "$state"
+    case "${vram:-}" in
+      '' | *[!0-9]*) vram=unknown ;;
+    esac
+    if [ "$gd_sessions" = 0 ] && [ "$vram" != unknown ] && [ "$vram" -lt "$gpu_limit" ]; then
+      break
+    fi
+    if [ "$state" != "$last_state" ]; then
+      echo "waiting for the GPU on $host: $gd_sessions gd-* tmux sessions, $vram MiB VRAM used (limit $gpu_limit)"
+      last_state="$state"
+    fi
+  fi
+  sleep 60
+done
 
 work="$(mktemp -d "${TMPDIR:-/tmp}/pc-run.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
