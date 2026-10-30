@@ -824,17 +824,18 @@ AUTHOR_BLOCK = [
      "en_name": "Kostiantyn Bokhan",
      "en_body": f"Candidate of Technical Sciences, Associate Professor of "
                 f"{DEPT_EN}, {KHPI_EN}.",
-     "email": "[e-mail]",
+     "email": "kostiantyn.bokhan@khpi.edu.ua",
      "orcid": "https://orcid.org/0000-0003-3375-2527",
      "scopus": "https://www.scopus.com/authid/detail.uri?authorId=57191592568",
     },
     {
      "ua_name": "Паржин Юрій Володимирович",
-     "ua_body": "доктор технічних наук, Університет Огасти, Огаста, США;",
+     "ua_body": "доктор технічних наук, постдокторант Школи комп'ютерних та кібернаук, "
+                "Університет Огасти, Огаста, США;",
      "en_name": "Yurii Parzhyn",
-     "en_body": "Doctor of Technical Sciences, School of Computer and Cyber "
+     "en_body": "Doctor of Technical Sciences, Postdoctoral Fellow, School of Computer and Cyber "
                 "Sciences, Augusta University, Augusta, USA.",
-     "email": "[e-mail]",
+     "email": "yparzhyn@augusta.edu",
      "orcid": "https://orcid.org/0000-0001-5727-1918",
      "scopus": "https://www.scopus.com/authid/detail.uri?authorId=57224412390",
     },
@@ -843,7 +844,7 @@ AUTHOR_BLOCK = [
      "ua_body": f"аспірант {DEPT_UA}, {KHPI_UA};",
      "en_name": "Kyrylo Perevoznyk",
      "en_body": f"Postgraduate Student of {DEPT_EN}, {KHPI_EN}.",
-     "email": "[e-mail]",
+     "email": "kyrylo.perevoznyk@cs.khpi.edu.ua",
      "orcid": "https://orcid.org/0009-0009-2327-1501",
      "scopus": "https://www.scopus.com/authid/detail.uri?authorId=59564678000",
     },
@@ -854,9 +855,9 @@ AUTHOR_BLOCK = [
      "en_name": "Tetiana Aleksandrova",
      "en_body": f"Doctor of Technical Sciences, Professor, Head of {DEPT_EN}, "
                 f"{KHPI_EN}.",
-     "email": "[e-mail]",
-     "orcid": "[ORCID]",
-     "scopus": "[Scopus ID]",
+     "email": "Tetiana.Aleksandrova@khpi.edu.ua",
+     "orcid": "https://orcid.org/0000-0001-9596-0669",
+     "scopus": "https://www.scopus.com/authid/detail.uri?authorId=57189376480",
     },
 ]
 
