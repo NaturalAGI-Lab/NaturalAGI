@@ -154,43 +154,50 @@ def setup_page(section) -> None:
 # front matter
 # --------------------------------------------------------------------------
 
-def front_matter(doc: Document) -> None:
-    p = para(doc, align=WD_ALIGN_PARAGRAPH.LEFT, space_after=6)
-    p.paragraph_format.tab_stops.add_tab_stop(TEXT_WIDTH,
-                                              WD_TAB_ALIGNMENT.RIGHT)
-    _style_run(p.add_run(C.UDC), 10)
-
-    para(doc, C.AUTHORS, size=11, align=WD_ALIGN_PARAGRAPH.LEFT,
-         space_after=6)
-    for affiliation in C.AFFILIATIONS:
-        para(doc, affiliation, size=11, align=WD_ALIGN_PARAGRAPH.LEFT)
-
-    para(doc, C.TITLE, size=12, align=WD_ALIGN_PARAGRAPH.CENTER,
-         space_before=14, space_after=12, bold=True)
-
+def _abstract_block(doc: Document, marker: str, labelled: list, kw_marker: str,
+                    keywords: str, space_after: float) -> None:
     abstract = doc.add_paragraph()
     fmt = abstract.paragraph_format
     fmt.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     fmt.left_indent = Cm(0.75)
     fmt.first_line_indent = Cm(0.75)
     fmt.line_spacing = 1.0
-    fmt.space_after = Pt(6)
-    _style_run(abstract.add_run("Abstract. "), 9, spacing=TRACKING)
-    for index, (label, body) in enumerate(C.ABSTRACT):
+    fmt.space_after = Pt(3)
+    _style_run(abstract.add_run(marker + " "), 9, spacing=TRACKING)
+    for index, (label, text) in enumerate(labelled):
         if index:
             _style_run(abstract.add_run(" "), 9)
         _style_run(abstract.add_run(label + " "), 9, bold=True)
-        add_runs(abstract, body, 9)
+        add_runs(abstract, text, 9)
 
-    keywords = doc.add_paragraph()
-    kfmt = keywords.paragraph_format
+    kw = doc.add_paragraph()
+    kfmt = kw.paragraph_format
     kfmt.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
     kfmt.left_indent = Cm(0.75)
     kfmt.first_line_indent = Cm(0.75)
     kfmt.line_spacing = 1.0
-    kfmt.space_after = Pt(10)
-    _style_run(keywords.add_run("Keywords: "), 9, bold=True, spacing=TRACKING)
-    _style_run(keywords.add_run(C.KEYWORDS + "."), 9)
+    kfmt.space_after = Pt(space_after)
+    _style_run(kw.add_run(kw_marker + " "), 9, bold=True, spacing=TRACKING)
+    _style_run(kw.add_run(keywords + "."), 9)
+
+
+def _title_block(doc: Document, authors: str, affiliations: list,
+                 title: str) -> None:
+    para(doc, authors, size=11, align=WD_ALIGN_PARAGRAPH.LEFT, space_after=6)
+    for affiliation in affiliations:
+        para(doc, affiliation, size=11, align=WD_ALIGN_PARAGRAPH.LEFT)
+    para(doc, title, size=12, align=WD_ALIGN_PARAGRAPH.CENTER,
+         space_before=8, space_after=8, bold=True)
+
+
+def front_matter(doc: Document) -> None:
+    p = para(doc, align=WD_ALIGN_PARAGRAPH.LEFT, space_after=8)
+    _style_run(p.add_run(C.UDC), 10)
+    _title_block(doc, C.UA_AUTHORS, C.UA_AFFILIATIONS, C.UA_TITLE.upper())
+    _abstract_block(doc, "Анотація.", C.UA_ABSTRACT, "Ключові слова:",
+                    C.UA_KEYWORDS, 9)
+    _title_block(doc, C.AUTHORS, C.AFFILIATIONS, C.TITLE)
+    _abstract_block(doc, "Abstract.", C.ABSTRACT, "Keywords:", C.KEYWORDS, 10)
 
 
 # --------------------------------------------------------------------------
@@ -404,6 +411,11 @@ def body(doc: Document) -> None:
 def back_matter(doc: Document) -> None:
     switch_columns(doc, 1)
 
+    for title, text in C.END_SECTIONS:
+        p = para(doc, align=WD_ALIGN_PARAGRAPH.LEFT, space_after=3)
+        _style_run(p.add_run(title + ". "), 10, bold=True)
+        add_runs(p, text, 10)
+
     para(doc, "References", size=12, align=WD_ALIGN_PARAGRAPH.CENTER,
          space_before=5, space_after=5, bold=True, keep_with_next=True)
     for index, reference in enumerate(C.REFERENCES, start=1):
@@ -449,34 +461,6 @@ def back_matter(doc: Document) -> None:
         p4.paragraph_format.line_spacing = 1.0
         p4.paragraph_format.space_after = Pt(8)
         _style_run(p4.add_run(f"Scopus ID: {author['scopus']}."), 9)
-
-    para(doc, C.UA_TITLE, size=10, align=WD_ALIGN_PARAGRAPH.CENTER,
-         space_before=6, space_after=2, bold=True, keep_with_next=True)
-    para(doc, C.UA_AUTHORS, size=10, align=WD_ALIGN_PARAGRAPH.CENTER,
-         space_after=6, keep_with_next=True)
-
-    ua = doc.add_paragraph()
-    fmt = ua.paragraph_format
-    fmt.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    fmt.left_indent = Cm(0.75)
-    fmt.first_line_indent = Cm(0.75)
-    fmt.line_spacing = 1.0
-    fmt.space_after = Pt(6)
-    _style_run(ua.add_run("Анотація. "), 9, spacing=TRACKING)
-    for index, (label, text) in enumerate(C.UA_ABSTRACT):
-        if index:
-            _style_run(ua.add_run(" "), 9)
-        _style_run(ua.add_run(label + " "), 9, bold=True)
-        add_runs(ua, text, 9)
-
-    kw = doc.add_paragraph()
-    kfmt = kw.paragraph_format
-    kfmt.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-    kfmt.left_indent = Cm(0.75)
-    kfmt.first_line_indent = Cm(0.75)
-    kfmt.line_spacing = 1.0
-    _style_run(kw.add_run("Ключові слова: "), 9, bold=True, spacing=TRACKING)
-    _style_run(kw.add_run(C.UA_KEYWORDS + "."), 9)
 
 
 # --------------------------------------------------------------------------
