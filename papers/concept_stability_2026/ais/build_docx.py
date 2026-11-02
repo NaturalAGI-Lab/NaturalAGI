@@ -3,8 +3,7 @@
 Usage:
     .venv/bin/python papers/concept_stability_2026/ais/build_docx.py
 
-Layout follows ../journal_rules/ais_layout.md, whose numbers were measured off
-the team's own published AIS article. Front matter and back matter run full
+Layout follows ../journal_rules/ais_layout.md. Front matter and back matter run full
 width; the body runs in two 8.0 cm columns with a 0.5 cm gutter, interrupted by
 continuous section breaks wherever a wide figure or table needs the full
 measure.
@@ -38,10 +37,6 @@ TEXT_WIDTH = Cm(16.51)
 COL_WIDTH = Cm(8.0)
 COL_GAP_TWIPS = 283  # 0.5 cm
 
-HEADER_EN = "Advanced Information Systems"
-HEADER_UA = "Сучасні інформаційні системи"
-ISSN = "ISSN 2522-9052"
-
 INLINE = re.compile(r"(\*\*.+?\*\*|\*.+?\*|<sub>.+?</sub>|<sup>.+?</sup>)")
 
 
@@ -65,32 +60,11 @@ def _set_columns(section, count: int) -> None:
 
 def _document_settings(doc: Document) -> None:
     settings = doc.settings.element
-    if not settings.xpath("./w:evenAndOddHeaders"):
-        settings.append(_el("w:evenAndOddHeaders"))
     # Justified 8 cm columns look ragged without it; AIS prints hyphenated.
     if not settings.xpath("./w:autoHyphenation"):
         settings.append(_el("w:autoHyphenation", **{"w:val": "true"}))
         settings.append(_el("w:hyphenationZone", **{"w:val": "227"}))
         settings.append(_el("w:doNotHyphenateCaps", **{"w:val": "true"}))
-
-
-def _bottom_border(paragraph) -> None:
-    borders = _el("w:pBdr")
-    borders.append(_el("w:bottom", **{"w:val": "single", "w:sz": "6",
-                                      "w:space": "1", "w:color": "000000"}))
-    paragraph._p.get_or_add_pPr().append(borders)
-
-
-def _page_field(paragraph) -> None:
-    run = paragraph.add_run()
-    run.font.name = FONT
-    run.font.size = Pt(10)
-    begin = _el("w:fldChar", **{"w:fldCharType": "begin"})
-    instr = _el("w:instrText", **{"xml:space": "preserve"})
-    instr.text = " PAGE "
-    end = _el("w:fldChar", **{"w:fldCharType": "end"})
-    for node in (begin, instr, end):
-        run._r.append(node)
 
 
 def _style_run(run, size: float, *, bold=False, italic=False, sub=False,
@@ -174,46 +148,6 @@ def setup_page(section) -> None:
     section.right_margin = Cm(2.25)
     section.top_margin = Cm(2.0)
     section.bottom_margin = Cm(2.5)
-    section.header_distance = Cm(1.4)
-    section.footer_distance = Cm(1.4)
-
-
-def fill_header(section, left: str, right: str) -> None:
-    p = section.header.paragraphs[0]
-    _write_running_head(p, left, right)
-    _bottom_border(p)
-    ep = section.even_page_header.paragraphs[0]
-    _write_running_head(ep, ISSN, HEADER_UA)
-    _bottom_border(ep)
-
-
-def _drop_style_tabs(p) -> None:
-    """The built-in Header/Footer styles carry a centre tab at half measure,
-    which swallows the first tab. Detaching the style leaves only our own."""
-    pPr = p._p.get_or_add_pPr()
-    for node in pPr.findall(qn("w:pStyle")):
-        pPr.remove(node)
-
-
-def _write_running_head(p, left: str, right: str) -> None:
-    _drop_style_tabs(p)
-    p.paragraph_format.tab_stops.add_tab_stop(TEXT_WIDTH,
-                                              WD_TAB_ALIGNMENT.RIGHT)
-    p.paragraph_format.space_after = Pt(0)
-    _style_run(p.add_run(f"{left}\t{right}"), 10)
-
-
-def fill_footer(section) -> None:
-    p = section.footer.paragraphs[0]
-    _drop_style_tabs(p)
-    p.paragraph_format.tab_stops.add_tab_stop(TEXT_WIDTH,
-                                              WD_TAB_ALIGNMENT.RIGHT)
-    _style_run(p.add_run("\t"), 10)
-    _page_field(p)
-    ep = section.even_page_footer.paragraphs[0]
-    _drop_style_tabs(ep)
-    ep.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
-    _page_field(ep)
 
 
 # --------------------------------------------------------------------------
@@ -232,7 +166,7 @@ def front_matter(doc: Document) -> None:
         para(doc, affiliation, size=11, align=WD_ALIGN_PARAGRAPH.LEFT)
 
     para(doc, C.TITLE, size=12, align=WD_ALIGN_PARAGRAPH.CENTER,
-         space_before=14, space_after=12)
+         space_before=14, space_after=12, bold=True)
 
     abstract = doc.add_paragraph()
     fmt = abstract.paragraph_format
@@ -422,9 +356,9 @@ def _placement(block) -> str | None:
 def body(doc: Document) -> None:
     columns = 2
     for section_data in C.SECTIONS:
-        para(doc, section_data["title"], size=11,
-             align=WD_ALIGN_PARAGRAPH.CENTER, space_before=10, space_after=6,
-             keep_with_next=True)
+        para(doc, section_data["title"], size=12,
+             align=WD_ALIGN_PARAGRAPH.CENTER, space_before=5, space_after=5,
+             bold=True, keep_with_next=True)
         blocks = section_data["blocks"]
         for index, block in enumerate(blocks):
             kind = block[0]
@@ -432,9 +366,9 @@ def body(doc: Document) -> None:
                 para(doc, block[1], indent=Cm(0.75))
                 continue
             if kind == "h2":
-                para(doc, block[1], size=10, align=WD_ALIGN_PARAGRAPH.LEFT,
-                     indent=Cm(0.75), space_before=6, space_after=2,
-                     bold=True, italic=True, keep_with_next=True)
+                para(doc, block[1], size=10, align=WD_ALIGN_PARAGRAPH.CENTER,
+                     space_before=5, space_after=5, bold=True,
+                     keep_with_next=True)
                 continue
             if kind == "eq":
                 add_equation(doc, block[1], block[2])
@@ -470,8 +404,8 @@ def body(doc: Document) -> None:
 def back_matter(doc: Document) -> None:
     switch_columns(doc, 1)
 
-    para(doc, "REFERENCES", size=10, align=WD_ALIGN_PARAGRAPH.CENTER,
-         space_before=10, space_after=6, keep_with_next=True)
+    para(doc, "References", size=12, align=WD_ALIGN_PARAGRAPH.CENTER,
+         space_before=5, space_after=5, bold=True, keep_with_next=True)
     for index, reference in enumerate(C.REFERENCES, start=1):
         p = doc.add_paragraph()
         fmt = p.paragraph_format
@@ -560,8 +494,6 @@ def main() -> None:
     section = doc.sections[0]
     setup_page(section)
     _set_columns(section, 1)
-    fill_header(section, HEADER_EN, ISSN)
-    fill_footer(section)
 
     front_matter(doc)
     switch_columns(doc, 2)

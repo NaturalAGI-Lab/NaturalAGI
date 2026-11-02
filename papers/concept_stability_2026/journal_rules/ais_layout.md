@@ -10,6 +10,8 @@ rules; the team's own published AIS article
 Vol. 9 No. 4, 2025, pp. 100–119, `doi:10.20998/2522-9052.2025.4.13`) shows what
 the journal actually prints. Every geometric number below was measured off that
 PDF with `pdftotext -bbox-layout`; where the site is silent the PDF decides.
+`AIS_ArticleRequirements_EN.pdf` overrides both: this manuscript follows it for
+headings, the title and the absence of headers and footers.
 
 ## Site rules
 
@@ -36,20 +38,19 @@ PDF with `pdftotext -bbox-layout`; where the site is silent the PDF decides.
 | Left / right margin | 63.86 pt = 2.25 cm |
 | Text width | 467.96 pt = 16.51 cm |
 | Columns | 2 × 226.92 pt (8.0 cm), gap 14.12 pt (0.5 cm) |
-| Running head baseline | 39.4 pt from top edge (header distance ≈ 1.39 cm) |
 | First body element | 59.2 pt from top edge |
-| Footer | page number + copyright line, ≈ 1.8 cm from bottom edge |
 
 ## Font sizes (measured)
 
 | Element | Size | Style |
 |---|---|---|
-| Running head, UDC/doi line, body text | 10 pt | regular, justified |
+| UDC/doi line, body text | 10 pt | regular, justified |
 | Author line | 11 pt | regular, superscript affiliation markers |
 | Affiliation lines | 11 pt | regular |
-| Article title | 12 pt | ALL CAPS, centered |
+| Article title | 12 pt | ALL CAPS, bold, centered |
 | Abstract, keywords | 9 pt | justified, left indent 0.75 cm |
-| Section headings | 11 pt | regular, centered |
+| Section headings | 12 pt | bold, centered, 5 pt above and below |
+| Subsection headings | 10 pt | bold, centered, no indent, 5 pt above and below |
 | Figure and table captions | 9 pt | fig. caption centered below, table caption left above |
 | References | 9 pt | numbered list |
 | First-line paragraph indent | 21.2 pt = 0.75 cm | body and abstract |
@@ -57,20 +58,17 @@ PDF with `pdftotext -bbox-layout`; where the site is silent the PDF decides.
 
 ## Front matter order
 
-1. Running head — odd pages `Advanced Information Systems. YYYY. Vol. N, No. M`
-   left / `ISSN 2522-9052` right; even pages `ISSN 2522-9052` left /
-   `Сучасні інформаційні системи. YYYY. Т. N, № M` right; rule below.
-2. `UDC <code>` left, `doi: https://doi.org/10.20998/...` right — the DOI is
+1. `UDC <code>` left, `doi: https://doi.org/10.20998/...` right — the DOI is
    assigned by the editor, so a submission leaves it out.
-3. Author line with superscript affiliation numbers.
-4. Affiliation lines, one per superscript.
-5. Title, all caps, centered.
-6. Abstract, opening with letter-spaced `A b s t r a c t .` followed by the
+2. Author line with superscript affiliation numbers.
+3. Affiliation lines, one per superscript.
+4. Title, all caps, bold, centered.
+5. Abstract, opening with letter-spaced `A b s t r a c t .` followed by the
    structured labels the journal prints in letter-spaced type: *Relevance.*,
    *The object of research*, *The subject of the research*, *The purpose of this
    paper*, *Research Results.*
-7. `K e y w o r d s :` letter-spaced, entries separated by semicolons.
-8. Section break to the two-column body.
+6. `K e y w o r d s :` letter-spaced, entries separated by semicolons.
+7. Section break to the two-column body.
 
 ## Back matter order
 
@@ -89,9 +87,6 @@ PDF with `pdftotext -bbox-layout`; where the site is silent the PDF decides.
 
 ## Choices this paper makes where the sources are silent
 
-- **Subsection headings**: the reference article has none. Rendered here as
-  bold italic 10 pt on their own line, indented like a paragraph — subordinate
-  to the centered 11 pt section headings without inventing a competing style.
 - **Wide tables and figures**: placed in a full-width single-column section
   break, matching how the reference article prints Table 1 and its wide
   figures.
