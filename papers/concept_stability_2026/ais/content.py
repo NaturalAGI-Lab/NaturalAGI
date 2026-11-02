@@ -35,29 +35,30 @@ ABSTRACT = [
      "representation. But their reliability is measured by the stability of "
      "the structure formation and an ability to trace the wrong answer to the "
      "decision that produced it."),
-    ("The object of research", "is the process of the handwritten-digit "
-     "recognition using graph-based content representations without "
-     "backpropagation."),
     ("The subject of research", "is the stability of concept formation and "
      "the tracing mechanisms of the classification errors."),
     ("The purpose of this paper", "is to determine when concept graphs "
      "stabilize during training and find the causes of misclassifications at "
      "different processing stages."),
+    ("Tasks:", "to record when structure and coordinate ranges stop changing, "
+     "to measure the effect of the sample count, and to assign each error to "
+     "a decision step."),
+    ("Methods:", "skeleton graphs, concept formation by graph reduction, and "
+     "graph edit distance with a complexity prior."),
     ("Research Results.", "Across 13 concepts, node and edge counts "
      "stabilized after 1-37 training files (depending on the structure "
-     "complexity), while coordinate ranges continued to learn. Out of 820 "
-     "misclassifications on 8683 MNIST test images, 312 resulted from "
-     "limitations in pre-processing, 383 from higher similarity scores for "
-     "incorrect classes, and 125 from the complexity prior. The system decides "
-     "91.13% of classified complete-contour images correctly; the error study "
-     "repeats the test with retrained concepts that store every ranking and "
-     "reach 90.05%."),
+     "complexity), while coordinate ranges continued to learn. The system "
+     "decides 91.13% of classified complete-contour images correctly. With "
+     "retrained concepts that store every ranking (90.05%), out of 820 "
+     "misclassifications on 8683 MNIST test images, 312 arose because no "
+     "true-class concept reached comparison, mostly after rejection in "
+     "pre-processing, 383 from higher similarity scores for incorrect classes, "
+     "and 125 from the complexity prior."),
     ("Conclusions.", "Concept graphs stabilize structurally within tens of "
      "samples, although some of the features continue to evolve independently. "
-     "Error analysis identifies failures in the graph construction which is "
-     "primarily originated from the pre-processing limitations and not the "
-     "system design, providing directions for improving the classification "
-     "reliability."),
+     "Error analysis ties each failure to graph construction, the structural "
+     "check, the similarity costs or the ranking prior, providing directions "
+     "for improving the classification reliability."),
 ]
 
 KEYWORDS = ("structural pattern recognition; graph edit distance; concept "
@@ -774,15 +775,25 @@ REFERENCES = _number_citations()
 # Back matter
 # --------------------------------------------------------------------------
 
-TO_COMPLETE = "[To be completed by the authors.]"
-
 END_SECTIONS = [
-    ("Author Contributions", TO_COMPLETE),
-    ("Conflicts of interest", TO_COMPLETE),
-    ("Funding", TO_COMPLETE),
+    ("Author Contributions", "Conceptualization, Y.P. and M.L.; methodology, "
+     "software, investigation, formal analysis and writing – original draft, "
+     "M.L.; validation, K.P.; writing – review and editing, K.B. and T.A.; "
+     "supervision, K.B. and T.A. All authors have read and agreed to the "
+     "published version of the manuscript."),
+    ("Conflicts of interest", "The authors declare that they have no conflicts "
+     "of interest in relation to the current study, including financial, "
+     "personal, authorship, or any other, that could affect the study, as well "
+     "as the results reported in this paper."),
+    ("Funding", "This research received no external funding."),
     ("Data Availability", "The code and further traced cases are published at "
      "https://github.com/NaturalAGI-Lab/NaturalAGI."),
-    ("Use of artificial intelligence", TO_COMPLETE),
+    ("Use of artificial intelligence", "During the preparation of this "
+     "manuscript, the authors used Claude (Anthropic) for [drafting and language "
+     "editing of the text, and analysis scripts]. The authors designed the "
+     "experiments, obtained and checked the results, reviewed and edited the "
+     "output, and take full responsibility for the content of this "
+     "publication."),
 ]
 
 RECEIVED = "Received (Надійшла)"
@@ -868,26 +879,29 @@ UA_ABSTRACT = [
      "інтерпретувати рішення завдяки явному поданню структури. Проте їх "
      "надійність вимірюється стабільністю формування структури та можливістю "
      "простежити хибну відповідь до рішення, яке її спричинило."),
-    ("Об’єкт дослідження", "– процес розпізнавання рукописних цифр за допомогою "
-     "графових подань вмісту без зворотного поширення помилки."),
     ("Предмет дослідження", "– стабільність формування концептів і механізми "
      "простеження помилок класифікації."),
     ("Мета статті", "– визначити, коли графи концептів стабілізуються під час "
      "навчання, і знайти причини хибних класифікацій на різних етапах "
      "обробки."),
+    ("Завдання:", "зафіксувати, коли структура й діапазони координат перестають "
+     "змінюватися, виміряти вплив кількості прикладів і віднести кожну помилку "
+     "до кроку рішення."),
+    ("Методи:", "скелетні графи, формування концептів редукцією графів і "
+     "редакційна відстань між графами з поправкою на складність."),
     ("Результати дослідження.", "Для 13 концептів кількості вузлів і ребер "
      "стабілізувалися після 1–37 навчальних файлів (залежно від складності "
-     "структури), тоді як діапазони координат продовжували навчатися. Із 820 "
-     "хибних класифікацій на 8 683 тестових зображеннях MNIST 312 спричинили "
-     "обмеження передобробки, 383 – вищі оцінки подібності для хибних класів "
-     "і 125 – поправка на складність. Система правильно класифікує 91,13 % "
-     "класифікованих зображень із повними контурами; дослідження помилок "
-     "повторює тест із перенавченими концептами, що зберігають кожне "
-     "ранжування, і досягає 90,05 %."),
+     "структури), тоді як діапазони координат продовжували навчатися. Система "
+     "правильно класифікує 91,13 % класифікованих зображень із повними "
+     "контурами. Із перенавченими концептами, що зберігають кожне ранжування "
+     "(90,05 %), із 820 хибних класифікацій на 8 683 тестових зображеннях MNIST "
+     "312 виникли тому, що жоден концепт істинного класу не дійшов до "
+     "порівняння, переважно після відхилення на передобробці, 383 – через вищі "
+     "оцінки подібності для хибних класів і 125 – через поправку на складність."),
     ("Висновки.", "Графи концептів структурно стабілізуються за десятки "
      "прикладів, хоча частина ознак продовжує змінюватися незалежно. Аналіз "
-     "помилок виявляє збої в побудові графа, що переважно походять від "
-     "обмежень передобробки, а не від дизайну системи, і вказує напрями "
+     "помилок пов'язує кожен збій із побудовою графа, структурною перевіркою, "
+     "вартостями подібності або поправкою ранжування, що вказує напрями "
      "підвищення надійності класифікації."),
 ]
 
