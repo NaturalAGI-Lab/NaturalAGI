@@ -58,9 +58,10 @@ ABSTRACT = [
      "skeleton pruning that removes a stroke end, a spur that gives a zero "
      "the topology of a six, a junction of an open four lost in graph "
      "construction, deletions cheaper than missed feature ranges, and a "
-     "prior term larger than the similarity gap. A version without the "
-     "two constants fitted to the test set reaches 92.90% on 8,708 "
-     "complete-contour images against 90.89% for the original model."),
+     "prior term larger than the similarity gap. The system decides 91.13% "
+     "of classified complete-contour images correctly; the error study "
+     "repeats the test with retrained concepts that store every ranking "
+     "and reach 90.05%."),
     ("Conclusions.", "Formation settles within tens of samples, and a "
      "stopping rule must watch structure and envelopes separately. Most "
      "errors originate before scoring, in graph construction and in the "
@@ -163,9 +164,7 @@ SECTIONS = [
      "graphs, and how the concepts transfer to other MNIST splits;"),
    ("p", "3) to split all wrong-class answers of a test run into mechanisms "
      "defined by the decision steps, and to trace representative cases of "
-     "each mechanism from pixels to ranking;"),
-   ("p", "4) to measure a version of the classifier without the constants "
-     "that had been fitted to the test set."),
+     "each mechanism from pixels to ranking."),
   ],
  },
  {
@@ -545,62 +544,6 @@ SECTIONS = [
   ],
  },
  {
-  "title": "Results of the Current System Version",
-  "blocks": [
-   ("p", "The current version of the classifier drops the two constants "
-     "that had been fitted to the test set: the prior weight λ = 0.10 in "
-     "(2) and a width gate of 0.33 that compares an envelope with the "
-     "spread of the same feature over the concepts of all classes. Every "
-     "later change was accepted on a development split of 1,996 images "
-     "from the MNIST training set, and the test set was run once per "
-     "frozen configuration. Removing the two constants costs 4.51 points "
-     "on the development split (Table 4). The changes that follow keep "
-     "the rules of the method: a concept learns from positive examples "
-     "only, and no score uses statistics of other classes. The originals, "
-     "augmentations and 13 subclasses stay the same; each subclass now "
-     "gives one concept per binarization threshold, 39 in all."),
-   ("tbl", 4,
-    "Steps of the current version, accuracy on the development split "
-    "(1,996 images)",
-    ["Step", "Accuracy, %"],
-    [["Original model", "80.91"],
-     ["λ = 0, no width gate", "76.40"],
-     ["28 node features instead of 13", "78.01"],
-     ["Cost grows over 4 half-widths outside an envelope", "80.96"],
-     ["Thresholds 110, 150, 190; best similarity per concept", "83.52"],
-     ["Complexity term with λ = 0.05", "83.82"],
-     ["One detector for training and recognition", "84.72"],
-     ["Thin skeleton as a fourth filter; concepts from each threshold",
-      "84.97"],
-     ["Orientation layer with bands from the concept's own images",
-      "86.27"]],
-    "column", [0.78, 0.22], [1]),
-   ("p", "The last step adds a parametric layer. A descriptor sums the "
-     "stroke centre line in four orientation bins over 2×2 and 3×3 grids. "
-     "For each dimension a concept keeps the shortest interval that holds "
-     "80% of the values of its own training images. A dimension scores 1 "
-     "inside the interval and falls linearly to 0 one interval width "
-     "outside; half of the mean score is added to the similarity of each "
-     "concept that passes preprocessing."),
-   ("p", "On the 8,708 complete-contour test images this version answers "
-     "92.90% correctly, with the 15 images that no concept accepts counted "
-     "as errors. The original model rerun on the same images gives "
-     "90.89% (91.13% when the 22 images without a graph are left out). "
-     "The paired difference is +2.01 points (95% CI +1.36 to +2.66; "
-     "McNemar p = 2·10⁻⁹). On all 10,000 test images accuracy rises from "
-     "82.24% to 85.44%, and on the 1,290 incomplete-contour images from "
-     "23.95% to 35.12%."),
-   ("p", "The largest confusion pairs move where the census points. "
-     "Against the 91.13% run, class 4 gains most: 4→7 falls from 62 "
-     "errors to 4 and 4→1 from 52 to 22. The pair 5→3, which the prior "
-     "settles in 55 of its 56 cases in the census, falls from 43 to 10. "
-     "2→7 falls from 111 to 66 and 2→6 from 57 to 21. One pair grows: "
-     "1→7 rises from 26 to 151. The run stores the final ranking only, "
-     "so its errors cannot yet be split into gate, similarity and prior, "
-     "and which step moved each pair has not been traced."),
-  ],
- },
- {
   "title": "Discussion",
   "blocks": [
    ("p", "**Where corrections belong.** The three mechanisms point to "
@@ -663,11 +606,6 @@ SECTIONS = [
      "to a step: skeleton pruning, a spur that changes the topology, a "
      "junction lost in graph construction, deletions cheaper than missed "
      "feature ranges, and a prior term larger than the similarity gap."),
-   ("p", "4. Without the two constants fitted to the test set, and with "
-     "changes chosen on a development split, the classifier answers "
-     "92.90% of 8,708 complete-contour test images against 90.89% for the "
-     "original model. The class-4 pairs and the prior pair 5→3 shrink "
-     "most, while 1→7 grows from 26 to 151 errors."),
    ("p", "**Prospects.** The census sets the order of work. The class-4 gate "
      "errors and the pruning rule come first, since they remove the true "
      "concept from competition. The ranking prior should be revised only "
@@ -916,9 +854,10 @@ UA_ABSTRACT = [
      "штриха, відросток, що надає нулю топологію шістки, вузол розгалуження "
      "відкритої четвірки, втрачений під час побудови графа, вилучення "
      "вузлів, дешевші за вихід ознак за межі діапазонів, і доданок поправки, "
-     "більший за різницю подібностей. Версія без двох констант, "
-     "підібраних на тестовій вибірці, досягає 92,90 % на 8 708 зображеннях "
-     "із повними контурами проти 90,89 % у вихідної моделі."),
+     "більший за різницю подібностей. Система правильно класифікує 91,13 % "
+     "класифікованих зображень із повними контурами; дослідження помилок "
+     "повторює тест із перенавченими концептами, що зберігають кожне "
+     "ранжування, і досягає 90,05 %."),
     ("Висновки.", "Формування стабілізується за десятки прикладів, і "
      "правило зупинки має окремо стежити за структурою та оболонками. "
      "Більшість помилок виникає до обчислення подібності – під час побудови "
