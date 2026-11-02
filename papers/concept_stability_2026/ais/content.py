@@ -263,9 +263,11 @@ SECTIONS = [
      "at file 15. A flat envelope is therefore not a safe signal that "
      "formation has finished, and a stopping rule has to check both "
      "markers (Fig. 1)."),
-   ("fig", "trajectories.png", 1,
-    "Node count and mean envelope width of each concept against the number "
-    "of training files consumed in one formation pass", "full"),
+   ("fig", "anatomy_ais/trajectories.png", 1,
+    "Node count (solid line, left axis) and mean envelope width (dashed line, "
+    "right axis) of each concept against the number of training files in one "
+    "formation pass. Dotted lines mark *m*<sub>topo</sub> (blue) and "
+    "*m*<sub>env</sub> (orange)", "full"),
    ("h2", "Dependence on the number of samples"),
    ("p", "Three concepts of different kinds, 2_2 (loop and intersection), "
      "7_1 (one open stroke) and 4_1 (closed four), were formed repeatedly "
@@ -275,12 +277,13 @@ SECTIONS = [
      "at five and to 12 at ten and twenty: early concepts carry nodes that "
      "later samples do not share, and reduction removes them. For 7_1 the "
      "mean envelope width is 0.33, 0.48, 0.68 and 0.80 at 2, 5, 10 and 20 "
-     "files, since each sample adds its own variation. In 4_1 the "
-     "structure does not move at all: from the second file on the concept "
-     "has 8 nodes and 8 edges."),
-   ("fig", "curves.png", 2,
-    "Node count and mean envelope width against the number of training "
-    "files for 2_2, 7_1 and 4_1; three draws per condition", "full"),
+     "files, since each sample adds its own variation. The node "
+     "count of 4_1 falls from 9.3 at two files to 8 at five, ten and "
+     "twenty."),
+   ("fig", "anatomy_ais/curves.png", 2,
+    "Node count (a) and mean envelope width (b) against the number of "
+    "training files for 2_2, 7_1 and 4_1. Dots: three draws; lines: their "
+    "means", "full"),
    ("p", "More samples buy a smaller graph and looser bands. These probe "
      "concepts were not deployed, so the test does not say which of the two "
      "effects helps recognition more; a classification run per condition "
@@ -406,11 +409,10 @@ SECTIONS = [
      "means the concept is larger than the image (31 images)."),
    ("fig", "anatomy_ais/pairs.png", 3,
     "The ten most frequent confusion pairs by number of errors: gate (blue), "
-    "similarity (orange) and prior (green)", "full"),
+    "similarity (orange) and prior (green)", "column"),
    ("fig", "anatomy_ais/gate_reasons.png", 4,
     "Number of gate errors by the combination of rejection messages per image "
-    "(top) and number of rejections by message per true-class concept "
-    "(bottom)", "full", 0.85),
+    "(a) and number of rejections by message per true-class concept (b)", "column"),
    ("h2", "Gate: a pruned stroke end (2 read as 6)"),
    ("p", "Image mnist_test_2_00144 is a 2 classified as 6_1; both concepts "
      "of class 2 were rejected before comparison (Fig. 5). Its skeleton "
@@ -466,7 +468,7 @@ SECTIONS = [
    ("fig", "anatomy_ais/case1_ranking.png", 7,
     "mnist_test_5_00606: raw similarity (open circle) and adjusted score "
     "(filled circle) of the compared concepts. Green: predicted concept; "
-    "black: true concept", "column", 0.75),
+    "black: true concept", "column"),
    ("p", "The same term also repairs answers. In mnist_test_2_00030, a 2 "
      "with a short spur at the intersection, 7_1 leads on raw similarity "
      "with 0.7679 against 0.7591 for 2_1; the prior adds 0.3700 to 2_1 and "

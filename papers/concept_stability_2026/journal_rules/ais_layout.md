@@ -23,6 +23,8 @@ PDF with `pdftotext -bbox-layout`; where the site is silent the PDF decides.
 - Article structure: problem statement and relevance → analysis of recent
   research and publications → statement of the article tasks → main part →
   conclusions and prospects for future work.
+- Figures (`AIS_ArticleRequirements_EN.pdf`): centered caption below the figure, 9 pt; large figures may span up to 16.5 cm; inscriptions and lines must be clear, with no noise or visual artifacts. The file sets no format, resolution or colour rule.
+- Headings (`AIS_ArticleRequirements_EN.pdf`): section title 12 pt bold, subsection 10 pt bold centered, no headers or footers. The published article measured below differs.
 - ORCID required for every author. Plagiarism screening via Unicheck.
 - Publication fee 500 UAH.
 
