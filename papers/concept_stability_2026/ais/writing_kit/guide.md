@@ -30,19 +30,10 @@
 | complete contours, incomplete contours | зображення з повними й розірваними контурами |
 | conditional accuracy, end-to-end accuracy, dead-letter queue (DLQ) | точність серед classified; серед усіх submitted; черга збоїв конвеєра |
 | compression | відношення nodes і values у training graphs до збережених у concepts |
-| baseline configuration, improved configuration | система статті; конфігурація К. Перевозника |
-| development split, frozen configuration, paired difference | 1 996 зображень з навчальної частини MNIST для вибору змін; конфігурація, зафіксована до тесту; різниця на тих самих зображеннях |
-| width gate | поріг 0,33 у baseline configuration, що порівнює envelope з розмахом feature по concepts усіх класів |
-| graded penalty | вартість за out-of-range feature росте поступово, а не стрибком |
-| binarization threshold, filter, best similarity over filters | 110 / 150 / 190; граф зображення за одним порогом; concept бере найбільшу similarity серед filters |
-| fine skeleton, stem rule | четвертий filter: поріг 150 і simplification epsilon 2,5, дрібніший skeleton; skeleton rule, що зберігає короткий junction–junction edge, коли через нього йде прямий stem |
-| complexity term | λ log<sub>2</sub> *K* в improved configuration, λ = 0,05 |
-| detector | параметри бінаризації й спрощення, однакові для formation і recognition |
-| parametric layer, orientation descriptor, band | доданок до similarity з опису форми штриха; інтервал значень з власних зображень concept |
 
 ## Розділи
 
-Кожен пункт «П» — один абзац: які тези в ньому мають бути. Переказуй своїми словами, порядок тез можна міняти. «[new run]» — число з нового запуску improved configuration (NIK-389), поки його немає.
+Кожен пункт «П» — один абзац: які тези в ньому мають бути. Переказуй своїми словами, порядок тез можна міняти.
 
 ### Анотація
 
@@ -50,9 +41,9 @@
 - Актуальність: graph-based classifiers можна читати й перевіряти; їхня надійність залежить від стабільності formation і від того, чи можна простежити wrong-class answer до кроку.
 - Предмет: стабільність concept formation і mechanisms помилок класифікації.
 - Мета: визначити, коли concept graphs стабілізуються, і знайти причини помилок на кроках обробки.
-- Завдання: чотири завдання з 1.3 коротко.
-- Методи: skeleton graphs, concept formation by reduction, GED з complexity prior; improved configuration — кілька binarization thresholds, graded penalty і parametric layer, кожна зміна вибрана на development split.
-- Результати: 13 concepts; structural marker — 1–37 training files, envelopes ростуть далі; 91,13 %; у повторному запуску (90,05 %, 8 683 зображення) 820 wrong-class answers = 312 gate + 383 similarity + 125 prior; improved configuration — [new run] на complete contours.
+- Завдання: три завдання з 1.3 коротко.
+- Методи: skeleton graphs, concept formation by reduction, GED з complexity prior.
+- Результати: 13 concepts; structural marker — 1–37 training files, envelopes ростуть далі; 91,13 %; у повторному запуску (90,05 %, 8 683 зображення) 820 wrong-class answers = 312 gate + 383 similarity + 125 prior.
 - Висновки: структура стабільна за десятки прикладів; кожна помилка прив'язана до кроку, тож видно, що виправляти.
 
 ### 1.1 Research Background
@@ -76,7 +67,6 @@
 - Завдання 1: зафіксувати для кожного concept, коли структура й envelopes перестають змінюватися за один formation pass.
 - Завдання 2: виміряти залежність структури й envelopes від number of training samples, compression of training graphs і transfer концептів на інші MNIST splits.
 - Завдання 3: розділити всі wrong-class answers на mechanisms за decision steps і простежити representative cases кожного mechanism від pixels до ranking.
-- Завдання 4: перевірити зміни конфігурації, обґрунтовані теорією й вибрані на development split, і порівняти improved configuration з baseline configuration на test set.
 
 ### 2.1 The classifier
 
@@ -96,16 +86,6 @@
 - Що зроблено: concepts retrained на тих самих 869 files із тими самими classification parameters, ranking збережено.
 - Результат запуску: 7 819 із 8 683 = 90,05 % (95 % Wilson interval 89,40–90,66 %); 21 pipeline failure; 44 images rejected by all 13 concepts.
 - Усі числа 3.3 — з цього запуску; кожен trace перераховано production scoring code, і він збігся зі stored ranking.
-
-### 2.4 Improved configuration
-
-Конфігурацію зібрав К. Перевозник (співавтор). Обґрунтування кроків — пункти 1–3 листів Ю. Паржина і §15 рукопису його теорії; що з цього цитувати, вирішуєш ти, ймовірно [4] або [5]. Описуєш усі кроки фінальної конфігурації; два з них (fine skeleton, stem rule) — власні, теорія їх не вимагає, так і напиши.
-- П1. Навіщо: дві константи baseline configuration підібрано на test set — λ = 0,10 у (2) і width gate 0,33, що порівнює envelope з розмахом тієї самої feature по concepts усіх класів. Width gate використовує інші класи, а правило методу — concept вчиться лише на positive examples, і жоден score не бере statistics of other classes. Обидві прибрано; на development split це коштує 4,51 п.п. (80,91 → 76,40 %).
-- П2. Protocol: кожну зміну приймали на development split (1 996 images з MNIST training set) за правилом, записаним до запуску: lower bound of the 95 % CI of the paired difference вища за −1 п.п. Test set — один прогін на кожну frozen configuration. Originals, augmentations і 13 subclasses ті самі.
-- П3. Зміни з теорією (таблиця 4): 28 node features замість 13 (п. 1, розширений набір параметрів); graded penalty — cost за out-of-range feature росте поступово на 4 half-widths, а не стрибком (п. 1, квантифіковане відхилення); feature weight ε = 1 (п. 1, ваговий коефіцієнт); binarization thresholds 110, 150, 190 — кілька alternative filters (п. 2), concepts з кожного threshold; one detector для formation і recognition.
-- П4. Два кроки, де теорія обґрунтовує сам крок, але не його форму: best similarity over filters — п. 2 не каже, як поєднати filters, взято максимум (MAX), за аналогією з complex cells зорової кори; complexity term λ log<sub>2</sub> *K* — §15 вимагає, щоб reaction містила кількість структурних доданків, форму взято з (2), λ = 0,05 обрано на development split. Так і напиши: крок із теорії, форма чи значення — з development split.
-- П4a. Два власні кроки без теорії, кожен прийнято за тим самим правилом на development split: fine skeleton — четвертий filter, threshold 150 із simplification epsilon 2,5 замість 4,55, тобто дрібніший skeleton того самого image (аналогія — spatial-frequency channels зорової кори V1, не вимога теорії); stem rule — skeleton rule, що зберігає короткий junction–junction edge, коли через нього проходить прямий stem. Таблиця 4 дає приріст кожного з них окремо від кроку one detector і всіх прийнятих кроків разом (84,97 %).
-- П5. Parametric layer (п. 3: soma зчитує flat vector ознак, розрізнення на parametric level): orientation descriptor — маса орієнтацій centre line штриха в чотирьох напрямках на grids 2 × 2 і 3 × 3; для кожного виміру concept зберігає band — найкоротший інтервал, що містить 80 % значень його власних training images; вимір дає 1 всередині band і лінійно спадає до 0 на одну band width назовні; до similarity кожного concept, що пройшов preprocessing, додається β × середня оцінка вимірів, β = 0,5 обрано на development split; на development split 86,27 % (+1,30 п.п., p = 0,004).
 
 ### 3.1 Convergence of concept formation (завдання 1)
 
@@ -132,23 +112,15 @@
 - 3.3.5, П4. У всіх 44 similarity errors 4→7 winner 7_1, best class-4 concept — 4_2, median similarities 0,7428 і 0,6025. Під 7_1 жодна не платить за label mismatch; усі 21 images з composition 4_2 matched п'ятьма substitutions і двома deletions. Mechanism: preprocessing для smaller concept обрізає image до нього, а deletion дешевша за node з out-of-range features, тож smaller concept, що discards зайве, перемагає correct concept, який мусить match кожен node.
 - 3.3.6 Dominant pair 2→7 [7]. У 91.13 % configuration — 111 errors; у 110 lower loop двійки без hole вже в binary mask (loop drawn open або interior filled товстим stroke), в одному випадку hole втрачено при vectorization. Двійка отримує open-stroke topology, як 7_1, і програє на similarity — це збігається з 90 similarity cases із 93 у повторному запуску.
 
-### 3.4 Accuracy of the improved configuration (завдання 4)
-
-Подавай це як configuration цього дослідження, а не як «покращення нашої попередньої роботи [7]»: comparison з baseline configuration — всередині статті. Обидві configurations рахуються однаково: image без answer — помилка; тому baseline дає 90,89 %, а не 91,13 % з інших розділів. Усі числа improved configuration — [new run].
-- П1. Таблиця 5: complete contours (8 708 images) — baseline 90,89 %, improved [new run]; paired difference і 95 % CI [new run]; all 10 000 test images — 82,24 % і [new run]; incomplete contours (1 290) — 23,95 % і [new run].
-- П2. Внесок кроків на development split (таблиця 4): до one detector — 84,72 % (graded penalty +2,95 п.п., binarization thresholds з best similarity over filters +2,56); concepts з кожного threshold, ε = 1 і parametric layer — [new run].
-- П3. Per digit на всіх 10 000 і confusion pairs на complete contours проти baseline — [new run]: які класи й pairs змінилися найбільше, які погіршилися.
-
 ### 4. Discussion
 
 Журнал хоче: тлумачення; порівняння з іншими дослідженнями; практичне значення (де, за яких умов, який ефект); як результат закриває проблему з 1.2; наприкінці обмеження, недоліки й розвиток.
 - П1. Where corrections belong. Gate (38,0 %) вирішується до будь-якого cost: pruning зрізає end двійки, graph construction зливає два junctions четвірки; зміна cost weights тут не допоможе, бо true concept cost не отримує. Similarity (46,7 %): частина cases має справді іншу topology (zero with a spur) → виправляти graph construction, а не scoring. 4→7: topology правильна, програш через preprocessing для smaller concept і дешеві deletions → це scoring question. Prior (15,2 %): єдина група, яку може прямо змінити ranking rule, але воно ж rescues інші answers (2_00030), тож міряти треба обидва боки.
-- П2. Improved configuration і mechanisms. Кроки improved configuration відповідають mechanisms census: кілька binarization thresholds дають concept інший graph того самого image (gate), graded penalty прибирає cliff за out-of-range feature (similarity), complexity prior із λ = 0,10 замінено complexity term із λ = 0,05 (prior). Аналіз К. Перевозника: без complexity prior smaller concepts 7_1 і 1_3 wins 288 wrong-class answers на development split — той самий mechanism «smaller concept is cheaper», що в 4→7. Які pairs і mechanisms реально зменшилися — [new run]; census для improved configuration потребує stored rankings.
-- П3. Stability і теорія [5]: жоден concept не змінив node чи edge count після file 37, більшість — за кілька files. Кроки — не epochs: кожен file проходить reduction один раз. Bounded part of convergence — структура, envelopes і далі вбирають variation. Order independence випливає з commutativity of accumulation у теорії [5]; controlled experiment — окремо, після виправлення pairing step.
-- П4. Comparison з іншими роботами: [15, 16] знаходять failures ззовні, за subsets of inputs, а тут кожна wrong-class answer прив'язана до decision step; [17, 18] зупиняються на skeleton, а тут видно, як skeleton defect змінює клас; [8–11] міряють distance, а тут видно, де вона помиляється в classifier.
-- П5. Practical significance: де застосовувати (задачі, де рішення треба перевіряти й пояснювати); умови (images with complete contours, див. 23,94 % на incomplete); expected effect (correction можна спрямувати на конкретний decision step і заздалегідь оцінити, скільки помилок він зачепить).
-- П6. Limitations: два стани системи (91,13 % і retrained 90,05 %), тож census описує retrained concepts; structural marker порівнює counts, а не attributed graphs; sample-count study — три concepts і без classification runs; traces пояснюють окремі images, а census дає розмір mechanism, але не причину кожного case. Improved configuration: scalar parameters (λ, β, 4 half-widths, 80 % band, thresholds) обрано на development split з MNIST, тож transfer на інші дані не показано; GED з timeout змінює 0,3 % answers між однаковими runs; edit costs і timeout успадковано від baseline configuration. Інші traces — у repository [20].
-- П7. Prospects за порядком: census для improved configuration; gate errors class 4 і pruning rule, бо вони прибирають true concept зі змагання; complexity prior/term переглядати лише з підрахунком rescued answers; classification runs для кожної sample-count умови; order experiment після виправлення pairing step.
+- П2. Stability і теорія [5]: жоден concept не змінив node чи edge count після file 37, більшість — за кілька files. Кроки — не epochs: кожен file проходить reduction один раз. Bounded part of convergence — структура, envelopes і далі вбирають variation. Order independence випливає з commutativity of accumulation у теорії [5]; controlled experiment — окремо, після виправлення pairing step.
+- П3. Comparison з іншими роботами: [15, 16] знаходять failures ззовні, за subsets of inputs, а тут кожна wrong-class answer прив'язана до decision step; [17, 18] зупиняються на skeleton, а тут видно, як skeleton defect змінює клас; [8–11] міряють distance, а тут видно, де вона помиляється в classifier.
+- П4. Practical significance: де застосовувати (задачі, де рішення треба перевіряти й пояснювати); умови (images with complete contours, див. 23,94 % на incomplete); expected effect (correction можна спрямувати на конкретний decision step і заздалегідь оцінити, скільки помилок він зачепить).
+- П5. Limitations: два стани системи (91,13 % і retrained 90,05 %), тож census описує retrained concepts; structural marker порівнює counts, а не attributed graphs; sample-count study — три concepts і без classification runs; traces пояснюють окремі images, а census дає розмір mechanism, але не причину кожного case. Інші traces — у repository [20].
+- П6. Prospects за порядком: gate errors class 4 і pruning rule, бо вони прибирають true concept зі змагання; complexity prior переглядати лише з підрахунком rescued answers; classification runs для кожної sample-count умови; order experiment після виправлення pairing step.
 
 ### 5. Conclusions
 
@@ -156,7 +128,6 @@
 - 1 (завдання 1): структура стабілізується за 1–37 training files на concept, задовго до кінця cohort; envelopes — за окремим графіком, раніше чи пізніше за структуру; stopping rule має стежити за обома markers.
 - 2 (завдання 2): більше samples — smaller graph і wider envelopes; 13 concepts зберігають 106 із 9 738 nodes, compression 91,9× за nodes і 50,6× за values; на всіх 70 000 MNIST images — 73,42 % end-to-end без retraining.
 - 3 (завдання 3): усі 820 wrong-class answers — три mechanisms: true concept не дійшов до comparison (312), програв на similarity (383), вів на similarity й програв через prior (125). Traces прив'язують кожен mechanism до decision step: skeleton pruning, spur, що міняє topology, junction, втрачений у graph construction, deletions дешевші за out-of-range features, prior term більший за similarity gap.
-- 4 (завдання 4): без констант, підібраних на test set, і зі змінами, обґрунтованими теорією й вибраними на development split, improved configuration дає [new run] на complete contours і [new run] на всіх 10 000.
 
 ### Кінцеві розділи
 
@@ -181,8 +152,6 @@ Conflicts of interest, Funding і Data Availability заповнено стан�
 1. Convergence markers: *m*<sub>topo</sub>, *m*<sub>env</sub> і кількість training files кожного concept.
 2. Compression: training files, nodes in → kept, node compression і value compression.
 3. Concepts of the 91.13 % configuration на інших MNIST splits без retraining: submitted, classified, correct, conditional і end-to-end accuracy, DLQ, no result.
-4. Кроки improved configuration: accuracy на development split (1 996 images) після кожного кроку; останні два рядки — [new run].
-5. Baseline і improved configurations на test set: complete contours, all 10 000, incomplete contours; стовпці improved — [new run].
 
 ## Формули
 
@@ -209,10 +178,6 @@ Conflicts of interest, Funding і Data Availability заповнено стан�
 | Таблиця 3: тест 82,69 % умовна / 82,21 % наскрізна; повні 7 911 із 8 704 (90,89 %), неповні 310 із 1 295 (23,94 %); трейн 45 501 повних, класифіковано 98,49 %, 85,85 %; усі 70 000 — 73,42 % | vault `raw/analyses/supervisor_program_2026_07/dataset_variants_findings.md`, `experiments/run_20260717_161201/` |
 | Випадки: 2_00144 скелет 168 px, гілка 12,5 px < поріг 15,7 px (8 % від 196,6), подібність 6_1 0,6892 / 9_2 0,6742 / 4_1 0,6441. 0_00701 відросток 15,4 px > поріг 13,1 px, заміна вузла 4,1419, 0_1 0,5868, 6_1 0,7120. 5_00606: 5_1 GED 6,7259, *s* 0,7880, пріор +0,3700; 3_1 GED 7,8362, *s* 0,7614, пріор +0,4087, різниця 0,0121. 2_00030: 7_1 0,7679 проти 2_1 0,7591, 2_1 виграє на 0,0442. 4_00755: 1_3 0,6489, 7_1 0,5973, 1_1 0,5815, 1_1 скоригована 0,9515. 4_00487: 4_2 GED 10,6695, *s* 0,6144; 7_1 GED 4,4255, *s* 0,7460; 1,0630 проти 1,0231; медіани 44 випадків 0,7428 і 0,6025 | vault `raw/analyses/error_anatomy_ais_2026/data.json`, ключ `cases`; `raw/analyses/itssi_xai_2026/traces_20261023/verification/` |
 | 2→7 у конфігурації 91,13 %: 111 помилок, у 110 петля без отвору вже в масці | vault `raw/evidence/2026-08-01_blue_remarks/` |
-| Improved configuration, development split: 80,91 → 76,40 → 78,01 → 80,96 → 83,52 → 83,82 → 84,72 % (таблиця 4 до one detector) | `experiments/run_20261024_113123/findings.md` |
-| Baseline configuration, пораховано як improved: 90,89 % на 8 708 complete, 82,24 % на 10 000, 23,95 % на 1 290 incomplete; 288 wrong-class answers 7_1 і 1_3 без complexity prior | звіт К. Перевозника від 28.10, vault `raw/analyses/error_anatomy_ais_2026/perevoznyk_report_2026-10-28.docx`, розділи 1, 4, 10 |
-| Improved configuration, development split після one detector (кожен крок окремо від 84,72): fine skeleton 85,67, ε = 1 85,02, stem rule 84,87, concepts з кожного threshold 84,77; усі разом 84,97; parametric layer (β = 0,5) 86,27, p = 0,004 | звіт К. Перевозника від 28.10, розділ 4 |
-| Improved configuration, test set: 92,90 % complete, 85,44 % усі, 35,12 % incomplete (звіт К. Перевозника); у статтю — середнє за нашими повторними запусками | [new run], NIK-389, vault `raw/analyses/coman_reproduction_2026_11/` |
 
 ## Джерела
 

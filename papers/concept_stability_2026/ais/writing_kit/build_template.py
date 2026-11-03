@@ -25,36 +25,7 @@ TEXT = "[text]"
 CAPTION = "[caption]"
 KEEP_END = ("Conflicts of interest", "Funding", "Data Availability")
 OPEN, CLOSE = "⟦", "⟧"
-EXTRA = {
-    "2": [
-        ("h2", "2.4 Improved configuration"),
-        ("p", TEXT),
-        ("tbl", 4, CAPTION, ["Step", "Accuracy, %"],
-         [["Baseline configuration", "80.91"],
-          ["No complexity prior, no width gate", "76.40"],
-          ["28 node features instead of 13", "78.01"],
-          ["Graded penalty over 4 half-widths outside the envelope", "80.96"],
-          ["Binarization thresholds 110, 150, 190; best similarity over filters", "83.52"],
-          ["Complexity term, λ = 0.05", "83.82"],
-          ["One detector for formation and recognition", "84.72"],
-          ["+ fine skeleton as a fourth filter", "85.67"],
-          ["+ feature weight ε = 1", "85.02"],
-          ["+ stem rule", "84.87"],
-          ["+ concepts from each threshold", "84.77"],
-          ["All accepted steps together", "84.97"],
-          ["Parametric layer, β = 0.5", "86.27"]],
-         "column", [0.78, 0.22], []),
-    ],
-    "3": [
-        ("h2", "3.4 Accuracy of the improved configuration"),
-        ("p", TEXT),
-        ("tbl", 5, CAPTION, ["Subset", "Images", "Baseline, %", "Improved, %", "Difference, pp (95% CI)"],
-         [["Complete contours", "8,708", "90.89", "[new run]", "[new run]"],
-          ["All test images", "10,000", "82.24", "[new run]", "[new run]"],
-          ["Incomplete contours", "1,290", "23.95", "[new run]", "[new run]"]],
-         "full", [0.24, 0.12, 0.15, 0.15, 0.34], []),
-    ],
-}
+EXTRA: dict = {}
 RED = RGBColor(0xC0, 0x00, 0x00)
 
 
