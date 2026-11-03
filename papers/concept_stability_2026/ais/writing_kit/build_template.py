@@ -22,7 +22,6 @@ import build_docx as B  # noqa: E402
 import content as C  # noqa: E402
 
 TEXT = "[text]"
-CAPTION = "[caption]"
 KEEP_END = ("Conflicts of interest", "Funding", "Data Availability")
 OPEN, CLOSE = "⟦", "⟧"
 EXTRA: dict = {}
@@ -61,10 +60,6 @@ def placeholder_blocks(blocks: list, keyed: dict) -> list:
         if kind == "p":
             if not result or result[-1] != ("p", TEXT):
                 result.append(("p", TEXT))
-        elif kind == "fig":
-            result.append(("fig", block[1], block[2], CAPTION, block[4]))
-        elif kind == "tbl":
-            result.append(("tbl", block[1], CAPTION) + tuple(block[3:]))
         else:
             result.append(block)
             if kind == "h2":
