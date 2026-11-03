@@ -105,7 +105,8 @@ def paint_notes(path: Path) -> None:
                 run.font.italic = True
             if CLOSE in run.text:
                 inside = False
-            run.text = run.text.replace(OPEN, "").replace(CLOSE, "")
+            if OPEN in run.text or CLOSE in run.text:
+                run.text = run.text.replace(OPEN, "").replace(CLOSE, "")
     doc.save(str(path))
 
 
