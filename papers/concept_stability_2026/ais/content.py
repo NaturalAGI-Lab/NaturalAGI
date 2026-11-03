@@ -412,12 +412,12 @@ SECTIONS = [
      "(37 images, 15 of them of class 8 and 10 of class 0), and «pre-filter» "
      "means the concept is larger than the image (31 images)."),
    ("fig", "anatomy_ais/pairs.png", 3,
-    "The ten most frequent confusion pairs by number of errors: gate (blue), "
-    "similarity (orange) and prior (green)", "column"),
+    "The ten most frequent confusion pairs by number of errors: pre-match rejection (blue), "
+    "structural mismatch (orange) and complexity override (green)", "column"),
    ("fig", "anatomy_ais/gate_reasons.png", 4,
-    "Number of gate errors by the combination of rejection messages per image "
+    "Number of pre-match rejections by the combination of rejection messages per image "
     "(a) and number of rejections by message per true-class concept (b)", "column"),
-   ("h2", "3.3.2 Gate: a pruned stroke end (2 read as 6)"),
+   ("h2", "3.3.2 Pre-match rejection: a pruned stroke end (2 read as 6)"),
    ("p", "Image mnist_test_2_00144 is a 2 classified as 6_1; both concepts "
      "of class 2 were rejected before comparison (Fig. 5). Its skeleton "
      "has 168 pixels. Pruning removed a 12.5 px branch from the "
@@ -440,7 +440,7 @@ SECTIONS = [
     "graph (right). Black marks the pruned base tail. Circle: endpoint; "
     "diamond: corner; large square: intersection; small square: vector",
     "full"),
-   ("h2", "3.3.3 Similarity: a spur turns a 0 into a 6"),
+   ("h2", "3.3.3 Structural mismatch: a spur turns a 0 into a 6"),
    ("p", "Image mnist_test_0_00701 is a 0 classified as 6_1 (Fig. 6). A "
      "15.4 px spur runs from the top of the loop to a free end; the pruning "
      "threshold for this skeleton is 13.1 px, so the spur stays. The graph "
@@ -458,7 +458,7 @@ SECTIONS = [
     "mnist_test_0_00701, panels and markers as in Fig. 5: the spur at the top "
     "survives pruning and gives the zero an endpoint and an intersection",
     "full"),
-   ("h2", "3.3.4 Prior: a correct lead lost by 0.0121"),
+   ("h2", "3.3.4 Complexity override: a correct lead lost by 0.0121"),
    ("p", "Image mnist_test_5_00606 is a 5 classified as 3_1. Its graph is "
      "one open stroke with two endpoints and five corners, complexity 25. "
      "Concept 5_1 has GED 6.7259, one out-of-range feature and similarity "
