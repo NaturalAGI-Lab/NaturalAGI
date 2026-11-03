@@ -65,7 +65,7 @@
 
 - Мета: виміряти stabilization of concept graphs під час formation і віднести кожну wrong-class answer тестового запуску до decision step, що її спричинив.
 - Завдання 1: зафіксувати для кожного concept, коли структура й envelopes перестають змінюватися за один formation pass.
-- Завдання 2: виміряти залежність структури й envelopes від number of training samples, compression of training graphs і transfer концептів на інші MNIST splits.
+- Завдання 2: виміряти залежність структури й envelopes від number of training samples і compression of training graphs.
 - Завдання 3: розділити всі wrong-class answers на mechanisms за decision steps і простежити representative cases кожного mechanism від pixels до ranking.
 
 ### 2.1 The classifier
@@ -92,11 +92,11 @@
 - П1. Таблиця 1: *m*<sub>topo</sub> від 1 до 37 training files. Concepts з одним open stroke стабілізуються одразу: 1_1 після першого file; 1_3, 4_1, 4_2, 7_1 після другого. З loops чи кількома strokes — десятки files: 8_1 до file 37 із 42, 5_1 до 28, 2_1 до 23. Кожен concept стабілізується задовго до кінця cohort: 2_1, найбільша cohort, на file 23 із 121.
 - П2. *m*<sub>env</sub> не йде слідом за *m*<sub>topo</sub>: 8_1 — envelope на file 5, структура до 37; 2_1 — 12 і 23; 5_1 — 11 і 28; 7_1 навпаки — структура на 2, envelope на 15. Отже, flat envelope не означає кінця formation, і stopping rule має перевіряти обидва markers (рис. 1).
 
-### 3.2 Sample count, compression and transfer (завдання 2)
+### 3.2 Sample count and compression (завдання 2)
 
 - 3.2.1. Три різні concepts: 2_2 (loop і intersection), 7_1 (один open stroke), 4_1 (closed four); по три random subsets на 2, 5, 10, 20 files (рис. 2). Більше files рухає структуру й envelope у протилежні боки: nodes 2_2 16 → 12,7 → 12 → 12, бо ранні concepts мають nodes, яких наступні samples не мають; mean envelope width 7_1 0,33 / 0,48 / 0,68 / 0,80, бо кожен sample додає свою variation; nodes 4_1 9,3 → 8. Висновок: smaller graph і looser bands. Ці probe concepts не deployed, тож невідомо, що з двох ефектів більше допомагає recognition; наступний крок — classification run на кожну умову.
 - 3.2.2. Таблиця 2: 869 training graphs — 9 738 nodes, 9 242 edges, 336 637 stored values → 106 nodes, 100 edges, 6 647 values, з них 3 053 ranges. Counting rule (розділ «Формули»). Node compression 91,9×, для 2_1 176,7×; value compression 50,6×. Це відношення consumed до kept, а не parameter count, і з розміром neural network його не порівнюють. Image node має ~60 properties, formation відкидає лише source file path; concepts набувають aggregate properties, яких немає в жодному image node, наприклад expected degree of the start point.
-- 3.2.3. Система читає contours, тож цифра з broken stroke дає skeleton, який не покриє жоден concept із closed contours. Тому concepts без retraining запущено на всьому test set і на training split 60 000 (таблиця 3). Пояснити: classified / DLQ (pipeline failure) / no result; conditional accuracy ділить на classified, end-to-end accuracy — на всі submitted. Test: complete 7 911 із 8 704 (90,89 %), incomplete 310 із 1 295 (23,94 %), разом 82,21 %. Training split: completeness labels з heuristic, а не manual review; перший run лишив 8 662 без result; rerun на 45 501 complete — classified 98,49 %, conditional accuracy 85,85 %; gap до test схожий на label noise heuristic, але його не isolated. Усі 70 000 — 73,42 % end-to-end без per-split tuning.
+- 3.2.3. Generalization to other MNIST splits, для довідки: не окреме завдання, бо мета статті — complete contours; коротко. Система читає contours, тож цифра з broken stroke дає skeleton, який не покриє жоден concept із closed contours. Тому concepts без retraining запущено на всьому test set і на training split 60 000 (таблиця 3). Пояснити: classified / DLQ (pipeline failure) / no result; conditional accuracy ділить на classified, end-to-end accuracy — на всі submitted. Test: complete 7 911 із 8 704 (90,89 %), incomplete 310 із 1 295 (23,94 %), разом 82,21 %. Training split: completeness labels з heuristic, а не manual review; перший run лишив 8 662 без result; rerun на 45 501 complete — classified 98,49 %, conditional accuracy 85,85 %; gap до test схожий на label noise heuristic, але його не isolated. Усі 70 000 — 73,42 % end-to-end без per-split tuning.
 
 ### 3.3 Mechanisms of misclassification (завдання 3)
 
@@ -126,7 +126,7 @@
 
 Журнал вимагає: один висновок на кожне завдання; у кожному — особливість результату, чим пояснюється, числа.
 - 1 (завдання 1): структура стабілізується за 1–37 training files на concept, задовго до кінця cohort; envelopes — за окремим графіком, раніше чи пізніше за структуру; stopping rule має стежити за обома markers.
-- 2 (завдання 2): більше samples — smaller graph і wider envelopes; 13 concepts зберігають 106 із 9 738 nodes, compression 91,9× за nodes і 50,6× за values; на всіх 70 000 MNIST images — 73,42 % end-to-end без retraining.
+- 2 (завдання 2): більше samples — smaller graph і wider envelopes; 13 concepts зберігають 106 із 9 738 nodes, compression 91,9× за nodes і 50,6× за values.
 - 3 (завдання 3): усі 820 wrong-class answers — три mechanisms: true concept не дійшов до comparison (312), програв на similarity (383), вів на similarity й програв через prior (125). Traces прив'язують кожен mechanism до decision step: skeleton pruning, spur, що міняє topology, junction, втрачений у graph construction, deletions дешевші за out-of-range features, prior term більший за similarity gap.
 
 ### Кінцеві розділи

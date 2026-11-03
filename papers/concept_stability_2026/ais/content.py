@@ -164,8 +164,8 @@ SECTIONS = [
    ("p", "1) to record, for each concept, when its structure and its "
      "parameter envelopes stop changing during one formation pass;"),
    ("p", "2) to measure how structure and envelopes depend on the number of "
-     "training samples, how strongly formation compresses the training "
-     "graphs, and how the concepts transfer to other MNIST splits;"),
+     "training samples and how strongly formation compresses the training "
+     "graphs;"),
    ("p", "3) to split all wrong-class answers of a test run into mechanisms "
      "defined by the decision steps, and to trace representative cases of "
      "each mechanism from pixels to ranking."),
@@ -285,7 +285,7 @@ SECTIONS = [
     "right axis) of each concept against the number of training files in one "
     "formation pass. Dotted lines mark *m*<sub>topo</sub> (blue) and "
     "*m*<sub>env</sub> (orange)", "full"),
-   ("h2", "3.2 Sample count, compression and transfer"),
+   ("h2", "3.2 Sample count and compression"),
    ("h2", "3.2.1 Dependence on the number of samples"),
    ("p", "Three concepts of different kinds, 2_2 (loop and intersection), "
      "7_1 (one open stroke) and 4_1 (closed four), were formed repeatedly "
@@ -338,7 +338,7 @@ SECTIONS = [
      ["9_2", "88", "1,078 → 8", "134.8", "74.5"],
      ["**Total**", "**869**", "**9,738 → 106**", "**91.9**", "**50.6**"]],
     "column", [0.18, 0.16, 0.30, 0.18, 0.18], [13]),
-   ("h2", "3.2.3 Transfer to other MNIST splits"),
+   ("h2", "3.2.3 Generalization to other MNIST splits"),
    ("p", "The system reads contours, so a digit with a broken stroke gives a "
      "skeleton that no concept formed from closed contours can cover. The "
      "concepts were therefore also run, without retraining, on the whole "
