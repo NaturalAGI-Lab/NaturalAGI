@@ -285,8 +285,7 @@ SECTIONS = [
     "right axis) of each concept against the number of training files in one "
     "formation pass. Dotted lines mark *m*<sub>topo</sub> (blue) and "
     "*m*<sub>env</sub> (orange)", "full"),
-   ("h2", "3.2 Sample count and compression"),
-   ("h2", "3.2.1 Dependence on the number of samples"),
+   ("h2", "3.2 Influence of sample number on concept formation"),
    ("p", "Three concepts of different kinds, 2_2 (loop and intersection), "
      "7_1 (one open stroke) and 4_1 (closed four), were formed repeatedly "
      "on random subsets of their cached files: three subsets each of size "
@@ -306,7 +305,6 @@ SECTIONS = [
      "concepts were not deployed, so the test does not say which of the two "
      "effects helps recognition more; a classification run per condition "
      "is the next step."),
-   ("h2", "3.2.2 Compression"),
    ("p", "The 869 training graphs hold 9,738 nodes and 9,242 edges with "
      "336,637 stored values; the 13 concepts keep 106 nodes and 100 edges "
      "with 6,647 values, of which 3,053 are ranges. A range counts as two "
@@ -338,29 +336,15 @@ SECTIONS = [
      ["9_2", "88", "1,078 → 8", "134.8", "74.5"],
      ["**Total**", "**869**", "**9,738 → 106**", "**91.9**", "**50.6**"]],
     "column", [0.18, 0.16, 0.30, 0.18, 0.18], [13]),
-   ("h2", "3.2.3 Generalization to other MNIST splits"),
+   ("h2", "3.3 Misclassification analysis"),
    ("p", "The system reads contours, so a digit with a broken stroke gives a "
      "skeleton that no concept formed from closed contours can cover. The "
      "concepts were therefore also run, without retraining, on the whole "
-     "MNIST test set and on the 60,000-image training split (Table 3). A "
+     "MNIST test set and on the 60,000-image training split. A "
      "submitted image is either classified, sent to the dead-letter queue "
      "(DLQ) after a pipeline failure, or left without a result. Conditional "
      "accuracy divides by classified images, end-to-end accuracy by all "
      "submissions."),
-   ("tbl", 3,
-    "Concepts of the 91.13% configuration on other MNIST splits, no "
-    "retraining",
-    ["Split", "Submitted", "Classified", "Correct", "Conditional",
-     "End-to-end", "DLQ", "No result"],
-    [["Test, all", "10,000", "9,942", "8,221", "82.69%", "82.21%", "58",
-      "0"],
-     ["Train, all", "60,000", "51,045", "43,172", "84.58%", "71.95%", "293",
-      "8,662"],
-     ["Test + train", "70,000", "60,987", "51,393", "84.27%", "73.42%",
-      "351", "8,662"],
-     ["Train, complete", "45,501", "44,812", "38,469", "85.85%", "84.55%",
-      "14", "675"]],
-    "full", [0.17, 0.11, 0.11, 0.11, 0.13, 0.13, 0.11, 0.13], []),
    ("p", "On the whole test set the complete slice scores 7,911 of 8,704 "
      "(90.89%) end-to-end and the incomplete slice 310 of 1,295 (23.94%), "
      "which brings the total to 82.21%. On the training split the "
@@ -371,8 +355,6 @@ SECTIONS = [
      "the test figure fits label noise in the heuristic, which we did not "
      "isolate. Over all 70,000 MNIST images the 13 concepts reach 73.42% "
      "end-to-end with no per-split tuning."),
-   ("h2", "3.3 Mechanisms of misclassification"),
-   ("h2", "3.3.1 Three mechanisms"),
    ("p", "Each of the 820 wrong-class answers falls into exactly one of three "
      "mechanisms, defined by the decision step that settled it:"),
    ("p", "– **gate** (312, 38.0%): no concept of the true class reached "
@@ -398,13 +380,13 @@ SECTIONS = [
      "4→5 has 26 and 45. The pair 2→3 has 21 similarity and 10 prior "
      "cases."),
    ("p", "The gate messages show what preprocessing found missing in the "
-     "image graph (Fig. 4). Counted per rejected true-class concept, the "
+     "image graph. Counted per rejected true-class concept, the "
      "most common are «concept has endpoints but image does not» (141), "
      "«concept has corner points but image does not» (115) and «concept "
      "has intersection points but image does not» (111). Counted per "
      "image, the pair «no corner points» plus «no intersection points» "
      "accounts for 100 gate errors, all of class 4, and «no endpoints» "
-     "alone for 82, of which 56 are of class 2. In Fig. 4 «no endpoints» "
+     "alone for 82, of which 56 are of class 2. «No endpoints» "
      "stands for the first message, and likewise for corners and "
      "intersections. «Too few» means the concept has more points of that "
      "type than the image. «Iteration limit» means the critical-point "
@@ -414,25 +396,17 @@ SECTIONS = [
    ("fig", "anatomy_ais/pairs.png", 3,
     "The ten most frequent confusion pairs by number of errors: pre-match rejection (blue), "
     "structural mismatch (orange) and complexity override (green)", "column"),
-   ("fig", "anatomy_ais/gate_reasons.png", 4,
-    "Number of pre-match rejections by the combination of rejection messages per image "
-    "(a) and number of rejections by message per true-class concept (b)", "column"),
-   ("fig", "anatomy_ais/gallery_gate.png", 5,
-    "Pre-match rejection (312 of 820 errors): the three most frequent confusion pairs, three test "
-    "images each. Pruned skeleton in red, GNG graph in blue; dot: endpoint; square: intersection", "column"),
-   ("fig", "anatomy_ais/gallery_similarity.png", 6,
-    "Structural mismatch (383 of 820 errors): the three most frequent confusion pairs, three test "
-    "images each; markers as in Fig. 5", "column"),
-   ("fig", "anatomy_ais/gallery_prior.png", 7,
-    "Complexity override (125 of 820 errors): the three most frequent confusion pairs, three test "
-    "images each; markers as in Fig. 5", "column"),
-   ("fig", "anatomy_ais/mechanism_examples.png", 8,
+   ("fig", "anatomy_ais/gallery_mechanisms.png", 4,
+    "Common errors per mechanism: rows show pre-match rejection (312 of 820 errors), structural mismatch (383) "
+    "and complexity override (125); columns show the three most frequent confusion pairs of each, one test image "
+    "per pair, with the number of errors of the pair in brackets. Pruned skeleton in red, GNG graph in blue; dot: "
+    "endpoint; square: intersection", "column"),
+   ("fig", "anatomy_ais/mechanism_examples.png", 5,
     "One error per mechanism. From left: image graph, winning concept, best true-class concept, and "
     "their scores split into similarity (dark) and complexity term (light). In the top row the true "
     "concept 2_2 is rejected before matching", "full"),
-   ("h2", "3.3.2 Pre-match rejection: a pruned stroke end (2 read as 6)"),
    ("p", "Image mnist_test_2_00144 is a 2 classified as 6_1; both concepts "
-     "of class 2 were rejected before comparison (Fig. 9). Its skeleton "
+     "of class 2 were rejected before comparison. Its skeleton "
      "has 168 pixels. Pruning removed a 12.5 px branch from the "
      "intersection at (57, 69) to the end at (67, 75), because it was "
      "shorter than the threshold of 15.7 px, 8% of the 196.6 px skeleton "
@@ -448,13 +422,7 @@ SECTIONS = [
      "endpoint besides S. 6_1 wins with similarity 0.6892 against 0.6742 "
      "and 0.6441, and the prior does not change the order. The error "
      "starts at pruning, which removed an end that the 2 needs."),
-   ("fig", "anatomy_ais/case2_pipeline.png", 9,
-    "mnist_test_2_00144: image (left), binary mask (centre), skeleton and "
-    "graph (right). Black marks the pruned base tail. Circle: endpoint; "
-    "diamond: corner; large square: intersection; small square: vector",
-    "full"),
-   ("h2", "3.3.3 Structural mismatch: a spur turns a 0 into a 6"),
-   ("p", "Image mnist_test_0_00701 is a 0 classified as 6_1 (Fig. 10). A "
+   ("p", "Image mnist_test_0_00701 is a 0 classified as 6_1. A "
      "15.4 px spur runs from the top of the loop to a free end; the pruning "
      "threshold for this skeleton is 13.1 px, so the spur stays. The graph "
      "has one endpoint, one intersection of degree 3, five corners and one "
@@ -467,25 +435,16 @@ SECTIONS = [
      "0.7120. Both concepts have complexity 20, so the prior adds the same "
      "term to both. The error is decided by the similarity function on a "
      "graph whose topology really is that of another class."),
-   ("fig", "anatomy_ais/case3_pipeline.png", 10,
-    "mnist_test_0_00701, panels and markers as in Fig. 9: the spur at the top "
-    "survives pruning and gives the zero an endpoint and an intersection",
-    "full"),
-   ("h2", "3.3.4 Complexity override: a correct lead lost by 0.0121"),
    ("p", "Image mnist_test_5_00606 is a 5 classified as 3_1. Its graph is "
      "one open stroke with two endpoints and five corners, complexity 25. "
      "Concept 5_1 has GED 6.7259, one out-of-range feature and similarity "
      "0.7880; concept 3_1 has GED 7.8362, two out-of-range features and "
      "similarity 0.7614. The prior adds 0.3700 to 5_1 (complexity 13) and "
      "0.4087 to 3_1 (complexity 17). 5_1 leads on raw similarity by "
-     "0.0266, the prior gives 3_1 0.0387 more, and 3_1 wins by 0.0121 "
-     "(Fig. 11). The other eight concepts do not reach comparison: 2_2, 4_1, "
+     "0.0266, the prior gives 3_1 0.0387 more, and 3_1 wins by 0.0121. "
+     "The other eight concepts do not reach comparison: 2_2, 4_1, "
      "6_1 and 9_2 find no intersection in the image graph, 0_1 and 8_1 find "
      "no corner, and 1_1 and 4_2 have more endpoints than the image."),
-   ("fig", "anatomy_ais/case1_ranking.png", 11,
-    "mnist_test_5_00606: raw similarity (open circle) and adjusted score "
-    "(filled circle) of the compared concepts. Green: predicted concept; "
-    "black: true concept", "column"),
    ("p", "The same term also repairs answers. In mnist_test_2_00030, a 2 "
      "with a short spur at the intersection, 7_1 leads on raw similarity "
      "with 0.7679 against 0.7591 for 2_1; the prior adds 0.3700 to 2_1 and "
@@ -494,10 +453,9 @@ SECTIONS = [
      "decides wherever the similarity cannot separate two concepts, and "
      "whether it decides correctly depends on which of the two is the "
      "richer one."),
-   ("h2", "3.3.5 Class 4: a lost junction and a cheaper small concept"),
    ("p", "Class 4 gives 209 of the 820 wrong-class answers, second only to "
      "class 2 with 216, through both gate and similarity. Image mnist_test_4_00755 is an "
-     "open 4 classified as 1_1 (Fig. 12). No branch was pruned. The "
+     "open 4 classified as 1_1 (Fig. 4, Fig. 6). No branch was pruned. The "
      "skeleton has two junctions about 24 px apart, one where the left stroke "
      "meets the crossbar and one where the crossbar crosses the main "
      "stroke, but the graph keeps a single intersection of degree 4 with "
@@ -517,11 +475,7 @@ SECTIONS = [
      "other 3. The same pair of messages rejects class 4 in 35 of the 36 "
      "gate errors 4→7. Here the class is lost before scoring, and the "
      "prior only picks among wrong concepts."),
-   ("fig", "anatomy_ais/case6_pipeline.png", 12,
-    "mnist_test_4_00755, panels and markers as in Fig. 9: the two junctions "
-    "of the skeleton become one intersection of degree 4, and the graph has "
-    "no corner point", "full"),
-   ("fig", "anatomy_ais/junction_merge.png", 13,
+   ("fig", "anatomy_ais/junction_merge.png", 6,
     "Junction-bridge merge, which collapses a junction-to-junction edge shorter than 1.5 times the "
     "estimated stroke width. From left: pruned skeleton, graph without the merge, graph with it. In the "
     "eights it restores the crossing of the waist; in 4_00755 it folds the crossbar into one "
@@ -534,7 +488,7 @@ SECTIONS = [
      "substitutes all nine nodes without a deletion or a label mismatch, "
      "but eight features fall outside their ranges on four nodes, and "
      "these four substitutions cost 1.4948 to 3.0611 each. GED is 10.6695 "
-     "and similarity 0.6144 (Fig. 14). Under 7_1 preprocessing removes the "
+     "and similarity 0.6144. Under 7_1 preprocessing removes the "
      "branch above the intersection, the intersection becomes a corner, "
      "and GED deletes two more nodes and three edges at 0.25 each. GED is "
      "4.4255 with two out-of-range features, and similarity 0.7460. The "
@@ -549,14 +503,6 @@ SECTIONS = [
      "a node whose features miss the ranges. A smaller concept that "
      "discards what does not fit then beats the correct concept that has "
      "to match every node."),
-   ("fig", "anatomy_ais/case8_matching.png", 14,
-    "mnist_test_4_00487: node matching under 4_2 (top) and 7_1 (bottom), image "
-    "graph on the left and concept on the right, markers as in Fig. 9. A line "
-    "joins substituted nodes: darker means a higher cost, thick means a "
-    "feature out of range. Star: start point; hollow circle: corner demoted "
-    "to a plain point; cross: deleted node; dashed: deleted edge; pale: "
-    "removed by preprocessing", "column"),
-   ("h2", "3.3.6 The dominant pair 2→7"),
    ("p", "The pair 2→7 is the largest and the one we have studied longest "
      "[@lapin2026dessert]. In the 91.13% configuration it held 111 "
      "errors. In 110 of them the lower loop of the 2 has no hole already "
@@ -609,7 +555,7 @@ SECTIONS = [
      "size of each mechanism but not the front-end cause of every case in "
      "it. Further traced cases are published in the project repository "
      "[@repo]."),
-   ("fig", "anatomy_ais/gng_seeds.png", 15,
+   ("fig", "anatomy_ais/gng_seeds.png", 7,
     "GNG seed and graph topology. (a)–(l) Two test images: skeleton, GNG network and final graph under "
     "the most frequent seed and under a seed that changes the topology. Red: edges on a cycle; dashed "
     "circle: the loop made by the seed; (f), (l): zoom on it with the GNG neurons in grey. (m) Number of "
