@@ -613,8 +613,7 @@ SECTIONS = [
     "GNG seed and graph topology. (a)–(l) Two test images: skeleton, GNG network and final graph under "
     "the most frequent seed and under a seed that changes the topology. Red: edges on a cycle; dashed "
     "circle: the loop made by the seed; (f), (l): zoom on it with the GNG neurons in grey. (m) Number of "
-    "distinct topologies per test image over seeds 0–9. (n) Cycle count under most seeds and under "
-    "another seed, by number of test images", "full"),
+    "distinct topologies per test image over seeds 0–9", "full"),
    ("p", "**Prospects.** The census sets the order of work. The class-4 gate "
      "errors and the pruning rule come first, since they remove the true "
      "concept from competition. The ranking prior should be revised only "
