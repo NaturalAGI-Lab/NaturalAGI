@@ -25,6 +25,32 @@ TEXT = "[text]"
 CAPTION = "[caption]"
 KEEP_END = ("Conflicts of interest", "Funding", "Data Availability")
 OPEN, CLOSE = "⟦", "⟧"
+EXTRA = {
+    "2": [
+        ("h2", "2.4 Improved configuration"),
+        ("p", TEXT),
+        ("tbl", 4, CAPTION, ["Step", "Accuracy, %"],
+         [["Baseline configuration", "80.91"],
+          ["λ = 0, no width gate", "76.40"],
+          ["28 node features instead of 13", "78.01"],
+          ["Cost grows over 4 half-widths outside an envelope", "80.96"],
+          ["Thresholds 110, 150, 190; best similarity per concept", "83.52"],
+          ["Complexity term with λ = 0.05", "83.82"],
+          ["One detector for training and recognition", "84.72"],
+          ["Thin skeleton as a fourth filter; concepts from each threshold", "84.97"],
+          ["Orientation layer with bands from the concept's own images", "86.27"]],
+         "column", [0.78, 0.22], []),
+    ],
+    "3": [
+        ("h2", "3.4 Accuracy of the improved configuration"),
+        ("p", TEXT),
+        ("tbl", 5, CAPTION, ["Subset", "Images", "Baseline, %", "Improved, %", "Difference, pp (95% CI)"],
+         [["Complete contours", "8,708", "90.89", "92.90", "+2.01 (+1.36 to +2.66)"],
+          ["All test images", "10,000", "82.24", "85.44", "+3.20 (+2.57 to +3.83)"],
+          ["Incomplete contours", "1,290", "23.95", "35.12", "+11.16 (+9.11 to +13.21)"]],
+         "full", [0.24, 0.12, 0.15, 0.15, 0.34], []),
+    ],
+}
 RED = RGBColor(0xC0, 0x00, 0x00)
 
 
@@ -78,7 +104,8 @@ def blank_content() -> None:
     for section in C.SECTIONS:
         number = section["title"].split(".")[0]
         lead = [note(item) for item in keyed.get(number, [])]
-        sections.append({"title": section["title"], "blocks": lead + placeholder_blocks(section["blocks"], keyed)})
+        blocks = section["blocks"] + EXTRA.get(number, [])
+        sections.append({"title": section["title"], "blocks": lead + placeholder_blocks(blocks, keyed)})
     C.SECTIONS = sections
     abstract = notes["Анотація"]
     C.ABSTRACT = [(label, f"{OPEN}{item.split(': ', 1)[-1]}{CLOSE} {TEXT}")
