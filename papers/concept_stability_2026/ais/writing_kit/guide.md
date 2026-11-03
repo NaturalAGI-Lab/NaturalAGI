@@ -35,6 +35,7 @@
 | width gate | поріг 0,33 у baseline configuration, що порівнює envelope з розмахом feature по concepts усіх класів |
 | graded penalty | вартість за out-of-range feature росте поступово, а не стрибком |
 | binarization threshold, filter, best similarity over filters | 110 / 150 / 190; граф зображення за одним порогом; concept бере найбільшу similarity серед filters |
+| fine skeleton, stem rule | четвертий filter: поріг 150 і simplification epsilon 2,5, дрібніший skeleton; skeleton rule, що зберігає короткий junction–junction edge, коли через нього йде прямий stem |
 | complexity term | λ log<sub>2</sub> *K* в improved configuration, λ = 0,05 |
 | detector | параметри бінаризації й спрощення, однакові для formation і recognition |
 | parametric layer, orientation descriptor, band | доданок до similarity з опису форми штриха; інтервал значень з власних зображень concept |
@@ -98,12 +99,13 @@
 
 ### 2.4 Improved configuration
 
-Конфігурацію зібрав К. Перевозник (співавтор). Обґрунтування кроків — пункти 1–3 листів Ю. Паржина і §15 рукопису його теорії; що з цього цитувати, вирішуєш ти, ймовірно [4] або [5]. Тут лише кроки, що мають теорію; кроки без теорії (thin skeleton, stem rule) у статтю не входять.
+Конфігурацію зібрав К. Перевозник (співавтор). Обґрунтування кроків — пункти 1–3 листів Ю. Паржина і §15 рукопису його теорії; що з цього цитувати, вирішуєш ти, ймовірно [4] або [5]. Описуєш усі кроки фінальної конфігурації; два з них (fine skeleton, stem rule) — власні, теорія їх не вимагає, так і напиши.
 - П1. Навіщо: дві константи baseline configuration підібрано на test set — λ = 0,10 у (2) і width gate 0,33, що порівнює envelope з розмахом тієї самої feature по concepts усіх класів. Width gate використовує інші класи, а правило методу — concept вчиться лише на positive examples, і жоден score не бере statistics of other classes. Обидві прибрано; на development split це коштує 4,51 п.п. (80,91 → 76,40 %).
 - П2. Protocol: кожну зміну приймали на development split (1 996 images з MNIST training set) за правилом, записаним до запуску: lower bound of the 95 % CI of the paired difference вища за −1 п.п. Test set — один прогін на кожну frozen configuration. Originals, augmentations і 13 subclasses ті самі.
 - П3. Зміни з теорією (таблиця 4): 28 node features замість 13 (п. 1, розширений набір параметрів); graded penalty — cost за out-of-range feature росте поступово на 4 half-widths, а не стрибком (п. 1, квантифіковане відхилення); feature weight ε = 1 (п. 1, ваговий коефіцієнт); binarization thresholds 110, 150, 190 — кілька alternative filters (п. 2), concepts з кожного threshold; one detector для formation і recognition.
 - П4. Два кроки, де теорія обґрунтовує сам крок, але не його форму: best similarity over filters — п. 2 не каже, як поєднати filters, взято максимум (MAX), за аналогією з complex cells зорової кори; complexity term λ log<sub>2</sub> *K* — §15 вимагає, щоб reaction містила кількість структурних доданків, форму взято з (2), λ = 0,05 обрано на development split. Так і напиши: крок із теорії, форма чи значення — з development split.
-- П5. Parametric layer (п. 3: soma зчитує flat vector ознак, розрізнення на parametric level): orientation descriptor — маса орієнтацій centre line штриха в чотирьох напрямках на grids 2 × 2 і 3 × 3; для кожного виміру concept зберігає band — найкоротший інтервал, що містить 80 % значень його власних training images; вимір дає 1 всередині band і лінійно спадає до 0 на одну band width назовні; до similarity кожного concept, що пройшов preprocessing, додається β × середня оцінка вимірів, β обрано на development split ([new run]: значення β).
+- П4a. Два власні кроки без теорії, кожен прийнято за тим самим правилом на development split: fine skeleton — четвертий filter, threshold 150 із simplification epsilon 2,5 замість 4,55, тобто дрібніший skeleton того самого image (аналогія — spatial-frequency channels зорової кори V1, не вимога теорії); stem rule — skeleton rule, що зберігає короткий junction–junction edge, коли через нього проходить прямий stem. Таблиця 4 дає приріст кожного з них окремо від кроку one detector і всіх прийнятих кроків разом (84,97 %).
+- П5. Parametric layer (п. 3: soma зчитує flat vector ознак, розрізнення на parametric level): orientation descriptor — маса орієнтацій centre line штриха в чотирьох напрямках на grids 2 × 2 і 3 × 3; для кожного виміру concept зберігає band — найкоротший інтервал, що містить 80 % значень його власних training images; вимір дає 1 всередині band і лінійно спадає до 0 на одну band width назовні; до similarity кожного concept, що пройшов preprocessing, додається β × середня оцінка вимірів, β = 0,5 обрано на development split; на development split 86,27 % (+1,30 п.п., p = 0,004).
 
 ### 3.1 Convergence of concept formation (завдання 1)
 
@@ -209,7 +211,8 @@ Conflicts of interest, Funding і Data Availability заповнено стан�
 | 2→7 у конфігурації 91,13 %: 111 помилок, у 110 петля без отвору вже в масці | vault `raw/evidence/2026-08-01_blue_remarks/` |
 | Improved configuration, development split: 80,91 → 76,40 → 78,01 → 80,96 → 83,52 → 83,82 → 84,72 % (таблиця 4 до one detector) | `experiments/run_20261024_113123/findings.md` |
 | Baseline configuration, пораховано як improved: 90,89 % на 8 708 complete, 82,24 % на 10 000, 23,95 % на 1 290 incomplete; 288 wrong-class answers 7_1 і 1_3 без complexity prior | звіт К. Перевозника від 28.10, vault `raw/analyses/error_anatomy_ais_2026/perevoznyk_report_2026-10-28.docx`, розділи 1, 4, 10 |
-| Improved configuration без thin skeleton і stem rule: усі тестові числа | [new run], NIK-389 |
+| Improved configuration, development split після one detector (кожен крок окремо від 84,72): fine skeleton 85,67, ε = 1 85,02, stem rule 84,87, concepts з кожного threshold 84,77; усі разом 84,97; parametric layer (β = 0,5) 86,27, p = 0,004 | звіт К. Перевозника від 28.10, розділ 4 |
+| Improved configuration, test set: 92,90 % complete, 85,44 % усі, 35,12 % incomplete (звіт К. Перевозника); у статтю — середнє за нашими повторними запусками | [new run], NIK-389, vault `raw/analyses/coman_reproduction_2026_11/` |
 
 ## Джерела
 
