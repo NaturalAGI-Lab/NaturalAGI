@@ -162,8 +162,8 @@ SECTIONS = [
      "during formation and to assign every wrong-class answer of a test run "
      "to the decision step that caused it. The objectives are:"),
    ("p", "1) to record, for each concept, when its structure and its "
-     "parameter envelopes stop changing during one formation pass;"),
-   ("p", "2) to measure how structure and envelopes depend on the number of "
+     "feature ranges stop changing during one formation pass;"),
+   ("p", "2) to measure how structure and feature ranges depend on the number of "
      "training samples and how strongly formation compresses the training "
      "graphs;"),
    ("p", "3) to split all wrong-class answers of a test run into mechanisms "
@@ -190,7 +190,7 @@ SECTIONS = [
      "Each new graph is reduced to the structure it shares with the "
      "current concept, and the concept stores, for each feature of each "
      "node, the range of values seen so far. We call these ranges the "
-     "envelope of the concept. The 13 concepts of this paper cover the ten "
+     "feature ranges of the concept. The 13 concepts of this paper cover the ten "
      "digits; digits 1, 2, 4 and 9 have two subclasses each, of which 1_2 "
      "and 9_1 are not in use."),
    ("p", "Classification runs in four steps. The complexity pre-filter drops "
@@ -227,10 +227,10 @@ SECTIONS = [
      "The structural marker *m*<sub>topo</sub> is the last training file "
      "that changed the node or edge count of the concept. It compares "
      "counts only, so a rearrangement that keeps the counts is not seen. "
-     "For the envelope marker *m*<sub>env</sub> we take the file at which "
-     "a run of five consecutive files begins in which the mean envelope "
+     "For the feature-range marker *m*<sub>env</sub> we take the file at which "
+     "a run of five consecutive files begins in which the mean feature-range "
      "width grows by less than 0.02 per file. It marks the onset of slow "
-     "growth: envelopes keep widening slowly after it."),
+     "growth: feature ranges keep widening slowly after it."),
    ("h2", "2.3 Error analysis"),
    ("p", "The error analysis needs the full ranking of every concept for "
      "every image, which the 91.13% run did not store, and its concepts "
@@ -272,16 +272,16 @@ SECTIONS = [
      "until file 37 of 42, 5_1 until 28 and 2_1 until 23. Every concept "
      "settles well before its cohort is used up; 2_1, the largest cohort, "
      "settles at file 23 of 121."),
-   ("p", "The envelope marker does not follow the structural one. For 8_1 "
+   ("p", "The feature-range marker does not follow the structural one. For 8_1 "
      "the widths flatten at file 5 while the graph keeps changing until "
-     "file 37. The same order holds for 2_1 (envelope at file 12, "
+     "file 37. The same order holds for 2_1 (feature range at file 12, "
      "structure at 23) and 5_1 (11 and 28). For 7_1 the order is "
-     "reversed: the structure is fixed at file 2 and the envelope settles "
-     "at file 15. A flat envelope is therefore not a safe signal that "
+     "reversed: the structure is fixed at file 2 and the feature range settles "
+     "at file 15. A flat feature range is therefore not a safe signal that "
      "formation has finished, and a stopping rule has to check both "
      "markers (Fig. 1)."),
    ("fig", "anatomy_ais/trajectories.png", 1,
-    "Node count (solid line, left axis) and mean envelope width (dashed line, "
+    "Node count (solid line, left axis) and mean feature-range width (dashed line, "
     "right axis) of each concept against the number of training files in one "
     "formation pass. Dotted lines mark *m*<sub>topo</sub> (blue) and "
     "*m*<sub>env</sub> (orange)", "full"),
@@ -289,16 +289,16 @@ SECTIONS = [
    ("p", "Three concepts of different kinds, 2_2 (loop and intersection), "
      "7_1 (one open stroke) and 4_1 (closed four), were formed repeatedly "
      "on random subsets of their cached files: three subsets each of size "
-     "2, 5, 10 and 20 (Fig. 2). More files move structure and envelope in opposite "
+     "2, 5, 10 and 20 (Fig. 2). More files move structure and feature range in opposite "
      "directions. The node count of 2_2 falls from 16 at two files to 12.7 "
      "at five and to 12 at ten and twenty: early concepts carry nodes that "
      "later samples do not share, and reduction removes them. For 7_1 the "
-     "mean envelope width is 0.33, 0.48, 0.68 and 0.80 at 2, 5, 10 and 20 "
+     "mean feature-range width is 0.33, 0.48, 0.68 and 0.80 at 2, 5, 10 and 20 "
      "files, since each sample adds its own variation. The node "
      "count of 4_1 falls from 9.3 at two files to 8 at five, ten and "
      "twenty."),
    ("fig", "anatomy_ais/curves.png", 2,
-    "Node count (a) and mean envelope width (b) against the number of "
+    "Node count (a) and mean feature-range width (b) against the number of "
     "training files for 2_2, 7_1 and 4_1. Dots: three draws; lines: their "
     "means", "full"),
    ("p", "More samples buy a smaller graph and looser bands. These probe "
@@ -537,9 +537,9 @@ SECTIONS = [
      "number of steps [@lapin2026itssi]: no concept changed its node or "
      "edge count after file 37, and most settled within a few files. The "
      "steps are not training epochs: each file passes through reduction "
-     "once, and further files only add evidence. The envelopes keep "
+     "once, and further files only add evidence. The feature ranges keep "
      "widening slowly after the structure is fixed, so the bounded part of "
-     "convergence is the structure, while the envelopes keep absorbing "
+     "convergence is the structure, while the feature ranges keep absorbing "
      "variation. Independence of the formed concept from the order of "
      "samples follows from the commutativity of accumulation in the theory "
      "[@lapin2026itssi]; a controlled experiment on it is left for a "
@@ -573,11 +573,11 @@ SECTIONS = [
   "blocks": [
    ("p", "1. Concept formation settles its structure within 1 to 37 "
      "training files per concept, well before each cohort is exhausted. "
-     "The parameter envelopes settle on a separate schedule, earlier or "
+     "The feature ranges settle on a separate schedule, earlier or "
      "later than the structure, so a stopping rule for formation has to "
      "watch both."),
    ("p", "2. More training samples give a smaller concept graph with wider "
-     "envelopes. The 13 concepts keep 106 of the 9,738 nodes of their "
+     "feature ranges. The 13 concepts keep 106 of the 9,738 nodes of their "
      "training graphs, a compression of 91.9 times in nodes and 50.6 "
      "times in stored values."),
    ("p", "3. All 820 wrong-class answers of the test run split into three "

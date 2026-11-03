@@ -12,9 +12,9 @@
 |---|---|
 | concept, subclass | збережений граф одного підкласу цифри (0_1, 4_2 …); 13 concepts на 10 цифр |
 | formation, reduction | побудова concept з training graphs; кожен новий граф зводиться до спільної з concept структури |
-| envelope | діапазони значень кожної feature кожного node, які зберігає concept |
+| feature range | діапазони значень кожної feature кожного node, які зберігає concept |
 | training file, cohort | одне навчальне зображення; усі training files одного subclass |
-| structural marker *m*<sub>topo</sub>, envelope marker *m*<sub>env</sub> | два маркери збіжності formation |
+| structural marker *m*<sub>topo</sub>, feature-range marker *m*<sub>env</sub> | два маркери збіжності formation |
 | binary mask, skeleton, pruning, branch, spur | бінаризоване зображення; скелет завтовшки 1 px; обрізання коротких branches; короткий відросток |
 | growing neural gas | метод, що ставить nodes на skeleton |
 | point, vector; endpoint E, corner point C, intersection point I | вузли графа й відрізки між ними; типи points |
@@ -23,7 +23,7 @@
 | complexity pre-filter | відкидає concepts, складніші за зображення |
 | preprocessing, rejection message | зведення image graph до структури concept; повідомлення, з яким concept відхилено |
 | graph edit distance (GED); deletion, insertion, substitution; label mismatch | відстань між графами та її операції; заміна nodes різних типів |
-| out-of-range feature | feature, значення якої поза envelope |
+| out-of-range feature | feature, значення якої поза feature range |
 | similarity *s*, adjusted score *ŝ*, complexity prior | формули (1) і (2); доданок λ log<sub>2</sub> *K* |
 | census; mechanism: pre-match rejection, structural mismatch, complexity override | розподіл усіх wrong-class answers за кроком, що їх вирішив |
 | wrong-class answer, confusion pair (2→7) | хибна відповідь; пара «істинний клас → передбачений» |
@@ -43,12 +43,12 @@
 - Мета: визначити, коли concept graphs стабілізуються, і знайти причини помилок на кроках обробки.
 - Завдання: три завдання з 1.3 коротко.
 - Методи: skeleton graphs, concept formation by reduction, GED з complexity prior.
-- Результати: 13 concepts; structural marker — 1–37 training files, envelopes ростуть далі; 91,13 %; у повторному запуску (90,05 %, 8 683 зображення) 820 wrong-class answers = 312 pre-match rejection + 383 structural mismatch + 125 complexity override.
+- Результати: 13 concepts; structural marker — 1–37 training files, feature ranges ростуть далі; 91,13 %; у повторному запуску (90,05 %, 8 683 зображення) 820 wrong-class answers = 312 pre-match rejection + 383 structural mismatch + 125 complexity override.
 - Висновки: структура стабільна за десятки прикладів; кожна помилка прив'язана до кроку, тож видно, що виправляти.
 
 ### 1.1 Research Background
 
-- П1. Gradient-trained networks точні, але знання сидять у weights, які не прочитаєш; post hoc explanations лише наближені; для рішень, які треба перевіряти, краща inherently interpretable model [1, 2]. Наша модель: subclass цифри — attributed graph, сформований reduction кількох training graphs, рішення — graph matching [3–5]. Кожен node, edge й envelope можна роздрукувати.
+- П1. Gradient-trained networks точні, але знання сидять у weights, які не прочитаєш; post hoc explanations лише наближені; для рішень, які треба перевіряти, краща inherently interpretable model [1, 2]. Наша модель: subclass цифри — attributed graph, сформований reduction кількох training graphs, рішення — graph matching [3–5]. Кожен node, edge й feature range можна роздрукувати.
 - П2. Читабельність ще не означає довіри, треба виміряти дві властивості. Stability: concept, що міняється з кожним прикладом, не може бути еталоном; теорія стверджує збіжність до attractor за обмежене число кроків [5]. Accountability of errors: кожну wrong-class answer має бути видно до кроку, де вона виникла, а всі помилки мають ділитися на causes, що вказують на конкретні виправлення.
 - П3. Що вже зроблено: 91,13 % на MNIST test images with complete contours, 13 concepts [6, 7]; пояснено найчастішу confusion pair 2→7. Чого немає: formation у часі не виміряно, решту помилок не пояснено. Ця стаття закриває обидві прогалини. Кінцеве речення за вимогою журналу: «Therefore, research on … is timely and relevant».
 
@@ -64,21 +64,21 @@
 ### 1.3 Research Aim and Objectives
 
 - Мета: виміряти stabilization of concept graphs під час formation і віднести кожну wrong-class answer тестового запуску до decision step, що її спричинив.
-- Завдання 1: зафіксувати для кожного concept, коли структура й envelopes перестають змінюватися за один formation pass.
-- Завдання 2: виміряти залежність структури й envelopes від number of training samples і compression of training graphs.
+- Завдання 1: зафіксувати для кожного concept, коли структура й feature ranges перестають змінюватися за один formation pass.
+- Завдання 2: виміряти залежність структури й feature ranges від number of training samples і compression of training graphs.
 - Завдання 3: розділити всі wrong-class answers на mechanisms за decision steps і простежити representative cases кожного mechanism від pixels до ranking.
 
 ### 2.1 The classifier
 
 Журнал також хоче в розділі 2: гіпотезу, припущення, програмне забезпечення, обґрунтування вибору методів. У тезах їх майже немає, тож додай коротко.
 - П1. Pipeline [5, 7]: image 100 × 100 → binarization at threshold 110 → one-pixel skeleton → pruning of branches from an intersection to a free end shorter than max(8 % of skeleton length, 5 px) → growing neural gas places nodes on the skeleton → graph of points and vectors. Points: endpoints E, corner points C, intersection points I; vectors — stroke segments між ними. 13 geometric features у [0, 1] на кожен node. Complexity = nodes + edges.
-- П2. Concept: формується з training graphs одного subclass; кожен новий graph проходить reduction до спільної з concept структури; concept зберігає range кожної feature кожного node — це envelope. 13 concepts на 10 цифр; 1, 2, 4, 9 мають по два subclasses, 1_2 і 9_1 не використовуються.
+- П2. Concept: формується з training graphs одного subclass; кожен новий graph проходить reduction до спільної з concept структури; concept зберігає range кожної feature кожного node — це feature range. 13 concepts на 10 цифр; 1, 2, 4, 9 мають по два subclasses, 1_2 і 9_1 не використовуються.
 - П3. Classification у чотири кроки: (1) complexity pre-filter відкидає concepts, складніші за image; (2) preprocessing ставить start point S і зводить endpoints, intersections і corners до структури concept, а якщо не вдається — rejection message («concept has endpoints but image does not»), яке описує image graph після preprocessing, а не raw image; (3) GED з фіксованими costs, similarity за формулою (1); (4) ranking за adjusted score, формула (2), λ = 0,10; complexity prior віддає перевагу richer concept, коли два збігаються майже однаково; winner називає клас.
 
 ### 2.2 Formation measurements
 
 - П1. Formation відтворено offline на cached training graphs кодом продакшену, без запису в deployed concept store. Concepts of the 91.13 % configuration [7], 869 training files. Cohort 4_1 — 36 files: шість прибрано, бо вони змішували open і closed shapes цифри 4, і formation не могла їх об'єднати.
-- П2. Два маркери за один formation pass: structural marker *m*<sub>topo</sub> і envelope marker *m*<sub>env</sub> (визначення в розділі «Формули»). Обмеження: *m*<sub>topo</sub> бачить лише counts, rearrangement без зміни counts не помічає; *m*<sub>env</sub> позначає onset of slow growth, після нього envelopes ще повільно ширшають.
+- П2. Два маркери за один formation pass: structural marker *m*<sub>topo</sub> і feature-range marker *m*<sub>env</sub> (визначення в розділі «Формули»). Обмеження: *m*<sub>topo</sub> бачить лише counts, rearrangement без зміни counts не помічає; *m*<sub>env</sub> позначає onset of slow growth, після нього feature ranges ще повільно ширшають.
 
 ### 2.3 Error analysis
 
@@ -90,11 +90,11 @@
 ### 3.1 Convergence of concept formation (завдання 1)
 
 - П1. Таблиця 1: *m*<sub>topo</sub> від 1 до 37 training files. Concepts з одним open stroke стабілізуються одразу: 1_1 після першого file; 1_3, 4_1, 4_2, 7_1 після другого. З loops чи кількома strokes — десятки files: 8_1 до file 37 із 42, 5_1 до 28, 2_1 до 23. Кожен concept стабілізується задовго до кінця cohort: 2_1, найбільша cohort, на file 23 із 121.
-- П2. *m*<sub>env</sub> не йде слідом за *m*<sub>topo</sub>: 8_1 — envelope на file 5, структура до 37; 2_1 — 12 і 23; 5_1 — 11 і 28; 7_1 навпаки — структура на 2, envelope на 15. Отже, flat envelope не означає кінця formation, і stopping rule має перевіряти обидва markers (рис. 1).
+- П2. *m*<sub>env</sub> не йде слідом за *m*<sub>topo</sub>: 8_1 — feature range на file 5, структура до 37; 2_1 — 12 і 23; 5_1 — 11 і 28; 7_1 навпаки — структура на 2, feature range на 15. Отже, flat feature range не означає кінця formation, і stopping rule має перевіряти обидва markers (рис. 1).
 
 ### 3.2 Influence of sample number on concept formation (завдання 2)
 
-- П1. Три різні concepts: 2_2 (loop і intersection), 7_1 (один open stroke), 4_1 (closed four); по три random subsets на 2, 5, 10, 20 files (рис. 2). Більше files рухає структуру й envelope у протилежні боки: nodes 2_2 16 → 12,7 → 12 → 12, бо ранні concepts мають nodes, яких наступні samples не мають; mean envelope width 7_1 0,33 / 0,48 / 0,68 / 0,80, бо кожен sample додає свою variation; nodes 4_1 9,3 → 8. Висновок: smaller graph і looser bands. Ці probe concepts не deployed, тож невідомо, що з двох ефектів більше допомагає recognition; наступний крок — classification run на кожну умову.
+- П1. Три різні concepts: 2_2 (loop і intersection), 7_1 (один open stroke), 4_1 (closed four); по три random subsets на 2, 5, 10, 20 files (рис. 2). Більше files рухає структуру й feature range у протилежні боки: nodes 2_2 16 → 12,7 → 12 → 12, бо ранні concepts мають nodes, яких наступні samples не мають; mean feature-range width 7_1 0,33 / 0,48 / 0,68 / 0,80, бо кожен sample додає свою variation; nodes 4_1 9,3 → 8. Висновок: smaller graph і looser bands. Ці probe concepts не deployed, тож невідомо, що з двох ефектів більше допомагає recognition; наступний крок — classification run на кожну умову.
 - П2. Таблиця 2: 869 training graphs — 9 738 nodes, 9 242 edges, 336 637 stored values → 106 nodes, 100 edges, 6 647 values, з них 3 053 ranges. Counting rule (розділ «Формули»). Node compression 91,9×, для 2_1 176,7×; value compression 50,6×. Це відношення consumed до kept, а не parameter count, і з розміром neural network його не порівнюють. Image node має ~60 properties, formation відкидає лише source file path; concepts набувають aggregate properties, яких немає в жодному image node, наприклад expected degree of the start point.
 
 ### 3.3 Misclassification analysis (завдання 3)
@@ -117,7 +117,7 @@
 
 Журнал хоче: тлумачення; порівняння з іншими дослідженнями; практичне значення (де, за яких умов, який ефект); як результат закриває проблему з 1.2; наприкінці обмеження, недоліки й розвиток.
 - П1. Where corrections belong. Pre-match rejection (38,0 %) вирішується до будь-якого cost: pruning зрізає end двійки, graph construction зливає два junctions четвірки; зміна cost weights тут не допоможе, бо true concept cost не отримує. Structural mismatch (46,7 %): частина cases має справді іншу topology (zero with a spur) → виправляти graph construction, а не scoring. 4→7: topology правильна, програш через preprocessing для smaller concept і дешеві deletions → це scoring question. Complexity override (15,2 %): єдина група, яку може прямо змінити ranking rule, але воно ж rescues інші answers (2_00030), тож міряти треба обидва боки.
-- П2. Stability і теорія [5]: жоден concept не змінив node чи edge count після file 37, більшість — за кілька files. Кроки — не epochs: кожен file проходить reduction один раз. Bounded part of convergence — структура, envelopes і далі вбирають variation.
+- П2. Stability і теорія [5]: жоден concept не змінив node чи edge count після file 37, більшість — за кілька files. Кроки — не epochs: кожен file проходить reduction один раз. Bounded part of convergence — структура, feature ranges і далі вбирають variation.
 - П3. Comparison з іншими роботами: [15, 16] знаходять failures ззовні, за subsets of inputs, а тут кожна wrong-class answer прив'язана до decision step; [17, 18] зупиняються на skeleton, а тут видно, як skeleton defect змінює клас; [8–11] міряють distance, а тут видно, де вона помиляється в classifier.
 - П4. Practical significance: де застосовувати (задачі, де рішення треба перевіряти й пояснювати); умови (images with complete contours, див. 23,94 % на incomplete); expected effect (correction можна спрямувати на конкретний decision step і заздалегідь оцінити, скільки помилок він зачепить).
 - П5. Limitations: метод моделює біологічні механізми (виділення контуру, скелет, ріст мережі вузлів), але їхні реалізації неідеальні, тож частина структур і skeletons спотворена ще до formation і classification: pruning зрізає кінці, spurs додають endpoints, junctions зливаються (рис. 4, 5; pre-match rejection 38,0 %). Growing neural gas ставить nodes ітеративно й не гарантує однакову convergence: з 10 seeds топологія graph (endpoints, junctions, cycle rank) залежить від seed у 26,6 % test images (24,5 % complete contours, 37,8 % із 820 wrong-class answers); production завжди бере seed 42 (рис. 7). Junction merge зливає junctions, ближчі за 1,5 оцінки stroke width: для 8 це лагодить waist (740 із 974 eights), для 4 складає crossbar в одну intersection (315 із 982 fours; рис. 6). Це лише кілька прикладів, які розбирає ця стаття; таких спотворень більше, і їх розберуть у future work. Далі: два стани системи (91,13 % і retrained 90,05 %), тож census описує retrained concepts; structural marker порівнює counts, а не attributed graphs; sample-count study — три concepts і без classification runs; traces пояснюють окремі images, а census дає розмір mechanism, але не причину кожного case. Інші traces — у repository [20].
@@ -126,8 +126,8 @@
 ### 5. Conclusions
 
 Журнал вимагає: один висновок на кожне завдання; у кожному — особливість результату, чим пояснюється, числа.
-- 1 (завдання 1): структура стабілізується за 1–37 training files на concept, задовго до кінця cohort; envelopes — за окремим графіком, раніше чи пізніше за структуру; stopping rule має стежити за обома markers.
-- 2 (завдання 2): більше samples — smaller graph і wider envelopes; 13 concepts зберігають 106 із 9 738 nodes, compression 91,9× за nodes і 50,6× за values.
+- 1 (завдання 1): структура стабілізується за 1–37 training files на concept, задовго до кінця cohort; feature ranges — за окремим графіком, раніше чи пізніше за структуру; stopping rule має стежити за обома markers.
+- 2 (завдання 2): більше samples — smaller graph і wider feature ranges; 13 concepts зберігають 106 із 9 738 nodes, compression 91,9× за nodes і 50,6× за values.
 - 3 (завдання 3): усі 820 wrong-class answers — три mechanisms: true concept не дійшов до comparison (312), програв на similarity (383), вів на similarity й програв через prior (125). Traces прив'язують кожен mechanism до decision step: skeleton pruning, spur, що міняє topology, junction, втрачений у graph construction, deletions дешевші за out-of-range features, prior term більший за similarity gap.
 
 ### Кінцеві розділи
@@ -138,8 +138,8 @@ Conflicts of interest, Funding і Data Availability заповнено стан�
 
 | № | Файл у `../../figures/anatomy_ais/` | Що показує |
 |---|---|---|
-| 1 | `trajectories.png` | Node count (суцільна, ліва вісь) і mean envelope width (штрихова, права вісь) кожного concept від кількості training files; пунктир — *m*<sub>topo</sub> (синій) і *m*<sub>env</sub> (помаранчевий) |
-| 2 | `curves.png` | (a) node count і (b) mean envelope width для 2_2, 7_1, 4_1 при 2, 5, 10, 20 training files; точки — три draws, лінії — середні |
+| 1 | `trajectories.png` | Node count (суцільна, ліва вісь) і mean feature-range width (штрихова, права вісь) кожного concept від кількості training files; пунктир — *m*<sub>topo</sub> (синій) і *m*<sub>env</sub> (помаранчевий) |
+| 2 | `curves.png` | (a) node count і (b) mean feature-range width для 2_2, 7_1, 4_1 при 2, 5, 10, 20 training files; точки — три draws, лінії — середні |
 | 3 | `pairs.png` | Ten most frequent confusion pairs: pre-match rejection (синій), structural mismatch (помаранчевий), complexity override (зелений) |
 | 4 | `gallery_mechanisms.png` | По рядку на mechanism (pre-match rejection, structural mismatch, complexity override): три найчастіші пари, по одному зображенню; у заголовку — пара, кількість errors пари і image id. Skeleton червоним, GNG graph синім; коло — endpoint, квадрат — intersection |
 | 5 | `mechanism_examples.png` | По одній помилці на mechanism: image graph, winning concept, true-class concept, score (similarity + complexity term) |
@@ -156,7 +156,7 @@ Conflicts of interest, Funding і Data Availability заповнено стан�
 - (1) *s* = 1 − *c* / (*c* + max(*n*<sub>1</sub>, *n*<sub>2</sub>)): *c* — GED, *n*<sub>1</sub>, *n*<sub>2</sub> — nodes плюс edges image graph і concept після preprocessing.
 - (2) *ŝ* = *s* + λ log<sub>2</sub> *K*: *K* — complexity of the concept, λ = 0,10 (complexity prior).
 - GED costs: deletion of an image node or edge 0,25; insertion of a concept node 6; substitution of nodes with different labels 6; substitution of nodes with the same label — weighted sum of feature deviations, 1 за кожну out-of-range feature.
-- *m*<sub>topo</sub> — останній training file, що змінив node чи edge count. *m*<sub>env</sub> — file, з якого починаються п'ять поспіль files із приростом mean envelope width менше 0,02 на file.
+- *m*<sub>topo</sub> — останній training file, що змінив node чи edge count. *m*<sub>env</sub> — file, з якого починаються п'ять поспіль files із приростом mean feature-range width менше 0,02 на file.
 - Compression counting rule: range — два values, scalar чи string — один, list — поелементно, однаково для input і concept.
 - Confidence interval of accuracy — Wilson interval, 95 %.
 
