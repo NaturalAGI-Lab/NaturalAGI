@@ -1,0 +1,44 @@
+{
+  "timestamp": "2026-10-26T00:54:05",
+  "git": {
+    "commit": "12e35613e2905e8867f150bb8d6c48ec52f42e47",
+    "branch": "experiment/gap-aware-associative-emnist",
+    "dirty": true
+  },
+  "model": "Matching-free projection model inspired by the manuscript's Section IV hypotheses (not that section; on hold after the review of 29.10.2026): redundant hypergraph H0 of the neuron, local counters f(e) over its originals, attractor = {f >= 0.8}, novelty map with consolidation (only neurons with >= 2 originals compete), professor's point 3 as an iterated pairwise competition, parametric layer, centre-line shape anchors as synapses",
+  "training": {
+    "originals": "Nikita's 76 MNIST originals (base76) + 10 augmentations each (rotation +-10 deg, shift +-3 px, scale +-10 %, shear +-0.2)",
+    "map": "novelty rho 0.6, tau 0.8, min_originals 2"
+  },
+  "detector": "four skeleton channels (thresholds 110 / 150 / 190 with the production rules, fine 150), MAX over channels",
+  "final_changes": {
+    "param_beta": 0.3,
+    "sleep_theta": 0.7,
+    "shape_anchors": true
+  },
+  "selection": {
+    "final": "combination: R1 \u03b2 0.3 + R4 \u03b8 0.7 + R2 shape anchors",
+    "changes": {
+      "param_beta": 0.3,
+      "sleep_theta": 0.7,
+      "shape_anchors": true
+    },
+    "accepted": [
+      "R1 \u03b2 0.1",
+      "R1 \u03b2 0.2",
+      "R1 \u03b2 0.3",
+      "R1 \u03b2 0.5",
+      "R2 shape anchors",
+      "R4 \u03b8 0.5",
+      "R4 \u03b8 0.7"
+    ],
+    "chosen": [
+      "R1 \u03b2 0.3",
+      "R4 \u03b8 0.7",
+      "R2 shape anchors"
+    ]
+  },
+  "protocol": "all choices on dev (1 996 official-train images), official test run once per frozen configuration",
+  "dump": "tests/_isl/R_mnist76_test.jsonl",
+  "lab_log": "experiments/isl_transfer_2026-10/lab_log.md sections N, P, R"
+}

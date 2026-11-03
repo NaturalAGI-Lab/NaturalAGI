@@ -41,11 +41,13 @@ class ConceptMinorClassifier:
             ),
         ),
         start_point_preprocessor: StartPointPreprocessor = StartPointPreprocessor(),
+        preprocess_fallback: bool = False,
     ):
         self.comparator = comparator if comparator is not None else GEDComparator(timeout=ged_timeout)
         self.critical_point_preprocessor = critical_point_preprocessor
         self.graph_complexity_service = GraphComplexityService()
         self.start_point_preprocessor = start_point_preprocessor
+        self.preprocess_fallback = preprocess_fallback
 
     def preprocess_pair(self, image_graph: nx.Graph, concept_graph: nx.Graph):
         image_graph = copy.deepcopy(image_graph)
@@ -78,9 +80,22 @@ class ConceptMinorClassifier:
 
         try:
             logging.info("Preprocessing image graph")
-            preprocessed_image_graph, preprocessed_concept_graph = self.preprocess_pair(
-                image_graph, concept_graph
-            )
+            try:
+                preprocessed_image_graph, preprocessed_concept_graph = self.preprocess_pair(
+                    image_graph, concept_graph
+                )
+            except ValueError as ve:
+                # Critical-point reduction couldn't make graphs isomorphic
+                # (typical for broken/incomplete structure — image differs too
+                # much from concept). With fallback enabled, compare the
+                # un-reduced graphs instead of rejecting the concept.
+                if not self.preprocess_fallback:
+                    raise
+                logging.info(
+                    f"Preprocessor failed for {concept_id} ({ve}); falling back to raw GED"
+                )
+                preprocessed_image_graph = image_graph
+                preprocessed_concept_graph = concept_graph
             similarity = self.comparator.compare(
                 image_graph=preprocessed_image_graph,
                 concept_graph=preprocessed_concept_graph,

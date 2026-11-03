@@ -1,0 +1,59 @@
+{
+  "timestamp": "2026-10-26T01:19:33",
+  "git": {
+    "commit": "12e35613e2905e8867f150bb8d6c48ec52f42e47",
+    "branch": "experiment/gap-aware-associative-emnist",
+    "dirty": true
+  },
+  "model": "Matching-free projection model inspired by the manuscript's Section IV hypotheses (not that section; on hold after the review of 29.10.2026): redundant hypergraph H0 of the neuron, local counters f(e) over its originals, attractor = {f >= 0.8}, novelty map with consolidation (only neurons with >= 2 originals compete), professor's point 3 as an iterated pairwise competition, parametric layer, centre-line shape anchors as synapses",
+  "training": {
+    "originals": "first 10 images per letter of the bank (official train), no selection: 260 originals + augmentations (rotation +-10 deg, shift +-3 px)",
+    "map": "novelty rho 0.6, tau 0.8, min_originals 2",
+    "census": {
+      "neurons": 102,
+      "competing": 55,
+      "originals_in_competing_%": 81.9
+    }
+  },
+  "detector": "four skeleton channels (thresholds 110 / 150 / 190 with the production rules, fine 150), MAX over channels",
+  "final_changes": {
+    "param_beta": 0.3,
+    "sleep_theta": 0.7,
+    "shape_anchors": true
+  },
+  "selection": {
+    "final": "combination: R1 \u03b2 0.3 + R4 \u03b8 0.7 + R2 shape anchors",
+    "changes": {
+      "param_beta": 0.3,
+      "sleep_theta": 0.7,
+      "shape_anchors": true
+    },
+    "accepted": [
+      "R1 \u03b2 0.1",
+      "R1 \u03b2 0.2",
+      "R1 \u03b2 0.3",
+      "R1 \u03b2 0.5",
+      "R2 shape anchors",
+      "R4 \u03b8 0.5",
+      "R4 \u03b8 0.7"
+    ],
+    "chosen": [
+      "R1 \u03b2 0.3",
+      "R4 \u03b8 0.7",
+      "R2 shape anchors"
+    ]
+  },
+  "protocol": "all choices on dev (2 600 other bank images, official train), official test run once on the frozen configuration",
+  "dump": "tests/_isl/R_emnist_test.jsonl",
+  "lab_log": "experiments/isl_transfer_2026-10/lab_log.md sections N, P, R",
+  "dataset": "EMNIST-letters (26 classes, case merged), official test 20 800 images (tests/emnist_testfull)",
+  "previous_final": {
+    "P final": 69.57,
+    "delta_pp": 1.76,
+    "ci95": [
+      1.39,
+      2.13
+    ],
+    "mcnemar_p": 2.9e-20
+  }
+}

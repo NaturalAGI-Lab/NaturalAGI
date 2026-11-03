@@ -1,4 +1,7 @@
 import logging
+import uuid
+
+import cv2
 import numpy as np
 import networkx as nx
 from opentelemetry import trace
@@ -25,8 +28,25 @@ class SkeletonGNGMapper:
         settings: Settings,
         skeletonization_threshold: int = None,
         simplification_epsilon: float = None,
+        thick_stroke_threshold: int = 0,
+        thick_stroke_px: float = 8.0,
+        bridge_protect_stems: bool = None,
+        bridge_components: bool = False,
     ):
+        # A glyph may consist of separate strokes by nature (the dot of i / j, a detached bar of F). With
+        # bridge_components the skeleton of the first attempt is kept and its parts are joined by the shortest
+        # node-to-node links instead of failing; off = historical behaviour (lower the threshold until connected).
+        self.bridge_components = bool(bridge_components)
+        # None = module default (junction_merge.PROTECT_THROUGH_STROKES); True keeps a short
+        # junction-junction edge when a straight stem passes through either junction (H, K).
+        self.bridge_protect_stems = bridge_protect_stems
+        self.last_skeleton = None   # thinned centre line of the attempt that produced the returned graph
         self.logger = logging.getLogger(__name__)
+        # Thick strokes (median width >= thick_stroke_px at the base threshold) swallow loops and
+        # junctions in the skeleton; binarising them at thick_stroke_threshold thins them first.
+        # 0 = off (default, historical behaviour).
+        self.thick_stroke_threshold = int(thick_stroke_threshold or 0)
+        self.thick_stroke_px = float(thick_stroke_px)
         self.settings = settings
         self.min_threshold = 20
         self.threshold_step = 5
@@ -45,6 +65,14 @@ class SkeletonGNGMapper:
                 f"and simplification epsilon: {self.simplification_epsilon}"
             )
             current_threshold = self.skeletonization_threshold
+            first_disconnected = None
+            if self.thick_stroke_threshold:
+                width = self.median_stroke_width(image, current_threshold)
+                if width >= self.thick_stroke_px:
+                    self.logger.info(
+                        f"Thick strokes ({width:.1f} px): binarising at {self.thick_stroke_threshold}"
+                    )
+                    current_threshold = max(current_threshold, self.thick_stroke_threshold)
             attempt_number = 0
 
             while current_threshold >= self.min_threshold:
@@ -69,7 +97,10 @@ class SkeletonGNGMapper:
                         attempt_span.set_attribute("connected", connected)
 
                         if connected:
+                            self.last_skeleton = skeleton
                             return graph, current_threshold
+                        if first_disconnected is None and graph.number_of_nodes() > 0:
+                            first_disconnected = (graph, skeleton, current_threshold)
 
                     current_threshold -= self.threshold_step
                     attempt_number += 1
@@ -82,11 +113,45 @@ class SkeletonGNGMapper:
                     attempt_number += 1
                     continue
 
+            if self.bridge_components and first_disconnected is not None:
+                graph, skeleton, threshold = first_disconnected
+                self.last_skeleton = skeleton
+                return self._join_components(graph), threshold
             raise Exception("Could not create connected graph with any threshold")
 
         except Exception as e:
             self.logger.error(f"Failed to process image: {str(e)}")
             raise
+
+    @staticmethod
+    def _join_components(graph: nx.Graph) -> nx.Graph:
+        """Connect the parts of a skeleton by the shortest node-to-node links (largest part first)."""
+        graph = graph.copy()
+        while True:
+            parts = sorted(nx.connected_components(graph), key=len, reverse=True)
+            if len(parts) <= 1:
+                return graph
+            main, best = parts[0], None
+            for other in parts[1:]:
+                for u in main:
+                    for v in other:
+                        d = float(np.hypot(graph.nodes[u]["x"] - graph.nodes[v]["x"], graph.nodes[u]["y"] - graph.nodes[v]["y"]))
+                        if best is None or d < best[0]:
+                            best = (d, u, v)
+            a, b = graph.nodes[best[1]], graph.nodes[best[2]]
+            graph.add_edge(      # same attributes as a regular skeleton edge, so every later stage treats it alike
+                best[1], best[2], id=str(uuid.uuid4()), x1=a["x"], y1=a["y"], x2=b["x"], y2=b["y"],
+                length=best[0], joined=True,
+            )
+
+    @staticmethod
+    def median_stroke_width(image, threshold) -> float:
+        """Twice the median distance-to-background over the ink pixels (px)."""
+        binary = (image > threshold).astype(np.uint8)
+        if binary.sum() == 0:
+            return 0.0
+        dist = cv2.distanceTransform(binary, cv2.DIST_L2, 3)
+        return float(2.0 * np.median(dist[binary > 0]))
 
     @_tracer.start_as_current_span("skeletonization.binary_image")
     @timed(label="binary_image")
@@ -173,7 +238,7 @@ class SkeletonGNGMapper:
     def _merge_junction_bridges(self, graph, image, threshold, skeleton):
         binary = self.binary_image(image, threshold)
         stroke_width = estimate_stroke_width(binary, skeleton)
-        graph = merge_short_junction_bridges(graph, BRIDGE_MERGE_FACTOR * stroke_width)
+        graph = merge_short_junction_bridges(graph, BRIDGE_MERGE_FACTOR * stroke_width, self.bridge_protect_stems)
         span = trace.get_current_span()
         span.set_attribute("stroke_width", stroke_width)
         span.set_attribute("node_count", graph.number_of_nodes())

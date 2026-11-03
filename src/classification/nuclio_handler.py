@@ -18,6 +18,7 @@ import classification_orchestrator as _orch
 from graph_similarity import cost_functions as _cf
 from repository.concept_repository import ConceptRepository
 from repository.image_repository import ImageRepository
+from band.band_repository import load_band_models, remove_image_features
 
 HANDLER_NAME = "classification"
 
@@ -70,13 +71,21 @@ def _annotate_range_widths(concept_graphs: dict) -> None:
 
 @contextmanager
 def _cost_config_override(features=None, costs=None, epsilon=None,
-                         coverage_alpha=None, complexity_lambda=None):
+                         coverage_alpha=None, complexity_lambda=None,
+                         range_gate=None, range_span=None,
+                         insert_cost=None, eligibility_slack=None):
     orig_features = _cf.features
     orig_epsilon = _cf.DIAGNOSTIC_WEIGHT_EPSILON
+    orig_gate, orig_span = _cf.RANGE_GATE_REL_WIDTH, _cf.RANGE_SOFTEN_SPAN
     orig_costs = {k: v for k, v in vars(_cf.NodeCost).items() if not k.startswith("_")}
     orig_cov = _orch.COVERAGE_ALPHA
     orig_lam = _orch.COMPLEXITY_PRIOR_LAMBDA
+    orig_ins, orig_slack = _cf.CONCEPT_NODE_INSERT_COST, _orch.ELIGIBILITY_SLACK
     try:
+        if insert_cost is not None:
+            _cf.CONCEPT_NODE_INSERT_COST = float(insert_cost)
+        if eligibility_slack is not None:
+            _orch.ELIGIBILITY_SLACK = float(eligibility_slack)
         if features is not None:
             _cf.features = features
         if epsilon is not None:
@@ -88,6 +97,10 @@ def _cost_config_override(features=None, costs=None, epsilon=None,
             _orch.COVERAGE_ALPHA = float(coverage_alpha)
         if complexity_lambda is not None:
             _orch.COMPLEXITY_PRIOR_LAMBDA = float(complexity_lambda)
+        if range_gate is not None:
+            _cf.RANGE_GATE_REL_WIDTH = float(range_gate)
+        if range_span is not None:
+            _cf.RANGE_SOFTEN_SPAN = float(range_span)
         yield
     finally:
         _cf.features = orig_features
@@ -96,6 +109,23 @@ def _cost_config_override(features=None, costs=None, epsilon=None,
             setattr(_cf.NodeCost, k, v)
         _orch.COVERAGE_ALPHA = orig_cov
         _orch.COMPLEXITY_PRIOR_LAMBDA = orig_lam
+        _cf.RANGE_GATE_REL_WIDTH, _cf.RANGE_SOFTEN_SPAN = orig_gate, orig_span
+        _cf.CONCEPT_NODE_INSERT_COST, _orch.ELIGIBILITY_SLACK = orig_ins, orig_slack
+
+
+def _message_overrides(parameters):
+    """Per-message cost overrides; the same set for the traced and the untraced path."""
+    return dict(
+        features=parameters.get("features"),
+        costs=parameters.get("node_costs"),
+        epsilon=parameters.get("diagnostic_weight_epsilon"),
+        coverage_alpha=parameters.get("coverage_alpha"),
+        complexity_lambda=parameters.get("complexity_prior_lambda"),
+        range_gate=parameters.get("range_gate_rel_width"),
+        range_span=parameters.get("range_soften_span"),
+        insert_cost=parameters.get("concept_node_insert_cost"),
+        eligibility_slack=parameters.get("eligibility_slack"),
+    )
 
 
 def _load_concept_cache(context) -> int:
@@ -114,6 +144,21 @@ def _load_concept_cache(context) -> int:
     _cf.compute_feature_global_spans(concept_graphs)
     setattr(context.user_data, "concept_graphs", concept_graphs)
     setattr(context.user_data, "concept_reload_mtime", _reload_signal_mtime())
+    # Band models (graph-level band concepts) and the structural graphs that only explain
+    # their leaves. Both are empty unless a band model has been trained; band_mode defaults
+    # to "off", in which case neither is ever read.
+    try:
+        band_models = load_band_models(context.user_data.neo4j_driver)
+        explainer_graphs = {
+            cid: concept_repo.get_concept_graph(cid)
+            for cid in concept_repo.get_explainer_concept_ids()
+        }
+        _annotate_range_widths(explainer_graphs)
+    except Exception as e:  # noqa: BLE001
+        context.logger.error_with(f"Band models not loaded: {e}", handler=HANDLER_NAME)
+        band_models, explainer_graphs = {}, {}
+    setattr(context.user_data, "band_models", band_models)
+    setattr(context.user_data, "explainer_graphs", explainer_graphs)
     context.logger.info_with(
         f"Loaded + annotated {len(concept_graphs)} concept graphs",
         handler=HANDLER_NAME,
@@ -211,7 +256,7 @@ def kafka_handler(context, event):
             **settings.model_dump(),
             **data["parameters"],
         }.items()
-        if key in {"ged_timeout", "skeletonization_threshold", "simplification_epsilon", "comparison_method", "fgw_alpha"}
+        if key in {"ged_timeout", "skeletonization_threshold", "simplification_epsilon", "comparison_method", "fgw_alpha", "preprocess_fallback", "calibration", "band_mode", "band_model", "band_topk"}
     }
 
     context.logger.info_with(
@@ -228,6 +273,35 @@ def kafka_handler(context, event):
                              profiling, delete_image_nodes, start_time)
 
 
+def _cleanup_image_features(context, data, image_id) -> None:
+    """The per-image :GraphFeatures node exists only when the request asked for a direction map."""
+    params = data.get("parameters", {})
+    wanted = params.get("direction_map") or params.get("band_mode", "off") != "off"
+    if wanted and params.get("delete_image_nodes", True) and not params.get("keep_graph_features"):
+        try:
+            remove_image_features(context.user_data.neo4j_driver, image_id)
+        except Exception as e:  # noqa: BLE001
+            context.logger.error_with(f"GraphFeatures cleanup failed: {e}", handler=HANDLER_NAME)
+
+
+def _band_kwargs(context, classification_params) -> dict:
+    """Orchestrator kwargs for band mode. `off` (default) passes nothing model-related."""
+    band_mode = str(classification_params.get("band_mode", "off"))
+    if band_mode == "off":
+        return {"band_mode": "off"}
+    name = classification_params.get("band_model")
+    models = getattr(context.user_data, "band_models", {}) or {}
+    # A missing model is reported by the orchestrator inside the classify try-block, so the
+    # message still reaches the DLQ and the image nodes are still cleaned up.
+    return {
+        "band_mode": band_mode,
+        "band_model": models.get(name),
+        "band_model_name": name,
+        "band_topk": int(classification_params.get("band_topk", 3)),
+        "explainer_graphs": getattr(context.user_data, "explainer_graphs", {}) or {},
+    }
+
+
 def _classify_no_trace(context, data, image_id, classification_params,
                        profiling, delete_image_nodes, start_time):
     orchestrator = ClassificationOrchestrator(
@@ -235,19 +309,16 @@ def _classify_no_trace(context, data, image_id, classification_params,
         ged_timeout=classification_params["ged_timeout"],
         comparison_method=classification_params.get("comparison_method", "ged"),
         fgw_alpha=float(classification_params.get("fgw_alpha", 0.5)),
+        preprocess_fallback=bool(classification_params.get("preprocess_fallback", False)),
+        calibration=str(classification_params.get("calibration", "off")),
+        **_band_kwargs(context, classification_params),
         tracer=None,
     )
     try:
         if not image_id:
             raise ValueError("image_id must be provided in the request body")
 
-        msg_features = data["parameters"].get("features")
-        msg_costs = data["parameters"].get("node_costs")
-        msg_epsilon = data["parameters"].get("diagnostic_weight_epsilon")
-        msg_cov = data["parameters"].get("coverage_alpha")
-        msg_lam = data["parameters"].get("complexity_prior_lambda")
-
-        with _cost_config_override(msg_features, msg_costs, msg_epsilon, msg_cov, msg_lam):
+        with _cost_config_override(**_message_overrides(data["parameters"])):
             comparison_results = orchestrator.classify_image(
                 image_id, context.user_data.concept_graphs
             )
@@ -282,6 +353,7 @@ def _classify_no_trace(context, data, image_id, classification_params,
         if delete_image_nodes:
             image_repository = ImageRepository(context.user_data.neo4j_driver)
             image_repository.remove_image_nodes(image_id)
+        _cleanup_image_features(context, data, image_id)
 
 
 def _classify_with_trace(context, event, data, image_id, classification_params,
@@ -305,6 +377,9 @@ def _classify_with_trace(context, event, data, image_id, classification_params,
             ged_timeout=classification_params["ged_timeout"],
             comparison_method=classification_params.get("comparison_method", "ged"),
             fgw_alpha=float(classification_params.get("fgw_alpha", 0.5)),
+            preprocess_fallback=bool(classification_params.get("preprocess_fallback", False)),
+            calibration=str(classification_params.get("calibration", "off")),
+            **_band_kwargs(context, classification_params),
             tracer=tracer,
         )
 
@@ -312,11 +387,7 @@ def _classify_with_trace(context, event, data, image_id, classification_params,
             if not image_id:
                 raise ValueError("image_id must be provided in the request body")
 
-            msg_features = data["parameters"].get("features")
-            msg_costs = data["parameters"].get("node_costs")
-            msg_epsilon = data["parameters"].get("diagnostic_weight_epsilon")
-
-            with _cost_config_override(msg_features, msg_costs, msg_epsilon):
+            with _cost_config_override(**_message_overrides(data["parameters"])):
                 comparison_results = orchestrator.classify_image(
                     image_id, context.user_data.concept_graphs
                 )
@@ -364,6 +435,7 @@ def _classify_with_trace(context, event, data, image_id, classification_params,
             if delete_image_nodes:
                 image_repository = ImageRepository(context.user_data.neo4j_driver)
                 image_repository.remove_image_nodes(image_id)
+            _cleanup_image_features(context, data, image_id)
 
 
 def http_handler(context, event):
@@ -382,6 +454,14 @@ def http_handler(context, event):
         body = {}
 
     operation = body.get("operation")
+    if operation == "band_status":
+        models = getattr(context.user_data, "band_models", {}) or {}
+        return json.dumps({
+            "status": "ok",
+            "band_models": {k: {"concepts": len(m.band_ids), "dm_version": m.dm_version} for k, m in models.items()},
+            "explainer_graphs": len(getattr(context.user_data, "explainer_graphs", {}) or {}),
+            "structural_concepts": len(getattr(context.user_data, "concept_graphs", {}) or {}),
+        })
     if operation == "reload_concepts":
         _raise_reload_signal()
         count = _load_concept_cache(context)

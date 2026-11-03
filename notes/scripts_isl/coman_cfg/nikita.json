@@ -1,0 +1,3 @@
+{"ged_timeout": 5, "preprocess_fallback": false, "diagnostic_weight_epsilon": 0.1,
+ "node_costs": {"NO_COST": 0.0, "MINOR": 0.25, "GENERAL": 0.5, "SEVERE": 0.8, "NO_MATCH": 1, "IMPOSSIBLE": 6},
+ "features": ["normalized_x", "normalized_y", "distance_to_centroid", "horizontal_direction", "vertical_direction", "angle_with_ox", "junction_angle_min", "is_endpoint", "is_corner", "length_ratio_to_max", "avg_neighbor_vector_length", "neighbor_endpoint_count", "neighbor_junction_count"]}

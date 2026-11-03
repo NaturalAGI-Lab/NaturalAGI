@@ -10,6 +10,7 @@ from common.model.dlq import DLQModel
 from common.tracing import init_tracer, inject_trace_headers, extract_trace_context, SpanKind
 from settings import Settings
 from skeleton_gng_mapper import SkeletonGNGMapper
+from dense_features import dense_representation
 from graph_serializer import GraphSerializer
 
 
@@ -81,14 +82,57 @@ def kafka_handler(context, event):
         simplification_epsilon = parameters.get(
             "simplification_epsilon", settings.simplification_epsilon
         )
-        graph, threshold = SkeletonGNGMapper(
-            settings, skeletonization_threshold, simplification_epsilon
-        ).process_image(image)
+        mapper = SkeletonGNGMapper(
+            settings,
+            skeletonization_threshold,
+            simplification_epsilon,
+            thick_stroke_threshold=int(parameters.get("thick_stroke_threshold", 0) or 0),
+            thick_stroke_px=float(parameters.get("thick_stroke_px", 8.0)),
+            bridge_protect_stems=bool(parameters.get("bridge_protect_stems", False)),
+            bridge_components=bool(parameters.get("bridge_components", False)),
+        )
+        graph, threshold = mapper.process_image(image)
+        # Shape read off the dense centre line (orientation block + shape-context points); opt-in.
+        want_dense = bool(parameters.get("dense_features", False))
+        if want_dense:
+            dense = dense_representation(mapper.last_skeleton, deslant=bool(parameters.get("deslant", False)), normalisation=str(parameters.get("normalisation", "bbox")), moment_range=float(parameters.get("moment_range", 2.0)))
+            if dense is not None:
+                data["dense"] = dense
         data["parameters"]["skeletonization_threshold"] = threshold
         data["parameters"]["simplification_epsilon"] = simplification_epsilon
 
         json_net = GraphSerializer.serialize(graph)
         context.logger.info_with(f"Net: {json_net}", handler=HANDLER_NAME)
+
+        # Committee of skeletons: extra skeletons from other binarisations travel with the
+        # message as `skeleton_alts`; only the direction map reads them (classification averages
+        # the letter scores over all maps). `committee_threshold` = int or list; 0/absent = off.
+        committee = parameters.get("committee_threshold", 0) or 0
+        committee = [int(t) for t in (committee if isinstance(committee, list) else [committee]) if int(t) > 0]
+        if committee:
+            alts, dense_alts = [], []
+            for thr in committee:
+                try:
+                    alt_mapper = SkeletonGNGMapper(
+                        settings,
+                        thr,
+                        simplification_epsilon,
+                        thick_stroke_threshold=int(parameters.get("thick_stroke_threshold", 0) or 0),
+                        thick_stroke_px=float(parameters.get("thick_stroke_px", 8.0)),
+                        bridge_protect_stems=bool(parameters.get("bridge_protect_stems", False)),
+                        bridge_components=bool(parameters.get("bridge_components", False)),
+                    )
+                    alt_graph, _ = alt_mapper.process_image(image)
+                    if want_dense:
+                        alt_dense = dense_representation(alt_mapper.last_skeleton, deslant=bool(parameters.get("deslant", False)), normalisation=str(parameters.get("normalisation", "bbox")), moment_range=float(parameters.get("moment_range", 2.0)))
+                        dense_alts.append(alt_dense["orient"] if alt_dense else None)
+                    alts.append(GraphSerializer.serialize(alt_graph))
+                except Exception as e:  # noqa: BLE001
+                    context.logger.warn_with(f"Committee skeleton at {thr} failed: {e}", handler=HANDLER_NAME)
+            if alts:
+                data["skeleton_alts"] = alts
+                if want_dense and len(dense_alts) == len(alts):
+                    data["dense_alts"] = dense_alts
 
         context.logger.info_with("Processed request successfully", handler=HANDLER_NAME)
         data["skeleton"] = json_net

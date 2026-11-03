@@ -61,6 +61,10 @@ DIAGNOSTIC_WEIGHT_EPSILON: float = 1.0
 # the full MNIST test set. RANGE_GATE_REL_WIDTH = 0.0 disables softening (original cliff).
 RANGE_GATE_REL_WIDTH: float = 0.33
 RANGE_SOFTEN_SPAN: float = 2.0
+# Cost of an attractor node that has no counterpart in the image (GED insertion of a concept node). None keeps the
+# graph-minor semantics (IMPOSSIBLE: the whole attractor must embed). A finite value recognises an incomplete input
+# (ISL Def. 1, f >= tau): the attractor still wins when most of its elements are found. Per-message tunable.
+CONCEPT_NODE_INSERT_COST: float | None = None
 FEATURE_GLOBAL_SPANS: dict[str, float] = {}
 
 
@@ -129,6 +133,8 @@ def node_del_cost(node_data: Any) -> float:
 
 
 def node_ins_cost(_: Any) -> float:
+    if CONCEPT_NODE_INSERT_COST is not None:
+        return CONCEPT_NODE_INSERT_COST
     return NodeCost.IMPOSSIBLE
 
 

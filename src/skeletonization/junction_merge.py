@@ -4,6 +4,12 @@ import numpy as np
 # Multiple of the estimated stroke width below which a junction-junction edge is
 # treated as a thinning artifact ("theta bridge") and collapsed.
 BRIDGE_MERGE_FACTOR = 1.5
+# A short junction-junction edge is only a thinning artifact when the strokes pass THROUGH the pair
+# diagonally (the waist of an 8, the crossing of an X). When a stroke runs straight through one of the
+# two junctions (the stem of an H or a K: its two other branches are collinear), the short edge is a
+# real stroke attached to that stem and must stay. Off by default = historical behaviour.
+PROTECT_THROUGH_STROKES = False
+THROUGH_STROKE_MIN_ANGLE_DEG = 150.0
 
 
 def estimate_stroke_width(binary, skeleton) -> float:
@@ -11,7 +17,27 @@ def estimate_stroke_width(binary, skeleton) -> float:
     return 2.0 * float(np.asarray(binary).sum()) / max(float(np.asarray(skeleton).sum()), 1.0)
 
 
-def merge_short_junction_bridges(graph: nx.Graph, max_bridge_len: float) -> nx.Graph:
+def _has_through_stroke(graph: nx.Graph, junction, other) -> bool:
+    """True when two of the junction's branches (other than the bridge to `other`) continue each other in a
+    straight line, i.e. a stem passes through the junction."""
+    p = np.array([graph.nodes[junction]["x"], graph.nodes[junction]["y"]], float)
+    dirs = []
+    for n in graph.neighbors(junction):
+        if n == other:
+            continue
+        d = np.array([graph.nodes[n]["x"], graph.nodes[n]["y"]], float) - p
+        norm = np.linalg.norm(d)
+        if norm > 1e-9:
+            dirs.append(d / norm)
+    cos_limit = np.cos(np.radians(THROUGH_STROKE_MIN_ANGLE_DEG))
+    for i in range(len(dirs)):
+        for j in range(i + 1, len(dirs)):
+            if float(dirs[i] @ dirs[j]) <= cos_limit:
+                return True
+    return False
+
+
+def merge_short_junction_bridges(graph: nx.Graph, max_bridge_len: float, protect_through_strokes: bool = None) -> nx.Graph:
     """Collapse a short edge joining two junctions (degree >= 3) into a single crossing node.
 
     Zhang-Suen thinning of a thick crossing (e.g. the waist of an 8) does not yield a clean
@@ -26,6 +52,8 @@ def merge_short_junction_bridges(graph: nx.Graph, max_bridge_len: float) -> nx.G
     ``contraction`` bookkeeping is keyed by a tuple, which breaks JSON serialisation downstream.
     Skipping shared-neighbour pairs avoids both.
     """
+    if protect_through_strokes is None:
+        protect_through_strokes = PROTECT_THROUGH_STROKES
     graph = graph.copy()
     changed = True
     while changed:
@@ -39,6 +67,8 @@ def merge_short_junction_bridges(graph: nx.Graph, max_bridge_len: float) -> nx.G
                 continue
             common = (set(graph.neighbors(u)) - {v}) & (set(graph.neighbors(v)) - {u})
             if common:
+                continue
+            if protect_through_strokes and (_has_through_stroke(graph, u, v) or _has_through_stroke(graph, v, u)):
                 continue
             mid_x = (graph.nodes[u]["x"] + graph.nodes[v]["x"]) / 2.0
             mid_y = (graph.nodes[u]["y"] + graph.nodes[v]["y"]) / 2.0

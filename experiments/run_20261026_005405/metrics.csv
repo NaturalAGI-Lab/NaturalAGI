@@ -1,0 +1,10 @@
+Metric,Value
+Total Images,8708.0
+Failed (no answer),0.0
+Successfully Classified,8708.0
+Success Rate (%),100.0
+Accuracy (%),90.74414331649058
+Precision (%),90.85232448578004
+Recall (%),91.3487483294113
+F1 Score (%),90.86403034029398
+Top-3 Accuracy (%),96.26779972439137

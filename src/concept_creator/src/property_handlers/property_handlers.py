@@ -1,5 +1,7 @@
 from typing import Any, Dict, List, Union
 import logging
+import math
+import os
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +127,30 @@ def is_match(concept_value: Any, instance_value: Any) -> bool:
     return concept_value == instance_value
 
 
+def _majority_interval(samples: List[float], tau: float) -> Dict[str, Any]:
+    """Stable interval by majority (ISL Def. 1, f >= tau): the shortest interval holding >= tau of the merged values,
+    centred on their median. Keeps the samples so the next merge sees every value, not just the two ends."""
+    s = sorted(samples)
+    n = len(s)
+    k = max(1, math.ceil(tau * n))
+    lo = min(range(n - k + 1), key=lambda i: s[i + k - 1] - s[i])
+    mid = n // 2
+    median = s[mid] if n % 2 else (s[mid - 1] + s[mid]) / 2
+    return {"min": s[lo], "max": s[lo + k - 1], "center": median, "type": "range", "samples": s}
+
+
 def _merge_numeric_values(values: List[Any]) -> Dict[str, Any]:
+    if os.environ.get("CONCEPT_INTERVAL_MODE") == "majority":
+        samples = []
+        for value in values:
+            if is_numeric(value):
+                samples.append(float(value))
+            elif is_range(value):
+                samples.extend(value.get("samples", [value["min"], value["max"]]))
+        if samples:
+            return _majority_interval(samples, float(os.environ.get("CONCEPT_INTERVAL_TAU", "0.8")))
+        return values[0]
+
     numeric_values = []
 
     for value in values:

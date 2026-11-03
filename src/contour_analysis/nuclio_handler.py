@@ -19,6 +19,9 @@ from service.graph_analysis.analyzers.contour_type_analyzer import ContourTypeAn
 from service.graph_analysis.analyzers.monotony_analyzer import MonotonyAnalyzer
 from service.graph_analysis.analyzers.cycle_count_analyzer import CycleCountAnalyzer
 from service.graph_analysis.analyzers.structural_feature_analyzer import StructuralFeatureAnalyzer
+from service.graph_analysis.analyzers.direction_map_analyzer import DirectionMapAnalyzer
+from logic.direction_map import DM_VERSION_DENSE, DM_VERSION_DESLANT, compute_direction_map, dense_dim_schema
+from service.graph_analysis.analyzers import direction_map_analyzer as _dm_analyzer
 
 HANDLER_NAME = "contour_analysis"
 
@@ -60,6 +63,7 @@ def init_context(context):
     setattr(
         context.user_data, "kafka_bootstrap_servers", settings.kafka_bootstrap_servers
     )
+    setattr(context.user_data, "driver", driver)
     setattr(context.user_data, "tertiary_features_service", tertiary_features_service)
     setattr(context.user_data, "data_preprocessing_service", data_preprocessing_service)
     setattr(
@@ -125,7 +129,68 @@ def kafka_handler(context, event):
         networkx_graph_analysis.add_analyzer(MonotonyAnalyzer)
         networkx_graph_analysis.add_analyzer(CycleCountAnalyzer)
         networkx_graph_analysis.add_analyzer(StructuralFeatureAnalyzer)
+        # Opt-in graph-level feature for band concepts; absent => analysis unchanged.
+        if parameters.get("direction_map") or parameters.get("band_mode", "off") != "off":
+            networkx_graph_analysis.add_analyzer(DirectionMapAnalyzer)
+        deslant = bool(parameters.get("deslant", False))
+        _dm_analyzer.DESLANT = deslant
+        normalisation = str(parameters.get("normalisation", "bbox"))
+        moment_range = float(parameters.get("moment_range", 2.0))
+        _dm_analyzer.NORMALISATION, _dm_analyzer.MOMENT_RANGE = normalisation, moment_range
         networkx_graph_analysis.analyze_graph(image_id, session_id)
+
+        band_features_on = bool(parameters.get("direction_map") or parameters.get("band_mode", "off") != "off")
+        dense = input_data.get("dense") if band_features_on else None
+        if dense:
+            # dm3: append the dense centre-line orientation block; keep the shape-context points beside it
+            try:
+                names, blocks, grids = dense_dim_schema()
+                dense_version = DM_VERSION_DESLANT if deslant else DM_VERSION_DENSE
+                if normalisation != "bbox":      # features of different normalisations must never be mixed
+                    dense_version += f"-{normalisation}{moment_range:g}" if normalisation == "moment" else f"-{normalisation}"
+                with context.user_data.driver.session() as neo:
+                    neo.run(
+                        "MERGE (s:DirectionMapSchema {dm_version: $v}) "
+                        "ON CREATE SET s.dim_names = $names, s.dim_block = $blocks, s.dim_grid = $grids",
+                        v=dense_version, names=names, blocks=blocks, grids=grids,
+                    )
+                    neo.run(
+                        "MATCH (f:GraphFeatures {image_id: $id}) "
+                        "SET f.dm = f.dm + $orient, f.dm_version = $v, f.sp = $sp, f.st = $st",
+                        id=image_id, orient=dense["orient"], v=dense_version,
+                        sp=dense["points"], st=dense["tangents"],
+                    )
+            except Exception as e:  # noqa: BLE001
+                context.logger.warn_with(f"Dense features failed: {e}", handler=HANDLER_NAME)
+                dense = None
+
+        if input_data.get("skeleton_alts") and band_features_on:
+            # committee of skeletons: the extra skeletons only contribute direction maps,
+            # stored flattened (k maps x D values) on the image's GraphFeatures node
+            try:
+                flat = []
+                dense_alts = input_data.get("dense_alts") or []
+                for k, net in enumerate(input_data["skeleton_alts"]):
+                    alt = NetworkxGraphAnalysis(
+                        GraphDeserializer.deserialize(net),
+                        analysis_result_persistence_service=None,
+                        merge_threshold=context.user_data.settings.merge_threshold,
+                    )
+                    alt.merge_close_intersection_points()
+                    dm_alt = [float(v) for v in compute_direction_map(alt.graph, deslant=deslant, normalisation=normalisation, moment_range=moment_range)]
+                    if dense:
+                        if k >= len(dense_alts) or not dense_alts[k]:
+                            continue          # an extra map must have the same dimensions as the main one
+                        dm_alt += dense_alts[k]
+                    flat += dm_alt
+                if flat:
+                    with context.user_data.driver.session() as neo:
+                        neo.run(
+                            "MATCH (f:GraphFeatures {image_id: $id}) SET f.dm_alt = $dm",
+                            id=image_id, dm=flat,
+                        )
+            except Exception as e:  # noqa: BLE001
+                context.logger.warn_with(f"Committee direction maps failed: {e}", handler=HANDLER_NAME)
 
         context.user_data.tertiary_features_service.create_tertiary_features(
             image_id, session_id

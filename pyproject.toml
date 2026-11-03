@@ -48,4 +48,10 @@ dev = [
     "psutil>=5.9.0",
     "streamlit>=1.40.0",
     "optuna>=4.0.0",
+    "pytest>=8",
 ]
+
+[tool.pytest.ini_options]
+# Pure-python unit tests (no Docker / Kafka / Neo4j). `tests/` holds datasets and is gitignored.
+testpaths = ["unit_tests"]
+addopts = "--import-mode=importlib"

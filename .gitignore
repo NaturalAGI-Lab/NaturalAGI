@@ -226,3 +226,14 @@ experiments/neo4j_backup_*/
 
 # Per-machine make settings (e.g. PROFILE = lowspec, HOST_IP = ...)
 local.mk
+
+# Datasets, skeleton caches and evaluation dumps of the few-shot experiments (5+ GB, regenerable;
+# see experiments/fewshot_band_concepts_2026-10/report.md)
+tests/
+
+# Neo4j data-dir backups
+neo4j-data.bak-*/
+
+# Professor Parzhyn's unpublished manuscript and review notes (never commit)
+/Итоговый вариант_1.docx
+/Зауваження.docx

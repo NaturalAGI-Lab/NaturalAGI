@@ -15,12 +15,24 @@ class ConceptRepository:
         with self.driver.session() as session:
             concept_query = """
             MATCH (c:Point)
-            WHERE c.concept_id IS NOT NULL
+            WHERE c.concept_id IS NOT NULL AND c.concept_kind IS NULL
             RETURN DISTINCT c.concept_id AS concept_id
             """
             return [
                 record["concept_id"]
                 for record in session.run(concept_query)
+            ]
+
+    def get_explainer_concept_ids(self) -> List[str]:
+        """Structural concepts folded only to explain a band leaf (concept_kind = 'leaf_explainer').
+        They never take part in the structural decision."""
+        with self.driver.session() as session:
+            return [
+                record["concept_id"]
+                for record in session.run(
+                    "MATCH (c:Point) WHERE c.concept_kind = 'leaf_explainer' "
+                    "RETURN DISTINCT c.concept_id AS concept_id"
+                )
             ]
 
     def get_concept_graph(self, concept_id: str) -> nx.Graph:

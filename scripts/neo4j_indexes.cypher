@@ -12,3 +12,9 @@ CREATE INDEX idx_vector_session_id IF NOT EXISTS FOR (n:Vector) ON (n.session_id
 
 // StartPoint concept lookup
 CREATE INDEX idx_startpoint_concept_id IF NOT EXISTS FOR (n:StartPoint) ON (n.concept_id);
+
+// Band concepts (graph-level direction map): per-image features and band models
+CREATE INDEX idx_graphfeatures_image_id IF NOT EXISTS FOR (n:GraphFeatures) ON (n.image_id);
+CREATE INDEX idx_graphfeatures_session_id IF NOT EXISTS FOR (n:GraphFeatures) ON (n.session_id);
+CREATE INDEX idx_bandconcept_model_id IF NOT EXISTS FOR (n:BandConcept) ON (n.model_id);
+CREATE INDEX idx_bandmodel_model_id IF NOT EXISTS FOR (n:BandModel) ON (n.model_id);

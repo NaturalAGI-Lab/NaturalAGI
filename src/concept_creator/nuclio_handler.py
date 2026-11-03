@@ -9,6 +9,8 @@ from pydantic_settings import BaseSettings
 
 from src.concept_creation_repository import ConceptCreationRepository
 from src.critical_point_concept_service import CriticalPointConceptService
+from src.band_concepts.band_concept_service import BandConceptService
+from src.band_concepts.band_repository import BandRepository
 
 HANDLER_NAME = "concept_creator"
 
@@ -35,8 +37,36 @@ def init_context(context):
         settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass
     )
     context.settings = settings
+    context.band_service = BandConceptService(
+        BandRepository(settings.neo4j_dsn, settings.neo4j_user, settings.neo4j_pass)
+    )
 
     return context
+
+
+def _build_band_model(context, body: Dict[str, Any], start_time: float):
+    """operation == "build_band_model": graph-level band concepts, independent of the fold."""
+    if not body.get("model_id") or not body.get("forms"):
+        return context.Response(
+            body=json.dumps({"error": "build_band_model needs model_id and forms"}),
+            status_code=400,
+            content_type="application/json",
+        )
+    result = context.band_service.build_band_model(
+        body["model_id"],
+        body["forms"],
+        merge_similar=bool(body.get("merge_similar", True)),
+        q=float(body.get("q", 10.0)),
+        root_scope=str(body.get("root_scope", "form")),
+        block_weights=body.get("block_weights"),
+        alpha=float(body.get("alpha", 5.0)),
+        leaf_weight=float(body.get("leaf_weight", 0.7)),
+        stage2_lambda=float(body.get("stage2_lambda", 0.0)),
+        stage2_topk=int(body.get("stage2_topk", 5)),
+        stage2_beta=float(body.get("stage2_beta", 0.3)),
+    )
+    result["execution_time_seconds"] = time.time() - start_time
+    return context.Response(body=json.dumps(result), status_code=200, content_type="application/json")
 
 
 def handler(context, event):
@@ -50,6 +80,9 @@ def handler(context, event):
         # Parse the event body
         body = json.loads(event.body.decode("utf-8"))
         context.logger.info(f"Body: {body}")
+        # Requests without `operation` are the structural fold below, unchanged.
+        if body.get("operation") == "build_band_model":
+            return _build_band_model(context, body, start_time)
         session_id = body.get("session_id")
         concept_id = body.get("concept_id")
 
