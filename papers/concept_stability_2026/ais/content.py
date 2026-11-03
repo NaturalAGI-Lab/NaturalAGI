@@ -310,32 +310,15 @@ SECTIONS = [
      "with 6,647 values, of which 3,053 are ranges. A range counts as two "
      "values (its bounds), every scalar or string counts once, lists are "
      "counted per element, and the rule is the same for input and concept. Node compression is 91.9 times overall and "
-     "reaches 176.7 times for 2_1; value compression is 50.6 times "
-     "(Table 2). These ratios compare what formation consumed with what it "
+     "ranges from 33.6 times for 1_1 (33 samples) to 176.7 times for 2_1 "
+     "(121 samples), rising with the number of samples; value compression "
+     "is 50.6 times. These ratios compare what formation consumed with what it "
      "kept. They are not parameter counts and are not comparable with the "
      "size of a neural network. Image graphs carry about 60 node "
      "properties, and formation drops only one of them, the path of the "
      "source file; the concepts "
      "gain aggregate properties that no single image node has, such as the "
      "expected degree of the start point."),
-   ("tbl", 2,
-    "Compression from training graphs to concepts",
-    ["Concept", "Files", "Nodes in → kept", "Node ×", "Value ×"],
-    [["0_1", "33", "418 → 10", "41.8", "23.2"],
-     ["1_1", "33", "235 → 7", "33.6", "18.3"],
-     ["1_3", "55", "187 → 3", "62.3", "34.6"],
-     ["2_1", "121", "1,237 → 7", "176.7", "96.8"],
-     ["2_2", "55", "902 → 12", "75.2", "41.5"],
-     ["3_1", "77", "1,093 → 9", "121.4", "67.8"],
-     ["4_1", "36", "400 → 8", "50.0", "27.4"],
-     ["4_2", "65", "631 → 9", "70.1", "38.3"],
-     ["5_1", "88", "1,192 → 7", "170.3", "93.4"],
-     ["6_1", "77", "1,050 → 10", "105.0", "58.6"],
-     ["7_1", "99", "669 → 5", "133.8", "73.0"],
-     ["8_1", "42", "646 → 11", "58.7", "32.8"],
-     ["9_2", "88", "1,078 → 8", "134.8", "74.5"],
-     ["**Total**", "**869**", "**9,738 → 106**", "**91.9**", "**50.6**"]],
-    "column", [0.18, 0.16, 0.30, 0.18, 0.18], [13]),
    ("h2", "3.3 Misclassification analysis"),
    ("p", "The system reads contours, so a digit with a broken stroke gives a "
      "skeleton that no concept formed from closed contours can cover. The "

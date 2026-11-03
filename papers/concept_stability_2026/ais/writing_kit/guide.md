@@ -95,7 +95,7 @@
 ### 3.2 Influence of sample number on concept formation (завдання 2)
 
 - П1. Три різні concepts: 2_2 (loop і intersection), 7_1 (один open stroke), 4_1 (closed four); по три random subsets на 2, 5, 10, 20 files (рис. 2). Більше files рухає структуру й feature range у протилежні боки: nodes 2_2 16 → 12,7 → 12 → 12, бо ранні concepts мають nodes, яких наступні samples не мають; mean feature-range width 7_1 0,33 / 0,48 / 0,68 / 0,80, бо кожен sample додає свою variation; nodes 4_1 9,3 → 8. Висновок: smaller graph і looser bands. Ці probe concepts не deployed, тож невідомо, що з двох ефектів більше допомагає recognition; наступний крок — classification run на кожну умову.
-- П2. Таблиця 2: 869 training graphs — 9 738 nodes, 9 242 edges, 336 637 stored values → 106 nodes, 100 edges, 6 647 values, з них 3 053 ranges. Counting rule (розділ «Формули»). Node compression 91,9×, для 2_1 176,7×; value compression 50,6×. Це відношення consumed до kept, а не parameter count, і з розміром neural network його не порівнюють. Image node має ~60 properties, formation відкидає лише source file path; concepts набувають aggregate properties, яких немає в жодному image node, наприклад expected degree of the start point.
+- П2. Без таблиці, одним абзацом: 869 training graphs — 9 738 nodes, 9 242 edges, 336 637 stored values → 106 nodes, 100 edges, 6 647 values, з них 3 053 ranges. Counting rule (розділ «Формули»). Node compression 91,9×, від 33,6× (1_1, 33 samples) до 176,7× (2_1, 121 sample) — росте з кількістю samples; value compression 50,6×. Це відношення consumed до kept, а не parameter count, і з розміром neural network його не порівнюють. Image node має ~60 properties, formation відкидає лише source file path; concepts набувають aggregate properties, яких немає в жодному image node, наприклад expected degree of the start point.
 
 ### 3.3 Misclassification analysis (завдання 3)
 
@@ -149,7 +149,6 @@ Conflicts of interest, Funding і Data Availability заповнено стан�
 ## Таблиці
 
 1. Convergence markers: *m*<sub>topo</sub>, *m*<sub>env</sub> і кількість training files кожного concept.
-2. Compression: training files, nodes in → kept, node compression і value compression.
 
 ## Формули
 
