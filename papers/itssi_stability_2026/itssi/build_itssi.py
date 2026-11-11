@@ -40,6 +40,9 @@ PAGE_TOP_PT = 1134 / 20
 LINK_COLOR = "0563C1"
 
 FIGURE_WIDTH_IN = {1: 4.4, 2: 4.8, 3: 3.6, 4: 3.3, 5: 4.1, 6: 2.7, 7: 4.8}
+FIGURE_FILES = {1: "trajectories.png", 2: "curves.png", 3: "pairs.png", 4: "gallery_mechanisms.png",
+                5: "mechanism_examples.png", 6: "junction_merge.png", 7: "gng_seeds.png"}
+FIGURE_DIR = {"en": HERE.parent / "figures/anatomy_ais", "uk": HERE.parent / "figures/anatomy_itssi_uk"}
 TABLE_CELL_PADDING_TW = "30"
 
 EN_HEADINGS = {
@@ -570,13 +573,16 @@ def replace_quotes(root) -> None:
 
 # -------------------------------------------------------------------- figures
 
-def scale_figures(doc, root) -> list[dict]:
+def scale_figures(doc, root, lang: str) -> list[dict]:
     report = []
     for n, drawing in enumerate(root.iter(w("drawing")), start=1):
         inline = drawing.find(WP + "inline")
         extent = inline.find(WP + "extent")
         embed = inline.find(f".//{A}blip").get(R_NS + "embed")
-        image = Image.from_blob(doc.part.related_parts[embed].blob)
+        part = doc.part.related_parts[embed]
+        if lang == "uk":
+            part._blob = (FIGURE_DIR["uk"] / FIGURE_FILES[n]).read_bytes()
+        image = Image.from_blob(part.blob)
         width_in = FIGURE_WIDTH_IN[n]
         cx = round(width_in * EMU_IN)
         cy = round(cx * image.px_height / image.px_width)
@@ -798,7 +804,7 @@ def build(lang: str, shared: dict) -> dict:
     tighten_tables(body)
     for p in list(body.iter(w("p"))):
         linkify(doc, p)
-    figures = scale_figures(doc, body)
+    figures = scale_figures(doc, body, lang)
     doc.save(OUTPUT[lang])
     return {"notes": notes, "figures": figures, "order": order}
 
@@ -1036,6 +1042,25 @@ def verify_parity() -> list[str]:
     return problems
 
 
+def verify_images(lang: str) -> list[str]:
+    """The embedded figures are the files of the output language, and the two languages differ."""
+    doc = docx.Document(OUTPUT[lang])
+    problems = []
+    drawings = list(doc.element.body.iter(w("drawing")))
+    if len(drawings) != len(FIGURE_FILES):
+        return [f"{lang}: {len(drawings)} images, expected {len(FIGURE_FILES)}"]
+    for n, drawing in enumerate(drawings, start=1):
+        embed = drawing.find(f".//{A}blip").get(R_NS + "embed")
+        blob = doc.part.related_parts[embed].blob
+        want = (FIGURE_DIR[lang] / FIGURE_FILES[n]).read_bytes()
+        other = (FIGURE_DIR["en" if lang == "uk" else "uk"] / FIGURE_FILES[n]).read_bytes()
+        if blob != want:
+            problems.append(f"{lang}: Fig. {n} is not {FIGURE_DIR[lang].name}/{FIGURE_FILES[n]}")
+        if want == other:
+            problems.append(f"Fig. {n}: en and uk figure files are identical")
+    return problems
+
+
 def verify_pdf(lang: str, report: dict) -> list[str]:
     problems = []
     if report["body_pages"] < 8:
@@ -1056,7 +1081,7 @@ def main() -> int:
         p1, s1 = verify_structure(lang, refs)
         p2, s2 = verify_references(lang, shared["order"], refs)
         problems += verify_text(lang, shared["order"]) + p1 + p2 + verify_pdf(lang, pdf_stats)
-        problems += verify_typography(lang) + verify_figures(lang)
+        problems += verify_typography(lang) + verify_figures(lang) + verify_images(lang)
         print(f"== {lang}: {OUTPUT[lang].name}")
         print("abstract characters (with spaces):", out["notes"])
         print("structure:", s1)
