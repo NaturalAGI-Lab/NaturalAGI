@@ -30,7 +30,7 @@ ITSSI fixed structure. Prose written fresh in Ukrainian (uniqueness ≥75% vs th
 
 ## Reference list plan (closes remark 6)
 
-~20–22 entries. Verified DOIs mined from `papers/concept_stability_2026/references.bib` (checked vs Crossref 14 Aug); the rest verified via Crossref before drafting. The mis-matched `liu2023 MATA` citation from the KhPI list is dropped.
+~20–22 entries. Verified DOIs mined from `papers/itssi_stability_2026/references.bib` (checked vs Crossref 14 Aug); the rest verified via Crossref before drafting. The mis-matched `liu2023 MATA` citation from the KhPI list is dropped.
 
 Core: Ribeiro 2016 (LIME), Lundberg 2017 (SHAP), Slack 2020, Hooshyar 2024, Rajabi 2024, Rudin 2019, Han 2022 (Vision GNN), Chatbri 2016, Shen 2016, Conte 2004, Riesen 2009, Wang 2021 (GED embedding), Snell 2017, Finn 2017, Lake 2015, Nawaz 2025, Hinton 2022 (Forward-Forward), LeCun 1998, Fritzke 1995 (GNG, no DOI — the one allowed gap), Zhang & Suen 1984, Douglas & Peucker 1973.
 Self (≤30%): Parzhyn 2025 (arXiv Architecture), Parzhyn/Lapin/Bokhan 2025 (AIS), Parzhyn 2022 (KhPI Week), Lapin 2025 (АСУ) → 4 of ~22 ≈ 18%.

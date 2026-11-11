@@ -4,7 +4,7 @@ Re-plots from the committed formation-probe caches and baseline run
 artifacts. Neo4j (holding the baseline image graphs) is required only for
 the two triptychs; everything else runs offline.
 
-Usage: .venv/bin/python papers/concept_stability_2026/render_figures.py
+Usage: .venv/bin/python papers/itssi_stability_2026/render_figures.py
 """
 import random
 import sys

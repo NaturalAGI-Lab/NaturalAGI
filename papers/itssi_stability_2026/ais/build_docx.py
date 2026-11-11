@@ -1,7 +1,7 @@
 """Build the AIS submission .docx from content.py.
 
 Usage:
-    .venv/bin/python papers/concept_stability_2026/ais/build_docx.py
+    .venv/bin/python papers/itssi_stability_2026/ais/build_docx.py
 
 Layout follows ../journal_rules/ais_layout.md. Front matter and back matter run full
 width; the body runs in two 8.0 cm columns with a 0.5 cm gutter, interrupted by
@@ -10,8 +10,8 @@ measure.
 
 Verification:
     /Applications/LibreOffice.app/Contents/MacOS/soffice --headless \\
-        --convert-to pdf --outdir papers/concept_stability_2026/ais \\
-        papers/concept_stability_2026/ais/lapin_ais_2026.docx
+        --convert-to pdf --outdir papers/itssi_stability_2026/ais \\
+        papers/itssi_stability_2026/ais/lapin_ais_2026.docx
 """
 from __future__ import annotations
 

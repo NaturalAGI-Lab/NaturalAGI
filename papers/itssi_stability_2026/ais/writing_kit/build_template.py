@@ -1,7 +1,7 @@
 """Build the AIS template the author writes in: journal headings, figures, tables and formulas, no prose.
 
 Usage:
-    .venv/bin/python papers/concept_stability_2026/ais/writing_kit/build_template.py
+    .venv/bin/python papers/itssi_stability_2026/ais/writing_kit/build_template.py
 
 The layout is the journal's (../../journal_rules/ais_layout.md), so the text is
 written straight into the final format. The paragraph outline from guide.md is

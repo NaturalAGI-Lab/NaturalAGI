@@ -34,10 +34,10 @@ reference DOIs were checked against Crossref on 2026-08-14.
 ## Building the AIS submission
 
 ```bash
-.venv/bin/python papers/concept_stability_2026/ais/build_docx.py
+.venv/bin/python papers/itssi_stability_2026/ais/build_docx.py
 /Applications/LibreOffice.app/Contents/MacOS/soffice --headless \
-    --convert-to pdf --outdir papers/concept_stability_2026/ais \
-    papers/concept_stability_2026/ais/lapin_ais_2026.docx
+    --convert-to pdf --outdir papers/itssi_stability_2026/ais \
+    papers/itssi_stability_2026/ais/lapin_ais_2026.docx
 ```
 
 Text lives in `ais/content.py`, layout in `ais/build_docx.py`, and the measured
@@ -56,7 +56,7 @@ make clean
 All figures are English. Regenerate with:
 
 ```bash
-.venv/bin/python papers/concept_stability_2026/render_figures.py
+.venv/bin/python papers/itssi_stability_2026/render_figures.py
 ```
 
 Triptychs need Neo4j up with the baseline image graphs; the rest renders
