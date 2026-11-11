@@ -1,0 +1,37 @@
+[
+ {
+  "id": "d1",
+  "after": "p9",
+  "en": "Recent work makes GED faster or replaces it with a learned score. Kim [n1] computes GED more efficiently by using isomorphic vertices, and Moscatelli et al. [n2] study node matching for edit distance. Moscatelli et al. [n3] predict GED with the Edges network, which turns the quadratic assignment problem into edge prediction on a GED instance graph and outputs a soft assignment matrix without a matching solver. Wang et al. [n4] and Chen et al. [n5] learn graph similarity with matching networks; GMN-Zoomer [n5] matches graphs at several levels of a hierarchy and fuses the results into one score. These models are trained with gradients and return a score or a soft assignment, so they do not show which edit led a classifier to a wrong class."
+ },
+ {
+  "id": "d2",
+  "after": "p13",
+  "en": "Prototype and concept models explain their decisions by design. PIP-PACA [n6] links image parts to prototypes and adds clustering attention between the prototypes. Proto-Caps [n7] explains medical image decisions with visual prototypes of appearance features that experts define in advance. Mbiaya et al. [n8] add a knowledge graph to a concept-based classifier to improve its accuracy. Vasu et al. [n9] build global concept-based explanations for any image classifier. Zhang et al. [n10] compute concept-based counterfactual explanations in closed form, and in their user study, participants identified model failures with 89.88% accuracy. Liu et al. [n24] form global prototypes for few-shot learning by training base and novel classes together. In all these works, the prototypes and concepts are learned or explained inside a network trained by gradient descent, and none of them records when a prototype or concept stops changing during training."
+ },
+ {
+  "id": "d3",
+  "after": "p14",
+  "en": "Brown et al. [n11] propose shortcut testing, a multitask method that checks whether a clinical model relies on improper correlations, and apply it in radiology and dermatology. Fay et al. [n15] split the image features into the primary task and a spuriously correlated factor and minimize the mutual information between them, so the network learns without the shortcut. Borges [n12] audits shortcut learning in breast cancer subtyping: one clinical predictor is changed at a time, and the shift of the predicted subtype probabilities shows which feature drives the misclassification. These studies detect or suppress shortcuts in a trained model as a whole or in its input features; they do not localize a wrong answer to a processing step."
+ },
+ {
+  "id": "d4",
+  "after": "p15",
+  "en": "Xie et al. [n18] model handwritten mathematical expressions as stroke graphs and label their nodes and edges with an edge-weighted graph attention network. The graph makes the structure of the expression explicit, but the network that labels it is trained end to end with gradients."
+ },
+ {
+  "id": "d5",
+  "after": "d4",
+  "en": "Several recent methods train without backpropagation. Forward Projection [n19] trains each layer in closed form with a single forward pass and no feedback from later layers. Nimmo and Mondragón [n20] build Hebbian convolutional networks with winner-takes-all competition, lateral inhibition and the Bienenstock-Cooper-Munro rule. Lin et al. [n21] study overfitting and anti-Hebbian learning in unsupervised Hebbian networks. Radhakrishnan et al. [n22] show that the average gradient outer product, which needs no backpropagation, describes feature learning in neural networks and lets kernel machines learn features. Xu et al. [n23] reformulate the Forward-Forward algorithm as distance metric learning to improve local learning. These methods remove backpropagation, but they still store what they learn in weights, not in a class structure that can be read."
+ },
+ {
+  "id": "p17",
+  "replace": true,
+  "en": "In summary, graph matching studies measure distance, interpretability studies set requirements or explain trained models, error analysis examines models from outside, skeleton studies stop before the classification decision, and backpropagation-free methods still keep what they learn in weights. Yet we found no study that measured when the concept graphs of a structural classifier trained without gradients stop changing, or split all of its wrong-class answers by the decision step that caused them."
+ },
+ {
+  "id": "p51",
+  "replace": true,
+  "en": "Software used: Python 3.12 (https://www.python.org), OpenCV 4.13 (https://opencv.org) (image reading), NetworkX 3.6 [25], scikit-image 0.26 [26], skan 0.13 [27], rdp 0.8 [28], Numba 0.64 [29]. Services run on Nuclio (https://github.com/nuclio/nuclio) + Kafka (https://kafka.apache.org), and graphs are stored in Neo4j (https://neo4j.com). The code is available at https://github.com/NaturalAGI-Lab/NaturalAGI [33]."
+ }
+]
