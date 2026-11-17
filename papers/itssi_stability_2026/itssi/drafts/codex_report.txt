@@ -1,0 +1,9 @@
+Записано **7 пунктів** у [drafts_uk.json](/Users/mlapin/Development/personal/NaturalAGI/papers/itssi_stability_2026/itssi/drafts/drafts_uk.json). Вихідні поля, порядок, кількість речень, цитування та URL збережено.
+
+Обрані відповідники поза глосарієм:
+
+- isomorphic vertices → ізоморфні вершини; soft assignment → м’яке призначення; matching solver → розв’язувач задачі зіставлення.
+- clustering attention → кластеризаційна увага; counterfactual explanations → контрфактичні пояснення; closed form → замкнена форма; knowledge graph → граф знань.
+- spuriously correlated factor → хибно корельований чинник; mutual information → взаємна інформація; stroke graphs → графи штрихів; edge-weighted graph attention network → графова мережа уваги зі зваженими ребрами.
+- Hebbian → геббівський; anti-Hebbian learning → антигеббівське навчання; winner-takes-all → переможець отримує все; lateral inhibition → латеральне гальмування.
+- average gradient outer product → середній зовнішній добуток градієнтів; kernel machines → ядерні машини; distance metric learning → навчання метрики відстані; overfitting → перенавчання.

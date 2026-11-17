@@ -1,0 +1,9 @@
+Записано **116 елементів** у [translation_uk.json](translation_uk.json). Порядок, `id`, `en`, кількість речень і захищені позначення збережено.
+
+Вибрані відповідники поза глосарієм:
+
+- readability → читабельність; traceability → простежуваність; accountability → підзвітність.
+- few-shot learning → навчання на малій кількості прикладів; shortcut learning → навчання за спрощеними правилами; message passing → передавання повідомлень.
+- inference → виведення; augmentation → аугментація; morphological closing → морфологічне замикання; quantisation error → похибка квантування.
+- stroke → штрих; loop → петля; centroid → центроїд; medial axis → медіальна вісь; crossbar → поперечина; waist → перешийок.
+- quadratic assignment problem → квадратична задача призначення; testbed → випробувальне середовище; census → суцільний облік.

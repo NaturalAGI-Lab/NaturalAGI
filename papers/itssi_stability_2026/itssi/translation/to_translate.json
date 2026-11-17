@@ -1,0 +1,466 @@
+[
+ {
+  "id": "p1",
+  "en": "1. Introduction"
+ },
+ {
+  "id": "p2",
+  "en": "1.1 Research Background"
+ },
+ {
+  "id": "p3",
+  "en": "Neural network models that use gradient descent are very accurate [1]. But all the knowledge is stored in the weights that are hidden and cannot be easily read or interpreted [2]. Existing post-hoc explanation mechanisms simulate explanations and interpretability and are computed after training, only approximating how the neural network works [2, 3]."
+ },
+ {
+  "id": "p4",
+  "en": "Our model, the Compartment Attractor Neural Network (ComAN) [4], represents each digit as a concept: a bipartite graph with points and vectors. These nodes include the set of features that explain the internal structure [5]. The so-called \"concept\" is formed by reducing the training set graphs to the structure they all share, without using standard training algorithms such as backpropagation or gradient descent."
+ },
+ {
+  "id": "p5",
+  "en": "The readability requirement is not the only thing that makes users trust the model. If the concept changes with each new sample, then it is not stable and thus cannot give consistent predictions even if it has high accuracy overall. Even models with equally good accuracy can give conflicting predictions when competing [6]. The theory of our model shows that the concept can be trained on a bounded number of training samples and form a stable attractor [7]."
+ },
+ {
+  "id": "p6",
+  "en": "Accountability of errors follows the readability and stability of trustworthy neural network models. Each wrong answer and classification has to be traced to the stage that produced it. Nowadays, regulations [8] ask for a record of high-risk AI systems' events, so the behavior can be traced at any time."
+ },
+ {
+  "id": "p7",
+  "en": "1.2 Literature Review and Problem Statement"
+ },
+ {
+  "id": "p8",
+  "en": "Graph edit distance (GED) is a common approach to compare two graphs [9–12]. A survey by Gao et al. [9] reviews these algorithms. They grouped the methods by graph type and by how edit costs are set, with the limitations listed. But they have not studied the errors of the classifiers that use GED. "
+ },
+ {
+  "id": "p9",
+  "en": "Computing GED is an NP-hard optimization task. Bougleux et al. [10] show that computation of GED can be written as a quadratic assignment problem, so known methods for that problem give fast approximations of GED. Blumenthal et al. [11] reviewed the main heuristics for GED and tested them in a single shared implementation. These heuristics estimate GED from above or below using assignment problems, local search, or linear programming. Riba et al. [12] developed a message-passing neural network to compute a GED-like distance. This approach outperformed approximate GED in handwritten word retrieval tasks; however, it requires gradient-based training."
+ },
+ {
+  "id": "p10",
+  "en": "Rudin [2] contends that post-training explanation of black box models is likely to simply reinforce bad practice in the context of high-stakes decisions and that we actually need models that are interpretable from the outset. The paper makes no mention of whether the classes of an interpretable model would remain stable as it learns. Rudin et al. [13] set out the fundamental principles of interpretable machine learning and identify ten technical challenge areas (from sparse logical models to interpretable reinforcement learning). The formation of class concepts in the absence of gradient training is not one of those."
+ },
+ {
+  "id": "p11",
+  "en": "Barredo Arrieta et al. [3] look at the concepts and taxonomies of explainable AI and the opportunities and challenges for responsible AI. It is a survey that classifies existing methods and does not assess the stability of model classes."
+ },
+ {
+  "id": "p12",
+  "en": "Yuan et al. [14] provide a unified taxonomy of explainability methods for GNNs (graph neural networks) and a testbed to evaluate them. These are post-hoc methods in the sense that they are methods for explaining the predictions of a trained model. This paper, however, studies readable graphs without such a step."
+ },
+ {
+  "id": "p13",
+  "en": "Ji et al. [15] improve the prototypical networks for few-shot learning with an attention-like strategy which weights each sample by how representative it is of its class and a distance-scaling strategy which reduces the intra-class distance whilst (concomitantly) enlarging the inter-class distance. As with most few-shot methods, it learns a class-level metric, so the question of whether a class concept formed purely via graph reduction will in fact converge to a stable structure remains open."
+ },
+ {
+  "id": "p14",
+  "en": "Oakden-Rayner et al. [16] showed that medical imaging models can perform well overall but fail on unlabelled subsets of patients, such as pneumothorax cases without a chest drain; similarly, Geirhos et al. [17] described shortcut learning, where deep networks rely on decision rules that work on standard benchmarks but fail under changed test conditions. In both cases, researchers identify failures by examining outputs or behavior, not by locating the decision step that caused them, because the internal steps of such networks cannot be read."
+ },
+ {
+  "id": "p15",
+  "en": "Gan et al. [18] represent handwritten Chinese characters as skeleton graphs and recognize them with a graph transformer, which they call more interpretable than image-based models. Still, they compare only recognition accuracy, do not trace wrong answers back to skeleton defects, and train the model with gradient descent. Bai et al. [19] prune skeletons by splitting the contour into parts and show that their method never leaves spurious branches, but they do not study how removing a branch changes the class a classifier picks. In contrast, our graph is built by a growing neural gas [20], which learns the topology of its input points, here, the skeleton pixels. Thus, any spur or broken stroke in the skeleton carries over into the graph and can affect recognition, leaving the effect of skeleton defects on classification unresolved."
+ },
+ {
+  "id": "p16",
+  "en": "Our earlier work introduced the classifier used in this study. Lapin and Bokhan [4] train a graph-based neural network model on a few samples without backpropagation, Parzhyn et al. [5] build the energy model behind its features, and Lapin et al. [7] describe concept formation as attractor dynamics and show that a concept can form from a bounded number of samples. Lapin et al. [21] test the classifier on MNIST handwritten digits, trace its decisions, and explain its most frequent confusion, 2→7. However, these studies do not record how a concept changes during formation, and they do not explain the remaining wrong-class answers."
+ },
+ {
+  "id": "p17",
+  "en": "In summary, graph matching studies measure distance, interpretability studies set requirements or explain trained models, error analysis examines models from outside, and skeleton studies stop before the classification decision. Yet we found no study that measured when the concept graphs of a structural classifier trained without gradients stop changing, or split all of its wrong-class answers by the decision step that caused them."
+ },
+ {
+  "id": "p18",
+  "en": "1.3 Research Aim and Objectives"
+ },
+ {
+  "id": "p19",
+  "en": "This study aims to determine when the concept graph stabilizes during formation and to show how to attribute each misclassification to the step that produced the wrong class."
+ },
+ {
+  "id": "p20",
+  "en": "To fulfill this aim, the study does the following:"
+ },
+ {
+  "id": "p21",
+  "en": "For each concept, record when its structure and feature ranges do not change in one formation pass."
+ },
+ {
+  "id": "p22",
+  "en": "Measure how the structure and feature ranges depend on the number of training samples, and the resulting compression of the training graphs in the final model."
+ },
+ {
+  "id": "p23",
+  "en": "Split all misclassifications by the step and provide examples for each group."
+ },
+ {
+  "id": "p24",
+  "en": "By knowing which step caused the error, we can estimate how many errors the correction can fix."
+ },
+ {
+  "id": "p25",
+  "en": "2. Materials and Methods"
+ },
+ {
+  "id": "p26",
+  "en": "2.1 The classifier"
+ },
+ {
+  "id": "p27",
+  "en": "The study uses the MNIST dataset [1], and all tests are performed using the complete contours. Complete contours are the structures that are drawn as one unbroken shape with no unintended gaps or stray substructures. We manually annotated the MNIST test set and divided it into two categories: complete and incomplete samples."
+ },
+ {
+  "id": "p28",
+  "en": "MNIST images were upscaled to ⟦M1⟧ pixels using Lanczos resampling with the Pillow library. The test set consists of 8,704 of 10,000 images that were labelled as \"complete contour\". Training set: 86 original images that were augmented by rotation, scaling, and elastic distortion, resulting in 869 training samples. In the study, one concept is trained per subclass. The parameter set is fixed for all classes and not tuned per class. "
+ },
+ {
+  "id": "p29",
+  "en": "Each image is transformed into a graph using the ComAN transformation pipeline that has the following stages: binarization, thinning, pruning, node placement, simplification, and junction-bridge merge."
+ },
+ {
+  "id": "p30",
+  "en": "Binarization initially keeps pixels with brightness over 110 and applies a ⟦M2⟧ morphological closing (scikit-image 0.26). The binarization threshold is dynamically selected during the image ingestion. The initial threshold is set to 110; in case the graph has disconnected parts, the threshold is lowered, and the binarization is retried."
+ },
+ {
+  "id": "p31",
+  "en": "Thinning uses the Zhang-Suen algorithm [22] shipped in scikit-image (version 0.26). It produces a one-pixel skeleton from the binarized contour."
+ },
+ {
+  "id": "p32",
+  "en": "Pruning is needed to remove the artifacts from binarization and thinning. It removes \"spurs\", the branches with a free end that are shorter than ⟦M3⟧(8% of skeleton length, 5 px) using the skan library (version 0.13)."
+ },
+ {
+  "id": "p33",
+  "en": "Nodes are placed on the skeleton pixels with Growing Neural Gas (GNG) [20]. Starting from two nodes, the network adds a node every 40 input points where the quantisation error is largest, up to 35 nodes, and connects the two nodes nearest to each input point, so edges follow the strokes. Nodes of degree 1 become endpoints and nodes of degree three or more become intersections. The node chains between them are simplified with the Ramer-Douglas-Peucker algorithm (⟦M4⟧), and the interior nodes it keeps become corner points."
+ },
+ {
+  "id": "p34",
+  "en": "When two handwritten strokes intersect, Zhang-Suen thinning transforms strokes to 1-pixel lines. It cannot shrink thick strokes to a single point, so the overlap becomes the \"junction-bridge\" between the two lines and creates an artifact that was not initially observed in the handwritten pixel image, but can be observed by plotting the resulting graph."
+ },
+ {
+  "id": "p35",
+  "en": "\"Junction-bridge\" reduction finds bridge candidates with two intersection points that are connected by the short line and merges them by eliminating the suitable candidate Vector whose edge is shorter than 1.5x the stroke width."
+ },
+ {
+  "id": "p36",
+  "en": "The graph is bipartite and composed of nodes that are points or vectors. Types of points: endpoints (E), corner points (C), and intersection points (I). Vectors connect points and indicate the stroke segments between two points."
+ },
+ {
+  "id": "p37",
+  "en": "Each node has a set of geometric features that are normalized to ⟦M5⟧. Features for point nodes: position of the point ⟦M6⟧; distance to centroid, horizontal and vertical direction; angle with the x-axis; smallest junction angle; endpoint flag, corner flag; length ratio to the longest stroke; mean neighbour edge length; counts of neighbouring endpoints and junctions. Complexity is calculated as the sum of nodes and edges."
+ },
+ {
+  "id": "p38",
+  "en": "The concept is formed from the training graphs of one subclass. Formation is iterative: the concept is compared with each next graph and reduced to the structure they share. Each matched node stores a feature range instead of a single value. This study has 13 concepts for 10 digits. Digits 1, 2, and 4 have two different variants of handwriting, so they get two subclasses. Concepts are noted as <class>_<subclass> for traceability (e.g. 1_1, 2_1, 2_2). Subclasses 1_2 and 9_1 are disabled in the classification because they are mostly similar to another subclass of the same digit class. Concepts range from 5 nodes (7_1) to 12 nodes (2_2), counting points and vectors. A concept has a starting point node, which is the most common and stable point for the concept graph. This point is selected in the training stage among all training samples and does not change afterward."
+ },
+ {
+  "id": "p39",
+  "en": "When the image is transformed into the graph and ready for inference, we start the classification pipeline, which has four steps: "
+ },
+ {
+  "id": "p40",
+  "en": "Complexity pre-filter. If the concept complexity > image complexity, it is dropped from the competition."
+ },
+ {
+  "id": "p41",
+  "en": "Preprocessing. The starting point aligns two graphs (concept and test graph). The image has its points (E/I/C) and vectors reduced to the concept’s structure. If the reduction fails, the concept is rejected."
+ },
+ {
+  "id": "p42",
+  "en": "Graph Edit Distance (GED). GED is computed with NetworkX (version 3.6) optimize_graph_edit_distance and a 5-second timeout. Costs are defined for all operations: deleting an image node or edge = 0.25; inserting a concept node: 6; substituting nodes with different labels (so a point never replaces a vector): 6; inserting or substituting an edge: 0; substituting nodes with the same label: weighted feature deviation, 1 per feature outside its range. Each feature is weighted by⟦M7⟧, with ⟦M8⟧."
+ },
+ {
+  "id": "p43",
+  "en": "Similarity is calculated by:"
+ },
+ {
+  "id": "p45",
+  "en": "where ⟦M10⟧ is the cost of the cheapest edit path found by GED,"
+ },
+ {
+  "id": "p46",
+  "en": "⟦M11⟧ and ⟦M12⟧ are the numbers of nodes and edges in the reduced image graph and the concept graph."
+ },
+ {
+  "id": "p48",
+  "en": "where ⟦M14⟧ is the complexity of the concept"
+ },
+ {
+  "id": "p49",
+  "en": "⟦M15⟧ is the weight of the complexity term."
+ },
+ {
+  "id": "p50",
+  "en": "GED was selected to provide a clear edit path for every decision and to compare graphs of different sizes. The complexity term was introduced to mitigate the issue that similarity favours small concepts because they are easy to match."
+ },
+ {
+  "id": "p51",
+  "en": "Software used: Python 3.12 [23], OpenCV 4.13 [24] (image reading), NetworkX 3.6 [25], scikit-image 0.26 [26], skan 0.13 [27], rdp 0.8 [28], Numba 0.64 [29]. Services run on Nuclio [30] + Kafka [31], and graphs are stored in Neo4j [32]. The code is available at github.com/NaturalAGI-Lab/NaturalAGI [33]."
+ },
+ {
+  "id": "p52",
+  "en": "2.2 Formation measurements"
+ },
+ {
+  "id": "p53",
+  "en": "The experiment for concept formation was done on the cached training graphs. It uses the cached concepts from an earlier test run. We recorded two markers in one formation pass: ⟦M16⟧ records the last sample number that changed the concept’s node or edge count; and ⟦M17⟧ records the first of five samples in a row where the mean feature-range width (of x and y position) grows by less than 0.02 per sample. Samples enter the pipeline in random order, which excludes the possibility of augmented samples being sequentially reduced and skewing results. A limitation of the ⟦M18⟧ metric is that it sees only counts and misses rearrangements that do not change the node or edge count."
+ },
+ {
+  "id": "p54",
+  "en": "To understand and check how GNG initialization affects graph construction, we ran several tests with different seeds on each test image. The resulting topologies were compared by the number of each point type and the number of cycles. All other experiments used seed 42."
+ },
+ {
+  "id": "p55",
+  "en": "To get the detailed classification result for each image, we ran a second experiment. All concepts were retrained on the same 869 samples. This time, it classified 7,819 of 8,683 images correctly (90.05%, 95% Wilson interval 89.40–90.66 %). The pipeline failed on 21 images, and 44 images were rejected by every concept. 820 images were incorrectly classified, so we clustered them into the steps where they were misclassified: "
+ },
+ {
+  "id": "p56",
+  "en": "pre-match rejection: no concept of the true class reached GED;"
+ },
+ {
+  "id": "p57",
+  "en": "structural mismatch: a concept of the true class reached GED but had lower similarity ⟦M19⟧;"
+ },
+ {
+  "id": "p58",
+  "en": "complexity override: a concept of the true class had equal or higher similarity ⟦M20⟧ but a lower final score ⟦M21⟧ (2)."
+ },
+ {
+  "id": "p59",
+  "en": "3. Results"
+ },
+ {
+  "id": "p60",
+  "en": "3.1 Convergence of concept formation"
+ },
+ {
+  "id": "p61",
+  "en": "Structures that are drawn with straight strokes (concepts 1_1, 1_3, 4_1, 4_2, 7_1) converge in topology faster, as shown in Table 1.  ⟦M22⟧ indicates the number of samples after which the structure no longer changes. Concepts with curved strokes settle between samples 4 and 37. "
+ },
+ {
+  "id": "p62",
+  "en": "Loops and intersection points do not mean that the concept needs more samples to converge. Concepts 2_1 and 5_1 have neither, but they finalized at samples 23 and 28, respectively. The same goes the other way: the concept with the loop might converge fast; the 2_2 topology has not changed from sample 5, although it has a loop in the structure."
+ },
+ {
+  "id": "p63",
+  "en": "All concepts converged topologically before their last training sample; 8_1 came closest, settling at sample 37 of 42."
+ },
+ {
+  "id": "p64",
+  "en": "Feature-range convergence (⟦M23⟧) has a different convergence tempo and is not synchronized with the convergence of the topology. Concept 8_1 topologically converged at sample 37 (Table 1), but its feature ranges settled at sample 5. Concepts 2_1, 5_1 and 9_2 follow the same order. In the other nine concepts, the order is reversed: concept 7_1 finalized its structure at sample 2, but its feature ranges kept widening until sample 15."
+ },
+ {
+  "id": "p65",
+  "en": "Table 1. Convergence markers of concept formation"
+ },
+ {
+  "id": "t0",
+  "en": "Concept"
+ },
+ {
+  "id": "t3",
+  "en": "Samples"
+ },
+ {
+  "id": "p122",
+  "en": "3.2 Influence of sample number on concept formation"
+ },
+ {
+  "id": "p123",
+  "en": "We have conducted the experiments by training 3 structurally different concepts: "
+ },
+ {
+  "id": "p124",
+  "en": "2_2 - with loops and intersection; "
+ },
+ {
+  "id": "p125",
+  "en": "7_1 - one open stroke;"
+ },
+ {
+  "id": "p126",
+  "en": "4_1 - closed substructure, similar to 2_2."
+ },
+ {
+  "id": "p127",
+  "en": "These concepts were retrained on different numbers of samples from their training subsets. Concepts got three random subsets at sizes: 2, 5, 10, and 20 samples (Fig. 2)."
+ },
+ {
+  "id": "p128",
+  "en": "From that experiment, we got the following results: Concept 2_2 has 16 nodes at 2 samples, 12.7 at 5 samples, 12 nodes at 10 and 20 samples. Concept 4_1 converged at 5 samples with 8 nodes; 9.3 nodes at 2 samples. The reason is that earlier concepts have nodes that later samples do not share, so they are removed by the reduction process. "
+ },
+ {
+  "id": "p129",
+  "en": "Also, more samples widen the feature ranges, because the concept absorbs more variations with each sample. Concept 7_1 has mean feature-range width: 0.33 at 2 samples, 0.48 at 5 samples, 0.68 at 10 samples, and 0.80 at 20 samples."
+ },
+ {
+  "id": "p130",
+  "en": "Fig. 1. Node count (solid line, left axis) and mean feature-range width (dashed line, right axis) of each concept against the number of training samples in one formation pass. Dotted lines mark ⟦M26⟧ (blue) and ⟦M27⟧ (orange)"
+ },
+ {
+  "id": "p131",
+  "en": "Fig. 2. Node count (a) and mean feature-range width (b) against the number of training samples for 2_2, 7_1 and 4_1. Dots: three draws; lines: their means"
+ },
+ {
+  "id": "p132",
+  "en": "The training set contains 869 graphs with a total of 9738 nodes that are connected by 9242 edges and 336 637 feature values, compressed to 106 concept nodes with 100 edges and 6647 values. Node compression is 91.9×; value compression is 50.6×."
+ },
+ {
+  "id": "p133",
+  "en": "3.3 Misclassification analysis"
+ },
+ {
+  "id": "p134",
+  "en": "Analyzing the misclassifications, we should mention the overall accuracy of the system on the MNIST test set for complete contours. 90.05% of samples were correctly classified (7,819 of 8,683 samples; 89.83% of all 8,704). Accuracy of incomplete contours was measured in a separate evaluation and achieved 23.94% (310 of 1295 samples). ComAN has an accuracy of 82.21% on the whole MNIST test."
+ },
+ {
+  "id": "p135",
+  "en": "Inference pipeline outputs 3 different types of messages: classified, DLQ (pipeline failure), and no results. The classified result contains the list of similarities sorted by the similarity score. DLQ message carries the error code and reason of failure. A no-result message is produced when there is no concept to be matched with the given graph, usually produced when the sample is corrupted."
+ },
+ {
+  "id": "p136",
+  "en": "Misclassifications are defined by three main clusters of errors: pre-match rejection (38%), structural mismatch (46.7%), and complexity override (15.2%). "
+ },
+ {
+  "id": "p137",
+  "en": "Pre-match rejection is a mechanism that allows concepts to compete if they are eligible for the classification of that sample. That is a preprocessing step before the Graph Edit Distance (GED) step. Out of 312 pre-match rejections: 277 are rejected because they lack one of the structural elements (such as an intersection point or a corner point) that is present in the concept even after the reduction process; 31 samples were rejected by the complexity pre-filter (the concept is more complex than the image graph, thus it cannot be matched to the image); 4 samples were rejected by both of those mechanisms."
+ },
+ {
+  "id": "p138",
+  "en": "Structural mismatch is the most common error. The correct concept was in the GED, but had lower similarity than the winner (incorrect class)."
+ },
+ {
+  "id": "p139",
+  "en": "Complexity override is needed to give more similarity points to the class that has more structural elements to cover. This type of misclassification occurs when the correct concept has equal or higher similarity, but loses by the complexity factor (⟦M28⟧). Without this term, 113 of these samples would be classified correctly; in the other 12, a concept of a third class leads on similarity."
+ },
+ {
+  "id": "p140",
+  "en": "In Figure 3, the ten most frequent confusion pairs are shown with colored bars by misclassification type. The causes of the largest pair, 2→7, are analysed in [21]."
+ },
+ {
+  "id": "p141",
+  "en": "Fig. 3. The ten most frequent confusion pairs by number of errors: pre-match rejection (blue), structural mismatch (orange) and complexity override (green)"
+ },
+ {
+  "id": "p142",
+  "en": "The most frequent rejection messages produced when a concept is rejected before matching are: «no endpoints», «no corner points», «no intersection points»."
+ },
+ {
+  "id": "p143",
+  "en": "All cases described above can be seen in Figure 4 and Figure 5. These are the most common examples of each error. Sample 2_01023 in Figure 4 has no endpoints in its graph, so both class-2 concepts were rejected in preprocessing, and it was matched with the concept of the number 6."
+ },
+ {
+  "id": "p144",
+  "en": "Fig. 4. Common errors per mechanism: rows show pre-match rejection (312 of 820 errors), structural mismatch (383) and complexity override (125); columns show the three most frequent confusion pairs of each, one test image per pair, with the number of errors of the pair in brackets. Pruned skeleton in red, GNG graph in blue; dot: endpoint; square: intersection"
+ },
+ {
+  "id": "p145",
+  "en": "One of the issues that cause the errors in the ComAN system is skeletonization and graph creation. To mitigate some of the artifacts it creates, we have added an additional reduction step. In Figure 6, one can observe the common issue we call «junction-bridge»."
+ },
+ {
+  "id": "p146",
+  "en": "This method has issues that can also be observed in Figure 6, in the last row with sample 4_00755. In this sample, the two intersections are valid, but only 24 px apart, and small enough to be below the threshold, so structurally important elements are collapsed, and the whole structure is corrupted. The merge restores the waist crossing in 740 of all 974 eights and folds the crossbar into one intersection in 315 of all 982 fours in the MNIST test set."
+ },
+ {
+  "id": "p147",
+  "en": "Fig. 5. One error per mechanism. From left: image graph, winning concept, best true-class concept, and their scores split into similarity (dark) and complexity term (light). In the top row the true concept 2_2 is rejected before matching"
+ },
+ {
+  "id": "p148",
+  "en": "Fig. 6. Junction-bridge merge, which collapses a junction-to-junction edge shorter than 1.5 times the estimated stroke width. From left: pruned skeleton, graph without the merge, graph with it. In the eights it restores the crossing of the waist; in 4_00755 it folds the crossbar into one intersection"
+ },
+ {
+  "id": "p149",
+  "en": "The graph topology depends on the GNG seed in 26.6% of test images: 24.5% of complete contours and 37.8% of the 820 misclassifications (Fig. 7)."
+ },
+ {
+  "id": "p150",
+  "en": "4. Discussion"
+ },
+ {
+  "id": "p151",
+  "en": "One of the aims of the study was to assess class concept stability. Results showed that concepts built using the MNIST dataset converge fast using the relatively small amount of samples (1-37, Table 1). Our research showed that the number of samples needed to settle the structure is related to the shape of its strokes. A loop made of straight strokes does not slow convergence: concept 4_1 settles at sample 2, as fast as the open straight-stroke concepts. Because the handwriting of the original samples varies and the samples are augmented by scaling (0.85–1.15), rotation (±12°), and elastic distortion, the same structural element gets different coordinates in different samples. So the flat feature range does not mean that the concept is formed; structural stability does not mean that the feature ranges have converged. Stopping rules should check both markers (Fig. 1). All concepts finalized before the latest sample was added, which shows that all classes have been trained and stabilized by the end of training. To understand how the number of samples influences concept stability, we experimented by supervising concept training at different sample rates (2, 5, 10, and 20) (Section 3.2, Fig. 2). The main takeaway is that low-stroke concepts converged quickly, while more detailed concepts needed more samples to reach topological convergence. Concepts with a low stroke count converged on the 2nd sample because their simple structure varies little across the training samples. RDP [28] simplifies those structures to a few lines, with the only differences being their position in the coordinate space and cross-alignment. For concepts with more detailed cycles, which RDP simplified from circles, the number of approximated lines varies from sample to sample, and the writing style differs relative to other elements. For those concepts, more samples are needed to converge on the topology. In the sample-count experiment (Fig. 2), concept 2_2 reached its final 12 nodes at 10 samples."
+ },
+ {
+  "id": "p152",
+  "en": "Fig. 7. GNG seed and graph topology. (a)–(l) Two test images: skeleton, GNG network and final graph under the most frequent seed and under a seed that changes the topology. Red: edges on a cycle; dashed circle: the loop made by the seed; (f), (l): zoom on it with the GNG neurons in grey. (m) Number of distinct topologies per test image over seeds 0–9"
+ },
+ {
+  "id": "p153",
+  "en": "Converged concepts have a compact structure. Concept 2_2 was compressed from 16 nodes to 12 by the 10th sample. Concept 7_1 had a mean feature range width from 0.33 to 0.80 at the 20th sample. This experiment showed that concepts generalize the possible values and topological structure shared by training samples. Theory [7] predicts that convergence is achievable with a bounded number of samples. However, the literature [2, 3, 6, 13, 15] does not check whether the trained classes are interpretable or whether few-shot models remain stable. This study measures formation stability for each concept."
+ },
+ {
+  "id": "p154",
+  "en": "Data analysis showed that misclassifications are tied to different pipeline steps, so no single correction can remove all errors."
+ },
+ {
+  "id": "p155",
+  "en": "Pre-match rejection (312 errors, 38%) happens before GED and any cost-function computation. In 277 cases, the image graph lacks important structural elements that the concept has, such as an endpoint or an intersection. A cost-function change cannot fix this, because seeking the concept never reaches this step. The fix belongs in image preprocessing and graph construction (Fig. 6 and 7). Most of these errors can be mitigated by using better image and graph preprocessing techniques that are the subject of future research."
+ },
+ {
+  "id": "p156",
+  "en": "Structural mismatch (383 errors, 46.7%) is the largest group of misclassification. In this case, the true concept reaches the GED pipeline stage but is misclassified due to similarity. To fix this stage, we need to change the cost-calculation mechanism, which is the model's current limitation."
+ },
+ {
+  "id": "p157",
+  "en": "Complexity override (125 errors, 15.2%). This mechanism was created to favor complex concepts because they are harder to match with the image graph. Without it, very simple concepts would win each classification because they match better. The cost of deleting image nodes and edges is only 0.25, so the concept would strip everything outside the bounds of topology and features."
+ },
+ {
+  "id": "p158",
+  "en": "These results address the error part of the problem stated in Section 1.2. Oakden-Rayner et al. [16] and Geirhos et al. [17] detect failures by examining model outputs, so each failure is tied to a subset of inputs or a change in test conditions. By contrast, this study ties each of the 820 misclassifications to the step that produced it: rejection before matching, lower similarity, or the complexity term. Studies of GED [9–12] compare, approximate, or learn the distance itself; here, GED drives a decision, and we count its failures by cause. Our previous study [21] explained the most frequent confusion, 2→7, whereas this study splits all misclassifications of a test run. A correction can therefore target the step that caused the error."
+ },
+ {
+  "id": "p159",
+  "en": "This model and method may be useful for the areas where every decision must be traced and explained. Such as highly regulated domains that require a log of every high-risk AI system event [8]. Every result from the classifier can be analyzed, so one can clearly see which stage of the pipeline had the most influence on the decision. The primary objective of this method is complete contour structures (e.g., ideal samples without major noise or lack of information in the structure). When the contours are incomplete, the accuracy of the classification drops to 23.94% because concepts cannot be matched due to the lack of structural elements in the inferred graph. For such kinds of tasks, we want to conduct experiments and research in the field of associative classification. The missing parts in the structure will be reconstructed to find the true concept for that true topology. The census shows how many errors a fix can reach before it is applied. A change to the complexity term can fix up to 113 misclassifications, but the side effects might be more impactful on the accuracy than these fractions of errors. Concept formation should stop only when both the structure and the feature ranges stop changing (Fig. 1)."
+ },
+ {
+  "id": "p160",
+  "en": "Limitations of the study were briefly described in the sections above. ComAN currently works only for the complete contour MNIST images. The main research uses the MNIST dataset, so some methods may not transfer well to other datasets. Early stages of the pipeline that involve the image preprocessing and graph construction are created to simulate the system in the human visual system, which is responsible for the early processing of visual input: finding edges and contours of an object [34, 35], and higher visual areas reduce its shape to a skeleton, the medial axis [36, 37]. But, as with any simulation, it does not perfectly transfer these abilities. The unexpected artifacts are the main limitation of this pipeline stage. Classification results were obtained using one GNG seed and one sample order. GED has a timeout of 5 seconds."
+ },
+ {
+  "id": "p161",
+  "en": "Using the same test split, the best classification model (SVM) reaches 79.70%, 11.2 pp below the ComAN classifier [33]."
+ },
+ {
+  "id": "p162",
+  "en": "Future work should help to make the decision path clearer. The plan is to study the other preprocessing methods and the possibility of replacing GED with a more biologically backed approach. To expand this system to more datasets and generalize the approach for more complex objects, like scenes and moving structures. "
+ },
+ {
+  "id": "p163",
+  "en": "5. Conclusions"
+ },
+ {
+  "id": "p164",
+  "en": "This study looked at when the concept graphs of a graph classifier trained without backprop would stop changing and then went on to trace every misclassification in a test run back to the step that had caused it."
+ },
+ {
+  "id": "p165",
+  "en": "The structure of every concept stopped changing well before its last training sample (i.e. by sample 1 to 37). Concepts with straight strokes (1_1, 1_3, 4_1, 4_2, 7_1) were all settled by sample 2, whereas the curved stroke concepts took 4 to 37 samples. The feature ranges settled on their own schedule too (5 to 18 samples): before the structure in 4 cases and after the structure in 9. The reason for this is that handwriting and augmentation give the same structural element different coordinates in different samples. A flat structure does not necessarily mean a formed concept, and formation should only stop when both markers are flat."
+ },
+ {
+  "id": "p166",
+  "en": "Concept 2_2 went from 16 nodes at 2 samples down to 12 nodes at 10 and 20 samples. The mean feature range width of 7_1 increased from 0.33 at 2 samples to 0.80 at 20. Reduction involves the removal of nodes that are not shared by later samples, and each new sample contributes its own variation to the ranges. Formation reduces the 869 training graphs from 9,738 nodes down to 13 concepts with 106 nodes: 91.9 times fewer nodes and 50.6 times fewer feature values."
+ },
+ {
+  "id": "p167",
+  "en": "All 820 misclassifications of the census run (8,683 images, 90.05% correct) fall into three categories. 312 (38.0%) were cases where the true concept was rejected prior to matching, primarily due to the image graph lacking an endpoint, corner point, or intersection that the concept has. 383 (46.7%) were cases where the true concept was matched but had less similarity than the winner. 125 (15.2%) had equal or greater similarity but lost on the complexity term. Without the complexity term, 113 of those would have been correct."
+ },
+ {
+  "id": "p168",
+  "en": "These results show that concepts stabilize into a fixed structure within tens of samples, and each misclassification points to one step at which a fix is appropriate. The next phase of work will be to look at the pre-match rejections and the pruning rule, as these are the ones that remove the true concept prior to it being compared."
+ },
+ {
+  "id": "p169",
+  "en": "Conflicts of interest. The authors declare that they have no conflicts of interest in relation to the current study, including financial, personal, authorship, or any other, that could affect the study, as well as the results reported in this paper."
+ },
+ {
+  "id": "p170",
+  "en": "Funding. This research received no external funding."
+ },
+ {
+  "id": "p171",
+  "en": "Data Availability. The code and further traced cases are published at https://github.com/NaturalAGI-Lab/NaturalAGI."
+ },
+ {
+  "id": "p172",
+  "en": "Use of artificial intelligence. The authors confirm that they did not use artificial intelligence technologies when creating the current work."
+ }
+]

@@ -1,0 +1,582 @@
+[
+  {
+    "id": "p1",
+    "en": "1. Introduction",
+    "uk": "1 Вступ"
+  },
+  {
+    "id": "p2",
+    "en": "1.1 Research Background",
+    "uk": "1.1 Актуальність дослідження"
+  },
+  {
+    "id": "p3",
+    "en": "Neural network models that use gradient descent are very accurate [1]. But all the knowledge is stored in the weights that are hidden and cannot be easily read or interpreted [2]. Existing post-hoc explanation mechanisms simulate explanations and interpretability and are computed after training, only approximating how the neural network works [2, 3].",
+    "uk": "Моделі нейронних мереж, які використовують градієнтний спуск, є дуже точними [1]. Але всі знання зберігаються у вагах, які приховані та які не можна легко прочитати або інтерпретувати [2]. Наявні механізми пояснення постфактум імітують пояснення та інтерпретованість і обчислюються після навчання, лише наближено відтворюючи те, як працює нейронна мережа [2, 3]."
+  },
+  {
+    "id": "p4",
+    "en": "Our model, the Compartment Attractor Neural Network (ComAN) [4], represents each digit as a concept: a bipartite graph with points and vectors. These nodes include the set of features that explain the internal structure [5]. The so-called \"concept\" is formed by reducing the training set graphs to the structure they all share, without using standard training algorithms such as backpropagation or gradient descent.",
+    "uk": "Наша модель, компартментна атракторна нейронна мережа (ComAN) [4], представляє кожну цифру як концепт: двочастковий граф із точками та векторами. Ці вузли містять набір ознак, які пояснюють внутрішню структуру [5]. Так званий \"концепт\" формується шляхом редукції графів навчального набору до структури, яку вони всі мають спільною, без використання стандартних алгоритмів навчання, таких як зворотне поширення помилки або градієнтний спуск."
+  },
+  {
+    "id": "p5",
+    "en": "The readability requirement is not the only thing that makes users trust the model. If the concept changes with each new sample, then it is not stable and thus cannot give consistent predictions even if it has high accuracy overall. Even models with equally good accuracy can give conflicting predictions when competing [6]. The theory of our model shows that the concept can be trained on a bounded number of training samples and form a stable attractor [7].",
+    "uk": "Вимога читабельності — не єдине, що змушує користувачів довіряти моделі. Якщо концепт змінюється з кожним новим зразком, то він не є стабільним і тому не може давати узгоджені передбачення, навіть якщо загалом має високу точність. Навіть моделі з однаково доброю точністю можуть давати суперечливі передбачення, коли конкурують [6]. Теорія нашої моделі показує, що концепт можна навчити на обмеженій кількості навчальних зразків і сформувати стабільний атрактор [7]."
+  },
+  {
+    "id": "p6",
+    "en": "Accountability of errors follows the readability and stability of trustworthy neural network models. Each wrong answer and classification has to be traced to the stage that produced it. Nowadays, regulations [8] ask for a record of high-risk AI systems' events, so the behavior can be traced at any time.",
+    "uk": "Підзвітність щодо помилок випливає з читабельності та стабільності моделей нейронних мереж, що заслуговують на довіру. Кожну неправильну відповідь і класифікацію потрібно простежити до етапу, який її породив. Сьогодні нормативні акти [8] вимагають реєстрації подій систем ШІ високого ризику, щоб поведінку можна було простежити в будь-який момент."
+  },
+  {
+    "id": "p7",
+    "en": "1.2 Literature Review and Problem Statement",
+    "uk": "1.2 Аналіз останніх досліджень і публікацій та постановка проблеми"
+  },
+  {
+    "id": "p8",
+    "en": "Graph edit distance (GED) is a common approach to compare two graphs [9–12]. A survey by Gao et al. [9] reviews these algorithms. They grouped the methods by graph type and by how edit costs are set, with the limitations listed. But they have not studied the errors of the classifiers that use GED. ",
+    "uk": "Редакційна відстань між графами (GED) є поширеним підходом до порівняння двох графів [9–12]. В огляді Gao та ін. [9] розглянуто ці алгоритми. Вони згрупували методи за типом графа та способом задання вартостей редагування, навівши обмеження. Але вони не досліджували помилки класифікаторів, які використовують GED. "
+  },
+  {
+    "id": "p9",
+    "en": "Computing GED is an NP-hard optimization task. Bougleux et al. [10] show that computation of GED can be written as a quadratic assignment problem, so known methods for that problem give fast approximations of GED. Blumenthal et al. [11] reviewed the main heuristics for GED and tested them in a single shared implementation. These heuristics estimate GED from above or below using assignment problems, local search, or linear programming. Riba et al. [12] developed a message-passing neural network to compute a GED-like distance. This approach outperformed approximate GED in handwritten word retrieval tasks; however, it requires gradient-based training.",
+    "uk": "Обчислення GED є NP-складною задачею оптимізації. Bougleux та ін. [10] показують, що обчислення GED можна записати як квадратичну задачу призначення, тому відомі методи для цієї задачі дають швидкі наближення GED. Blumenthal та ін. [11] розглянули основні евристики для GED і перевірили їх у єдиній спільній реалізації. Ці евристики оцінюють GED зверху або знизу, використовуючи задачі призначення, локальний пошук або лінійне програмування. Riba та ін. [12] розробили нейронну мережу з передаванням повідомлень для обчислення відстані, подібної до GED. Цей підхід перевершив наближену GED у задачах пошуку рукописних слів; однак він потребує навчання на основі градієнтів."
+  },
+  {
+    "id": "p10",
+    "en": "Rudin [2] contends that post-training explanation of black box models is likely to simply reinforce bad practice in the context of high-stakes decisions and that we actually need models that are interpretable from the outset. The paper makes no mention of whether the classes of an interpretable model would remain stable as it learns. Rudin et al. [13] set out the fundamental principles of interpretable machine learning and identify ten technical challenge areas (from sparse logical models to interpretable reinforcement learning). The formation of class concepts in the absence of gradient training is not one of those.",
+    "uk": "Rudin [2] стверджує, що пояснення моделей чорної скриньки після навчання, імовірно, лише закріплює погану практику в контексті рішень із високими ставками і що нам насправді потрібні моделі, які є інтерпретованими від самого початку. У статті не згадано, чи залишатимуться класи інтерпретованої моделі стабільними в міру її навчання. Rudin та ін. [13] викладають фундаментальні принципи інтерпретованого машинного навчання та визначають десять напрямів технічних проблем (від розріджених логічних моделей до інтерпретованого навчання з підкріпленням). Формування концептів класів за відсутності градієнтного навчання не належить до них."
+  },
+  {
+    "id": "p11",
+    "en": "Barredo Arrieta et al. [3] look at the concepts and taxonomies of explainable AI and the opportunities and challenges for responsible AI. It is a survey that classifies existing methods and does not assess the stability of model classes.",
+    "uk": "Barredo Arrieta та ін. [3] розглядають концепти й таксономії пояснюваного ШІ та можливості й виклики для відповідального ШІ. Це огляд, який класифікує наявні методи та не оцінює стабільність класів моделі."
+  },
+  {
+    "id": "p12",
+    "en": "Yuan et al. [14] provide a unified taxonomy of explainability methods for GNNs (graph neural networks) and a testbed to evaluate them. These are post-hoc methods in the sense that they are methods for explaining the predictions of a trained model. This paper, however, studies readable graphs without such a step.",
+    "uk": "Yuan та ін. [14] надають уніфіковану таксономію методів пояснюваності для GNN (графових нейронних мереж) і випробувальне середовище для їх оцінювання. Це методи постфактум у тому сенсі, що вони є методами пояснення передбачень навченої моделі. Однак у цій статті досліджено читабельні графи без такого кроку."
+  },
+  {
+    "id": "p13",
+    "en": "Ji et al. [15] improve the prototypical networks for few-shot learning with an attention-like strategy which weights each sample by how representative it is of its class and a distance-scaling strategy which reduces the intra-class distance whilst (concomitantly) enlarging the inter-class distance. As with most few-shot methods, it learns a class-level metric, so the question of whether a class concept formed purely via graph reduction will in fact converge to a stable structure remains open.",
+    "uk": "Ji та ін. [15] удосконалюють прототипні мережі для навчання на малій кількості прикладів за допомогою стратегії, подібної до уваги, яка зважує кожен зразок за тим, наскільки він є репрезентативним для свого класу, та стратегії масштабування відстані, яка зменшує внутрішньокласову відстань, водночас (одночасно) збільшуючи міжкласову відстань. Як і більшість методів навчання на малій кількості прикладів, цей метод навчає метрику на рівні класу, тому питання про те, чи справді концепт класу, сформований суто шляхом редукції графів, збігатиметься до стабільної структури, залишається відкритим."
+  },
+  {
+    "id": "p14",
+    "en": "Oakden-Rayner et al. [16] showed that medical imaging models can perform well overall but fail on unlabelled subsets of patients, such as pneumothorax cases without a chest drain; similarly, Geirhos et al. [17] described shortcut learning, where deep networks rely on decision rules that work on standard benchmarks but fail under changed test conditions. In both cases, researchers identify failures by examining outputs or behavior, not by locating the decision step that caused them, because the internal steps of such networks cannot be read.",
+    "uk": "Oakden-Rayner та ін. [16] показали, що моделі медичної візуалізації можуть добре працювати загалом, але давати збої на нерозмічених підмножинах пацієнтів, таких як випадки пневмотораксу без плеврального дренажу; подібно до цього, Geirhos та ін. [17] описали навчання за спрощеними правилами, коли глибокі мережі покладаються на правила ухвалення рішень, які працюють на стандартних еталонних наборах даних, але дають збої за змінених умов тестування. В обох випадках дослідники виявляють збої шляхом вивчення виходів або поведінки, а не шляхом визначення кроку ухвалення рішення, який їх спричинив, оскільки внутрішні кроки таких мереж неможливо прочитати."
+  },
+  {
+    "id": "p15",
+    "en": "Gan et al. [18] represent handwritten Chinese characters as skeleton graphs and recognize them with a graph transformer, which they call more interpretable than image-based models. Still, they compare only recognition accuracy, do not trace wrong answers back to skeleton defects, and train the model with gradient descent. Bai et al. [19] prune skeletons by splitting the contour into parts and show that their method never leaves spurious branches, but they do not study how removing a branch changes the class a classifier picks. In contrast, our graph is built by a growing neural gas [20], which learns the topology of its input points, here, the skeleton pixels. Thus, any spur or broken stroke in the skeleton carries over into the graph and can affect recognition, leaving the effect of skeleton defects on classification unresolved.",
+    "uk": "Gan та ін. [18] представляють рукописні китайські ієрогліфи як скелетні графи та розпізнають їх за допомогою графового трансформера, який вони називають більш інтерпретованим, ніж моделі на основі зображень. Утім, вони порівнюють лише точність розпізнавання, не простежують неправильні відповіді до дефектів скелета та навчають модель за допомогою градієнтного спуску. Bai та ін. [19] обрізають скелети, розділяючи контур на частини, і показують, що їхній метод ніколи не залишає хибних гілок, але вони не досліджують, як видалення гілки змінює клас, який обирає класифікатор. На відміну від цього, наш граф будується за допомогою зростаючого нейронного газу [20], який вивчає топологію своїх вхідних точок, тут — пікселів скелета. Отже, будь-який відросток або розірваний штрих у скелеті переноситься в граф і може впливати на розпізнавання, залишаючи вплив дефектів скелета на класифікацію невирішеним."
+  },
+  {
+    "id": "p16",
+    "en": "Our earlier work introduced the classifier used in this study. Lapin and Bokhan [4] train a graph-based neural network model on a few samples without backpropagation, Parzhyn et al. [5] build the energy model behind its features, and Lapin et al. [7] describe concept formation as attractor dynamics and show that a concept can form from a bounded number of samples. Lapin et al. [21] test the classifier on MNIST handwritten digits, trace its decisions, and explain its most frequent confusion, 2→7. However, these studies do not record how a concept changes during formation, and they do not explain the remaining wrong-class answers.",
+    "uk": "У нашій попередній роботі було представлено класифікатор, використаний у цьому дослідженні. Lapin і Bokhan [4] навчають модель нейронної мережі на основі графів на кількох зразках без зворотного поширення помилки, Parzhyn та ін. [5] будують енергетичну модель, що лежить в основі її ознак, а Lapin та ін. [7] описують формування концептів як динаміку атракторів і показують, що концепт може сформуватися з обмеженої кількості зразків. Lapin та ін. [21] перевіряють класифікатор на рукописних цифрах MNIST, простежують його рішення та пояснюють його найчастішу плутанину, 2→7. Однак ці дослідження не фіксують, як концепт змінюється під час формування, і не пояснюють решту відповідей із неправильним класом."
+  },
+  {
+    "id": "p17",
+    "en": "In summary, graph matching studies measure distance, interpretability studies set requirements or explain trained models, error analysis examines models from outside, and skeleton studies stop before the classification decision. Yet we found no study that measured when the concept graphs of a structural classifier trained without gradients stop changing, or split all of its wrong-class answers by the decision step that caused them.",
+    "uk": "Підсумовуючи, дослідження зіставлення графів вимірюють відстань, дослідження інтерпретованості встановлюють вимоги або пояснюють навчені моделі, аналіз помилок вивчає моделі ззовні, а дослідження скелетів зупиняються перед рішенням щодо класифікації. Проте ми не знайшли жодного дослідження, яке вимірювало б, коли графи концептів структурного класифікатора, навченого без градієнтів, перестають змінюватися, або розподіляло б усі його відповіді з неправильним класом за кроком ухвалення рішення, який їх спричинив."
+  },
+  {
+    "id": "p18",
+    "en": "1.3 Research Aim and Objectives",
+    "uk": "1.3 Мета та завдання дослідження"
+  },
+  {
+    "id": "p19",
+    "en": "This study aims to determine when the concept graph stabilizes during formation and to show how to attribute each misclassification to the step that produced the wrong class.",
+    "uk": "Це дослідження має на меті визначити, коли граф концепту стабілізується під час формування, і показати, як віднести кожну помилку класифікації до кроку, який породив неправильний клас."
+  },
+  {
+    "id": "p20",
+    "en": "To fulfill this aim, the study does the following:",
+    "uk": "Для досягнення цієї мети в дослідженні виконано таке:"
+  },
+  {
+    "id": "p21",
+    "en": "For each concept, record when its structure and feature ranges do not change in one formation pass.",
+    "uk": "Для кожного концепту зафіксувати, коли його структура та діапазони ознак не змінюються протягом одного проходу формування."
+  },
+  {
+    "id": "p22",
+    "en": "Measure how the structure and feature ranges depend on the number of training samples, and the resulting compression of the training graphs in the final model.",
+    "uk": "Виміряти, як структура та діапазони ознак залежать від кількості навчальних зразків, і отримане стиснення навчальних графів у кінцевій моделі."
+  },
+  {
+    "id": "p23",
+    "en": "Split all misclassifications by the step and provide examples for each group.",
+    "uk": "Розподілити всі помилки класифікації за кроком і надати приклади для кожної групи."
+  },
+  {
+    "id": "p24",
+    "en": "By knowing which step caused the error, we can estimate how many errors the correction can fix.",
+    "uk": "Знаючи, який крок спричинив помилку, ми можемо оцінити, скільки помилок може усунути виправлення."
+  },
+  {
+    "id": "p25",
+    "en": "2. Materials and Methods",
+    "uk": "2 Матеріали та методи"
+  },
+  {
+    "id": "p26",
+    "en": "2.1 The classifier",
+    "uk": "2.1 Класифікатор"
+  },
+  {
+    "id": "p27",
+    "en": "The study uses the MNIST dataset [1], and all tests are performed using the complete contours. Complete contours are the structures that are drawn as one unbroken shape with no unintended gaps or stray substructures. We manually annotated the MNIST test set and divided it into two categories: complete and incomplete samples.",
+    "uk": "У дослідженні використано набір даних MNIST [1], а всі тести виконано з використанням повних контурів. Повні контури — це структури, намальовані як одна неперервна форма без ненавмисних розривів або сторонніх підструктур. Ми вручну розмітили тестовий набір MNIST і розділили його на дві категорії: повні та неповні зразки."
+  },
+  {
+    "id": "p28",
+    "en": "MNIST images were upscaled to ⟦M1⟧ pixels using Lanczos resampling with the Pillow library. The test set consists of 8,704 of 10,000 images that were labelled as \"complete contour\". Training set: 86 original images that were augmented by rotation, scaling, and elastic distortion, resulting in 869 training samples. In the study, one concept is trained per subclass. The parameter set is fixed for all classes and not tuned per class. ",
+    "uk": "Зображення MNIST було збільшено до ⟦M1⟧ пікселів за допомогою передискретизації Ланцоша з використанням бібліотеки Pillow. Тестовий набір складається з 8 704 із 10 000 зображень, які було позначено як \"повний контур\". Навчальний набір: 86 оригінальних зображень, які було аугментовано обертанням, масштабуванням та еластичним спотворенням, у результаті чого отримано 869 навчальних зразків. У дослідженні для кожного підкласу навчається один концепт. Набір параметрів є фіксованим для всіх класів і не налаштовується для кожного класу. "
+  },
+  {
+    "id": "p29",
+    "en": "Each image is transformed into a graph using the ComAN transformation pipeline that has the following stages: binarization, thinning, pruning, node placement, simplification, and junction-bridge merge.",
+    "uk": "Кожне зображення перетворюється на граф за допомогою конвеєра перетворення ComAN, який має такі етапи: бінаризація, стоншення, обрізання, розміщення вузлів, спрощення та злиття \"міст між перетинами\" (junction-bridge)."
+  },
+  {
+    "id": "p30",
+    "en": "Binarization initially keeps pixels with brightness over 110 and applies a ⟦M2⟧ morphological closing (scikit-image 0.26). The binarization threshold is dynamically selected during the image ingestion. The initial threshold is set to 110; in case the graph has disconnected parts, the threshold is lowered, and the binarization is retried.",
+    "uk": "Бінаризація спочатку зберігає пікселі з яскравістю понад 110 і застосовує морфологічне замикання ⟦M2⟧ (scikit-image 0.26). Поріг бінаризації динамічно вибирається під час надходження зображення. Початковий поріг установлено на 110; якщо граф має незв’язні частини, поріг знижується і бінаризація повторюється."
+  },
+  {
+    "id": "p31",
+    "en": "Thinning uses the Zhang-Suen algorithm [22] shipped in scikit-image (version 0.26). It produces a one-pixel skeleton from the binarized contour.",
+    "uk": "Стоншення використовує алгоритм Чжана–Суена [22], що постачається у scikit-image (версія 0.26). Він створює однопіксельний скелет із бінаризованого контуру."
+  },
+  {
+    "id": "p32",
+    "en": "Pruning is needed to remove the artifacts from binarization and thinning. It removes \"spurs\", the branches with a free end that are shorter than ⟦M3⟧(8% of skeleton length, 5 px) using the skan library (version 0.13).",
+    "uk": "Обрізання потрібне для видалення артефактів бінаризації та стоншення. Воно видаляє \"відростки\", гілки з вільним кінцем, коротші за ⟦M3⟧(8 % довжини скелета, 5 пкс), за допомогою бібліотеки skan (версія 0.13)."
+  },
+  {
+    "id": "p33",
+    "en": "Nodes are placed on the skeleton pixels with Growing Neural Gas (GNG) [20]. Starting from two nodes, the network adds a node every 40 input points where the quantisation error is largest, up to 35 nodes, and connects the two nodes nearest to each input point, so edges follow the strokes. Nodes of degree 1 become endpoints and nodes of degree three or more become intersections. The node chains between them are simplified with the Ramer-Douglas-Peucker algorithm (⟦M4⟧), and the interior nodes it keeps become corner points.",
+    "uk": "Вузли розміщуються на пікселях скелета за допомогою зростаючого нейронного газу (GNG) [20]. Починаючи з двох вузлів, мережа додає вузол кожні 40 вхідних точок там, де похибка квантування найбільша, до 35 вузлів, і з’єднує два вузли, найближчі до кожної вхідної точки, тому ребра йдуть уздовж штрихів. Вузли степеня 1 стають кінцевими точками, а вузли степеня три або більше стають точками перетину. Ланцюжки вузлів між ними спрощуються за допомогою алгоритму Рамера–Дугласа–Пекера (⟦M4⟧), а внутрішні вузли, які він зберігає, стають кутовими точками."
+  },
+  {
+    "id": "p34",
+    "en": "When two handwritten strokes intersect, Zhang-Suen thinning transforms strokes to 1-pixel lines. It cannot shrink thick strokes to a single point, so the overlap becomes the \"junction-bridge\" between the two lines and creates an artifact that was not initially observed in the handwritten pixel image, but can be observed by plotting the resulting graph.",
+    "uk": "Коли два рукописні штрихи перетинаються, стоншення Чжана–Суена перетворює штрихи на лінії завтовшки 1 піксель. Воно не може стиснути товсті штрихи до однієї точки, тому перекриття стає \"мостом між перетинами\" (junction-bridge) між двома лініями та створює артефакт, який спочатку не спостерігався на рукописному піксельному зображенні, але який можна спостерігати, побудувавши отриманий граф."
+  },
+  {
+    "id": "p35",
+    "en": "\"Junction-bridge\" reduction finds bridge candidates with two intersection points that are connected by the short line and merges them by eliminating the suitable candidate Vector whose edge is shorter than 1.5x the stroke width.",
+    "uk": "Редукція \"міст між перетинами\" (junction-bridge) знаходить кандидати на міст із двома точками перетину, з’єднаними короткою лінією, і зливає їх, усуваючи відповідний вектор-кандидат, ребро якого коротше за 1,5 ширини штриха."
+  },
+  {
+    "id": "p36",
+    "en": "The graph is bipartite and composed of nodes that are points or vectors. Types of points: endpoints (E), corner points (C), and intersection points (I). Vectors connect points and indicate the stroke segments between two points.",
+    "uk": "Граф є двочастковим і складається з вузлів, які є точками або векторами. Типи точок: кінцеві точки (E), кутові точки (C) і точки перетину (I). Вектори з’єднують точки та позначають сегменти штрихів між двома точками."
+  },
+  {
+    "id": "p37",
+    "en": "Each node has a set of geometric features that are normalized to ⟦M5⟧. Features for point nodes: position of the point ⟦M6⟧; distance to centroid, horizontal and vertical direction; angle with the x-axis; smallest junction angle; endpoint flag, corner flag; length ratio to the longest stroke; mean neighbour edge length; counts of neighbouring endpoints and junctions. Complexity is calculated as the sum of nodes and edges.",
+    "uk": "Кожен вузол має набір геометричних ознак, нормалізованих до ⟦M5⟧. Ознаки для вузлів-точок: положення точки ⟦M6⟧; відстань до центроїда, горизонтальний і вертикальний напрям; кут з віссю x; найменший кут перетину; прапорець кінцевої точки, прапорець кутової точки; відношення довжини до найдовшого штриха; середня довжина сусідніх ребер; кількості сусідніх кінцевих точок і точок перетину. Складність обчислюється як сума вузлів і ребер."
+  },
+  {
+    "id": "p38",
+    "en": "The concept is formed from the training graphs of one subclass. Formation is iterative: the concept is compared with each next graph and reduced to the structure they share. Each matched node stores a feature range instead of a single value. This study has 13 concepts for 10 digits. Digits 1, 2, and 4 have two different variants of handwriting, so they get two subclasses. Concepts are noted as <class>_<subclass> for traceability (e.g. 1_1, 2_1, 2_2). Subclasses 1_2 and 9_1 are disabled in the classification because they are mostly similar to another subclass of the same digit class. Concepts range from 5 nodes (7_1) to 12 nodes (2_2), counting points and vectors. A concept has a starting point node, which is the most common and stable point for the concept graph. This point is selected in the training stage among all training samples and does not change afterward.",
+    "uk": "Концепт формується з навчальних графів одного підкласу. Формування є ітеративним: концепт порівнюється з кожним наступним графом і редукується до структури, яку вони мають спільною. Кожен зіставлений вузол зберігає діапазон ознак замість одного значення. У цьому дослідженні є 13 концептів для 10 цифр. Цифри 1, 2 і 4 мають два різні варіанти написання, тому вони отримують два підкласи. Концепти позначаються як <клас>_<підклас> для простежуваності (наприклад, 1_1, 2_1, 2_2). Підкласи 1_2 і 9_1 вимкнено під час класифікації, оскільки вони переважно подібні до іншого підкласу того самого класу цифри. Концепти мають від 5 вузлів (7_1) до 12 вузлів (2_2), ураховуючи точки та вектори. Концепт має вузол стартової точки, яка є найпоширенішою та найстабільнішою точкою для графа концепту. Ця точка вибирається на етапі навчання серед усіх навчальних зразків і надалі не змінюється."
+  },
+  {
+    "id": "p39",
+    "en": "When the image is transformed into the graph and ready for inference, we start the classification pipeline, which has four steps: ",
+    "uk": "Коли зображення перетворено на граф і воно готове до виведення, ми запускаємо конвеєр класифікації, який має чотири кроки: "
+  },
+  {
+    "id": "p40",
+    "en": "Complexity pre-filter. If the concept complexity > image complexity, it is dropped from the competition.",
+    "uk": "Попередній фільтр складності. Якщо складність концепту > складність зображення, він вилучається зі змагання."
+  },
+  {
+    "id": "p41",
+    "en": "Preprocessing. The starting point aligns two graphs (concept and test graph). The image has its points (E/I/C) and vectors reduced to the concept’s structure. If the reduction fails, the concept is rejected.",
+    "uk": "Попередня обробка. Стартова точка вирівнює два графи (концепт і тестовий граф). Точки (E/I/C) та вектори зображення редукуються до структури концепту. Якщо редукція не вдається, концепт відхиляється."
+  },
+  {
+    "id": "p42",
+    "en": "Graph Edit Distance (GED). GED is computed with NetworkX (version 3.6) optimize_graph_edit_distance and a 5-second timeout. Costs are defined for all operations: deleting an image node or edge = 0.25; inserting a concept node: 6; substituting nodes with different labels (so a point never replaces a vector): 6; inserting or substituting an edge: 0; substituting nodes with the same label: weighted feature deviation, 1 per feature outside its range. Each feature is weighted by⟦M7⟧, with ⟦M8⟧.",
+    "uk": "Редакційна відстань між графами (GED). GED обчислюється за допомогою optimize_graph_edit_distance у NetworkX (версія 3.6) з обмеженням часу 5 секунд. Вартості визначено для всіх операцій: видалення вузла або ребра зображення = 0,25; вставлення вузла концепту: 6; заміна вузлів із різними мітками (тому точка ніколи не замінює вектор): 6; вставлення або заміна ребра: 0; заміна вузлів з однаковою міткою: зважене відхилення ознак, 1 за кожну ознаку поза її діапазоном. Кожна ознака зважується за⟦M7⟧, із ⟦M8⟧."
+  },
+  {
+    "id": "p43",
+    "en": "Similarity is calculated by:",
+    "uk": "Подібність обчислюється за:"
+  },
+  {
+    "id": "p45",
+    "en": "where ⟦M10⟧ is the cost of the cheapest edit path found by GED,",
+    "uk": "де ⟦M10⟧ — вартість найдешевшого шляху редагування, знайденого GED,"
+  },
+  {
+    "id": "p46",
+    "en": "⟦M11⟧ and ⟦M12⟧ are the numbers of nodes and edges in the reduced image graph and the concept graph.",
+    "uk": "⟦M11⟧ і ⟦M12⟧ — кількості вузлів і ребер у редукованому графі зображення та графі концепту."
+  },
+  {
+    "id": "p48",
+    "en": "where ⟦M14⟧ is the complexity of the concept",
+    "uk": "де ⟦M14⟧ — складність концепту"
+  },
+  {
+    "id": "p49",
+    "en": "⟦M15⟧ is the weight of the complexity term.",
+    "uk": "⟦M15⟧ — вага доданка складності."
+  },
+  {
+    "id": "p50",
+    "en": "GED was selected to provide a clear edit path for every decision and to compare graphs of different sizes. The complexity term was introduced to mitigate the issue that similarity favours small concepts because they are easy to match.",
+    "uk": "GED було вибрано для забезпечення чіткого шляху редагування для кожного рішення та порівняння графів різних розмірів. Доданок складності було введено для пом’якшення проблеми, що подібність віддає перевагу малим концептам, оскільки їх легко зіставити."
+  },
+  {
+    "id": "p51",
+    "en": "Software used: Python 3.12 [23], OpenCV 4.13 [24] (image reading), NetworkX 3.6 [25], scikit-image 0.26 [26], skan 0.13 [27], rdp 0.8 [28], Numba 0.64 [29]. Services run on Nuclio [30] + Kafka [31], and graphs are stored in Neo4j [32]. The code is available at github.com/NaturalAGI-Lab/NaturalAGI [33].",
+    "uk": "Використане програмне забезпечення: Python 3.12 [23], OpenCV 4.13 [24] (читання зображень), NetworkX 3.6 [25], scikit-image 0.26 [26], skan 0.13 [27], rdp 0.8 [28], Numba 0.64 [29]. Сервіси працюють на Nuclio [30] + Kafka [31], а графи зберігаються в Neo4j [32]. Код доступний за адресою github.com/NaturalAGI-Lab/NaturalAGI [33]."
+  },
+  {
+    "id": "p52",
+    "en": "2.2 Formation measurements",
+    "uk": "2.2 Вимірювання формування"
+  },
+  {
+    "id": "p53",
+    "en": "The experiment for concept formation was done on the cached training graphs. It uses the cached concepts from an earlier test run. We recorded two markers in one formation pass: ⟦M16⟧ records the last sample number that changed the concept’s node or edge count; and ⟦M17⟧ records the first of five samples in a row where the mean feature-range width (of x and y position) grows by less than 0.02 per sample. Samples enter the pipeline in random order, which excludes the possibility of augmented samples being sequentially reduced and skewing results. A limitation of the ⟦M18⟧ metric is that it sees only counts and misses rearrangements that do not change the node or edge count.",
+    "uk": "Експеримент із формування концептів було проведено на кешованих навчальних графах. У ньому використано кешовані концепти з попереднього експерименту. Ми зафіксували два маркери в одному проході формування: ⟦M16⟧ фіксує номер останнього зразка, який змінив кількість вузлів або ребер концепту; а ⟦M17⟧ фіксує перший із п’яти послідовних зразків, на яких середня ширина діапазону ознак (положення x і y) зростає менш ніж на 0,02 на зразок. Зразки надходять до конвеєра у випадковому порядку, що виключає можливість послідовної редукції аугментованих зразків і спотворення результатів. Обмеження метрики ⟦M18⟧ полягає в тому, що вона бачить лише кількості та пропускає перебудови, які не змінюють кількість вузлів або ребер."
+  },
+  {
+    "id": "p54",
+    "en": "To understand and check how GNG initialization affects graph construction, we ran several tests with different seeds on each test image. The resulting topologies were compared by the number of each point type and the number of cycles. All other experiments used seed 42.",
+    "uk": "Щоб зрозуміти та перевірити, як ініціалізація GNG впливає на побудову графа, ми провели кілька тестів із різними зернами генератора випадкових чисел на кожному тестовому зображенні. Отримані топології порівнювали за кількістю точок кожного типу та кількістю циклів. В усіх інших експериментах використовували зерно генератора випадкових чисел 42."
+  },
+  {
+    "id": "p55",
+    "en": "To get the detailed classification result for each image, we ran a second experiment. All concepts were retrained on the same 869 samples. This time, it classified 7,819 of 8,683 images correctly (90.05%, 95% Wilson interval 89.40–90.66 %). The pipeline failed on 21 images, and 44 images were rejected by every concept. 820 images were incorrectly classified, so we clustered them into the steps where they were misclassified: ",
+    "uk": "Щоб отримати детальний результат класифікації для кожного зображення, ми провели другий експеримент. Усі концепти було перенавчено на тих самих 869 зразках. Цього разу він правильно класифікував 7 819 із 8 683 зображень (90,05 %, 95 % інтервал Вілсона 89,40–90,66 %). Конвеєр дав збій на 21 зображенні, а 44 зображення було відхилено кожним концептом. 820 зображень було класифіковано неправильно, тому ми згрупували їх за кроками, на яких їх було класифіковано помилково: "
+  },
+  {
+    "id": "p56",
+    "en": "pre-match rejection: no concept of the true class reached GED;",
+    "uk": "відхилення до зіставлення: жоден концепт істинного класу не досяг GED;"
+  },
+  {
+    "id": "p57",
+    "en": "structural mismatch: a concept of the true class reached GED but had lower similarity ⟦M19⟧;",
+    "uk": "структурна невідповідність: концепт істинного класу досяг GED, але мав нижчу подібність ⟦M19⟧;"
+  },
+  {
+    "id": "p58",
+    "en": "complexity override: a concept of the true class had equal or higher similarity ⟦M20⟧ but a lower final score ⟦M21⟧ (2).",
+    "uk": "переважання складності: концепт істинного класу мав рівну або вищу подібність ⟦M20⟧, але нижчу підсумкову оцінку ⟦M21⟧ (2)."
+  },
+  {
+    "id": "p59",
+    "en": "3. Results",
+    "uk": "3 Результати"
+  },
+  {
+    "id": "p60",
+    "en": "3.1 Convergence of concept formation",
+    "uk": "3.1 Збіжність формування концептів"
+  },
+  {
+    "id": "p61",
+    "en": "Structures that are drawn with straight strokes (concepts 1_1, 1_3, 4_1, 4_2, 7_1) converge in topology faster, as shown in Table 1.  ⟦M22⟧ indicates the number of samples after which the structure no longer changes. Concepts with curved strokes settle between samples 4 and 37. ",
+    "uk": "Структури, намальовані прямими штрихами (концепти 1_1, 1_3, 4_1, 4_2, 7_1), швидше збігаються за топологією, як показано в табл. 1.  ⟦M22⟧ позначає кількість зразків, після якої структура більше не змінюється. Концепти з кривими штрихами стабілізуються між зразками 4 і 37. "
+  },
+  {
+    "id": "p62",
+    "en": "Loops and intersection points do not mean that the concept needs more samples to converge. Concepts 2_1 and 5_1 have neither, but they finalized at samples 23 and 28, respectively. The same goes the other way: the concept with the loop might converge fast; the 2_2 topology has not changed from sample 5, although it has a loop in the structure.",
+    "uk": "Петлі та точки перетину не означають, що концепту потрібно більше зразків для збіжності. Концепти 2_1 і 5_1 не мають ні того, ні іншого, але вони остаточно сформувалися на зразках 23 і 28 відповідно. Те саме діє і навпаки: концепт із петлею може збігатися швидко; топологія 2_2 не змінювалася зі зразка 5, хоча в його структурі є петля."
+  },
+  {
+    "id": "p63",
+    "en": "All concepts converged topologically before their last training sample; 8_1 came closest, settling at sample 37 of 42.",
+    "uk": "Усі концепти збіглися топологічно до свого останнього навчального зразка; найближчим до нього був 8_1, який стабілізувався на зразку 37 із 42."
+  },
+  {
+    "id": "p64",
+    "en": "Feature-range convergence (⟦M23⟧) has a different convergence tempo and is not synchronized with the convergence of the topology. Concept 8_1 topologically converged at sample 37 (Table 1), but its feature ranges settled at sample 5. Concepts 2_1, 5_1 and 9_2 follow the same order. In the other nine concepts, the order is reversed: concept 7_1 finalized its structure at sample 2, but its feature ranges kept widening until sample 15.",
+    "uk": "Збіжність діапазонів ознак (⟦M23⟧) має інший темп збіжності та не синхронізована зі збіжністю топології. Концепт 8_1 топологічно збігся на зразку 37 (табл. 1), але його діапазони ознак стабілізувалися на зразку 5. Концепти 2_1, 5_1 і 9_2 дотримуються того самого порядку. В інших дев’яти концептах порядок зворотний: концепт 7_1 остаточно сформував свою структуру на зразку 2, але його діапазони ознак продовжували розширюватися до зразка 15 (рис. 1)."
+  },
+  {
+    "id": "p65",
+    "en": "Table 1. Convergence markers of concept formation",
+    "uk": "Таблиця 1. Маркери збіжності формування концептів"
+  },
+  {
+    "id": "t0",
+    "en": "Concept",
+    "uk": "Концепт"
+  },
+  {
+    "id": "t3",
+    "en": "Samples",
+    "uk": "Зразки"
+  },
+  {
+    "id": "p122",
+    "en": "3.2 Influence of sample number on concept formation",
+    "uk": "3.2 Вплив кількості зразків на формування концептів"
+  },
+  {
+    "id": "p123",
+    "en": "We have conducted the experiments by training 3 structurally different concepts: ",
+    "uk": "Ми провели експерименти, навчаючи 3 структурно різні концепти: "
+  },
+  {
+    "id": "p124",
+    "en": "2_2 - with loops and intersection; ",
+    "uk": "2_2 - з петлями та точкою перетину; "
+  },
+  {
+    "id": "p125",
+    "en": "7_1 - one open stroke;",
+    "uk": "7_1 - один відкритий штрих;"
+  },
+  {
+    "id": "p126",
+    "en": "4_1 - closed substructure, similar to 2_2.",
+    "uk": "4_1 - замкнена підструктура, подібна до 2_2."
+  },
+  {
+    "id": "p127",
+    "en": "These concepts were retrained on different numbers of samples from their training subsets. Concepts got three random subsets at sizes: 2, 5, 10, and 20 samples (Fig. 2).",
+    "uk": "Ці концепти було перенавчено на різній кількості зразків із їхніх навчальних підмножин. Концепти отримали три випадкові підмножини розміром: 2, 5, 10 і 20 зразків (рис. 2)."
+  },
+  {
+    "id": "p128",
+    "en": "From that experiment, we got the following results: Concept 2_2 has 16 nodes at 2 samples, 12.7 at 5 samples, 12 nodes at 10 and 20 samples. Concept 4_1 converged at 5 samples with 8 nodes; 9.3 nodes at 2 samples. The reason is that earlier concepts have nodes that later samples do not share, so they are removed by the reduction process. ",
+    "uk": "З цього експерименту ми отримали такі результати: концепт 2_2 має 16 вузлів за 2 зразки, 12,7 за 5 зразків, 12 вузлів за 10 і 20 зразків. Концепт 4_1 збігся за 5 зразків із 8 вузлами; 9,3 вузла за 2 зразки. Причина полягає в тому, що ранні концепти мають вузли, яких не мають пізніші зразки, тому вони видаляються процесом редукції. "
+  },
+  {
+    "id": "p129",
+    "en": "Also, more samples widen the feature ranges, because the concept absorbs more variations with each sample. Concept 7_1 has mean feature-range width: 0.33 at 2 samples, 0.48 at 5 samples, 0.68 at 10 samples, and 0.80 at 20 samples.",
+    "uk": "Також більша кількість зразків розширює діапазони ознак, оскільки концепт поглинає більше варіацій із кожним зразком. Концепт 7_1 має середню ширину діапазону ознак: 0,33 за 2 зразки, 0,48 за 5 зразків, 0,68 за 10 зразків і 0,80 за 20 зразків."
+  },
+  {
+    "id": "p130",
+    "en": "Fig. 1. Node count (solid line, left axis) and mean feature-range width (dashed line, right axis) of each concept against the number of training samples in one formation pass. Dotted lines mark ⟦M26⟧ (blue) and ⟦M27⟧ (orange)",
+    "uk": "Рис. 1. Кількість вузлів (суцільна лінія, ліва вісь) і середня ширина діапазону ознак (штрихова лінія, права вісь) кожного концепту залежно від кількості навчальних зразків в одному проході формування. Пунктирні лінії позначають ⟦M26⟧ (синій) і ⟦M27⟧ (помаранчевий)"
+  },
+  {
+    "id": "p131",
+    "en": "Fig. 2. Node count (a) and mean feature-range width (b) against the number of training samples for 2_2, 7_1 and 4_1. Dots: three draws; lines: their means",
+    "uk": "Рис. 2. Кількість вузлів (a) і середня ширина діапазону ознак (b) залежно від кількості навчальних зразків для 2_2, 7_1 і 4_1. Точки: три випадкові вибірки; лінії: їхні середні значення"
+  },
+  {
+    "id": "p132",
+    "en": "The training set contains 869 graphs with a total of 9738 nodes that are connected by 9242 edges and 336 637 feature values, compressed to 106 concept nodes with 100 edges and 6647 values. Node compression is 91.9×; value compression is 50.6×.",
+    "uk": "Навчальний набір містить 869 графів із загальною кількістю 9 738 вузлів, з’єднаних 9 242 ребрами, та 336 637 значень ознак, стиснених до 106 вузлів концептів зі 100 ребрами та 6 647 значеннями. Стиснення вузлів становить 91,9×; стиснення значень становить 50,6×."
+  },
+  {
+    "id": "p133",
+    "en": "3.3 Misclassification analysis",
+    "uk": "3.3 Аналіз помилок класифікації"
+  },
+  {
+    "id": "p134",
+    "en": "Analyzing the misclassifications, we should mention the overall accuracy of the system on the MNIST test set for complete contours. 90.05% of samples were correctly classified (7,819 of 8,683 samples; 89.83% of all 8,704). Accuracy of incomplete contours was measured in a separate evaluation and achieved 23.94% (310 of 1295 samples). ComAN has an accuracy of 82.21% on the whole MNIST test.",
+    "uk": "Аналізуючи помилки класифікації, ми маємо згадати загальну точність системи на тестовому наборі MNIST для повних контурів. 90,05 % зразків було класифіковано правильно (7 819 із 8 683 зразків; 89,83 % від усіх 8 704). Точність неповних контурів було виміряно в окремому оцінюванні, і вона досягла 23,94 % (310 із 1 295 зразків). ComAN має точність 82,21 % на всьому тестовому наборі MNIST."
+  },
+  {
+    "id": "p135",
+    "en": "Inference pipeline outputs 3 different types of messages: classified, DLQ (pipeline failure), and no results. The classified result contains the list of similarities sorted by the similarity score. DLQ message carries the error code and reason of failure. A no-result message is produced when there is no concept to be matched with the given graph, usually produced when the sample is corrupted.",
+    "uk": "Конвеєр виведення видає 3 різні типи повідомлень: класифіковано, DLQ (збій конвеєра) та без результатів. Класифікований результат містить список подібностей, відсортований за оцінкою подібності. Повідомлення DLQ містить код помилки та причину збою. Повідомлення без результату створюється, коли немає концепту для зіставлення із заданим графом, зазвичай коли зразок пошкоджений."
+  },
+  {
+    "id": "p136",
+    "en": "Misclassifications are defined by three main clusters of errors: pre-match rejection (38%), structural mismatch (46.7%), and complexity override (15.2%). ",
+    "uk": "Помилки класифікації визначаються трьома основними кластерами помилок: відхилення до зіставлення (38 %), структурна невідповідність (46,7 %) і переважання складності (15,2 %). "
+  },
+  {
+    "id": "p137",
+    "en": "Pre-match rejection is a mechanism that allows concepts to compete if they are eligible for the classification of that sample. That is a preprocessing step before the Graph Edit Distance (GED) step. Out of 312 pre-match rejections: 277 are rejected because they lack one of the structural elements (such as an intersection point or a corner point) that is present in the concept even after the reduction process; 31 samples were rejected by the complexity pre-filter (the concept is more complex than the image graph, thus it cannot be matched to the image); 4 samples were rejected by both of those mechanisms.",
+    "uk": "Відхилення до зіставлення — це механізм, який дозволяє концептам конкурувати, якщо вони придатні для класифікації цього зразка. Це крок попередньої обробки перед кроком редакційної відстані між графами (GED). Із 312 відхилень до зіставлення: 277 відхилено, оскільки їм бракує одного зі структурних елементів (такого як точка перетину або кутова точка), який присутній у концепті навіть після процесу редукції; 31 зразок було відхилено попереднім фільтром складності (концепт складніший за граф зображення, тому його не можна зіставити із зображенням); 4 зразки було відхилено обома цими механізмами."
+  },
+  {
+    "id": "p138",
+    "en": "Structural mismatch is the most common error. The correct concept was in the GED, but had lower similarity than the winner (incorrect class).",
+    "uk": "Структурна невідповідність є найпоширенішою помилкою. Правильний концепт був у GED, але мав нижчу подібність, ніж переможець (неправильний клас)."
+  },
+  {
+    "id": "p139",
+    "en": "Complexity override is needed to give more similarity points to the class that has more structural elements to cover. This type of misclassification occurs when the correct concept has equal or higher similarity, but loses by the complexity factor (⟦M28⟧). Without this term, 113 of these samples would be classified correctly; in the other 12, a concept of a third class leads on similarity.",
+    "uk": "Переважання складності потрібне, щоб надати більше балів подібності класу, який має більше структурних елементів для охоплення. Цей тип помилки класифікації виникає, коли правильний концепт має рівну або вищу подібність, але програє за фактором складності (⟦M28⟧). Без цього доданка 113 із цих зразків було б класифіковано правильно; в інших 12 за подібністю лідирує концепт третього класу."
+  },
+  {
+    "id": "p140",
+    "en": "In Figure 3, the ten most frequent confusion pairs are shown with colored bars by misclassification type. The causes of the largest pair, 2→7, are analysed in [21].",
+    "uk": "На рис. 3 показано десять найчастіших пар плутанини з кольоровими стовпчиками за типом помилки класифікації. Причини найбільшої пари, 2→7, проаналізовано в [21]."
+  },
+  {
+    "id": "p141",
+    "en": "Fig. 3. The ten most frequent confusion pairs by number of errors: pre-match rejection (blue), structural mismatch (orange) and complexity override (green)",
+    "uk": "Рис. 3. Десять найчастіших пар плутанини за кількістю помилок: відхилення до зіставлення (синій), структурна невідповідність (помаранчевий) і переважання складності (зелений)"
+  },
+  {
+    "id": "p142",
+    "en": "The most frequent rejection messages produced when a concept is rejected before matching are: «no endpoints», «no corner points», «no intersection points».",
+    "uk": "Найчастіші повідомлення про відхилення, що створюються, коли концепт відхиляється до зіставлення: \"немає кінцевих точок\", \"немає кутових точок\", \"немає точок перетину\"."
+  },
+  {
+    "id": "p143",
+    "en": "All cases described above can be seen in Figure 4 and Figure 5. These are the most common examples of each error. Sample 2_01023 in Figure 4 has no endpoints in its graph, so both class-2 concepts were rejected in preprocessing, and it was matched with the concept of the number 6.",
+    "uk": "Усі описані вище випадки можна побачити на рис. 4 і рис. 5. Це найпоширеніші приклади кожної помилки. Зразок 2_01023 на рис. 4 не має кінцевих точок у своєму графі, тому обидва концепти класу 2 було відхилено під час попередньої обробки, і його було зіставлено з концептом цифри 6."
+  },
+  {
+    "id": "p144",
+    "en": "Fig. 4. Common errors per mechanism: rows show pre-match rejection (312 of 820 errors), structural mismatch (383) and complexity override (125); columns show the three most frequent confusion pairs of each, one test image per pair, with the number of errors of the pair in brackets. Pruned skeleton in red, GNG graph in blue; dot: endpoint; square: intersection",
+    "uk": "Рис. 4. Поширені помилки за механізмами: рядки показують відхилення до зіставлення (312 із 820 помилок), структурну невідповідність (383) і переважання складності (125); стовпці показують три найчастіші пари плутанини для кожного, одне тестове зображення на пару, із кількістю помилок пари в дужках. Обрізаний скелет червоним, граф GNG синім; точка: кінцева точка; квадрат: точка перетину"
+  },
+  {
+    "id": "p145",
+    "en": "One of the issues that cause the errors in the ComAN system is skeletonization and graph creation. To mitigate some of the artifacts it creates, we have added an additional reduction step. In Figure 6, one can observe the common issue we call «junction-bridge».",
+    "uk": "Однією з проблем, що спричиняють помилки в системі ComAN, є скелетизація та створення графа. Щоб пом’якшити деякі артефакти, які вона створює, ми додали додатковий крок редукції. На рис. 6 можна спостерігати поширену проблему, яку ми називаємо \"міст між перетинами\" (junction-bridge)."
+  },
+  {
+    "id": "p146",
+    "en": "This method has issues that can also be observed in Figure 6, in the last row with sample 4_00755. In this sample, the two intersections are valid, but only 24 px apart, and small enough to be below the threshold, so structurally important elements are collapsed, and the whole structure is corrupted. The merge restores the waist crossing in 740 of all 974 eights and folds the crossbar into one intersection in 315 of all 982 fours in the MNIST test set.",
+    "uk": "Цей метод має проблеми, які також можна спостерігати на рис. 6, в останньому рядку зі зразком 4_00755. У цьому зразку дві точки перетину є дійсними, але розташовані лише на відстані 24 пкс одна від одної, і достатньо малі, щоб бути нижче порога, тому структурно важливі елементи згортаються, а вся структура пошкоджується. Злиття відновлює перетин у перешийку в 740 з усіх 974 вісімок і згортає поперечину в одну точку перетину в 315 з усіх 982 четвірок у тестовому наборі MNIST."
+  },
+  {
+    "id": "p147",
+    "en": "Fig. 5. One error per mechanism. From left: image graph, winning concept, best true-class concept, and their scores split into similarity (dark) and complexity term (light). In the top row the true concept 2_2 is rejected before matching",
+    "uk": "Рис. 5. Одна помилка на механізм. Зліва: граф зображення, концепт-переможець, найкращий концепт істинного класу та їхні оцінки, розділені на подібність (темна) і доданок складності (світлий). У верхньому рядку істинний концепт 2_2 відхилено до зіставлення"
+  },
+  {
+    "id": "p148",
+    "en": "Fig. 6. Junction-bridge merge, which collapses a junction-to-junction edge shorter than 1.5 times the estimated stroke width. From left: pruned skeleton, graph without the merge, graph with it. In the eights it restores the crossing of the waist; in 4_00755 it folds the crossbar into one intersection",
+    "uk": "Рис. 6. Злиття \"міст між перетинами\" (junction-bridge), яке згортає ребро між точками перетину, коротше за 1,5 оціненої ширини штриха. Зліва: обрізаний скелет, граф без злиття, граф із ним. У вісімках воно відновлює перетин у перешийку; у 4_00755 воно згортає поперечину в одну точку перетину"
+  },
+  {
+    "id": "p149",
+    "en": "The graph topology depends on the GNG seed in 26.6% of test images: 24.5% of complete contours and 37.8% of the 820 misclassifications (Fig. 7).",
+    "uk": "Топологія графа залежить від зерна генератора випадкових чисел GNG у 26,6 % тестових зображень: 24,5 % повних контурів і 37,8 % із 820 помилок класифікації (рис. 7)."
+  },
+  {
+    "id": "p150",
+    "en": "4. Discussion",
+    "uk": "4 Обговорення результатів"
+  },
+  {
+    "id": "p151",
+    "en": "One of the aims of the study was to assess class concept stability. Results showed that concepts built using the MNIST dataset converge fast using the relatively small amount of samples (1-37, Table 1). Our research showed that the number of samples needed to settle the structure is related to the shape of its strokes. A loop made of straight strokes does not slow convergence: concept 4_1 settles at sample 2, as fast as the open straight-stroke concepts. Because the handwriting of the original samples varies and the samples are augmented by scaling (0.85–1.15), rotation (±12°), and elastic distortion, the same structural element gets different coordinates in different samples. So the flat feature range does not mean that the concept is formed; structural stability does not mean that the feature ranges have converged. Stopping rules should check both markers (Fig. 1). All concepts finalized before the latest sample was added, which shows that all classes have been trained and stabilized by the end of training. To understand how the number of samples influences concept stability, we experimented by supervising concept training at different sample rates (2, 5, 10, and 20) (Section 3.2, Fig. 2). The main takeaway is that low-stroke concepts converged quickly, while more detailed concepts needed more samples to reach topological convergence. Concepts with a low stroke count converged on the 2nd sample because their simple structure varies little across the training samples. RDP [28] simplifies those structures to a few lines, with the only differences being their position in the coordinate space and cross-alignment. For concepts with more detailed cycles, which RDP simplified from circles, the number of approximated lines varies from sample to sample, and the writing style differs relative to other elements. For those concepts, more samples are needed to converge on the topology. In the sample-count experiment (Fig. 2), concept 2_2 reached its final 12 nodes at 10 samples.",
+    "uk": "Однією з цілей дослідження було оцінити стабільність концептів класів. Результати показали, що концепти, побудовані з використанням набору даних MNIST, збігаються швидко за відносно малої кількості зразків (1–37, табл. 1). Наше дослідження показало, що кількість зразків, потрібна для стабілізації структури, пов’язана з формою її штрихів. Петля, утворена прямими штрихами, не сповільнює збіжність: концепт 4_1 стабілізується на зразку 2, так само швидко, як і концепти з відкритими прямими штрихами. Оскільки почерк оригінальних зразків варіюється, а зразки аугментуються масштабуванням (0,85–1,15), обертанням (±12°) та еластичним спотворенням, той самий структурний елемент отримує різні координати в різних зразках. Тому незмінний діапазон ознак не означає, що концепт сформовано; структурна стабільність не означає, що діапазони ознак збіглися. Правила зупинки мають перевіряти обидва маркери (рис. 1). Усі концепти остаточно сформувалися до додавання останнього зразка, що показує, що всі класи було навчено та стабілізовано до кінця навчання. Щоб зрозуміти, як кількість зразків впливає на стабільність концепту, ми експериментували, контролюючи навчання концептів за різної кількості зразків (2, 5, 10 і 20) (підрозділ 3.2, рис. 2). Основний висновок полягає в тому, що концепти з малою кількістю штрихів збігалися швидко, тоді як більш деталізовані концепти потребували більше зразків для досягнення топологічної збіжності. Концепти з малою кількістю штрихів збігалися на 2-му зразку, оскільки їхня проста структура мало варіюється між навчальними зразками. RDP [28] спрощує ці структури до кількох ліній, єдиними відмінностями між якими є їхнє положення в координатному просторі та взаємне вирівнювання. Для концептів із більш деталізованими циклами, які RDP спростив із кіл, кількість апроксимованих ліній варіюється від зразка до зразка, а стиль написання відрізняється відносно інших елементів. Для цих концептів потрібно більше зразків, щоб збігтися за топологією. В експерименті з кількістю зразків (рис. 2) концепт 2_2 досяг своїх кінцевих 12 вузлів за 10 зразків."
+  },
+  {
+    "id": "p152",
+    "en": "Fig. 7. GNG seed and graph topology. (a)–(l) Two test images: skeleton, GNG network and final graph under the most frequent seed and under a seed that changes the topology. Red: edges on a cycle; dashed circle: the loop made by the seed; (f), (l): zoom on it with the GNG neurons in grey. (m) Number of distinct topologies per test image over seeds 0–9",
+    "uk": "Рис. 7. Зерно генератора випадкових чисел GNG і топологія графа. (a)–(l) Два тестові зображення: скелет, мережа GNG і кінцевий граф за найчастішого зерна генератора випадкових чисел і за зерна генератора випадкових чисел, яке змінює топологію. Червоним: ребра на циклі; штрихове коло: петля, утворена зерном генератора випадкових чисел; (f), (l): її збільшений вигляд із нейронами GNG сірим. (m) Кількість різних топологій на тестове зображення для зерен генератора випадкових чисел 0–9"
+  },
+  {
+    "id": "p153",
+    "en": "Converged concepts have a compact structure. Concept 2_2 was compressed from 16 nodes to 12 by the 10th sample. Concept 7_1 had a mean feature range width from 0.33 to 0.80 at the 20th sample. This experiment showed that concepts generalize the possible values and topological structure shared by training samples. Theory [7] predicts that convergence is achievable with a bounded number of samples. However, the literature [2, 3, 6, 13, 15] does not check whether the trained classes are interpretable or whether few-shot models remain stable. This study measures formation stability for each concept.",
+    "uk": "Концепти, що збіглися, мають компактну структуру. Концепт 2_2 було стиснуто з 16 вузлів до 12 до 10-го зразка. Концепт 7_1 мав середню ширину діапазону ознак від 0,33 до 0,80 на 20-му зразку. Цей експеримент показав, що концепти узагальнюють можливі значення та топологічну структуру, спільні для навчальних зразків. Теорія [7] передбачає, що збіжність досяжна за обмеженої кількості зразків. Однак у літературі [2, 3, 6, 13, 15] не перевіряють, чи є навчені класи інтерпретованими або чи залишаються стабільними моделі навчання на малій кількості прикладів. Це дослідження вимірює стабільність формування для кожного концепту."
+  },
+  {
+    "id": "p154",
+    "en": "Data analysis showed that misclassifications are tied to different pipeline steps, so no single correction can remove all errors.",
+    "uk": "Аналіз даних показав, що помилки класифікації пов’язані з різними кроками конвеєра, тому жодне окреме виправлення не може усунути всі помилки."
+  },
+  {
+    "id": "p155",
+    "en": "Pre-match rejection (312 errors, 38%) happens before GED and any cost-function computation. In 277 cases, the image graph lacks important structural elements that the concept has, such as an endpoint or an intersection. A cost-function change cannot fix this, because seeking the concept never reaches this step. The fix belongs in image preprocessing and graph construction (Fig. 6 and 7). Most of these errors can be mitigated by using better image and graph preprocessing techniques that are the subject of future research.",
+    "uk": "Відхилення до зіставлення (312 помилок, 38 %) відбувається до GED і будь-якого обчислення функції вартості. У 277 випадках графу зображення бракує важливих структурних елементів, які має концепт, таких як кінцева точка або точка перетину. Зміна функції вартості не може цього виправити, оскільки пошук концепту ніколи не досягає цього кроку. Виправлення належить до попередньої обробки зображень і побудови графів (рис. 6 і 7). Більшість цих помилок можна пом’якшити використанням кращих методів попередньої обробки зображень і графів, які є предметом майбутніх досліджень."
+  },
+  {
+    "id": "p156",
+    "en": "Structural mismatch (383 errors, 46.7%) is the largest group of misclassification. In this case, the true concept reaches the GED pipeline stage but is misclassified due to similarity. To fix this stage, we need to change the cost-calculation mechanism, which is the model's current limitation.",
+    "uk": "Структурна невідповідність (383 помилки, 46,7 %) є найбільшою групою помилок класифікації. У цьому випадку істинний концепт досягає етапу GED у конвеєрі, але класифікується помилково через подібність. Щоб виправити цей етап, нам потрібно змінити механізм обчислення вартості, який є поточним обмеженням моделі."
+  },
+  {
+    "id": "p157",
+    "en": "Complexity override (125 errors, 15.2%). This mechanism was created to favor complex concepts because they are harder to match with the image graph. Without it, very simple concepts would win each classification because they match better. The cost of deleting image nodes and edges is only 0.25, so the concept would strip everything outside the bounds of topology and features.",
+    "uk": "Переважання складності (125 помилок, 15,2 %). Цей механізм було створено, щоб віддавати перевагу складним концептам, оскільки їх важче зіставити з графом зображення. Без нього дуже прості концепти перемагали б у кожній класифікації, оскільки вони краще зіставляються. Вартість видалення вузлів і ребер зображення становить лише 0,25, тому концепт видаляв би все поза межами топології та ознак."
+  },
+  {
+    "id": "p158",
+    "en": "These results address the error part of the problem stated in Section 1.2. Oakden-Rayner et al. [16] and Geirhos et al. [17] detect failures by examining model outputs, so each failure is tied to a subset of inputs or a change in test conditions. By contrast, this study ties each of the 820 misclassifications to the step that produced it: rejection before matching, lower similarity, or the complexity term. Studies of GED [9–12] compare, approximate, or learn the distance itself; here, GED drives a decision, and we count its failures by cause. Our previous study [21] explained the most frequent confusion, 2→7, whereas this study splits all misclassifications of a test run. A correction can therefore target the step that caused the error.",
+    "uk": "Ці результати стосуються частини проблеми, пов’язаної з помилками, сформульованої в підрозділі 1.2. Oakden-Rayner та ін. [16] і Geirhos та ін. [17] виявляють збої, вивчаючи виходи моделі, тому кожен збій пов’язаний із підмножиною входів або зміною умов тестування. На відміну від цього, це дослідження пов’язує кожну з 820 помилок класифікації з кроком, який її породив: відхилення до зіставлення, нижча подібність або доданок складності. Дослідження GED [9–12] порівнюють, наближують або навчають саму відстань; тут GED визначає рішення, і ми підраховуємо її збої за причиною. Наше попереднє дослідження [21] пояснювало найчастішу плутанину, 2→7, тоді як це дослідження розподіляє всі помилки класифікації експерименту. Тому виправлення може бути спрямоване на крок, який спричинив помилку."
+  },
+  {
+    "id": "p159",
+    "en": "This model and method may be useful for the areas where every decision must be traced and explained. Such as highly regulated domains that require a log of every high-risk AI system event [8]. Every result from the classifier can be analyzed, so one can clearly see which stage of the pipeline had the most influence on the decision. The primary objective of this method is complete contour structures (e.g., ideal samples without major noise or lack of information in the structure). When the contours are incomplete, the accuracy of the classification drops to 23.94% because concepts cannot be matched due to the lack of structural elements in the inferred graph. For such kinds of tasks, we want to conduct experiments and research in the field of associative classification. The missing parts in the structure will be reconstructed to find the true concept for that true topology. The census shows how many errors a fix can reach before it is applied. A change to the complexity term can fix up to 113 misclassifications, but the side effects might be more impactful on the accuracy than these fractions of errors. Concept formation should stop only when both the structure and the feature ranges stop changing (Fig. 1).",
+    "uk": "Ця модель і метод можуть бути корисними для сфер, де кожне рішення потрібно простежувати та пояснювати. Таких як суворо регульовані сфери, які вимагають журналу кожної події системи ШІ високого ризику [8]. Кожен результат класифікатора можна проаналізувати, тому можна чітко побачити, який етап конвеєра мав найбільший вплив на рішення. Основною ціллю цього методу є структури повних контурів (наприклад, ідеальні зразки без значного шуму або браку інформації в структурі). Коли контури неповні, точність класифікації падає до 23,94 %, оскільки концепти неможливо зіставити через брак структурних елементів у графі, отриманому під час виведення. Для таких типів задач ми хочемо проводити експерименти та дослідження в галузі асоціативної класифікації. Відсутні частини структури буде відновлено, щоб знайти істинний концепт для цієї істинної топології. Суцільний облік показує, скільки помилок може охопити виправлення до його застосування. Зміна доданка складності може виправити до 113 помилок класифікації, але побічні ефекти можуть сильніше впливати на точність, ніж ці частки помилок. Формування концептів має зупинятися лише тоді, коли і структура, і діапазони ознак перестають змінюватися (рис. 1)."
+  },
+  {
+    "id": "p160",
+    "en": "Limitations of the study were briefly described in the sections above. ComAN currently works only for the complete contour MNIST images. The main research uses the MNIST dataset, so some methods may not transfer well to other datasets. Early stages of the pipeline that involve the image preprocessing and graph construction are created to simulate the system in the human visual system, which is responsible for the early processing of visual input: finding edges and contours of an object [34, 35], and higher visual areas reduce its shape to a skeleton, the medial axis [36, 37]. But, as with any simulation, it does not perfectly transfer these abilities. The unexpected artifacts are the main limitation of this pipeline stage. Classification results were obtained using one GNG seed and one sample order. GED has a timeout of 5 seconds.",
+    "uk": "Обмеження дослідження було стисло описано в підрозділах вище. ComAN наразі працює лише для зображень MNIST із повними контурами. Основне дослідження використовує набір даних MNIST, тому деякі методи можуть погано переноситися на інші набори даних. Ранні етапи конвеєра, що охоплюють попередню обробку зображень і побудову графів, створено для імітації системи в зоровій системі людини, яка відповідає за ранню обробку зорового входу: знаходження країв і контурів об’єкта [34, 35], а вищі зорові ділянки редукують його форму до скелета, медіальної осі [36, 37]. Але, як і будь-яка імітація, вона не переносить ці здібності досконало. Неочікувані артефакти є основним обмеженням цього етапу конвеєра. Результати класифікації було отримано з використанням одного зерна генератора випадкових чисел GNG та одного порядку зразків. GED має обмеження часу 5 секунд."
+  },
+  {
+    "id": "p161",
+    "en": "Using the same test split, the best classification model (SVM) reaches 79.70%, 11.2 pp below the ComAN classifier [33].",
+    "uk": "На тому самому тестовому розбитті найкраща модель класифікації (SVM) досягає 79,70 %, що на 11,2 п. п. нижче за класифікатор ComAN [33]."
+  },
+  {
+    "id": "p162",
+    "en": "Future work should help to make the decision path clearer. The plan is to study the other preprocessing methods and the possibility of replacing GED with a more biologically backed approach. To expand this system to more datasets and generalize the approach for more complex objects, like scenes and moving structures. ",
+    "uk": "Майбутня робота має допомогти зробити шлях ухвалення рішення зрозумілішим. План полягає в дослідженні інших методів попередньої обробки та можливості заміни GED підходом із більшим біологічним обґрунтуванням. Щоб поширити цю систему на більше наборів даних та узагальнити підхід для складніших об’єктів, таких як сцени та рухомі структури. "
+  },
+  {
+    "id": "p163",
+    "en": "5. Conclusions",
+    "uk": "5 Висновки"
+  },
+  {
+    "id": "p164",
+    "en": "This study looked at when the concept graphs of a graph classifier trained without backprop would stop changing and then went on to trace every misclassification in a test run back to the step that had caused it.",
+    "uk": "У цьому дослідженні розглянуто, коли графи концептів графового класифікатора, навченого без зворотного поширення помилки, перестануть змінюватися, а потім простежено кожну помилку класифікації в експерименті до кроку, який її спричинив."
+  },
+  {
+    "id": "p165",
+    "en": "The structure of every concept stopped changing well before its last training sample (i.e. by sample 1 to 37). Concepts with straight strokes (1_1, 1_3, 4_1, 4_2, 7_1) were all settled by sample 2, whereas the curved stroke concepts took 4 to 37 samples. The feature ranges settled on their own schedule too (5 to 18 samples): before the structure in 4 cases and after the structure in 9. The reason for this is that handwriting and augmentation give the same structural element different coordinates in different samples. A flat structure does not necessarily mean a formed concept, and formation should only stop when both markers are flat.",
+    "uk": "Структура кожного концепту перестала змінюватися задовго до його останнього навчального зразка (тобто на зразку від 1 до 37). Концепти з прямими штрихами (1_1, 1_3, 4_1, 4_2, 7_1) усі стабілізувалися до зразка 2, тоді як концептам із кривими штрихами знадобилося від 4 до 37 зразків. Діапазони ознак також стабілізувалися за власним графіком (від 5 до 18 зразків): до структури в 4 випадках і після структури в 9. Причина цього полягає в тому, що почерк і аугментація надають тому самому структурному елементу різні координати в різних зразках. Незмінна структура не обов’язково означає сформований концепт, і формування має зупинятися лише тоді, коли обидва маркери незмінні."
+  },
+  {
+    "id": "p166",
+    "en": "Concept 2_2 went from 16 nodes at 2 samples down to 12 nodes at 10 and 20 samples. The mean feature range width of 7_1 increased from 0.33 at 2 samples to 0.80 at 20. Reduction involves the removal of nodes that are not shared by later samples, and each new sample contributes its own variation to the ranges. Formation reduces the 869 training graphs from 9,738 nodes down to 13 concepts with 106 nodes: 91.9 times fewer nodes and 50.6 times fewer feature values.",
+    "uk": "Концепт 2_2 зменшився з 16 вузлів за 2 зразки до 12 вузлів за 10 і 20 зразків. Середня ширина діапазону ознак 7_1 збільшилася з 0,33 за 2 зразки до 0,80 за 20. Редукція передбачає видалення вузлів, які не є спільними з пізнішими зразками, і кожен новий зразок додає власну варіацію до діапазонів. Формування скорочує 869 навчальних графів із 9 738 вузлів до 13 концептів зі 106 вузлами: у 91,9 раза менше вузлів і в 50,6 раза менше значень ознак."
+  },
+  {
+    "id": "p167",
+    "en": "All 820 misclassifications of the census run (8,683 images, 90.05% correct) fall into three categories. 312 (38.0%) were cases where the true concept was rejected prior to matching, primarily due to the image graph lacking an endpoint, corner point, or intersection that the concept has. 383 (46.7%) were cases where the true concept was matched but had less similarity than the winner. 125 (15.2%) had equal or greater similarity but lost on the complexity term. Without the complexity term, 113 of those would have been correct.",
+    "uk": "Усі 820 помилок класифікації експерименту із суцільним обліком (8 683 зображення, 90,05 % правильних) належать до трьох категорій. 312 (38,0 %) були випадками, коли істинний концепт було відхилено до зіставлення, переважно через брак у графі зображення кінцевої точки, кутової точки або точки перетину, які має концепт. 383 (46,7 %) були випадками, коли істинний концепт було зіставлено, але він мав меншу подібність, ніж переможець. 125 (15,2 %) мали рівну або більшу подібність, але програли за доданком складності. Без доданка складності 113 із них були б правильними."
+  },
+  {
+    "id": "p168",
+    "en": "These results show that concepts stabilize into a fixed structure within tens of samples, and each misclassification points to one step at which a fix is appropriate. The next phase of work will be to look at the pre-match rejections and the pruning rule, as these are the ones that remove the true concept prior to it being compared.",
+    "uk": "Ці результати показують, що концепти стабілізуються до фіксованої структури в межах десятків зразків, а кожна помилка класифікації вказує на один крок, на якому доречне виправлення. Наступним етапом роботи буде розгляд відхилень до зіставлення та правила обрізання, оскільки саме вони усувають істинний концепт до його порівняння."
+  },
+  {
+    "id": "p169",
+    "en": "Conflicts of interest. The authors declare that they have no conflicts of interest in relation to the current study, including financial, personal, authorship, or any other, that could affect the study, as well as the results reported in this paper.",
+    "uk": "Конфлікт інтересів. Автори заявляють, що не мають конфліктів інтересів щодо поточного дослідження, зокрема фінансових, особистих, авторських або будь-яких інших, які могли б вплинути на дослідження, а також на результати, представлені в цій статті."
+  },
+  {
+    "id": "p170",
+    "en": "Funding. This research received no external funding.",
+    "uk": "Фінансування. Це дослідження не отримало зовнішнього фінансування."
+  },
+  {
+    "id": "p171",
+    "en": "Data Availability. The code and further traced cases are published at https://github.com/NaturalAGI-Lab/NaturalAGI.",
+    "uk": "Доступність даних. Код і додаткові простежені випадки опубліковано за адресою https://github.com/NaturalAGI-Lab/NaturalAGI."
+  },
+  {
+    "id": "p172",
+    "en": "Use of artificial intelligence. The authors confirm that they did not use artificial intelligence technologies when creating the current work.",
+    "uk": "Використання інструментів штучного інтелекту. Автори підтверджують, що не використовували технології штучного інтелекту під час створення поточної роботи."
+  }
+]
