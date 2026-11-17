@@ -4,7 +4,7 @@
 **Вкладення:**
 - `lapin_itssi_2026_uk.docx` — рукопис українською
 - `lapin_itssi_2026_en.docx` — англійська версія рукопису
-- `PublicationAgreement_UA.pdf` — згода на публікацію, підписана
+- `PublicationAgreement_UA_Lapin.pdf` — згода на публікацію, підписана
 
 ---
 
